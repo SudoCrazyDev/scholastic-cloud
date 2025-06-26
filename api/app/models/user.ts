@@ -11,20 +11,47 @@ const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
 
 export default class User extends compose(BaseModel, AuthFinder) {
   @column({ isPrimary: true })
-  declare id: number
+  declare id: string
 
   @column()
-  declare fullName: string | null
+  declare first_name: string
+
+  @column()
+  declare middle_name: string | null
+
+  @column()
+  declare last_name: string
+
+  @column()
+  declare ext_name: string | null
+
+  @column()
+  declare gender: 'male' | 'female' | 'other'
+
+  @column.date()
+  declare birthdate: DateTime
 
   @column()
   declare email: string
 
+  @column.dateTime()
+  declare email_verified_at: DateTime | null
+
   @column({ serializeAs: null })
   declare password: string
 
+  @column()
+  declare token: string | null
+
+  @column()
+  declare is_new: boolean
+
+  @column()
+  declare is_active: boolean
+
   @column.dateTime({ autoCreate: true })
-  declare createdAt: DateTime
+  declare created_at: DateTime
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
-  declare updatedAt: DateTime | null
+  declare updated_at: DateTime
 }
