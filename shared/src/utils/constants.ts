@@ -3,7 +3,7 @@ export const APP_NAME = 'ScholasticCloud';
 export const APP_VERSION = '1.0.0';
 
 // API constants
-export const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3333';
+export const API_BASE_URL = 'http://localhost:3333';
 export const API_TIMEOUT = 10000; // 10 seconds
 
 // Pagination constants
