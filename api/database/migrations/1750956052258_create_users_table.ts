@@ -19,6 +19,8 @@ export default class extends BaseSchema {
       table.boolean('is_new').defaultTo(true).notNullable()
       table.boolean('is_active').defaultTo(true).notNullable()
 
+      table.uuid('role_id').nullable()
+
       table.timestamp('created_at').notNullable()
       table.timestamp('updated_at').nullable()
     })

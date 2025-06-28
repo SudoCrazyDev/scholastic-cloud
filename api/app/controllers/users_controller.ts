@@ -4,44 +4,22 @@ import User from '#models/user'
 import { createUserValidator, updateUserValidator, userListValidator } from '#validators/user_validator'
 import { DateTime } from 'luxon'
 import hash from '@adonisjs/core/services/hash'
+import UserService from '#services/user_service'
 
 @inject()
 export default class UsersController {
+  constructor(private userService: UserService) {}
+
   /**
    * Display a list of users with pagination and filtering
    */
   async index({ request, response }: HttpContext) {
     try {
       const payload = await userListValidator.validate(request.qs())
-      const page = payload.page || 1
-      const limit = payload.limit || 20
-
-      const query = User.query()
-
-      // Apply filters
-      if (payload.search) {
-        query.where((builder) => {
-          builder
-            .whereILike('first_name', `%${payload.search}%`)
-            .orWhereILike('last_name', `%${payload.search}%`)
-            .orWhereILike('email', `%${payload.search}%`)
-        })
-      }
-
-      if (payload.gender) {
-        query.where('gender', payload.gender)
-      }
-
-      if (payload.is_active !== undefined) {
-        query.where('is_active', payload.is_active)
-      }
-
-      const users = await query
-        .orderBy('created_at', 'desc')
-        .paginate(page, limit)
+      const users = await this.userService.getUsers(payload)
 
       return response.ok({
-        data: users.all().map((user) => this.formatUserResponse(user)),
+        data: users.all().map((user: User) => this.formatUserResponse(user)),
         meta: users.getMeta(),
       })
     } catch (error) {
@@ -61,13 +39,18 @@ export default class UsersController {
    */
   async show({ params, response }: HttpContext) {
     try {
-      const user = await User.findOrFail(params.id)
+      const user = await this.userService.getUserById(params.id)
+      
+      if (!user) {
+        return response.notFound({
+          message: 'User not found',
+          status: 404,
+        })
+      }
+
       return response.ok(this.formatUserResponse(user))
     } catch (error) {
-      return response.notFound({
-        message: 'User not found',
-        status: 404,
-      })
+      throw error
     }
   }
 
@@ -79,8 +62,8 @@ export default class UsersController {
       const payload = await createUserValidator.validate(request.body())
 
       // Check if email already exists
-      const existingUser = await User.findBy('email', payload.email)
-      if (existingUser) {
+      const emailExists = await this.userService.emailExists(payload.email)
+      if (emailExists) {
         return response.conflict({
           message: 'Email already exists',
           status: 409,
@@ -90,13 +73,15 @@ export default class UsersController {
       // Hash the password before saving
       const hashedPassword = await hash.make(payload.password)
 
-      const user = await User.create({
+      const userData = {
         ...payload,
         password: hashedPassword,
         birthdate: DateTime.fromJSDate(payload.birthdate),
         is_new: true,
         is_active: true,
-      })
+      }
+
+      const user = await this.userService.createUser(userData)
 
       return response.created(this.formatUserResponse(user))
     } catch (error) {
@@ -116,13 +101,21 @@ export default class UsersController {
    */
   async update({ params, request, response }: HttpContext) {
     try {
-      const user = await User.findOrFail(params.id)
+      const user = await this.userService.getUserById(params.id)
+      
+      if (!user) {
+        return response.notFound({
+          message: 'User not found',
+          status: 404,
+        })
+      }
+
       const payload = await updateUserValidator.validate(request.body())
 
       // Check if email already exists (if email is being updated)
       if (payload.email && payload.email !== user.email) {
-        const existingUser = await User.findBy('email', payload.email)
-        if (existingUser) {
+        const emailExists = await this.userService.emailExists(payload.email, params.id)
+        if (emailExists) {
           return response.conflict({
             message: 'Email already exists',
             status: 409,
@@ -139,10 +132,9 @@ export default class UsersController {
         updateData.password = await hash.make(payload.password)
       }
 
-      user.merge(updateData)
-      await user.save()
+      const updatedUser = await this.userService.updateUser(params.id, updateData)
 
-      return response.ok(this.formatUserResponse(user))
+      return response.ok(this.formatUserResponse(updatedUser!))
     } catch (error) {
       if (error.messages) {
         return response.badRequest({
@@ -151,10 +143,7 @@ export default class UsersController {
           status: 400,
         })
       }
-      return response.notFound({
-        message: 'User not found',
-        status: 404,
-      })
+      throw error
     }
   }
 
@@ -163,15 +152,18 @@ export default class UsersController {
    */
   async destroy({ params, response }: HttpContext) {
     try {
-      const user = await User.findOrFail(params.id)
-      await user.delete()
+      const deleted = await this.userService.deleteUser(params.id)
+      
+      if (!deleted) {
+        return response.notFound({
+          message: 'User not found',
+          status: 404,
+        })
+      }
 
       return response.noContent()
     } catch (error) {
-      return response.notFound({
-        message: 'User not found',
-        status: 404,
-      })
+      throw error
     }
   }
 
@@ -191,6 +183,11 @@ export default class UsersController {
       email_verified_at: user.email_verified_at?.toISO(),
       is_new: user.is_new,
       is_active: user.is_active,
+      role: user.role ? {
+        id: (user.role as any).id,
+        title: (user.role as any).title,
+        slug: (user.role as any).slug,
+      } : null,
       created_at: user.created_at.toISO(),
       updated_at: user.updated_at.toISO(),
     }

@@ -1,10 +1,10 @@
-import app from '@adonisjs/core/services/app'
 import { HttpContext, ExceptionHandler } from '@adonisjs/core/http'
+import { Exception } from '@adonisjs/core/exceptions'
+import app from '@adonisjs/core/services/app'
 
 export default class HttpExceptionHandler extends ExceptionHandler {
   /**
-   * In debug mode, we map all SQLite errors to a generic database error and
-   * all errors to a generic error
+   * In debug mode, we want to see the actual error
    */
   protected debug = !app.inProduction
 
@@ -75,16 +75,22 @@ export default class HttpExceptionHandler extends ExceptionHandler {
 
   /**
    * The method is used to report error to the logging service or
-   * the a third party error monitoring service.
+   * the third party error monitoring service.
    *
    * @note You should not await the inside of this method. The notification
    * services should not block the execution
    */
-  async report(error: any, ctx: HttpContext) {
+  async report(error: Exception, ctx: HttpContext) {
     if (!this.debug) {
-      return
+      // Log error to external service in production
+      console.error('Error occurred:', {
+        error: error.message,
+        stack: error.stack,
+        url: ctx.request.url(),
+        method: ctx.request.method(),
+        ip: ctx.request.ip(),
+        userAgent: ctx.request.header('user-agent'),
+      })
     }
-
-    return super.report(error, ctx)
   }
 }
