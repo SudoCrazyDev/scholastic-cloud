@@ -1,69 +1,111 @@
-# React + TypeScript + Vite
+# ScholasticCloud Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern React application built with TypeScript, Vite, and Tailwind CSS.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Login Page**: Complete authentication flow with Formik and Yup validation
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+- **Animations**: Smooth animations using Framer Motion
+- **API Integration**: Axios-based API client with interceptors
+- **TypeScript**: Full type safety throughout the application
+- **Responsive Design**: Mobile-first responsive design with Tailwind CSS
 
-## Expanding the ESLint configuration
+## Setup
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Install dependencies:
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Create environment file:
+```bash
+cp .env.example .env
+```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+3. Configure environment variables:
+```env
+VITE_API_URL=http://localhost:3333
+```
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+4. Start development server:
+```bash
+npm run dev
+```
+
+## Project Structure
+
+```
+src/
+├── api/                 # API services and configuration
+│   ├── index.ts        # Axios configuration and interceptors
+│   └── auth.ts         # Authentication API endpoints
+├── components/         # Reusable UI components
+│   └── Alert.tsx       # Enhanced alert component with animations
+├── pages/             # Page components
+│   └── Login.tsx      # Login page with form validation
+├── types/             # TypeScript type definitions
+│   └── index.ts       # Common types
+├── utils/             # Utility functions
+│   └── errorHandler.ts # Error handling utilities
+└── App.tsx            # Main application component
+```
+
+## Path Aliases
+
+The project uses path aliases for cleaner imports:
+
+- `@/` - Points to `src/`
+- `@components/` - Points to `src/components/`
+- `@api/` - Points to `src/api/`
+- `@utils/` - Points to `src/utils/`
+- `@types/` - Points to `src/types/`
+
+## Technologies Used
+
+- **React 19** - UI library
+- **TypeScript** - Type safety
+- **Vite** - Build tool and dev server
+- **Tailwind CSS** - Utility-first CSS framework
+- **Formik** - Form management
+- **Yup** - Form validation
+- **Axios** - HTTP client
+- **Framer Motion** - Animation library
+- **React Hot Toast** - Toast notifications
+
+## API Integration
+
+The application includes a complete API integration setup:
+
+- **Base Configuration**: Axios instance with base URL and timeouts
+- **Request Interceptors**: Automatic token injection
+- **Response Interceptors**: Error handling and token refresh
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+- **Type Safety**: Full TypeScript support for API responses
+
+## Login Flow
+
+The login page includes:
+
+- **Form Validation**: Real-time validation with Yup schemas
+- **Error Handling**: Display of API errors and validation errors
+- **Loading States**: Loading indicators during API calls
+- **Success Feedback**: Success messages and automatic redirects
+- **Animations**: Smooth animations for better UX
+- **Responsive Design**: Works on all device sizes
+
+## Development
+
+```bash
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run linting
+npm run lint
 ```

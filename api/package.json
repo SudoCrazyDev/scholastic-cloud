@@ -29,7 +29,8 @@
     "#database/*": "./database/*.js",
     "#start/*": "./start/*.js",
     "#tests/*": "./tests/*.js",
-    "#config/*": "./config/*.js"
+    "#config/*": "./config/*.js",
+    "@shared/*": "../shared/src/*.js"
   },
   "devDependencies": {
     "@adonisjs/assembler": "^7.8.2",
@@ -61,7 +62,8 @@
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.6.1",
     "pg": "^8.16.2",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "shared": "file:../shared"
   },
   "hotHook": {
     "boundaries": [

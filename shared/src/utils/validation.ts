@@ -1,3 +1,5 @@
+import { ValidationError } from '../types/common';
+
 export interface ValidationRule {
   required?: boolean;
   minLength?: number;
@@ -11,11 +13,6 @@ export interface ValidationSchema {
   [key: string]: ValidationRule;
 }
 
-export interface ValidationError {
-  field: string;
-  message: string;
-}
-
 export const validateField = (
   value: any,
   fieldName: string,
@@ -26,6 +23,7 @@ export const validateField = (
     return {
       field: fieldName,
       message: `${fieldName} is required`,
+      rule: 'required',
     };
   }
 
@@ -36,6 +34,7 @@ export const validateField = (
     return {
       field: fieldName,
       message: `${fieldName} must be at least ${rules.minLength} characters`,
+      rule: 'minLength',
     };
   }
 
@@ -43,6 +42,7 @@ export const validateField = (
     return {
       field: fieldName,
       message: `${fieldName} must be at most ${rules.maxLength} characters`,
+      rule: 'maxLength',
     };
   }
 
@@ -51,6 +51,7 @@ export const validateField = (
     return {
       field: fieldName,
       message: `${fieldName} must be a valid email address`,
+      rule: 'email',
     };
   }
 
@@ -59,6 +60,7 @@ export const validateField = (
     return {
       field: fieldName,
       message: `${fieldName} format is invalid`,
+      rule: 'pattern',
     };
   }
 
@@ -69,6 +71,7 @@ export const validateField = (
       return {
         field: fieldName,
         message: typeof result === 'string' ? result : `${fieldName} is invalid`,
+        rule: 'custom',
       };
     }
   }

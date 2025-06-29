@@ -1,95 +1,126 @@
-import * as Headless from '@headlessui/react'
-import clsx from 'clsx'
-import type React from 'react'
-import { Text } from './text'
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const sizes = {
-  xs: 'sm:max-w-xs',
-  sm: 'sm:max-w-sm',
-  md: 'sm:max-w-md',
-  lg: 'sm:max-w-lg',
-  xl: 'sm:max-w-xl',
-  '2xl': 'sm:max-w-2xl',
-  '3xl': 'sm:max-w-3xl',
-  '4xl': 'sm:max-w-4xl',
-  '5xl': 'sm:max-w-5xl',
+export interface AlertProps {
+  type: 'success' | 'error' | 'warning' | 'info';
+  title?: string;
+  message: string;
+  onClose?: () => void;
+  show?: boolean;
+  className?: string;
 }
 
-export function Alert({
-  size = 'md',
-  className,
-  children,
-  ...props
-}: { size?: keyof typeof sizes; className?: string; children: React.ReactNode } & Omit<
-  Headless.DialogProps,
-  'as' | 'className'
->) {
-  return (
-    <Headless.Dialog {...props}>
-      <Headless.DialogBackdrop
-        transition
-        className="fixed inset-0 flex w-screen justify-center overflow-y-auto bg-zinc-950/15 px-2 py-2 transition duration-100 focus:outline-0 data-closed:opacity-0 data-enter:ease-out data-leave:ease-in sm:px-6 sm:py-8 lg:px-8 lg:py-16 dark:bg-zinc-950/50"
-      />
+const alertStyles = {
+  success: {
+    bg: 'bg-green-50',
+    border: 'border-green-200',
+    text: 'text-green-800',
+    icon: 'text-green-400',
+    iconBg: 'bg-green-100',
+  },
+  error: {
+    bg: 'bg-red-50',
+    border: 'border-red-200',
+    text: 'text-red-800',
+    icon: 'text-red-400',
+    iconBg: 'bg-red-100',
+  },
+  warning: {
+    bg: 'bg-yellow-50',
+    border: 'border-yellow-200',
+    text: 'text-yellow-800',
+    icon: 'text-yellow-400',
+    iconBg: 'bg-yellow-100',
+  },
+  info: {
+    bg: 'bg-blue-50',
+    border: 'border-blue-200',
+    text: 'text-blue-800',
+    icon: 'text-blue-400',
+    iconBg: 'bg-blue-100',
+  },
+};
 
-      <div className="fixed inset-0 w-screen overflow-y-auto pt-6 sm:pt-0">
-        <div className="grid min-h-full grid-rows-[1fr_auto_1fr] justify-items-center p-8 sm:grid-rows-[1fr_auto_3fr] sm:p-4">
-          <Headless.DialogPanel
-            transition
-            className={clsx(
-              className,
-              sizes[size],
-              'row-start-2 w-full rounded-2xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/10 sm:rounded-2xl sm:p-6 dark:bg-zinc-900 dark:ring-white/10 forced-colors:outline',
-              'transition duration-100 will-change-transform data-closed:opacity-0 data-enter:ease-out data-closed:data-enter:scale-95 data-leave:ease-in'
+const icons = {
+  success: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    </svg>
+  ),
+  error: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+    </svg>
+  ),
+  warning: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+    </svg>
+  ),
+  info: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+    </svg>
+  ),
+};
+
+export const Alert: React.FC<AlertProps> = ({
+  type,
+  title,
+  message,
+  onClose,
+  show = true,
+  className = '',
+}) => {
+  const styles = alertStyles[type];
+  const icon = icons[type];
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0, y: -20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.95 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className={`rounded-lg border p-4 ${styles.bg} ${styles.border} ${className}`}
+        >
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <div className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${styles.iconBg}`}>
+                <div className={styles.icon}>
+                  {icon}
+                </div>
+              </div>
+            </div>
+            <div className="ml-3 flex-1">
+              {title && (
+                <h3 className={`text-sm font-medium ${styles.text}`}>
+                  {title}
+                </h3>
+              )}
+              <div className={`mt-1 text-sm ${styles.text}`}>
+                <p>{message}</p>
+              </div>
+            </div>
+            {onClose && (
+              <div className="ml-auto pl-3">
+                <div className="-mx-1.5 -my-1.5">
+                  <button
+                    onClick={onClose}
+                    className={`inline-flex rounded-md p-1.5 ${styles.bg} ${styles.text} hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-50 focus:ring-green-600`}
+                  >
+                    <span className="sr-only">Dismiss</span>
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             )}
-          >
-            {children}
-          </Headless.DialogPanel>
-        </div>
-      </div>
-    </Headless.Dialog>
-  )
-}
-
-export function AlertTitle({
-  className,
-  ...props
-}: { className?: string } & Omit<Headless.DialogTitleProps, 'as' | 'className'>) {
-  return (
-    <Headless.DialogTitle
-      {...props}
-      className={clsx(
-        className,
-        'text-center text-base/6 font-semibold text-balance text-zinc-950 sm:text-left sm:text-sm/6 sm:text-wrap dark:text-white'
+          </div>
+        </motion.div>
       )}
-    />
-  )
-}
-
-export function AlertDescription({
-  className,
-  ...props
-}: { className?: string } & Omit<Headless.DescriptionProps<typeof Text>, 'as' | 'className'>) {
-  return (
-    <Headless.Description
-      as={Text}
-      {...props}
-      className={clsx(className, 'mt-2 text-center text-pretty sm:text-left')}
-    />
-  )
-}
-
-export function AlertBody({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
-  return <div {...props} className={clsx(className, 'mt-4')} />
-}
-
-export function AlertActions({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
-  return (
-    <div
-      {...props}
-      className={clsx(
-        className,
-        'mt-6 flex flex-col-reverse items-center justify-end gap-3 *:w-full sm:mt-4 sm:flex-row sm:*:w-auto'
-      )}
-    />
-  )
-}
+    </AnimatePresence>
+  );
+};

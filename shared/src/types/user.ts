@@ -16,10 +16,14 @@ export interface User {
   updated_at: Date;
 }
 
-export enum UserRole {
-  ADMIN = 'admin',
-  USER = 'user',
-  MODERATOR = 'moderator'
+export interface UserRole {
+  id: string;
+  title: string;
+  slug: string;
+  description?: string;
+  permissions?: string[];
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface CreateUserRequest {
@@ -72,18 +76,6 @@ export interface UserListResponse {
   };
 }
 
-export interface ValidationError {
-  field: string;
-  message: string;
-  rule: string;
-}
-
-export interface ApiError {
-  message: string;
-  errors?: ValidationError[];
-  status: number;
-}
-
 export interface UserProfile {
   id: string;
   email: string;
@@ -92,4 +84,41 @@ export interface UserProfile {
   role: UserRole;
   avatar?: string;
   bio?: string;
+}
+
+// API Service Types
+export interface CreateUserData {
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  ext_name?: string;
+  gender: 'male' | 'female' | 'other';
+  birthdate: any; // DateTime type
+  email: string;
+  password: string;
+  role_id?: string;
+}
+
+export interface UpdateUserData {
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  ext_name?: string;
+  gender?: 'male' | 'female' | 'other';
+  birthdate?: any; // DateTime type
+  email?: string;
+  password?: string;
+  role_id?: string;
+  is_new?: boolean;
+  is_active?: boolean;
+  token?: string | null;
+}
+
+export interface UserListFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  gender?: 'male' | 'female' | 'other';
+  is_active?: boolean;
+  role_id?: string;
 } 

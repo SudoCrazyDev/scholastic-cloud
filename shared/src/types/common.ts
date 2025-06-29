@@ -30,6 +30,12 @@ export interface ApiError {
   details?: any;
 }
 
+export interface ValidationError {
+  field: string;
+  message: string;
+  rule: string;
+}
+
 export interface SelectOption {
   value: string | number;
   label: string;

@@ -11,12 +11,21 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
+    "@tanstack/react-query": "^5.81.5",
+    "@tanstack/react-query-devtools": "^5.81.5",
+    "axios": "^1.6.2",
+    "formik": "^2.4.5",
+    "framer-motion": "^11.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "tailwindcss": "^4.1.11"
+    "react-hot-toast": "^2.5.2",
+    "react-router-dom": "^7.6.3",
+    "tailwindcss": "^4.1.11",
+    "yup": "^1.3.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
+    "@types/node": "^22.10.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react-swc": "^3.10.2",

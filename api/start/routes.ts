@@ -81,4 +81,4 @@ router.group(() => {
   router.group(() => {
     router.get('/', '#controllers/user_institutions_controller.getInstitutionUsers')
   }).prefix('/institutions/:institutionId/users')
-}).prefix('/api').use([jwtMiddleware])
+}).prefix('/api')

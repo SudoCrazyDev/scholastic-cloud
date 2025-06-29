@@ -1,0 +1,41 @@
+export declare const APP_NAME = "ScholasticCloud";
+export declare const APP_VERSION = "1.0.0";
+export declare const API_BASE_URL = "http://localhost:3333";
+export declare const API_TIMEOUT = 10000;
+export declare const DEFAULT_PAGE_SIZE = 10;
+export declare const MAX_PAGE_SIZE = 100;
+export declare const MAX_FILE_SIZE: number;
+export declare const ALLOWED_FILE_TYPES: string[];
+export declare const TOKEN_EXPIRY: number;
+export declare const REFRESH_TOKEN_EXPIRY: number;
+export declare const PASSWORD_MIN_LENGTH = 8;
+export declare const PASSWORD_MAX_LENGTH = 128;
+export declare const NAME_MAX_LENGTH = 50;
+export declare const EMAIL_MAX_LENGTH = 255;
+export declare const ERROR_MESSAGES: {
+    readonly REQUIRED_FIELD: "This field is required";
+    readonly INVALID_EMAIL: "Please enter a valid email address";
+    readonly INVALID_PASSWORD: "Password must be at least 8 characters with uppercase, lowercase, and number";
+    readonly PASSWORDS_DONT_MATCH: "Passwords do not match";
+    readonly FILE_TOO_LARGE: "File size must be less than 10MB";
+    readonly INVALID_FILE_TYPE: "File type not allowed";
+    readonly NETWORK_ERROR: "Network error. Please try again.";
+    readonly UNAUTHORIZED: "You are not authorized to perform this action";
+    readonly NOT_FOUND: "Resource not found";
+    readonly SERVER_ERROR: "Internal server error. Please try again later.";
+};
+export declare const SUCCESS_MESSAGES: {
+    readonly LOGIN_SUCCESS: "Login successful";
+    readonly REGISTER_SUCCESS: "Registration successful";
+    readonly LOGOUT_SUCCESS: "Logout successful";
+    readonly PROFILE_UPDATED: "Profile updated successfully";
+    readonly PASSWORD_CHANGED: "Password changed successfully";
+    readonly FILE_UPLOADED: "File uploaded successfully";
+};
+export declare const STORAGE_KEYS: {
+    readonly AUTH_TOKEN: "auth_token";
+    readonly REFRESH_TOKEN: "refresh_token";
+    readonly USER_DATA: "user_data";
+    readonly THEME: "theme";
+    readonly LANGUAGE: "language";
+};
