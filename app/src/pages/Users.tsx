@@ -1,4 +1,5 @@
 import { UserHeader, UserGrid, UserModal } from './Users/components'
+import { ConfirmationModal } from '../components/ConfirmationModal'
 import { useUsers } from '../hooks/useUsers'
 
 export default function Users() {
@@ -16,12 +17,14 @@ export default function Users() {
     editingUser,
     modalLoading,
     modalError,
+    deleteConfirmation,
     handleCreate,
     handleEdit,
     handleDelete,
     handleBulkDelete,
     handleModalSubmit,
     handleModalClose,
+    handleDeleteConfirmationClose,
     setSelectedRows,
   } = useUsers()
 
@@ -94,6 +97,19 @@ export default function Users() {
           institutions={institutions}
           loading={modalLoading}
           error={modalError}
+        />
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={deleteConfirmation.isOpen}
+          onClose={handleDeleteConfirmationClose}
+          onConfirm={deleteConfirmation.onConfirm}
+          title={deleteConfirmation.title}
+          message={deleteConfirmation.message}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="danger"
+          loading={deleteConfirmation.loading}
         />
       </div>
     </div>

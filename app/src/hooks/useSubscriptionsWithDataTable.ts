@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { roleService } from '../services/roleService'
-import type { Role, CreateRoleData, UpdateRoleData } from '../types'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useDataTable } from './useDataTable'
+import { subscriptionService } from '../services/subscriptionService'
+import type { Subscription, CreateSubscriptionData, UpdateSubscriptionData } from '../types'
 
 interface DeleteConfirmation {
   isOpen: boolean
@@ -11,21 +12,12 @@ interface DeleteConfirmation {
   loading: boolean
 }
 
-interface UseRolesOptions {
-  page?: number
-  limit?: number
-  search?: string
-  sortBy?: string
-  sortDirection?: 'asc' | 'desc'
-}
-
-export const useRoles = (options: UseRolesOptions = {}) => {
+export const useSubscriptionsWithDataTable = () => {
   const queryClient = useQueryClient()
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null)
   const [modalLoading, setModalLoading] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
-  const [selectedRows, setSelectedRows] = useState<Role[]>([])
   
   // Delete confirmation modal state
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
@@ -36,36 +28,37 @@ export const useRoles = (options: UseRolesOptions = {}) => {
     loading: false,
   })
 
-  // Query key for roles
-  const queryKey = ['roles', options]
-
-  // Fetch roles query
+  // Use the new useDataTable hook with TanStack Query
   const {
-    data: rolesResponse,
-    isLoading: loading,
+    data: subscriptions,
+    loading,
     error,
-    refetch,
-  } = useQuery({
-    queryKey,
-    queryFn: () => roleService.getRoles(options),
+    pagination,
+    search,
+    sorting,
+    refresh,
+    selectedRows,
+    setSelectedRows,
+  } = useDataTable<Subscription>({
+    queryKey: ['subscriptions'],
+    queryFn: (params) => subscriptionService.getSubscriptions(params),
+    initialPage: 1,
+    initialItemsPerPage: 10,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   })
 
-  const roles = rolesResponse?.data || []
-  const pagination = rolesResponse?.pagination
-
-  // Create role mutation
+  // Create subscription mutation
   const createMutation = useMutation({
-    mutationFn: (data: CreateRoleData) => roleService.createRole(data),
+    mutationFn: (data: CreateSubscriptionData) => subscriptionService.createSubscription(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
       setIsModalOpen(false)
-      setEditingRole(null)
+      setEditingSubscription(null)
       setModalError(null)
     },
     onError: (error: any) => {
-      console.error('Error creating role:', error)
+      console.error('Error creating subscription:', error)
       if (error.response?.data?.message) {
         setModalError(error.response.data.message)
       } else if (error.response?.data?.errors) {
@@ -73,23 +66,23 @@ export const useRoles = (options: UseRolesOptions = {}) => {
         const errorMessages = Object.values(errors).flat().join(', ')
         setModalError(errorMessages)
       } else {
-        setModalError('Failed to create role. Please try again.')
+        setModalError('Failed to create subscription. Please try again.')
       }
     },
   })
 
-  // Update role mutation
+  // Update subscription mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateRoleData }) =>
-      roleService.updateRole(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateSubscriptionData }) =>
+      subscriptionService.updateSubscription(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
       setIsModalOpen(false)
-      setEditingRole(null)
+      setEditingSubscription(null)
       setModalError(null)
     },
     onError: (error: any) => {
-      console.error('Error updating role:', error)
+      console.error('Error updating subscription:', error)
       if (error.response?.data?.message) {
         setModalError(error.response.data.message)
       } else if (error.response?.data?.errors) {
@@ -97,25 +90,25 @@ export const useRoles = (options: UseRolesOptions = {}) => {
         const errorMessages = Object.values(errors).flat().join(', ')
         setModalError(errorMessages)
       } else {
-        setModalError('Failed to update role. Please try again.')
+        setModalError('Failed to update subscription. Please try again.')
       }
     },
   })
 
-  // Delete role mutation
+  // Delete subscription mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => roleService.deleteRole(id),
+    mutationFn: (id: string) => subscriptionService.deleteSubscription(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
       setDeleteConfirmation(prev => ({ ...prev, isOpen: false, loading: false }))
     },
     onError: (error: any) => {
-      console.error('Error deleting role:', error)
+      console.error('Error deleting subscription:', error)
       setDeleteConfirmation(prev => ({ 
         ...prev, 
         loading: false,
         title: 'Error',
-        message: error.response?.data?.message || 'Failed to delete role. Please try again.',
+        message: error.response?.data?.message || 'Failed to delete subscription. Please try again.',
         onConfirm: () => setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
       }))
     },
@@ -123,44 +116,44 @@ export const useRoles = (options: UseRolesOptions = {}) => {
 
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
-    mutationFn: (ids: string[]) => Promise.all(ids.map(id => roleService.deleteRole(id))),
+    mutationFn: (ids: string[]) => Promise.all(ids.map(id => subscriptionService.deleteSubscription(id))),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
       setSelectedRows([])
       setDeleteConfirmation(prev => ({ ...prev, isOpen: false, loading: false }))
     },
     onError: (error: any) => {
-      console.error('Error deleting roles:', error)
+      console.error('Error deleting subscriptions:', error)
       setDeleteConfirmation(prev => ({ 
         ...prev, 
         loading: false,
         title: 'Error',
-        message: error.response?.data?.message || 'Failed to delete some roles. Please try again.',
+        message: error.response?.data?.message || 'Failed to delete some subscriptions. Please try again.',
         onConfirm: () => setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
       }))
     },
   })
 
   const handleCreate = () => {
-    setEditingRole(null)
+    setEditingSubscription(null)
     setModalError(null)
     setIsModalOpen(true)
   }
 
-  const handleEdit = (role: Role) => {
-    setEditingRole(role)
+  const handleEdit = (subscription: Subscription) => {
+    setEditingSubscription(subscription)
     setModalError(null)
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (role: Role) => {
+  const handleDelete = async (subscription: Subscription) => {
     setDeleteConfirmation({
       isOpen: true,
-      title: 'Delete Role',
-      message: `Are you sure you want to delete the role "${role.title}"?\n\nThis action cannot be undone.`,
+      title: 'Delete Subscription',
+      message: `Are you sure you want to delete the subscription "${subscription.title}"?\n\nThis action cannot be undone.`,
       onConfirm: async () => {
         setDeleteConfirmation(prev => ({ ...prev, loading: true }))
-        deleteMutation.mutate(role.id)
+        deleteMutation.mutate(subscription.id)
       },
       loading: false,
     })
@@ -169,28 +162,28 @@ export const useRoles = (options: UseRolesOptions = {}) => {
   const handleBulkDelete = async () => {
     if (selectedRows.length === 0) return
 
-    const roleNames = selectedRows.map(role => role.title).join('\n• ')
+    const subscriptionNames = selectedRows.map(subscription => subscription.title).join('\n• ')
     setDeleteConfirmation({
       isOpen: true,
-      title: 'Delete Multiple Roles',
-      message: `Are you sure you want to delete the following ${selectedRows.length} role(s)?\n\n• ${roleNames}\n\nThis action cannot be undone.`,
+      title: 'Delete Multiple Subscriptions',
+      message: `Are you sure you want to delete the following ${selectedRows.length} subscription(s)?\n\n• ${subscriptionNames}\n\nThis action cannot be undone.`,
       onConfirm: async () => {
         setDeleteConfirmation(prev => ({ ...prev, loading: true }))
-        bulkDeleteMutation.mutate(selectedRows.map(role => role.id))
+        bulkDeleteMutation.mutate(selectedRows.map(subscription => subscription.id))
       },
       loading: false,
     })
   }
 
-  const handleModalSubmit = async (data: CreateRoleData) => {
+  const handleModalSubmit = async (data: CreateSubscriptionData) => {
     setModalLoading(true)
     setModalError(null)
 
-    if (editingRole) {
-      // Update existing role
-      updateMutation.mutate({ id: editingRole.id, data: data as UpdateRoleData })
+    if (editingSubscription) {
+      // Update existing subscription
+      updateMutation.mutate({ id: editingSubscription.id, data: data as UpdateSubscriptionData })
     } else {
-      // Create new role
+      // Create new subscription
       createMutation.mutate(data)
     }
     
@@ -200,7 +193,7 @@ export const useRoles = (options: UseRolesOptions = {}) => {
   const handleModalClose = () => {
     if (!modalLoading && !createMutation.isPending && !updateMutation.isPending) {
       setIsModalOpen(false)
-      setEditingRole(null)
+      setEditingSubscription(null)
       setModalError(null)
     }
   }
@@ -213,29 +206,17 @@ export const useRoles = (options: UseRolesOptions = {}) => {
 
   return {
     // Data
-    roles,
+    subscriptions,
     loading,
-    error: error?.message || null,
-    pagination: {
-      currentPage: pagination?.current_page || 1,
-      totalPages: pagination?.last_page || 1,
-      totalItems: pagination?.total || 0,
-      itemsPerPage: pagination?.per_page || 10,
-      onPageChange: () => {}, // This will be handled by the parent component
-    },
-    search: {
-      value: options.search || '',
-      onSearch: () => {}, // This will be handled by the parent component
-    },
-    sorting: {
-      config: options.sortBy && options.sortDirection ? { key: options.sortBy, direction: options.sortDirection } : null,
-      onSort: () => {}, // This will be handled by the parent component
-    },
+    error,
+    pagination,
+    search,
+    sorting,
     selectedRows,
     
     // Modal state
     isModalOpen,
-    editingRole,
+    editingSubscription,
     modalLoading: modalLoading || createMutation.isPending || updateMutation.isPending,
     modalError,
     deleteConfirmation,
@@ -249,6 +230,6 @@ export const useRoles = (options: UseRolesOptions = {}) => {
     handleModalClose,
     handleDeleteConfirmationClose,
     setSelectedRows,
-    refresh: refetch,
+    refresh,
   }
 } 

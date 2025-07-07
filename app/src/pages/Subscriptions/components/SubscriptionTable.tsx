@@ -46,7 +46,7 @@ export const SubscriptionTable: React.FC<SubscriptionTableProps> = ({
       label: 'Title',
       sortable: true,
       render: (value) => (
-        <div className="font-medium text-gray-900">{value}</div>
+        <div className="font-medium text-white">{value}</div>
       ),
     },
     {
@@ -54,7 +54,7 @@ export const SubscriptionTable: React.FC<SubscriptionTableProps> = ({
       label: 'Description',
       sortable: false,
       render: (value) => (
-        <div className="text-gray-600">
+        <div className="text-gray-300">
           {value || 'No description'}
         </div>
       ),
@@ -64,7 +64,7 @@ export const SubscriptionTable: React.FC<SubscriptionTableProps> = ({
       label: 'Price',
       sortable: true,
       render: (value) => (
-        <div className="text-gray-900 font-medium">
+        <div className="text-gray-100 font-medium">
           ${Number(value).toFixed(2)}
         </div>
       ),

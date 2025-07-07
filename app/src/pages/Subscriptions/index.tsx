@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { SubscriptionHeader, SubscriptionTable, SubscriptionModal } from './components'
+import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { useSubscriptions } from '@hooks'
 
 const Subscriptions: React.FC = () => {
@@ -19,6 +20,7 @@ const Subscriptions: React.FC = () => {
     editingSubscription,
     modalLoading,
     modalError,
+    deleteConfirmation,
     
     // Actions
     handleCreate,
@@ -27,6 +29,7 @@ const Subscriptions: React.FC = () => {
     handleBulkDelete,
     handleModalSubmit,
     handleModalClose,
+    handleDeleteConfirmationClose,
     setSelectedRows,
   } = useSubscriptions()
 
@@ -67,8 +70,21 @@ const Subscriptions: React.FC = () => {
         loading={modalLoading}
         error={modalError}
       />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        onClose={handleDeleteConfirmationClose}
+        onConfirm={deleteConfirmation.onConfirm}
+        title={deleteConfirmation.title}
+        message={deleteConfirmation.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deleteConfirmation.loading}
+      />
     </motion.div>
   )
 }
 
-export default Subscriptions 
+export default Subscriptions

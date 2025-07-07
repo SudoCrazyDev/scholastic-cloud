@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { RoleHeader, RoleTable, RoleModal } from './components'
+import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { useRoles } from '@hooks'
 
 const Roles: React.FC = () => {
@@ -19,6 +20,7 @@ const Roles: React.FC = () => {
     editingRole,
     modalLoading,
     modalError,
+    deleteConfirmation,
     
     // Actions
     handleCreate,
@@ -27,6 +29,7 @@ const Roles: React.FC = () => {
     handleBulkDelete,
     handleModalSubmit,
     handleModalClose,
+    handleDeleteConfirmationClose,
     setSelectedRows,
   } = useRoles()
 
@@ -66,6 +69,19 @@ const Roles: React.FC = () => {
         role={editingRole}
         loading={modalLoading}
         error={modalError}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        onClose={handleDeleteConfirmationClose}
+        onConfirm={deleteConfirmation.onConfirm}
+        title={deleteConfirmation.title}
+        message={deleteConfirmation.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deleteConfirmation.loading}
       />
     </motion.div>
   )

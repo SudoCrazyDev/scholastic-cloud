@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { User, ApiResponse } from '../types'
+import type { User, PaginatedResponse } from '../types'
 
 export interface CreateUserData {
   first_name: string
@@ -36,6 +36,8 @@ class UserService {
     page?: number
     limit?: number
     search?: string
+    sortBy?: string
+    sortDirection?: 'asc' | 'desc'
     gender?: 'male' | 'female' | 'other'
     is_active?: boolean
     role_id?: string
@@ -45,28 +47,30 @@ class UserService {
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.search) queryParams.append('search', params.search)
+    if (params?.sortBy) queryParams.append('sort_by', params.sortBy)
+    if (params?.sortDirection) queryParams.append('sort_direction', params.sortDirection)
     if (params?.gender) queryParams.append('gender', params.gender)
     if (params?.is_active !== undefined) queryParams.append('is_active', params.is_active.toString())
     if (params?.role_id) queryParams.append('role_id', params.role_id)
 
     const url = `${this.baseUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
-    const response = await api.get<ApiResponse<User[]>>(url)
+    const response = await api.get<PaginatedResponse<User>>(url)
     
     return response.data
   }
 
   async getUser(id: string) {
-    const response = await api.get<ApiResponse<User>>(`${this.baseUrl}/${id}`)
+    const response = await api.get<{ data: User }>(`${this.baseUrl}/${id}`)
     return response.data
   }
 
   async createUser(data: CreateUserData) {
-    const response = await api.post<ApiResponse<User>>(this.baseUrl, data)
+    const response = await api.post<{ data: User }>(this.baseUrl, data)
     return response.data
   }
 
   async updateUser(id: string, data: UpdateUserData) {
-    const response = await api.put<ApiResponse<User>>(`${this.baseUrl}/${id}`, data)
+    const response = await api.put<{ data: User }>(`${this.baseUrl}/${id}`, data)
     return response.data
   }
 
@@ -75,7 +79,7 @@ class UserService {
   }
 
   async assignUserToInstitution(userId: string, institutionId: string, isDefault: boolean = false) {
-    const response = await api.post<ApiResponse<any>>(`/user-institutions`, {
+    const response = await api.post<{ data: any }>(`/user-institutions`, {
       user_id: userId,
       institution_id: institutionId,
       is_default: isDefault

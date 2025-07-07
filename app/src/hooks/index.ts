@@ -1,7 +1,15 @@
-export { useAuth } from './useAuth'
-export { useLogin, useLogout, useProfile } from './useAuthQueries'
-export { useDataTable } from './useDataTable'
-export { useRoles } from './useRoles'
+// TanStack Query hooks
 export { useSubscriptions } from './useSubscriptions'
+export { useUsers } from './useUsers'
 export { useInstitutions } from './useInstitutions'
-export { useUsers } from './useUsers' 
+export { useRoles } from './useRoles'
+
+// Generic data table hook
+export { useDataTable } from './useDataTable'
+
+// Example implementation
+export { useSubscriptionsWithDataTable } from './useSubscriptionsWithDataTable'
+
+// Legacy hooks (for backward compatibility)
+export { useAuth } from './useAuth'
+export { useLogin, useLogout, useProfile } from './useAuthQueries' 

@@ -1,15 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { api } from '../lib/api'
+import { useState, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 export interface UseDataTableOptions<T = any> {
-  endpoint: string
+  queryKey: string[]
+  queryFn: (params: DataTableParams) => Promise<any>
   initialPage?: number
   initialItemsPerPage?: number
   initialSearch?: string
   initialSort?: { key: string; direction: 'asc' | 'desc' }
-  searchFields?: string[]
-  transformData?: (data: T[]) => T[]
-  onError?: (error: string) => void
+  staleTime?: number
+  retry?: number
+}
+
+export interface DataTableParams {
+  page: number
+  limit: number
+  search?: string
+  sortBy?: string
+  sortDirection?: 'asc' | 'desc'
 }
 
 export interface UseDataTableReturn<T = any> {
@@ -37,104 +45,44 @@ export interface UseDataTableReturn<T = any> {
 }
 
 export function useDataTable<T = any>({
-  endpoint,
+  queryKey,
+  queryFn,
   initialPage = 1,
   initialItemsPerPage = 10,
   initialSearch = '',
   initialSort,
-  searchFields = [],
-  transformData,
-  onError,
+  staleTime = 5 * 60 * 1000,
+  retry = 1,
 }: UseDataTableOptions<T>): UseDataTableReturn<T> {
-  const [data, setData] = useState<T[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(initialPage)
   const [itemsPerPage] = useState(initialItemsPerPage)
   const [searchValue, setSearchValue] = useState(initialSearch)
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(initialSort || null)
-  const [pagination, setPagination] = useState({
-    currentPage: initialPage,
-    totalPages: 1,
-    totalItems: 0,
-    itemsPerPage: initialItemsPerPage,
-  })
   const [selectedRows, setSelectedRows] = useState<T[]>([])
 
-  // Use refs to store stable references
-  const endpointRef = useRef(endpoint)
-  const transformDataRef = useRef(transformData)
-  const onErrorRef = useRef(onError)
-  const searchFieldsRef = useRef(searchFields)
+  // Build query parameters
+  const queryParams: DataTableParams = {
+    page: currentPage,
+    limit: itemsPerPage,
+    ...(searchValue && { search: searchValue }),
+    ...(sortConfig && { sortBy: sortConfig.key, sortDirection: sortConfig.direction }),
+  }
 
-  // Update refs when props change
-  useEffect(() => {
-    endpointRef.current = endpoint
-    transformDataRef.current = transformData
-    onErrorRef.current = onError
-    searchFieldsRef.current = searchFields
-  }, [endpoint, transformData, onError, searchFields])
+  // Fetch data using TanStack Query
+  const {
+    data: response,
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: [...queryKey, queryParams],
+    queryFn: () => queryFn(queryParams),
+    staleTime,
+    retry,
+  })
 
-  // Fetch data function - stable reference
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const params = new URLSearchParams()
-      
-      // Pagination
-      params.append('page', currentPage.toString())
-      params.append('limit', itemsPerPage.toString())
-      
-      // Search
-      if (searchValue.trim()) {
-        if (searchFieldsRef.current.length > 0) {
-          searchFieldsRef.current.forEach(field => {
-            params.append(`search[${field}]`, searchValue.trim())
-          })
-        } else {
-          params.append('search', searchValue.trim())
-        }
-      }
-      
-      // Sorting
-      if (sortConfig) {
-        params.append('sort_by', sortConfig.key)
-        params.append('sort_direction', sortConfig.direction)
-      }
-      
-      const queryParams = params.toString()
-      const url = `${endpointRef.current}${queryParams ? `?${queryParams}` : ''}`
-      
-      const response = await api.get(url)
-      
-      if (response.data) {
-        const responseData = response.data
-        const transformedData = transformDataRef.current ? transformDataRef.current(responseData.data || []) : (responseData.data || [])
-        setData(transformedData)
-        
-        // Handle both 'pagination' and 'meta' response formats
-        const paginationData = responseData.pagination || responseData.meta
-        if (paginationData) {
-          setPagination({
-            currentPage: paginationData.current_page || paginationData.currentPage || 1,
-            totalPages: paginationData.last_page || paginationData.totalPages || 1,
-            totalItems: paginationData.total || 0,
-            itemsPerPage: paginationData.per_page || paginationData.itemsPerPage || itemsPerPage,
-          })
-        }
-      } else {
-        throw new Error('Invalid response format')
-      }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || 'An error occurred while fetching data'
-      setError(errorMessage)
-      onErrorRef.current?.(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }, [currentPage, itemsPerPage, searchValue, sortConfig])
+  const data = response?.data || []
+  const pagination = response?.pagination
 
   // Handle page change
   const handlePageChange = useCallback((page: number) => {
@@ -153,30 +101,15 @@ export function useDataTable<T = any>({
     setCurrentPage(1) // Reset to first page when sorting
   }, [])
 
-  // Refresh data
-  const refresh = useCallback(() => {
-    fetchData()
-  }, [fetchData])
-
-  // Fetch data when dependencies change
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  // Reset selected rows when data changes
-  useEffect(() => {
-    setSelectedRows([])
-  }, [data])
-
   return {
     data,
     loading,
-    error,
+    error: error?.message || null,
     pagination: {
-      currentPage: pagination.currentPage,
-      totalPages: pagination.totalPages,
-      totalItems: pagination.totalItems,
-      itemsPerPage: pagination.itemsPerPage,
+      currentPage: pagination?.current_page || 1,
+      totalPages: pagination?.last_page || 1,
+      totalItems: pagination?.total || 0,
+      itemsPerPage: pagination?.per_page || itemsPerPage,
       onPageChange: handlePageChange,
     },
     search: {
@@ -187,7 +120,7 @@ export function useDataTable<T = any>({
       config: sortConfig,
       onSort: handleSort,
     },
-    refresh,
+    refresh: refetch,
     selectedRows,
     setSelectedRows,
   }

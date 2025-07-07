@@ -196,6 +196,7 @@ export function SubscriptionModal({
                     Description
                   </label>
                   <Textarea
+                    className="text-gray-100"
                     value={formData.description}
                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleDescriptionChange(e.target.value)}
                     placeholder="Enter subscription description (optional)"

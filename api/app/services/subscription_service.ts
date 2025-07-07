@@ -1,4 +1,5 @@
 import Subscription from '#models/subscription'
+import InstitutionSubscription from '#models/institution_subscription'
 
 export interface CreateSubscriptionData {
   title: string
@@ -85,6 +86,15 @@ export default class SubscriptionService {
     const subscription = await Subscription.find(id)
     if (!subscription) {
       return false
+    }
+
+    // Check if any institutions are using this subscription
+    const institutionSubscriptions = await InstitutionSubscription.query()
+      .where('subscription_id', id)
+      .first()
+
+    if (institutionSubscriptions) {
+      throw new Error('Cannot delete subscription: It is currently assigned to one or more institutions')
     }
 
     await subscription.delete()

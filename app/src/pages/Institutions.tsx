@@ -1,6 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { InstitutionHeader, InstitutionGrid, InstitutionModal } from './Institutions/components'
+import { ConfirmationModal } from '../components/ConfirmationModal'
 import { useInstitutions } from '@hooks'
 
 const Institutions: React.FC = () => {
@@ -14,13 +15,14 @@ const Institutions: React.FC = () => {
     sorting,
     selectedRows,
     subscriptions,
-    
+
     // Modal state
     isModalOpen,
     editingInstitution,
     modalLoading,
     modalError,
-    
+    deleteConfirmation,
+
     // Actions
     handleCreate,
     handleEdit,
@@ -28,6 +30,7 @@ const Institutions: React.FC = () => {
     handleBulkDelete,
     handleModalSubmit,
     handleModalClose,
+    handleDeleteConfirmationClose,
     setSelectedRows,
   } = useInstitutions()
 
@@ -66,8 +69,21 @@ const Institutions: React.FC = () => {
         loading={modalLoading}
         error={modalError}
       />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirmation.isOpen}
+        onClose={handleDeleteConfirmationClose}
+        onConfirm={deleteConfirmation.onConfirm}
+        title={deleteConfirmation.title}
+        message={deleteConfirmation.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deleteConfirmation.loading}
+      />
     </motion.div>
   )
 }
 
-export default Institutions 
+export default Institutions

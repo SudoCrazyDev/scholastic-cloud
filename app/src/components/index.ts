@@ -9,3 +9,4 @@ export type { UseDataTableOptions, UseDataTableReturn } from '../hooks/useDataTa
 // Modal exports
 export { RoleModal } from '../pages/Roles/components/RoleModal'
 export { InstitutionModal } from '../pages/Institutions/components/InstitutionModal'
+export { ConfirmationModal } from './ConfirmationModal'
