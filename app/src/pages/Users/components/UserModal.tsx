@@ -4,8 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
-import { Combobox } from '../../../components/combobox'
-import type { User, Role, Institution, CreateUserData, UpdateUserData } from '../../../types'
+import type { User, Role, Institution, CreateUserData } from '../../../types'
 
 interface UserModalProps {
   isOpen: boolean
