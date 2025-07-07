@@ -10,10 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.4",
+    "@heroicons/react": "^2.2.0",
     "@tailwindcss/vite": "^4.1.11",
     "@tanstack/react-query": "^5.81.5",
     "@tanstack/react-query-devtools": "^5.81.5",
     "axios": "^1.6.2",
+    "clsx": "^2.1.1",
     "formik": "^2.4.5",
     "framer-motion": "^11.0.0",
     "react": "^19.1.0",

@@ -1,94 +1,153 @@
-import * as Headless from '@headlessui/react'
-import clsx from 'clsx'
 import React, { forwardRef } from 'react'
+import clsx from 'clsx'
 
-export function InputGroup({ children }: React.ComponentPropsWithoutRef<'span'>) {
+export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
+  error?: string
+  label?: string
+  helperText?: string
+  leftIcon?: React.ReactNode
+  rightIcon?: React.ReactNode
+  variant?: 'default' | 'filled' | 'outlined'
+  size?: 'sm' | 'md' | 'lg'
+}
+
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ 
+    className, 
+    error, 
+    label, 
+    helperText, 
+    leftIcon, 
+    rightIcon, 
+    variant = 'default',
+    size = 'md',
+    disabled,
+    ...props 
+  }, ref) => {
+    const inputId = props.id || `input-${Math.random().toString(36).substr(2, 9)}`
+    
+    const inputClasses = clsx(
+      // Base styles
+      'w-full transition-all duration-200 ease-in-out',
+      'border border-gray-300 rounded-lg',
+      'bg-white text-gray-900',
+      'placeholder:text-gray-400',
+      'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+      'disabled:opacity-50 disabled:cursor-not-allowed',
+      'hover:border-gray-400',
+      
+      // Variant styles
+      variant === 'filled' && [
+        'bg-gray-50 border-gray-200',
+        'focus:bg-white focus:border-blue-500',
+        'hover:bg-gray-100'
+      ],
+      variant === 'outlined' && [
+        'bg-transparent border-gray-300',
+        'focus:border-blue-500',
+        'hover:border-gray-400'
+      ],
+      
+      // Size styles
+      size === 'sm' && 'px-3 py-2 text-sm',
+      size === 'md' && 'px-4 py-2.5 text-base',
+      size === 'lg' && 'px-4 py-3 text-lg',
+      
+      // Icon padding
+      leftIcon && (size === 'sm' ? 'pl-10' : size === 'lg' ? 'pl-12' : 'pl-11'),
+      rightIcon && (size === 'sm' ? 'pr-10' : size === 'lg' ? 'pr-12' : 'pr-11'),
+      
+      // Error state
+      error && [
+        'border-red-300 text-red-900',
+        'focus:border-red-500 focus:ring-red-500',
+        'hover:border-red-400',
+        'placeholder:text-red-300'
+      ],
+      
+      className
+    )
+
+    const iconClasses = clsx(
+      'absolute top-1/2 -translate-y-1/2 text-gray-400',
+      'pointer-events-none transition-colors duration-200',
+      size === 'sm' && 'w-4 h-4',
+      size === 'md' && 'w-5 h-5',
+      size === 'lg' && 'w-6 h-6'
+    )
+
+    return (
+      <div className="w-full">
+        {label && (
+          <label 
+            htmlFor={inputId}
+            className={clsx(
+              'block text-sm font-medium text-gray-700 mb-2',
+              error && 'text-red-700'
+            )}
+          >
+            {label}
+          </label>
+        )}
+        
+        <div className="relative">
+          {leftIcon && (
+            <div className={clsx(iconClasses, 'left-3')}>
+              {leftIcon}
+            </div>
+          )}
+          
+          <input
+            ref={ref}
+            id={inputId}
+            className={inputClasses}
+            disabled={disabled}
+            {...props}
+          />
+          
+          {rightIcon && (
+            <div className={clsx(iconClasses, 'right-3')}>
+              {rightIcon}
+            </div>
+          )}
+        </div>
+        
+        {(error || helperText) && (
+          <div className="mt-2">
+            {error && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {error}
+              </p>
+            )}
+            {helperText && !error && (
+              <p className="text-sm text-gray-500">{helperText}</p>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+)
+
+Input.displayName = 'Input'
+
+// InputGroup component for grouped inputs
+export function InputGroup({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span
-      data-slot="control"
-      className={clsx(
-        'relative isolate block',
-        'has-[[data-slot=icon]:first-child]:[&_input]:pl-10 has-[[data-slot=icon]:last-child]:[&_input]:pr-10 sm:has-[[data-slot=icon]:first-child]:[&_input]:pl-8 sm:has-[[data-slot=icon]:last-child]:[&_input]:pr-8',
-        '*:data-[slot=icon]:pointer-events-none *:data-[slot=icon]:absolute *:data-[slot=icon]:top-3 *:data-[slot=icon]:z-10 *:data-[slot=icon]:size-5 sm:*:data-[slot=icon]:top-2.5 sm:*:data-[slot=icon]:size-4',
-        '[&>[data-slot=icon]:first-child]:left-3 sm:[&>[data-slot=icon]:first-child]:left-2.5 [&>[data-slot=icon]:last-child]:right-3 sm:[&>[data-slot=icon]:last-child]:right-2.5',
-        '*:data-[slot=icon]:text-zinc-500 dark:*:data-[slot=icon]:text-zinc-400'
-      )}
-    >
+    <div className={clsx('flex', className)}>
       {children}
-    </span>
+    </div>
   )
 }
 
-const dateTypes = ['date', 'datetime-local', 'month', 'time', 'week']
-type DateType = (typeof dateTypes)[number]
-
-export const Input = forwardRef(function Input(
-  {
-    className,
-    ...props
-  }: {
-    className?: string
-    type?: 'email' | 'number' | 'password' | 'search' | 'tel' | 'text' | 'url' | DateType
-  } & Omit<Headless.InputProps, 'as' | 'className'>,
-  ref: React.ForwardedRef<HTMLInputElement>
-) {
+// InputGroupItem for items within InputGroup
+export function InputGroupItem({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span
-      data-slot="control"
-      className={clsx([
-        className,
-        // Basic layout
-        'relative block w-full',
-        // Background color + shadow applied to inset pseudo element, so shadow blends with border in light mode
-        'before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm',
-        // Background color is moved to control and shadow is removed in dark mode so hide `before` pseudo
-        'dark:before:hidden',
-        // Focus ring
-        'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-blue-500',
-        // Disabled state
-        'has-data-disabled:opacity-50 has-data-disabled:before:bg-zinc-950/5 has-data-disabled:before:shadow-none',
-        // Invalid state
-        'has-data-invalid:before:shadow-red-500/10',
-      ])}
-    >
-      <Headless.Input
-        ref={ref}
-        {...props}
-        className={clsx([
-          // Date classes
-          props.type &&
-            dateTypes.includes(props.type) && [
-              '[&::-webkit-datetime-edit-fields-wrapper]:p-0',
-              '[&::-webkit-date-and-time-value]:min-h-[1.5em]',
-              '[&::-webkit-datetime-edit]:inline-flex',
-              '[&::-webkit-datetime-edit]:p-0',
-              '[&::-webkit-datetime-edit-year-field]:p-0',
-              '[&::-webkit-datetime-edit-month-field]:p-0',
-              '[&::-webkit-datetime-edit-day-field]:p-0',
-              '[&::-webkit-datetime-edit-hour-field]:p-0',
-              '[&::-webkit-datetime-edit-minute-field]:p-0',
-              '[&::-webkit-datetime-edit-second-field]:p-0',
-              '[&::-webkit-datetime-edit-millisecond-field]:p-0',
-              '[&::-webkit-datetime-edit-meridiem-field]:p-0',
-            ],
-          // Basic layout
-          'relative block w-full appearance-none rounded-lg px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
-          // Typography
-          'text-base/6 text-zinc-950 placeholder:text-zinc-500 sm:text-sm/6 dark:text-white',
-          // Border
-          'border border-zinc-950/10 data-hover:border-zinc-950/20 dark:border-white/10 dark:data-hover:border-white/20',
-          // Background color
-          'bg-transparent dark:bg-white/5',
-          // Hide default focus styles
-          'focus:outline-hidden',
-          // Invalid state
-          'data-invalid:border-red-500 data-invalid:data-hover:border-red-500 dark:data-invalid:border-red-500 dark:data-invalid:data-hover:border-red-500',
-          // Disabled state
-          'data-disabled:border-zinc-950/20 dark:data-disabled:border-white/15 dark:data-disabled:bg-white/2.5 dark:data-hover:data-disabled:border-white/15',
-          // System icons
-          'dark:scheme-dark',
-        ])}
-      />
-    </span>
+    <div className={clsx('flex-1', className)}>
+      {children}
+    </div>
   )
-})
+}

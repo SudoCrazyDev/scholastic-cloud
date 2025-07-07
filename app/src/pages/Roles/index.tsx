@@ -1,23 +1,22 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { InstitutionHeader, InstitutionGrid, InstitutionModal } from './Institutions/components'
-import { useInstitutions } from '@hooks'
+import { RoleHeader, RoleTable, RoleModal } from './components'
+import { useRoles } from '@hooks'
 
-const Institutions: React.FC = () => {
+const Roles: React.FC = () => {
   const {
     // Data
-    institutions,
+    roles,
     loading,
     error,
     pagination,
     search,
     sorting,
     selectedRows,
-    subscriptions,
     
     // Modal state
     isModalOpen,
-    editingInstitution,
+    editingRole,
     modalLoading,
     modalError,
     
@@ -29,7 +28,7 @@ const Institutions: React.FC = () => {
     handleModalSubmit,
     handleModalClose,
     setSelectedRows,
-  } = useInstitutions()
+  } = useRoles()
 
   return (
     <motion.div
@@ -39,30 +38,32 @@ const Institutions: React.FC = () => {
       className="space-y-6"
     >
       {/* Header */}
-      <InstitutionHeader
+      <RoleHeader
         selectedRows={selectedRows}
         onCreate={handleCreate}
         onBulkDelete={handleBulkDelete}
       />
 
-      {/* Grid */}
-      <InstitutionGrid
-        institutions={institutions}
+      {/* DataTable */}
+      <RoleTable
+        roles={roles}
         loading={loading}
         error={error}
+        pagination={pagination}
+        search={search}
+        sorting={sorting}
         selectedRows={selectedRows}
         onSelectionChange={setSelectedRows}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
 
-      {/* Institution Modal */}
-      <InstitutionModal
+      {/* Role Modal */}
+      <RoleModal
         isOpen={isModalOpen}
         onClose={handleModalClose}
         onSubmit={handleModalSubmit}
-        institution={editingInstitution}
-        subscriptions={subscriptions}
+        role={editingRole}
         loading={modalLoading}
         error={modalError}
       />
@@ -70,4 +71,4 @@ const Institutions: React.FC = () => {
   )
 }
 
-export default Institutions 
+export default Roles 

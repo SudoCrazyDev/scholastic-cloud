@@ -20,6 +20,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@components/*": ["src/components/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@hooks": ["src/hooks"],
       "@api/*": ["src/api/*"],
       "@utils/*": ["src/utils/*"],
       "@types/*": ["src/types/*"]

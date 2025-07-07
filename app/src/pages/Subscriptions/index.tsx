@@ -1,23 +1,22 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { InstitutionHeader, InstitutionGrid, InstitutionModal } from './Institutions/components'
-import { useInstitutions } from '@hooks'
+import { SubscriptionHeader, SubscriptionTable, SubscriptionModal } from './components'
+import { useSubscriptions } from '@hooks'
 
-const Institutions: React.FC = () => {
+const Subscriptions: React.FC = () => {
   const {
     // Data
-    institutions,
+    subscriptions,
     loading,
     error,
     pagination,
     search,
     sorting,
     selectedRows,
-    subscriptions,
     
     // Modal state
     isModalOpen,
-    editingInstitution,
+    editingSubscription,
     modalLoading,
     modalError,
     
@@ -29,7 +28,7 @@ const Institutions: React.FC = () => {
     handleModalSubmit,
     handleModalClose,
     setSelectedRows,
-  } = useInstitutions()
+  } = useSubscriptions()
 
   return (
     <motion.div
@@ -39,30 +38,32 @@ const Institutions: React.FC = () => {
       className="space-y-6"
     >
       {/* Header */}
-      <InstitutionHeader
+      <SubscriptionHeader
         selectedRows={selectedRows}
         onCreate={handleCreate}
         onBulkDelete={handleBulkDelete}
       />
 
-      {/* Grid */}
-      <InstitutionGrid
-        institutions={institutions}
+      {/* DataTable */}
+      <SubscriptionTable
+        subscriptions={subscriptions}
         loading={loading}
         error={error}
+        pagination={pagination}
+        search={search}
+        sorting={sorting}
         selectedRows={selectedRows}
         onSelectionChange={setSelectedRows}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
 
-      {/* Institution Modal */}
-      <InstitutionModal
+      {/* Subscription Modal */}
+      <SubscriptionModal
         isOpen={isModalOpen}
         onClose={handleModalClose}
         onSubmit={handleModalSubmit}
-        institution={editingInstitution}
-        subscriptions={subscriptions}
+        subscription={editingSubscription}
         loading={modalLoading}
         error={modalError}
       />
@@ -70,4 +71,4 @@ const Institutions: React.FC = () => {
   )
 }
 
-export default Institutions 
+export default Subscriptions 

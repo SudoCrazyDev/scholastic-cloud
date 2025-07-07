@@ -30,7 +30,6 @@ export const useAuthState = () => {
     const storedUser = localStorage.getItem('auth_user');
     
     if (storedToken && storedUser) {
-      console.log('useAuthState: Stored token:', storedUser);
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
     }
