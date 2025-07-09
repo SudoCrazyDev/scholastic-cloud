@@ -10,6 +10,7 @@ import Institutions from './pages/Institutions';
 import Roles from './pages/Roles';
 import Subscriptions from './pages/Subscriptions';
 import Staffs from './pages/Staffs';
+import ClassSections from './pages/ClassSections/ClassSections';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
               <Route path="roles" element={<Roles />} />
               <Route path="subscriptions" element={<Subscriptions />} />
               <Route path="staffs" element={<Staffs />} />
+              <Route path="class-sections" element={<ClassSections />} />
             </Route>
 
             {/* Catch all route */}

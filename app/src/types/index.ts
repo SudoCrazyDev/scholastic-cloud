@@ -143,4 +143,63 @@ export interface UpdateUserData {
   institution_ids?: string[];
   is_new?: boolean;
   is_active?: boolean;
+}
+
+// Class Section types
+export interface ClassSection {
+  id: string;
+  grade_level: string;
+  title: string;
+  adviser: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateClassSectionData {
+  grade_level: string;
+  title: string;
+  adviser: string;
+}
+
+export interface UpdateClassSectionData {
+  grade_level?: string;
+  title?: string;
+  adviser?: string;
+}
+
+// Class Section Subject types
+export interface ClassSectionSubject {
+  id: string;
+  class_section_id: string;
+  title: string;
+  variant?: string; // Optional variant (e.g., "Sewing", "Machineries", "Plumbing")
+  start_time: string;
+  end_time: string;
+  subject_teacher?: string; // Optional for parent subjects
+  parent_id?: string; // Reference to parent subject
+  order: number;
+  created_at: string;
+  updated_at: string;
+  children?: ClassSectionSubject[]; // For nested display
+}
+
+export interface CreateClassSectionSubjectData {
+  class_section_id: string;
+  title: string;
+  variant?: string;
+  start_time: string;
+  end_time: string;
+  subject_teacher?: string;
+  parent_id?: string;
+  order?: number;
+}
+
+export interface UpdateClassSectionSubjectData {
+  title?: string;
+  variant?: string;
+  start_time?: string;
+  end_time?: string;
+  subject_teacher?: string;
+  parent_id?: string;
+  order?: number;
 } 

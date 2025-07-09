@@ -9,7 +9,9 @@ import {
   Shield, 
   CreditCard,
   Menu,
-  Lock
+  Lock,
+  GraduationCap,
+  UserCheck
 } from 'lucide-react';
 
 interface MenuItem {
@@ -31,28 +33,42 @@ const menuItems: MenuItem[] = [
     id: 'users',
     label: 'Users',
     icon: <Users className="w-5 h-5" />,
-    path: '/dashboard/users',
+    path: '/users',
     allowedRoles: ['super-administrator'],
   },
   {
     id: 'institutions',
     label: 'Institutions',
     icon: <Building2 className="w-5 h-5" />,
-    path: '/dashboard/institutions',
+    path: '/institutions',
     allowedRoles: ['super-administrator'],
   },
   {
     id: 'roles',
     label: 'Roles',
     icon: <Shield className="w-5 h-5" />,
-    path: '/dashboard/roles',
+    path: '/roles',
     allowedRoles: ['super-administrator'],
   },
   {
     id: 'subscriptions',
     label: 'Subscriptions',
     icon: <CreditCard className="w-5 h-5" />,
-    path: '/dashboard/subscriptions',
+    path: '/subscriptions',
+    allowedRoles: ['super-administrator'],
+  },
+  {
+    id: 'class-sections',
+    label: 'Class Sections',
+    icon: <GraduationCap className="w-5 h-5" />,
+    path: '/class-sections',
+    allowedRoles: ['super-administrator'],
+  },
+  {
+    id: 'staffs',
+    label: 'Staffs',
+    icon: <UserCheck className="w-5 h-5" />,
+    path: '/staffs',
     allowedRoles: ['super-administrator'],
   },
 ];
