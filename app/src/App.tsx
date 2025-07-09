@@ -9,6 +9,7 @@ import Users from './pages/Users';
 import Institutions from './pages/Institutions';
 import Roles from './pages/Roles';
 import Subscriptions from './pages/Subscriptions';
+import Staffs from './pages/Staffs';
 
 function App() {
   return (
@@ -23,12 +24,13 @@ function App() {
             </Route>
 
             {/* Private Routes */}
-            <Route path="/dashboard" element={<PrivateLayout />}>
-              <Route index element={<Dashboard />} />
+            <Route element={<PrivateLayout />}>
+              <Route path="dashboard" element={<Dashboard />} />
               <Route path="users" element={<Users />} />
               <Route path="institutions" element={<Institutions />} />
               <Route path="roles" element={<Roles />} />
               <Route path="subscriptions" element={<Subscriptions />} />
+              <Route path="staffs" element={<Staffs />} />
             </Route>
 
             {/* Catch all route */}

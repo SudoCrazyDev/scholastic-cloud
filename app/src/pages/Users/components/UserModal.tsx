@@ -4,6 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
+import { Alert } from '../../../components/alert'
 import type { User, Role, Institution, CreateUserData } from '../../../types'
 
 interface UserModalProps {
@@ -15,6 +16,7 @@ interface UserModalProps {
   institutions: Institution[]
   loading?: boolean
   error?: string | null
+  success?: string | null
 }
 
 export function UserModal({ 
@@ -25,7 +27,8 @@ export function UserModal({
   roles,
   institutions,
   loading = false,
-  error = null 
+  error = null,
+  success = null
 }: UserModalProps) {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -35,11 +38,13 @@ export function UserModal({
     gender: '',
     birthdate: '',
     email: '',
-    password: '',
     role_id: '',
     institution_ids: [] as string[],
   })
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
+  const [showAlert, setShowAlert] = useState(false)
+  const [alertMessage, setAlertMessage] = useState('')
+  const [alertType, setAlertType] = useState<'success' | 'error'>('success')
 
   const isEditing = !!user
 
@@ -55,7 +60,6 @@ export function UserModal({
           gender: user.gender,
           birthdate: user.birthdate.split('T')[0], // Convert to date input format
           email: user.email,
-          password: '', // Don't populate password for editing
           role_id: '', // We'll need to fetch this separately
           institution_ids: [], // We'll need to fetch this separately
         })
@@ -68,14 +72,27 @@ export function UserModal({
           gender: '',
           birthdate: '',
           email: '',
-          password: '',
           role_id: '',
           institution_ids: [],
         })
       }
       setErrors({})
+      setShowAlert(false)
     }
   }, [isOpen, user])
+
+  // Handle external error/success messages
+  useEffect(() => {
+    if (error) {
+      setAlertMessage(error)
+      setAlertType('error')
+      setShowAlert(true)
+    } else if (success) {
+      setAlertMessage(success)
+      setAlertType('success')
+      setShowAlert(true)
+    }
+  }, [error, success])
 
   const handleFieldChange = (field: string, value: string | string[]) => {
     setFormData(prev => ({
@@ -90,57 +107,73 @@ export function UserModal({
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {}
 
+    // First Name validation
     if (!formData.first_name.trim()) {
       newErrors.first_name = 'First name is required'
     } else if (formData.first_name.length < 2) {
       newErrors.first_name = 'First name must be at least 2 characters'
     } else if (formData.first_name.length > 50) {
       newErrors.first_name = 'First name must be less than 50 characters'
+    } else if (!/^[a-zA-Z\s]+$/.test(formData.first_name)) {
+      newErrors.first_name = 'First name can only contain letters and spaces'
     }
 
+    // Middle Name validation
     if (formData.middle_name && formData.middle_name.length > 50) {
       newErrors.middle_name = 'Middle name must be less than 50 characters'
+    } else if (formData.middle_name && !/^[a-zA-Z\s]+$/.test(formData.middle_name)) {
+      newErrors.middle_name = 'Middle name can only contain letters and spaces'
     }
 
+    // Last Name validation
     if (!formData.last_name.trim()) {
       newErrors.last_name = 'Last name is required'
     } else if (formData.last_name.length < 2) {
       newErrors.last_name = 'Last name must be at least 2 characters'
     } else if (formData.last_name.length > 50) {
       newErrors.last_name = 'Last name must be less than 50 characters'
+    } else if (!/^[a-zA-Z\s]+$/.test(formData.last_name)) {
+      newErrors.last_name = 'Last name can only contain letters and spaces'
     }
 
+    // Extension Name validation
     if (formData.ext_name && formData.ext_name.length > 20) {
       newErrors.ext_name = 'Extension name must be less than 20 characters'
+    } else if (formData.ext_name && !/^[a-zA-Z\s.,]+$/.test(formData.ext_name)) {
+      newErrors.ext_name = 'Extension name can only contain letters, spaces, dots, and commas'
     }
 
+    // Gender validation
     if (!formData.gender) {
       newErrors.gender = 'Gender is required'
     }
 
+    // Birthdate validation
     if (!formData.birthdate) {
       newErrors.birthdate = 'Birthdate is required'
     } else {
       const birthDate = new Date(formData.birthdate)
       const today = new Date()
-      const age = today.getFullYear() - birthDate.getFullYear()
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const monthDiff = today.getMonth() - birthDate.getMonth()
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+      }
+      
       if (age < 13 || age > 120) {
         newErrors.birthdate = 'Age must be between 13 and 120 years'
       }
     }
 
+    // Email validation
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!isValidEmail(formData.email)) {
       newErrors.email = 'Please enter a valid email address'
     }
 
-    if (!isEditing && !formData.password) {
-      newErrors.password = 'Password is required'
-    } else if (formData.password && formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters'
-    }
-
+    // Role validation (optional for editing)
     if (formData.role_id && !roles.find(role => role.id === formData.role_id)) {
       newErrors.role_id = 'Please select a valid role'
     }
@@ -164,15 +197,28 @@ export function UserModal({
     try {
       const submitData = {
         ...formData,
-        password: formData.password || undefined, // Don't send empty password for updates
         role_id: formData.role_id || undefined,
         institution_ids: formData.institution_ids.length > 0 ? formData.institution_ids : undefined,
+        // For new users, we'll need to generate a password on the backend
+        password: isEditing ? undefined : 'temp_password_will_be_generated'
       }
       
       await onSubmit(submitData as CreateUserData)
-      onClose()
+      
+      // Show success message
+      setAlertMessage(isEditing ? 'User updated successfully!' : 'User created successfully! Password will be auto-generated.')
+      setAlertType('success')
+      setShowAlert(true)
+      
+      // Close modal after a short delay to show success message
+      setTimeout(() => {
+        onClose()
+      }, 1500)
     } catch (err) {
       // Error handling is done by the parent component
+      setAlertMessage('An error occurred. Please try again.')
+      setAlertType('error')
+      setShowAlert(true)
     }
   }
 
@@ -224,10 +270,14 @@ export function UserModal({
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
+                {/* Alert for success/error messages */}
+                {showAlert && (
+                  <Alert
+                    type={alertType}
+                    message={alertMessage}
+                    onClose={() => setShowAlert(false)}
+                    show={showAlert}
+                  />
                 )}
 
                 {/* Personal Information */}
@@ -245,6 +295,7 @@ export function UserModal({
                         onChange={(e) => handleFieldChange('first_name', e.target.value)}
                         error={errors.first_name}
                         placeholder="Enter first name"
+                        disabled={loading}
                       />
                     </div>
 
@@ -258,6 +309,7 @@ export function UserModal({
                         onChange={(e) => handleFieldChange('middle_name', e.target.value)}
                         error={errors.middle_name}
                         placeholder="Enter middle name"
+                        disabled={loading}
                       />
                     </div>
 
@@ -271,6 +323,7 @@ export function UserModal({
                         onChange={(e) => handleFieldChange('last_name', e.target.value)}
                         error={errors.last_name}
                         placeholder="Enter last name"
+                        disabled={loading}
                       />
                     </div>
 
@@ -284,6 +337,7 @@ export function UserModal({
                         onChange={(e) => handleFieldChange('ext_name', e.target.value)}
                         error={errors.ext_name}
                         placeholder="e.g., Jr., Sr., III"
+                        disabled={loading}
                       />
                     </div>
 
@@ -294,6 +348,7 @@ export function UserModal({
                       <Select
                         value={formData.gender}
                         onChange={(e) => handleFieldChange('gender', e.target.value)}
+                        disabled={loading}
                       >
                         <option value="">Select gender</option>
                         <option value="male">Male</option>
@@ -314,6 +369,7 @@ export function UserModal({
                         value={formData.birthdate}
                         onChange={(e) => handleFieldChange('birthdate', e.target.value)}
                         error={errors.birthdate}
+                        disabled={loading}
                       />
                     </div>
                   </div>
@@ -334,22 +390,18 @@ export function UserModal({
                         onChange={(e) => handleFieldChange('email', e.target.value)}
                         error={errors.email}
                         placeholder="Enter email address"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Password {!isEditing && '*'}
-                      </label>
-                      <Input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => handleFieldChange('password', e.target.value)}
-                        error={errors.password}
-                        placeholder={isEditing ? "Leave blank to keep current" : "Enter password"}
+                        disabled={loading}
                       />
                     </div>
                   </div>
+                  
+                  {!isEditing && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-sm text-blue-600">
+                        Password will be auto-generated and sent to the user's email address.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Role and Institutions */}
@@ -364,6 +416,7 @@ export function UserModal({
                       <Select
                         value={formData.role_id}
                         onChange={(e) => handleFieldChange('role_id', e.target.value)}
+                        disabled={loading}
                       >
                         <option value="">Select a role</option>
                         {roles.map((role) => (
@@ -390,6 +443,7 @@ export function UserModal({
                               handleFieldChange('institution_ids', [...formData.institution_ids, institutionId])
                             }
                           }}
+                          disabled={loading}
                         >
                           <option value="">Add an institution...</option>
                           {institutions
@@ -415,6 +469,7 @@ export function UserModal({
                                     type="button"
                                     onClick={() => handleFieldChange('institution_ids', formData.institution_ids.filter(id => id !== institution.id))}
                                     className="text-blue-600 hover:text-blue-800"
+                                    disabled={loading}
                                   >
                                     ×
                                   </button>

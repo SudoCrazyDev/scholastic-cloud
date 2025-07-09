@@ -26,6 +26,7 @@ export default function Users() {
     handleModalClose,
     handleDeleteConfirmationClose,
     setSelectedRows,
+    modalSuccess,
   } = useUsers()
 
   // Apply additional filters
@@ -97,6 +98,7 @@ export default function Users() {
           institutions={institutions}
           loading={modalLoading}
           error={modalError}
+          success={modalSuccess}
         />
 
         {/* Delete Confirmation Modal */}

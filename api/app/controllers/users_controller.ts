@@ -70,18 +70,15 @@ export default class UsersController {
         })
       }
 
-      // Hash the password before saving
-      const hashedPassword = await hash.make(payload.password)
-
       const userData = {
         ...payload,
-        password: hashedPassword,
+        password: 'password',
         birthdate: DateTime.fromJSDate(payload.birthdate),
         is_new: true,
         is_active: true,
       }
 
-      const user = await this.userService.createUser(userData)
+      const user = await this.userService.createUserWithInstitution(userData)
 
       return response.created(this.formatUserResponse(user))
     } catch (error) {
@@ -92,6 +89,22 @@ export default class UsersController {
           status: 400,
         })
       }
+      
+      // Handle specific validation errors
+      if (error.message === 'Role not found') {
+        return response.badRequest({
+          message: 'Role not found',
+          status: 400,
+        })
+      }
+      
+      if (error.message.includes('Institution with ID')) {
+        return response.badRequest({
+          message: error.message,
+          status: 400,
+        })
+      }
+      
       throw error
     }
   }
@@ -143,6 +156,22 @@ export default class UsersController {
           status: 400,
         })
       }
+      
+      // Handle specific validation errors
+      if (error.message === 'Role not found') {
+        return response.badRequest({
+          message: 'Role not found',
+          status: 400,
+        })
+      }
+      
+      if (error.message.includes('Institution with ID')) {
+        return response.badRequest({
+          message: error.message,
+          status: 400,
+        })
+      }
+      
       throw error
     }
   }
@@ -188,6 +217,20 @@ export default class UsersController {
         title: (user.role as any).title,
         slug: (user.role as any).slug,
       } : null,
+      institutions: user.userInstitutions ? user.userInstitutions.map((userInstitution: any) => {
+        // Load institution data if not already loaded
+        const institution = userInstitution.institution
+        if (!institution) {
+          return null
+        }
+        return {
+          id: institution.id,
+          name: institution.title,
+          code: institution.abbr,
+          type: institution.division,
+          is_default: userInstitution.is_default,
+        }
+      }).filter(Boolean) : [],
       created_at: user.created_at.toISO(),
       updated_at: user.updated_at.toISO(),
     }

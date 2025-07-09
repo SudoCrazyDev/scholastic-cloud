@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user'
 import Institution from '#models/institution'
 
@@ -22,9 +23,13 @@ export default class UserInstitution extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updated_at: DateTime
 
-  @belongsTo(() => User)
-  declare user: ReturnType<typeof belongsTo>
+  @belongsTo(() => User, {
+    foreignKey: 'user_id',
+  })
+  declare user: BelongsTo<typeof User>
 
-  @belongsTo(() => Institution)
-  declare institution: ReturnType<typeof belongsTo>
+  @belongsTo(() => Institution, {
+    foreignKey: 'institution_id',
+  })
+  declare institution: BelongsTo<typeof Institution>
 } 

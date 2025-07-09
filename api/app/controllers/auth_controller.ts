@@ -36,6 +36,14 @@ export default class AuthController {
               title: (loginResult.user.role as any).title,
               slug: (loginResult.user.role as any).slug,
             } : null,
+            institutions: loginResult.user.userInstitutions.map(ui => {
+              return {
+                id: ui.institution.id,
+                title: ui.institution.title,
+                abbr: ui.institution.abbr,
+                logo: ui.institution.logo,
+              }
+            }),
           },
           token: loginResult.token,
           token_type: loginResult.token_type,

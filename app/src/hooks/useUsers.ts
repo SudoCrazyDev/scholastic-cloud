@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userService } from '../services/userService'
 import { roleService } from '../services/roleService'
@@ -27,6 +27,7 @@ export const useUsers = (options: UseUsersOptions = {}) => {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [modalLoading, setModalLoading] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [modalSuccess, setModalSuccess] = useState<string | null>(null)
   const [selectedRows, setSelectedRows] = useState<User[]>([])
   
   // Delete confirmation modal state
@@ -92,13 +93,12 @@ export const useUsers = (options: UseUsersOptions = {}) => {
           )
         )
       }
-      
+      refetch();
       return newUser
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      setIsModalOpen(false)
-      setEditingUser(null)
+      setModalSuccess('User created successfully! Password will be auto-generated.')
       setModalError(null)
     },
     onError: (error: any) => {
@@ -121,8 +121,7 @@ export const useUsers = (options: UseUsersOptions = {}) => {
       userService.updateUser(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      setIsModalOpen(false)
-      setEditingUser(null)
+      setModalSuccess('User updated successfully!')
       setModalError(null)
     },
     onError: (error: any) => {
@@ -178,15 +177,33 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     },
   })
 
+  const [searchValue, setSearchValue] = useState(options.search || '')
+  const [currentPage, setCurrentPage] = useState(options.page || 1)
+
+  // Handler for search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchValue(value)
+    // Optionally, you can debounce this
+    queryClient.invalidateQueries({ queryKey: ['users'] })
+  }, [queryClient])
+
+  // Handler for pagination
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page)
+    queryClient.invalidateQueries({ queryKey: ['users'] })
+  }, [queryClient])
+
   const handleCreate = () => {
     setEditingUser(null)
     setModalError(null)
+    setModalSuccess(null)
     setIsModalOpen(true)
   }
 
   const handleEdit = (user: User) => {
     setEditingUser(user)
     setModalError(null)
+    setModalSuccess(null)
     setIsModalOpen(true)
   }
 
@@ -240,6 +257,7 @@ export const useUsers = (options: UseUsersOptions = {}) => {
       setIsModalOpen(false)
       setEditingUser(null)
       setModalError(null)
+      setModalSuccess(null)
     }
   }
 
@@ -255,15 +273,15 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     loading,
     error: error?.message || null,
     pagination: {
-      currentPage: pagination?.current_page || 1,
+      currentPage: currentPage,
       totalPages: pagination?.last_page || 1,
       totalItems: pagination?.total || 0,
       itemsPerPage: pagination?.per_page || 10,
-      onPageChange: () => {}, // This will be handled by the parent component
+      onPageChange: handlePageChange,
     },
     search: {
-      value: options.search || '',
-      onSearch: () => {}, // This will be handled by the parent component
+      value: searchValue,
+      onSearch: handleSearchChange,
     },
     sorting: {
       config: options.sortBy && options.sortDirection ? { key: options.sortBy, direction: options.sortDirection } : null,
@@ -278,6 +296,7 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     editingUser,
     modalLoading: modalLoading || createMutation.isPending || updateMutation.isPending,
     modalError,
+    modalSuccess,
     deleteConfirmation,
     
     // Actions
