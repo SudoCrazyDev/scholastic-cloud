@@ -31,7 +31,6 @@ class User extends Authenticatable
         'token',
         'token_expiry',
         'is_new',
-        'role_id',
     ];
 
     /**
@@ -76,10 +75,17 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the role that belongs to the user.
+     * Get the main role for the user through user institutions.
      */
     public function role()
     {
-        return $this->belongsTo(\App\Models\Role::class);
+        return $this->hasOneThrough(
+            \App\Models\Role::class,
+            \App\Models\UserInstitution::class,
+            'user_id', // Foreign key on user_institutions table
+            'id', // Foreign key on roles table
+            'id', // Local key on users table
+            'role_id' // Local key on user_institutions table
+        )->where('user_institutions.is_main', true);
     }
 }

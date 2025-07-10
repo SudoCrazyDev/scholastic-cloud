@@ -174,8 +174,14 @@ export function UserModal({
     }
 
     // Role validation (optional for editing)
-    if (formData.role_id && !roles.find(role => role.id === formData.role_id)) {
-      newErrors.role_id = 'Please select a valid role'
+    if (formData.role_id) {
+      // Convert both to strings for comparison to handle type mismatches
+      const selectedRoleId = String(formData.role_id)
+      const foundRole = roles.find(role => String(role.id) === selectedRoleId)
+      
+      if (!foundRole) {
+        newErrors.role_id = 'Please select a valid role'
+      }
     }
 
     setErrors(newErrors)
@@ -189,11 +195,10 @@ export function UserModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!validateForm()) {
       return
     }
-
+    
     try {
       const submitData = {
         ...formData,
@@ -202,7 +207,7 @@ export function UserModal({
         // For new users, we'll need to generate a password on the backend
         password: isEditing ? undefined : 'temp_password_will_be_generated'
       }
-      
+
       await onSubmit(submitData as CreateUserData)
       
       // Show success message

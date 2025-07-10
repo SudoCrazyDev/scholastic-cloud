@@ -6,8 +6,7 @@ import {
   UserIcon,
   EnvelopeIcon,
   CalendarIcon,
-  CheckCircleIcon,
-  XCircleIcon
+  CheckCircleIcon
 } from '@heroicons/react/24/outline'
 import { Checkbox } from '../../../components/checkbox'
 import { Badge } from '../../../components/badge'
@@ -66,7 +65,7 @@ export const UserGrid: React.FC<UserGridProps> = ({
     })
   }
 
-  const getGenderColor = (gender: string) => {
+  const getGenderColor = (gender: string | null) => {
     switch (gender) {
       case 'male': return 'blue'
       case 'female': return 'pink'
@@ -168,11 +167,13 @@ export const UserGrid: React.FC<UserGridProps> = ({
                   {getFullName(user)}
                 </h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge color={getGenderColor(user.gender)}>
-                    {user.gender.charAt(0).toUpperCase() + user.gender.slice(1)}
-                  </Badge>
-                  <Badge color={user.is_active ? 'green' : 'red'}>
-                    {user.is_active ? 'Active' : 'Inactive'}
+                  {user.gender && (
+                    <Badge color={getGenderColor(user.gender)}>
+                      {user.gender.charAt(0).toUpperCase() + user.gender.slice(1)}
+                    </Badge>
+                  )}
+                  <Badge color={"green"}>
+                    {"Active"}
                   </Badge>
                 </div>
               </div>

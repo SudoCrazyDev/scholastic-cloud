@@ -6,6 +6,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,4 +34,6 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('institutions', InstitutionController::class);
     Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
     Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
+    // User routes
+    Route::apiResource('users', UserController::class);
 });
