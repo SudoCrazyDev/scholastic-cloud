@@ -20,9 +20,18 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'ext_name',
+        'gender',
+        'birthdate',
         'email',
         'password',
+        'token',
+        'token_expiry',
+        'is_new',
+        'role_id',
     ];
 
     /**
@@ -64,5 +73,13 @@ class User extends Authenticatable
         return $this->belongsToMany(\App\Models\Institution::class, 'user_institutions')
             ->withPivot('role_id', 'is_default', 'is_main')
             ->withTimestamps();
+    }
+
+    /**
+     * Get the role that belongs to the user.
+     */
+    public function role()
+    {
+        return $this->belongsTo(\App\Models\Role::class);
     }
 }

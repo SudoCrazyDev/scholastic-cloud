@@ -1,13 +1,15 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { LoginResponse } from '../../../shared/src/types/auth';
+import { authService } from '../services/authService';
 
 interface AuthContextType {
-  user: LoginResponse['user'] | null;
+  user: any | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (userData: LoginResponse) => void;
+  login: (loginData: LoginResponse) => Promise<void>;
   logout: () => void;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,7 +23,7 @@ export const useAuth = () => {
 };
 
 export const useAuthState = () => {
-  const [user, setUser] = useState<LoginResponse['user'] | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,12 +39,32 @@ export const useAuthState = () => {
     setIsLoading(false);
   }, []);
 
-  const login = (userData: LoginResponse) => {
-    console.log('useAuthState: Login userData:', userData);
-    setUser(userData.user);
-    setToken(userData.token);
-    localStorage.setItem('auth_token', userData.token);
-    localStorage.setItem('auth_user', JSON.stringify(userData.user));
+  const login = async (loginData: LoginResponse) => {
+    console.log('useAuthState: Login loginData:', loginData);
+    
+    // Store token first
+    setToken(loginData.token);
+    localStorage.setItem('auth_token', loginData.token);
+    localStorage.setItem('token_expiry', loginData.token_expiry);
+    
+    try {
+      // Fetch user data separately
+      const userData = await authService.getProfile();
+      setUser(userData);
+      localStorage.setItem('auth_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Failed to fetch user profile after login:', error);
+      // Create a fallback user object with basic info
+      const fallbackUser = {
+        id: 'unknown',
+        first_name: 'User',
+        last_name: '',
+        email: 'user@example.com',
+        role: { title: 'User', slug: 'user' }
+      };
+      setUser(fallbackUser);
+      localStorage.setItem('auth_user', JSON.stringify(fallbackUser));
+    }
   };
 
   const logout = () => {
@@ -50,6 +72,18 @@ export const useAuthState = () => {
     setToken(null);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    localStorage.removeItem('token_expiry');
+  };
+
+  const refreshProfile = async () => {
+    try {
+      const userData = await authService.getProfile();
+      setUser(userData);
+      localStorage.setItem('auth_user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Failed to refresh user profile:', error);
+      throw error;
+    }
   };
 
   return {
@@ -59,6 +93,7 @@ export const useAuthState = () => {
     isLoading,
     login,
     logout,
+    refreshProfile,
   };
 };
 

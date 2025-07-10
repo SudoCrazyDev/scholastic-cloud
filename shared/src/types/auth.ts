@@ -4,25 +4,8 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  user: {
-    id: string;
-    first_name: string;
-    middle_name?: string;
-    last_name: string;
-    ext_name?: string;
-    email: string;
-    gender?: string;
-    birthdate?: string;
-    is_new?: boolean;
-    is_active?: boolean;
-    role?: {
-      title: string;
-      slug: string;
-    } | null;
-  };
   token: string;
-  token_type: string;
-  expires_in: string;
+  token_expiry: string;
 }
 
 export interface RegisterRequest {

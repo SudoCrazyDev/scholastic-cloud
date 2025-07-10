@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\InstitutionController;
+use App\Http\Controllers\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,17 +18,19 @@ use App\Http\Controllers\InstitutionController;
 |
 */
 
-// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-//     return $request->user();
-// });
+// Public routes (no authentication required)
+Route::post('/login', [AuthController::class, 'login']);
 
-// Role routes
-Route::apiResource('roles', RoleController::class);
-
-// Subscription routes
-Route::apiResource('subscriptions', SubscriptionController::class);
-
-// Institution routes
-Route::apiResource('institutions', InstitutionController::class);
-Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
-Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']); 
+// Protected routes (authentication required)
+Route::middleware('auth.token')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/profile', [AuthController::class, 'profile']);
+    // Role routes
+    Route::apiResource('roles', RoleController::class);
+    // Subscription routes
+    Route::apiResource('subscriptions', SubscriptionController::class);
+    // Institution routes
+    Route::apiResource('institutions', InstitutionController::class);
+    Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
+    Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
+});

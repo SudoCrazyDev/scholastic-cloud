@@ -38,11 +38,11 @@ const Login: React.FC = () => {
       setAlert(null);
       try {
         const response = await loginMutation.mutateAsync(values);
-        authLogin(response);
+        await authLogin(response);
         setAlert({
           type: 'success',
           title: 'Login Successful',
-          message: `Welcome back, ${response.user.first_name}!`,
+          message: 'Welcome back! Redirecting to dashboard...',
           show: true,
         });
         setTimeout(() => {
