@@ -1,5 +1,6 @@
 // TanStack Query hooks
 export { useClassSections } from './useClassSections'
+export { useSubjects } from './useSubjects'
 export { useSubscriptions } from './useSubscriptions'
 export { useUsers } from './useUsers'
 export { useInstitutions } from './useInstitutions'

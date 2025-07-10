@@ -9,6 +9,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\ClassSectionController;
+use App\Http\Controllers\SubjectController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,4 +44,7 @@ Route::middleware('auth.token')->group(function () {
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);
     // ClassSection routes
     Route::apiResource('class-sections', ClassSectionController::class);
+    // Subject routes
+    Route::apiResource('subjects', SubjectController::class);
+    Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
 });

@@ -173,20 +173,77 @@ export interface UpdateClassSectionData {
   academic_year?: string;
 }
 
-// Class Section Subject types
+// Subject types
+export interface Subject {
+  id: string;
+  institution_id: string;
+  class_section_id: string;
+  adviser?: string; // User ID of the subject teacher
+  adviserUser?: User; // Full user object
+  subject_type: 'parent' | 'child';
+  parent_subject_id?: string; // Reference to parent subject
+  parentSubject?: Subject; // Full parent subject object
+  title: string;
+  variant?: string; // Optional variant (e.g., "Sewing", "Machineries", "Plumbing")
+  start_time?: string;
+  end_time?: string;
+  is_limited_student?: boolean;
+  order: number; // Order for sorting subjects
+  created_at: string;
+  updated_at: string;
+  childSubjects?: Subject[]; // For nested display
+  classSection?: ClassSection;
+  institution?: Institution;
+}
+
+export interface CreateSubjectData {
+  institution_id: string;
+  class_section_id: string;
+  adviser?: string; // User ID of the subject teacher
+  subject_type: 'parent' | 'child';
+  parent_subject_id?: string;
+  title: string;
+  variant?: string;
+  start_time?: string;
+  end_time?: string;
+  is_limited_student?: boolean;
+}
+
+export interface UpdateSubjectData {
+  institution_id?: string;
+  class_section_id?: string;
+  adviser?: string;
+  subject_type?: 'parent' | 'child';
+  parent_subject_id?: string;
+  title?: string;
+  variant?: string;
+  start_time?: string;
+  end_time?: string;
+  is_limited_student?: boolean;
+}
+
+export interface ReorderSubjectsData {
+  class_section_id: string;
+  subject_orders: Array<{
+    id: string;
+    order: number;
+  }>;
+}
+
+// Legacy types for backward compatibility (deprecated)
 export interface ClassSectionSubject {
   id: string;
   class_section_id: string;
   title: string;
-  variant?: string; // Optional variant (e.g., "Sewing", "Machineries", "Plumbing")
+  variant?: string;
   start_time: string;
   end_time: string;
-  subject_teacher?: string; // Optional for parent subjects
-  parent_id?: string; // Reference to parent subject
+  subject_teacher?: string;
+  parent_id?: string;
   order: number;
   created_at: string;
   updated_at: string;
-  children?: ClassSectionSubject[]; // For nested display
+  children?: ClassSectionSubject[];
 }
 
 export interface CreateClassSectionSubjectData {

@@ -19,6 +19,7 @@ interface AutocompleteProps {
   disabled?: boolean
   error?: boolean
   filter?: (option: AutocompleteOption, query: string) => boolean
+  onQueryChange?: (query: string) => void
 }
 
 export function Autocomplete({
@@ -30,6 +31,7 @@ export function Autocomplete({
   disabled = false,
   error = false,
   filter,
+  onQueryChange,
 }: AutocompleteProps) {
   const [query, setQuery] = useState('')
 
@@ -76,6 +78,8 @@ export function Autocomplete({
           onChange={(event) => {
             const newQuery = event.target.value
             setQuery(newQuery)
+            // Call onQueryChange callback if provided
+            onQueryChange?.(newQuery)
             // Clear selection if user is typing and it doesn't match the current selection
             if (value && newQuery !== value.label) {
               onChange(null)

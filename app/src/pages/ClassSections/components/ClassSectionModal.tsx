@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { useFormik } from 'formik'
@@ -46,9 +46,24 @@ export function ClassSectionModal({
   error = null 
 }: ClassSectionModalProps) {
   const [selectedTeacher, setSelectedTeacher] = useState<{ id: string; label: string; description?: string } | null>(null)
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState('')
   
-  // Fetch teachers for autocomplete
-  const { teachers, loading: teachersLoading, getFullName } = useTeachers()
+  // Debounce the search query to avoid too many API calls
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchQuery(teacherSearchQuery)
+    }, 300)
+    
+    return () => clearTimeout(timeoutId)
+  }, [teacherSearchQuery])
+  
+  // Fetch teachers for autocomplete with search parameter
+  const { teachers, loading: teachersLoading, getFullName } = useTeachers({
+    search: debouncedSearchQuery,
+    limit: 20
+  })
 
   const isEditing = !!classSection
 
@@ -110,6 +125,10 @@ export function ClassSectionModal({
         formik.resetForm()
         setSelectedTeacher(null)
       }
+    } else {
+      // Clear search query when modal closes
+      setTeacherSearchQuery('')
+      setDebouncedSearchQuery('')
     }
   }, [isOpen, classSection, teachers])
 
@@ -217,6 +236,7 @@ export function ClassSectionModal({
                   <Autocomplete
                     value={selectedTeacher}
                     onChange={handleTeacherSelect}
+                    onQueryChange={setTeacherSearchQuery}
                     options={teachers.map(teacher => ({
                       id: teacher.id,
                       label: getFullName(teacher),
@@ -226,11 +246,6 @@ export function ClassSectionModal({
                     className={formik.touched.adviser_id && formik.errors.adviser_id ? 'border-red-500' : ''}
                     disabled={teachersLoading}
                     error={!!(formik.touched.adviser_id && formik.errors.adviser_id)}
-                    filter={(option, query) => {
-                      const lowerQuery = query.toLowerCase()
-                      return option.label.toLowerCase().includes(lowerQuery) || 
-                             (option.description ? option.description.toLowerCase().includes(lowerQuery) : false)
-                    }}
                   />
                   {formik.touched.adviser_id && formik.errors.adviser_id && (
                     <p className="mt-1 text-sm text-red-600">{formik.errors.adviser_id}</p>

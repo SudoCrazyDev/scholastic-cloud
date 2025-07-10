@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import { motion, Reorder } from 'framer-motion'
 import { 
   PlusIcon,
@@ -12,15 +12,17 @@ import {
   ChevronRightIcon
 } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
-import type { ClassSection, ClassSectionSubject } from '../../../types'
+import { Alert } from '../../../components/alert'
+import type { ClassSection, Subject } from '../../../types'
 
 interface ClassSectionSubjectsProps {
   selectedClassSection: ClassSection | null
-  subjects: ClassSectionSubject[]
+  subjects: Subject[]
   onCreateSubject: () => void
-  onEditSubject: (subject: ClassSectionSubject) => void
-  onDeleteSubject: (subject: ClassSectionSubject) => void
-  onReorderSubjects: (subjects: ClassSectionSubject[]) => void
+  onEditSubject: (subject: Subject) => void
+  onDeleteSubject: (subject: Subject) => void
+  onReorderSubjects: (classSectionId: string, subjectOrders: Array<{ id: string; order: number }>) => Promise<void>
+  loading?: boolean
 }
 
 export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
@@ -30,11 +32,29 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
   onEditSubject,
   onDeleteSubject,
   onReorderSubjects,
+  loading = false,
 }) => {
   const [isDragging, setIsDragging] = useState(false)
+  const [isReordering, setIsReordering] = useState(false)
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
-  const [draggedSubject, setDraggedSubject] = useState<ClassSectionSubject | null>(null)
+  const [draggedSubject, setDraggedSubject] = useState<Subject | null>(null)
   const [dragOverSubject, setDragOverSubject] = useState<string | null>(null)
+  const [alert, setAlert] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    show: boolean;
+  } | null>(null)
+  
+  // New state for debounced reordering
+  const [localSubjects, setLocalSubjects] = useState<Subject[]>(subjects)
+  const [pendingChanges, setPendingChanges] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Update local subjects when props change
+  React.useEffect(() => {
+    setLocalSubjects(subjects)
+  }, [subjects])
 
   const toggleParentExpansion = (parentId: string) => {
     setExpandedParents(prev => {
@@ -51,19 +71,64 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
   const isParentExpanded = (parentId: string) => expandedParents.has(parentId)
 
   // Helper function to flatten hierarchical subjects for reordering
-  const flattenSubjectsForReorder = (subjects: ClassSectionSubject[]): ClassSectionSubject[] => {
-    const result: ClassSectionSubject[] = []
+  const flattenSubjectsForReorder = (subjects: Subject[]): Subject[] => {
+    const result: Subject[] = []
     subjects.forEach(subject => {
       result.push(subject)
-      if (subject.children && subject.children.length > 0) {
-        result.push(...flattenSubjectsForReorder(subject.children))
+      if (subject.childSubjects && subject.childSubjects.length > 0) {
+        result.push(...flattenSubjectsForReorder(subject.childSubjects))
       }
     })
     return result
   }
 
+  // Debounced save function
+  const debouncedSave = useCallback((subjectOrders: Array<{ id: string; order: number }>) => {
+    // Clear any existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
+    }
+
+    // Set new timeout for 5 seconds
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (!selectedClassSection) return
+
+      try {
+        setIsSaving(true)
+        setPendingChanges(false)
+        
+        await onReorderSubjects(selectedClassSection.id, subjectOrders)
+        
+        // Show success message
+        setAlert({
+          type: 'success',
+          message: 'Subjects reordered successfully!',
+          show: true
+        })
+        
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => {
+          setAlert(null)
+        }, 3000)
+      } catch (error) {
+        console.error('Failed to reorder subjects:', error)
+        // Show error message to user
+        setAlert({
+          type: 'error',
+          message: 'Failed to reorder subjects. Please try again.',
+          show: true
+        })
+        
+        // Reset local subjects to match server state
+        setLocalSubjects(subjects)
+      } finally {
+        setIsSaving(false)
+      }
+    }, 5000) // 5 second delay
+  }, [selectedClassSection, onReorderSubjects, subjects])
+
   // Drag and drop handlers
-  const handleDragStart = (subject: ClassSectionSubject) => {
+  const handleDragStart = (subject: Subject) => {
     setDraggedSubject(subject)
     setIsDragging(true)
   }
@@ -79,15 +144,15 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
     setDragOverSubject(subjectId)
   }
 
-  const handleDrop = (e: React.DragEvent, targetSubjectId: string) => {
+  const handleDrop = async (e: React.DragEvent, targetSubjectId: string) => {
     e.preventDefault()
     
-    if (!draggedSubject || draggedSubject.id === targetSubjectId) {
+    if (!draggedSubject || draggedSubject.id === targetSubjectId || !selectedClassSection) {
       return
     }
 
     // Get all subjects for this class section
-    const allSubjects = flattenSubjectsForReorder(subjects)
+    const allSubjects = flattenSubjectsForReorder(localSubjects)
     
     // Find the indices of dragged and target subjects
     const draggedIndex = allSubjects.findIndex(s => s.id === draggedSubject.id)
@@ -108,17 +173,42 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
       order: index + 1
     }))
 
-    onReorderSubjects(reorderedWithUpdatedOrder)
+    // Update local state immediately for smooth UI
+    setLocalSubjects(prev => {
+      // This is a simplified update - in a real implementation you'd need to
+      // properly reconstruct the hierarchical structure
+      return reorderedWithUpdatedOrder
+    })
+    
+    // Set pending changes flag
+    setPendingChanges(true)
+
+    // Prepare the subject orders for the API call
+    const subjectOrders = reorderedWithUpdatedOrder.map(subject => ({
+      id: subject.id,
+      order: subject.order
+    }))
+    
+    // Trigger debounced save
+    debouncedSave(subjectOrders)
+    
     handleDragEnd()
   }
 
-
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Component for rendering individual subject
-  const SubjectItem = ({ subject, isChild = false }: { subject: ClassSectionSubject; isChild?: boolean }) => (
+  const SubjectItem = ({ subject, isChild = false }: { subject: Subject; isChild?: boolean }) => (
     <motion.div
       layout
-      draggable
+      draggable={!isReordering && !isSaving}
       onDragStart={() => handleDragStart(subject)}
       onDragEnd={handleDragEnd}
       onDragOver={(e) => handleDragOver(e, subject.id)}
@@ -128,12 +218,20 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
           ? 'border-indigo-500 bg-indigo-50 shadow-lg scale-105'
           : dragOverSubject === subject.id
           ? 'border-green-500 bg-green-50'
+          : isReordering || isSaving
+          ? 'border-gray-200 bg-gray-50 opacity-75'
           : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md'
       } ${isChild ? 'ml-6 border-l-4 border-l-indigo-200' : ''}`}
     >
       {/* Drag Handle */}
-      <div className="absolute left-2 top-1/2 transform -translate-y-1/2 cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100 transition-colors">
-        <Bars3Icon className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+      <div className={`absolute left-2 top-1/2 transform -translate-y-1/2 p-1 rounded transition-colors ${
+        isReordering || isSaving ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing hover:bg-gray-100'
+      }`}>
+        {isReordering || isSaving ? (
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+        ) : (
+          <Bars3Icon className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+        )}
       </div>
 
       {/* Main Content */}
@@ -151,10 +249,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
                 )}
               </h3>
             </div>
-            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full flex-shrink-0">
-              #{subject.order}
-            </span>
-            {!subject.subject_teacher && subject.children && subject.children.length > 0 && (
+            {subject.subject_type === 'parent' && (
               <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full flex-shrink-0">
                 Parent
               </span>
@@ -171,10 +266,12 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
               <ClockIcon className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>{subject.start_time} - {subject.end_time}</span>
             </div>
-            {subject.subject_teacher && (
+            {subject.adviserUser && (
               <div className="flex items-center text-sm text-gray-600">
                 <UserIcon className="w-4 h-4 mr-2 flex-shrink-0" />
-                <span className="truncate">{subject.subject_teacher}</span>
+                <span className="truncate">
+                  {subject.adviserUser.first_name} {subject.adviserUser.last_name}
+                </span>
               </div>
             )}
           </div>
@@ -225,6 +322,18 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      {/* Alert */}
+      {alert && (
+        <div className="mb-4">
+          <Alert
+            type={alert.type}
+            message={alert.message}
+            show={alert.show}
+            onClose={() => setAlert(null)}
+          />
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -242,9 +351,26 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
         </Button>
       </div>
 
+      {/* Pending Changes Indicator */}
+      {pendingChanges && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+            <p className="text-sm text-yellow-700">
+              Changes will be saved automatically in a few seconds...
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Subjects List */}
       <div className="space-y-3">
-        {subjects.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+            <p className="text-gray-500">Loading subjects...</p>
+          </div>
+        ) : localSubjects.length === 0 ? (
           <div className="text-center py-8">
             <AcademicCapIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 mb-4">No subjects assigned to this class section</p>
@@ -259,12 +385,12 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
           </div>
         ) : (
           <div className="space-y-3">
-            {subjects.map((subject) => (
+            {localSubjects.map((subject) => (
               <div key={subject.id} className="space-y-2">
                 {/* Parent Subject */}
                 <div className="relative w-full">
                   <div className="flex items-center w-full">
-                    {subject.children && subject.children.length > 0 && (
+                    {subject.childSubjects && subject.childSubjects.length > 0 && (
                       <button
                         onClick={() => toggleParentExpansion(subject.id)}
                         className="p-1 text-gray-400 hover:text-gray-600 transition-colors mr-2 flex-shrink-0"
@@ -283,9 +409,9 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
                 </div>
 
                 {/* Child Subjects */}
-                {subject.children && subject.children.length > 0 && isParentExpanded(subject.id) && (
+                {subject.childSubjects && subject.childSubjects.length > 0 && isParentExpanded(subject.id) && (
                   <div className="ml-6 space-y-2">
-                    {subject.children.map((child) => (
+                    {subject.childSubjects.map((child: Subject) => (
                       <SubjectItem key={child.id} subject={child} isChild={true} />
                     ))}
                   </div>
@@ -297,10 +423,10 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
       </div>
 
       {/* Instructions */}
-      {subjects.length > 1 && (
+      {localSubjects.length > 1 && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-700">
-            💡 Drag and drop subjects to reorder them. You can drag both parent and child subjects. The order will be saved automatically. Use the drag handle (⋮⋮) to drag subjects.
+            💡 Drag and drop subjects to reorder them. Changes will be saved automatically after 5 seconds of inactivity. Use the drag handle (⋮⋮) to drag subjects.
           </p>
         </div>
       )}

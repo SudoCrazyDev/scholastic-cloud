@@ -1,21 +1,68 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
+import { useFormik } from 'formik'
+import * as Yup from 'yup'
 import { Input } from '../../../components/input'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
-import type { ClassSectionSubject, CreateClassSectionSubjectData } from '../../../types'
+import { Autocomplete } from '../../../components/autocomplete'
+import { useTeachers } from '../../../hooks/useTeachers'
+import type { Subject, CreateSubjectData, UpdateSubjectData } from '../../../types'
 
 interface ClassSectionSubjectModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: CreateClassSectionSubjectData) => Promise<void>
-  subject?: ClassSectionSubject | null
+  onSubmit: (data: CreateSubjectData | UpdateSubjectData) => Promise<void>
+  subject?: Subject | null
   classSectionId: string
-  parentSubjects?: ClassSectionSubject[]
+  institutionId: string
+  parentSubjects?: Subject[]
   loading?: boolean
   error?: string | null
 }
+
+// Validation schema
+const validationSchema = Yup.object().shape({
+  subject_type: Yup.string()
+    .oneOf(['parent', 'child'], 'Subject type must be either parent or child')
+    .required('Subject type is required'),
+  parent_subject_id: Yup.string()
+    .when('subject_type', {
+      is: 'child',
+      then: (schema) => schema.required('Parent subject is required for child subjects'),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+  title: Yup.string()
+    .min(2, 'Title must be at least 2 characters')
+    .max(255, 'Title must be less than 255 characters')
+    .required('Title is required'),
+  variant: Yup.string()
+    .max(255, 'Variant must be less than 255 characters')
+    .nullable()
+    .optional(),
+  start_time: Yup.string()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Start time must be in HH:MM format')
+    .nullable()
+    .optional(),
+  end_time: Yup.string()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'End time must be in HH:MM format')
+    .nullable()
+    .optional()
+    .test('end-time-after-start', 'End time must be after start time', function(value) {
+      const { start_time } = this.parent
+      if (!start_time || !value) return true
+      return new Date(`2000-01-01T${value}`) > new Date(`2000-01-01T${start_time}`)
+    }),
+  adviser: Yup.string()
+    .when('subject_type', {
+      is: 'child',
+      then: (schema) => schema.required('Subject teacher is required for child subjects'),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+  is_limited_student: Yup.boolean()
+    .optional(),
+})
 
 export function ClassSectionSubjectModal({ 
   isOpen, 
@@ -23,122 +70,107 @@ export function ClassSectionSubjectModal({
   onSubmit, 
   subject, 
   classSectionId,
+  institutionId,
   parentSubjects = [],
   loading = false,
   error = null 
 }: ClassSectionSubjectModalProps) {
-  const [formData, setFormData] = useState({
-    title: '',
-    variant: '',
-    start_time: '',
-    end_time: '',
-    subject_teacher: '',
-    parent_id: '',
-    isParent: false,
+  const [selectedTeacher, setSelectedTeacher] = useState<{ id: string; label: string; description?: string } | null>(null)
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState('')
+  
+  // Debounce the search query to avoid too many API calls
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchQuery(teacherSearchQuery)
+    }, 300)
+    
+    return () => clearTimeout(timeoutId)
+  }, [teacherSearchQuery])
+  
+  // Fetch teachers for autocomplete with search parameter
+  const { teachers, loading: teachersLoading, getFullName } = useTeachers({
+    search: debouncedSearchQuery,
+    limit: 20
   })
-  const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
   const isEditing = !!subject
+
+  const formik = useFormik({
+    initialValues: {
+      subject_type: 'child' as 'parent' | 'child',
+      parent_subject_id: '',
+      title: '',
+      variant: '',
+      start_time: '',
+      end_time: '',
+      adviser: '',
+      is_limited_student: false,
+    },
+    validationSchema,
+    onSubmit: async (values) => {
+      try {
+        const submitData: CreateSubjectData | UpdateSubjectData = {
+          institution_id: institutionId,
+          class_section_id: classSectionId,
+          subject_type: values.subject_type,
+          parent_subject_id: values.subject_type === 'child' ? values.parent_subject_id : undefined,
+          title: values.title,
+          variant: values.variant || undefined,
+          start_time: values.start_time || undefined,
+          end_time: values.end_time || undefined,
+          adviser: values.subject_type === 'child' ? values.adviser : undefined,
+          is_limited_student: values.is_limited_student,
+        }
+        
+        await onSubmit(submitData)
+        onClose()
+      } catch (err) {
+        // Error handling is done by the parent component
+      }
+    },
+  })
 
   // Reset form when modal opens/closes or subject changes
   useEffect(() => {
     if (isOpen) {
       if (subject) {
-        setFormData({
+        formik.setValues({
+          subject_type: subject.subject_type,
+          parent_subject_id: subject.parent_subject_id || '',
           title: subject.title,
           variant: subject.variant || '',
-          start_time: subject.start_time,
-          end_time: subject.end_time,
-          subject_teacher: subject.subject_teacher || '',
-          parent_id: subject.parent_id || '',
-          isParent: !subject.subject_teacher && !subject.parent_id,
+          start_time: subject.start_time || '',
+          end_time: subject.end_time || '',
+          adviser: subject.adviser || '',
+          is_limited_student: subject.is_limited_student || false,
         })
+        
+        // Find the teacher if adviser is set
+        if (subject.adviser && subject.adviserUser) {
+          setSelectedTeacher({
+            id: subject.adviser,
+            label: getFullName(subject.adviserUser),
+            description: subject.adviserUser.email
+          })
+        } else {
+          setSelectedTeacher(null)
+        }
       } else {
-        setFormData({
-          title: '',
-          variant: '',
-          start_time: '',
-          end_time: '',
-          subject_teacher: '',
-          parent_id: '',
-          isParent: false,
-        })
+        formik.resetForm()
+        setSelectedTeacher(null)
       }
-      setErrors({})
+    } else {
+      // Clear search query when modal closes
+      setTeacherSearchQuery('')
+      setDebouncedSearchQuery('')
     }
-  }, [isOpen, subject])
+  }, [isOpen, subject, teachers])
 
-  const handleFieldChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {}
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'Subject title is required'
-    } else if (formData.title.length < 2) {
-      newErrors.title = 'Subject title must be at least 2 characters'
-    } else if (formData.title.length > 100) {
-      newErrors.title = 'Subject title must be less than 100 characters'
-    }
-
-    if (!formData.start_time.trim()) {
-      newErrors.start_time = 'Start time is required'
-    }
-
-    if (!formData.end_time.trim()) {
-      newErrors.end_time = 'End time is required'
-    }
-
-    if (formData.start_time && formData.end_time) {
-      const startTime = new Date(`2000-01-01T${formData.start_time}`)
-      const endTime = new Date(`2000-01-01T${formData.end_time}`)
-      
-      if (startTime >= endTime) {
-        newErrors.end_time = 'End time must be after start time'
-      }
-    }
-
-    // Subject teacher is only required for child subjects (not parent subjects)
-    if (!formData.isParent && !formData.subject_teacher.trim()) {
-      newErrors.subject_teacher = 'Subject teacher is required for child subjects'
-    } else if (formData.subject_teacher && formData.subject_teacher.length < 2) {
-      newErrors.subject_teacher = 'Teacher name must be at least 2 characters'
-    } else if (formData.subject_teacher && formData.subject_teacher.length > 100) {
-      newErrors.subject_teacher = 'Teacher name must be less than 100 characters'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
-
-    try {
-      const submitData = {
-        ...formData,
-        class_section_id: classSectionId,
-        parent_id: formData.isParent ? undefined : (formData.parent_id || undefined),
-        subject_teacher: formData.isParent ? undefined : formData.subject_teacher,
-        variant: formData.variant || undefined,
-      }
-      await onSubmit(submitData)
-      onClose()
-    } catch (err) {
-      // Error handling is done by the parent component
-    }
+  const handleTeacherSelect = (teacher: { id: string; label: string; description?: string } | null) => {
+    setSelectedTeacher(teacher)
+    formik.setFieldValue('adviser', teacher?.id || '')
   }
 
   const handleClose = () => {
@@ -146,6 +178,14 @@ export function ClassSectionSubjectModal({
       onClose()
     }
   }
+
+  // Filter parent subjects for child subjects
+  const availableParentSubjects = useMemo(() => {
+    if (formik.values.subject_type === 'child') {
+      return parentSubjects.filter(parent => parent.subject_type === 'parent')
+    }
+    return []
+  }, [formik.values.subject_type, parentSubjects])
 
   return (
     <AnimatePresence>
@@ -184,7 +224,7 @@ export function ClassSectionSubjectModal({
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <form onSubmit={formik.handleSubmit} className="p-6 space-y-6">
                 {error && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                     <p className="text-sm text-red-600">{error}</p>
@@ -194,14 +234,16 @@ export function ClassSectionSubjectModal({
                 {/* Subject Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Subject Type
+                    Subject Type *
                   </label>
                   <div className="flex items-center space-x-4">
                     <label className="flex items-center">
                       <input
                         type="radio"
-                        checked={formData.isParent}
-                        onChange={() => handleFieldChange('isParent', true)}
+                        name="subject_type"
+                        value="parent"
+                        checked={formik.values.subject_type === 'parent'}
+                        onChange={formik.handleChange}
                         className="mr-2"
                       />
                       <span className="text-sm">Parent Subject (e.g., MAPEH)</span>
@@ -209,30 +251,41 @@ export function ClassSectionSubjectModal({
                     <label className="flex items-center">
                       <input
                         type="radio"
-                        checked={!formData.isParent}
-                        onChange={() => handleFieldChange('isParent', false)}
+                        name="subject_type"
+                        value="child"
+                        checked={formik.values.subject_type === 'child'}
+                        onChange={formik.handleChange}
                         className="mr-2"
                       />
                       <span className="text-sm">Child Subject (e.g., PE, Arts)</span>
                     </label>
                   </div>
+                  {formik.touched.subject_type && formik.errors.subject_type && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.subject_type}</p>
+                  )}
                 </div>
 
                 {/* Parent Subject Selection (only for child subjects) */}
-                {!formData.isParent && (
+                {formik.values.subject_type === 'child' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parent Subject
+                      Parent Subject *
                     </label>
                     <Select
-                      value={formData.parent_id}
-                      onChange={(e) => handleFieldChange('parent_id', e.target.value)}
+                      name="parent_subject_id"
+                      value={formik.values.parent_subject_id}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      className={formik.touched.parent_subject_id && formik.errors.parent_subject_id ? 'border-red-500' : ''}
                     >
-                      <option value="">Select parent subject (optional)</option>
-                      {parentSubjects?.map(parent => (
+                      <option value="">Select parent subject</option>
+                      {availableParentSubjects.map(parent => (
                         <option key={parent.id} value={parent.id}>{parent.title}</option>
                       ))}
                     </Select>
+                    {formik.touched.parent_subject_id && formik.errors.parent_subject_id && (
+                      <p className="mt-1 text-sm text-red-600">{formik.errors.parent_subject_id}</p>
+                    )}
                   </div>
                 )}
 
@@ -243,13 +296,15 @@ export function ClassSectionSubjectModal({
                   </label>
                   <Input
                     type="text"
-                    value={formData.title}
-                    onChange={(e) => handleFieldChange('title', e.target.value)}
-                    placeholder={formData.isParent ? "e.g., MAPEH, Core Subjects" : "e.g., PE, Arts, Music"}
-                    className={errors.title ? 'border-red-500' : ''}
+                    name="title"
+                    value={formik.values.title}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    placeholder={formik.values.subject_type === 'parent' ? "e.g., MAPEH, Core Subjects" : "e.g., PE, Arts, Music"}
+                    className={formik.touched.title && formik.errors.title ? 'border-red-500' : ''}
                   />
-                  {errors.title && (
-                    <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+                  {formik.touched.title && formik.errors.title && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.title}</p>
                   )}
                 </div>
 
@@ -260,13 +315,15 @@ export function ClassSectionSubjectModal({
                   </label>
                   <Input
                     type="text"
-                    value={formData.variant}
-                    onChange={(e) => handleFieldChange('variant', e.target.value)}
+                    name="variant"
+                    value={formik.values.variant}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="e.g., Sewing, Machineries, Plumbing"
-                    className={errors.variant ? 'border-red-500' : ''}
+                    className={formik.touched.variant && formik.errors.variant ? 'border-red-500' : ''}
                   />
-                  {errors.variant && (
-                    <p className="mt-1 text-sm text-red-600">{errors.variant}</p>
+                  {formik.touched.variant && formik.errors.variant && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.variant}</p>
                   )}
                   <p className="mt-1 text-xs text-gray-500">
                     Use variants for subjects with the same name but different specializations (e.g., TLE - Sewing, TLE - Machineries)
@@ -277,53 +334,78 @@ export function ClassSectionSubjectModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Start Time *
+                      Start Time
                     </label>
                     <Input
                       type="time"
-                      value={formData.start_time}
-                      onChange={(e) => handleFieldChange('start_time', e.target.value)}
-                      className={errors.start_time ? 'border-red-500' : ''}
+                      name="start_time"
+                      value={formik.values.start_time}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      className={formik.touched.start_time && formik.errors.start_time ? 'border-red-500' : ''}
                     />
-                    {errors.start_time && (
-                      <p className="mt-1 text-sm text-red-600">{errors.start_time}</p>
+                    {formik.touched.start_time && formik.errors.start_time && (
+                      <p className="mt-1 text-sm text-red-600">{formik.errors.start_time}</p>
                     )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      End Time *
+                      End Time
                     </label>
                     <Input
                       type="time"
-                      value={formData.end_time}
-                      onChange={(e) => handleFieldChange('end_time', e.target.value)}
-                      className={errors.end_time ? 'border-red-500' : ''}
+                      name="end_time"
+                      value={formik.values.end_time}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      className={formik.touched.end_time && formik.errors.end_time ? 'border-red-500' : ''}
                     />
-                    {errors.end_time && (
-                      <p className="mt-1 text-sm text-red-600">{errors.end_time}</p>
+                    {formik.touched.end_time && formik.errors.end_time && (
+                      <p className="mt-1 text-sm text-red-600">{formik.errors.end_time}</p>
                     )}
                   </div>
                 </div>
 
                 {/* Subject Teacher (only for child subjects) */}
-                {!formData.isParent && (
+                {formik.values.subject_type === 'child' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Subject Teacher *
                     </label>
-                    <Input
-                      type="text"
-                      value={formData.subject_teacher}
-                      onChange={(e) => handleFieldChange('subject_teacher', e.target.value)}
-                      placeholder="e.g., Dr. Smith, Prof. Johnson"
-                      className={errors.subject_teacher ? 'border-red-500' : ''}
+                    <Autocomplete
+                      value={selectedTeacher}
+                      onChange={handleTeacherSelect}
+                      onQueryChange={setTeacherSearchQuery}
+                      options={teachers.map(teacher => ({
+                        id: teacher.id,
+                        label: getFullName(teacher),
+                        description: teacher.email
+                      }))}
+                      placeholder="Search for a teacher..."
+                      className={formik.touched.adviser && formik.errors.adviser ? 'border-red-500' : ''}
+                      disabled={teachersLoading}
+                      error={!!(formik.touched.adviser && formik.errors.adviser)}
                     />
-                    {errors.subject_teacher && (
-                      <p className="mt-1 text-sm text-red-600">{errors.subject_teacher}</p>
+                    {formik.touched.adviser && formik.errors.adviser && (
+                      <p className="mt-1 text-sm text-red-600">{formik.errors.adviser}</p>
                     )}
                   </div>
                 )}
+
+                {/* Limited Student Option */}
+                <div>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="is_limited_student"
+                      checked={formik.values.is_limited_student}
+                      onChange={formik.handleChange}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">Limited student capacity</span>
+                  </label>
+                </div>
 
                 {/* Actions */}
                 <div className="flex items-center justify-end space-x-3 pt-4">
@@ -337,10 +419,10 @@ export function ClassSectionSubjectModal({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || formik.isSubmitting}
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
-                    {loading ? 'Saving...' : (isEditing ? 'Update Subject' : 'Add Subject')}
+                    {loading || formik.isSubmitting ? 'Saving...' : (isEditing ? 'Update Subject' : 'Add Subject')}
                   </Button>
                 </div>
               </form>
