@@ -88,4 +88,54 @@ class User extends Authenticatable
             'role_id' // Local key on user_institutions table
         )->where('user_institutions.is_main', true);
     }
+
+    /**
+     * Get any role for the user through user institutions.
+     */
+    public function anyRole()
+    {
+        return $this->hasOneThrough(
+            \App\Models\Role::class,
+            \App\Models\UserInstitution::class,
+            'user_id', // Foreign key on user_institutions table
+            'id', // Foreign key on roles table
+            'id', // Local key on users table
+            'role_id' // Local key on user_institutions table
+        );
+    }
+
+    /**
+     * Get the user's default institution.
+     */
+    public function defaultInstitution()
+    {
+        return $this->hasOneThrough(
+            \App\Models\Institution::class,
+            \App\Models\UserInstitution::class,
+            'user_id', // Foreign key on user_institutions table
+            'id', // Foreign key on institutions table
+            'id', // Local key on users table
+            'institution_id' // Local key on user_institutions table
+        )->where('user_institutions.is_default', true);
+    }
+
+    /**
+     * Get the user's default institution ID.
+     */
+    public function getDefaultInstitutionId()
+    {
+        $defaultInstitution = $this->userInstitutions()
+            ->where('is_default', true)
+            ->first();
+        
+        return $defaultInstitution ? $defaultInstitution->institution_id : null;
+    }
+
+    /**
+     * Get the class sections that this user advises.
+     */
+    public function advisedClassSections()
+    {
+        return $this->hasMany(ClassSection::class, 'adviser');
+    }
 }

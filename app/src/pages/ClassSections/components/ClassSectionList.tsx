@@ -21,6 +21,7 @@ interface ClassSectionListProps {
   onSelectClassSection: (classSection: ClassSection) => void
   onEdit: (classSection: ClassSection) => void
   onDelete: (classSection: ClassSection) => void
+  loading?: boolean
 }
 
 export const ClassSectionList: React.FC<ClassSectionListProps> = ({
@@ -34,6 +35,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
   onSelectClassSection,
   onEdit,
   onDelete,
+  loading = false,
 }) => {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -79,7 +81,12 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
 
       {/* Class Sections List */}
       <div className="space-y-3">
-        {classSections.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+            <p className="text-gray-500">Loading class sections...</p>
+          </div>
+        ) : classSections.length === 0 ? (
           <div className="text-center py-8">
             <AcademicCapIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No class sections found</p>
@@ -115,7 +122,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <span className="font-medium">Adviser:</span>
-                      <span className="ml-1 truncate">{classSection.adviser}</span>
+                      <span className="ml-1 truncate">{classSection.adviser ? `${classSection.adviser?.last_name}, ${classSection.adviser?.first_name}` : 'Unassigned'}</span>
                     </div>
                   </div>
                 </div>

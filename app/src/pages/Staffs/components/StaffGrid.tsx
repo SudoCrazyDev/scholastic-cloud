@@ -2,24 +2,13 @@ import React from 'react';
 import { Button } from '../../../components/button';
 import { EnvelopeIcon, CakeIcon, UserIcon } from '@heroicons/react/24/outline';
 import { Pencil, Trash2, UserCog } from 'lucide-react';
-
-interface Staff {
-  id: number;
-  firstName: string;
-  middleName: string;
-  lastName: string;
-  extName: string;
-  gender: string;
-  birthdate: string;
-  email: string;
-  role: string;
-}
+import type { User } from '../../../types';
 
 interface StaffGridProps {
-  staffs: Staff[];
-  onEdit: (staff: Staff) => void;
-  onDelete: (staff: Staff) => void;
-  onChangeRole: (staff: Staff) => void;
+  staffs: User[];
+  onEdit: (staff: User) => void;
+  onDelete: (staff: User) => void;
+  onChangeRole: (staff: User) => void;
 }
 
 const genderAvatar = (gender: string) => (
@@ -30,6 +19,24 @@ const genderAvatar = (gender: string) => (
 
 const iconBtnClass =
   'inline-flex items-center justify-center w-8 h-8 rounded-full border border-transparent text-gray-400 hover:text-blue-500 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200';
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+const getFullName = (staff: User) => {
+  const parts = [
+    staff.last_name,
+    staff.first_name,
+    staff.middle_name,
+    staff.ext_name
+  ].filter(Boolean);
+  return parts.join(', ');
+};
 
 const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onDelete, onChangeRole }) => {
   return (
@@ -47,16 +54,18 @@ const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onDelete, onChang
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="font-medium text-base truncate text-gray-900">
-                {staff.lastName}, {staff.firstName} {staff.middleName} {staff.extName && <span className="text-gray-400">{staff.extName}</span>}
+                {getFullName(staff)}
               </div>
-              <div className="text-xs text-gray-500 mb-1">{staff.role}</div>
+              <div className="text-xs text-gray-500 mb-1">
+                {staff.role?.title || 'No role assigned'}
+              </div>
               <div className="flex items-center text-xs text-gray-500 gap-1">
                 <EnvelopeIcon className="w-4 h-4 text-gray-400" />
                 <span className="truncate">{staff.email}</span>
               </div>
               <div className="flex items-center text-xs text-gray-400 gap-1 mt-0.5">
                 <CakeIcon className="w-4 h-4" />
-                <span>{staff.birthdate}</span>
+                <span>{formatDate(staff.birthdate)}</span>
               </div>
             </div>
             {/* Actions */}

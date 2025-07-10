@@ -2,37 +2,59 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ClassSectionHeader, ClassSectionList, ClassSectionModal, ClassSectionSubjects, ClassSectionSubjectModal } from './components'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
+import { Alert } from '../../components/alert'
+import { useClassSections } from '../../hooks/useClassSections'
 import type { ClassSection, ClassSectionSubject } from '../../types'
 
 const ClassSections: React.FC = () => {
-  // Mock data for demonstration
-  const [classSections, setClassSections] = useState<ClassSection[]>([
-    {
-      id: '1',
-      grade_level: 'Grade 7',
-      title: 'Section A',
-      adviser: 'John Doe',
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: '2',
-      grade_level: 'Grade 8',
-      title: 'Section B',
-      adviser: 'Jane Smith',
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: '3',
-      grade_level: 'Grade 9',
-      title: 'Section C',
-      adviser: 'Mike Johnson',
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
-    }
-  ])
+  // State for search and filters
+  const [searchValue, setSearchValue] = useState<string>('')
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const [gradeFilter, setGradeFilter] = useState<string>('')
 
+  // API integration with TanStack Query
+  const {
+    classSections,
+    loading,
+    error,
+    isModalOpen,
+    editingClassSection,
+    modalLoading,
+    modalError,
+    modalSuccess,
+    deleteConfirmation,
+    handleCreate,
+    handleEdit,
+    handleDelete,
+    handleModalSubmit,
+    handleModalClose,
+    handleDeleteConfirmationClose,
+    handleSearchChange: hookHandleSearchChange,
+    handlePageChange: hookHandlePageChange,
+    handleGradeFilterChange: hookHandleGradeFilterChange,
+  } = useClassSections({
+    search: searchValue,
+    page: currentPage,
+    grade_level: gradeFilter,
+  })
+
+  // Wrapper handlers to update local state
+  const handleSearchChange = (value: string) => {
+    setSearchValue(value)
+    hookHandleSearchChange(value)
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    hookHandlePageChange(page)
+  }
+
+  const handleGradeFilterChange = (grade: string) => {
+    setGradeFilter(grade)
+    hookHandleGradeFilterChange(grade)
+  }
+
+  // Mock data for subjects (since there's no API for subjects yet)
   const [subjects, setSubjects] = useState<ClassSectionSubject[]>([
     {
       id: '1',
@@ -151,38 +173,21 @@ const ClassSections: React.FC = () => {
     }
   ])
 
-  // State management
+  // State management for subjects
   const [selectedClassSection, setSelectedClassSection] = useState<ClassSection | null>(null)
-  const [isClassSectionModalOpen, setIsClassSectionModalOpen] = useState(false)
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false)
-  const [editingClassSection, setEditingClassSection] = useState<ClassSection | null>(null)
   const [editingSubject, setEditingSubject] = useState<ClassSectionSubject | null>(null)
-  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+  const [subjectDeleteConfirmation, setSubjectDeleteConfirmation] = useState<{
     isOpen: boolean
-    type: 'classSection' | 'subject'
-    item: ClassSection | ClassSectionSubject | null
+    item: ClassSectionSubject | null
     onConfirm: () => void
   }>({
     isOpen: false,
-    type: 'classSection',
     item: null,
     onConfirm: () => {}
   })
 
-  // Filter and search state
-  const [gradeFilter, setGradeFilter] = useState<string>('')
-  const [searchTerm, setSearchTerm] = useState<string>('')
-
   const gradeLevels = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']
-
-  // Filtered class sections
-  const filteredClassSections = classSections.filter(section => {
-    const matchesGrade = !gradeFilter || section.grade_level === gradeFilter
-    const matchesSearch = !searchTerm || 
-      section.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      section.adviser.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesGrade && matchesSearch
-  })
 
   // Helper function to build hierarchical structure
   const buildSubjectHierarchy = (subjects: ClassSectionSubject[]) => {
@@ -224,68 +229,7 @@ const ClassSections: React.FC = () => {
       )
     : []
 
-  // Handlers
-  const handleCreateClassSection = () => {
-    setEditingClassSection(null)
-    setIsClassSectionModalOpen(true)
-  }
-
-  const handleEditClassSection = (classSection: ClassSection) => {
-    setEditingClassSection(classSection)
-    setIsClassSectionModalOpen(true)
-  }
-
-  const handleDeleteClassSection = (classSection: ClassSection) => {
-    setDeleteConfirmation({
-      isOpen: true,
-      type: 'classSection',
-      item: classSection,
-      onConfirm: () => {
-        console.log('Delete class section:', classSection.id)
-        setClassSections(prevSections => 
-          prevSections.filter(section => section.id !== classSection.id)
-        )
-        // Also remove subjects for this class section
-        setSubjects(prevSubjects => 
-          prevSubjects.filter(subject => subject.class_section_id !== classSection.id)
-        )
-        // Clear selection if the deleted section was selected
-        if (selectedClassSection?.id === classSection.id) {
-          setSelectedClassSection(null)
-        }
-        setDeleteConfirmation({ isOpen: false, type: 'classSection', item: null, onConfirm: () => {} })
-      }
-    })
-  }
-
-  const handleClassSectionSubmit = async (data: any) => {
-    console.log('Class section submit:', data)
-    
-    if (editingClassSection) {
-      // Update existing class section
-      setClassSections(prevSections => 
-        prevSections.map(section => 
-          section.id === editingClassSection.id 
-            ? { ...section, ...data }
-            : section
-        )
-      )
-    } else {
-      // Create new class section
-      const newClassSection: ClassSection = {
-        id: Date.now().toString(), // Temporary ID for demo
-        grade_level: data.grade_level,
-        title: data.title,
-        adviser: data.adviser,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-      setClassSections(prevSections => [...prevSections, newClassSection])
-    }
-    
-    setIsClassSectionModalOpen(false)
-  }
-
+  // Subject handlers
   const handleCreateSubject = () => {
     if (!selectedClassSection) return
     setEditingSubject(null)
@@ -298,16 +242,15 @@ const ClassSections: React.FC = () => {
   }
 
   const handleDeleteSubject = (subject: ClassSectionSubject) => {
-    setDeleteConfirmation({
+    setSubjectDeleteConfirmation({
       isOpen: true,
-      type: 'subject',
       item: subject,
       onConfirm: () => {
         console.log('Delete subject:', subject.id)
         setSubjects(prevSubjects => 
           prevSubjects.filter(s => s.id !== subject.id)
         )
-        setDeleteConfirmation({ isOpen: false, type: 'subject', item: null, onConfirm: () => {} })
+        setSubjectDeleteConfirmation({ isOpen: false, item: null, onConfirm: () => {} })
       }
     })
   }
@@ -344,18 +287,6 @@ const ClassSections: React.FC = () => {
     setIsSubjectModalOpen(false)
   }
 
-  // Helper function to flatten hierarchical subjects back to flat array
-  const flattenSubjects = (subjects: ClassSectionSubject[]): ClassSectionSubject[] => {
-    const result: ClassSectionSubject[] = []
-    subjects.forEach(subject => {
-      result.push({ ...subject, children: undefined }) // Remove children for flat storage
-      if (subject.children && subject.children.length > 0) {
-        result.push(...flattenSubjects(subject.children))
-      }
-    })
-    return result
-  }
-
   const handleReorderSubjects = (reorderedSubjects: ClassSectionSubject[]) => {
     console.log('Reordered subjects:', reorderedSubjects)
     setSubjects(prevSubjects => {
@@ -375,6 +306,25 @@ const ClassSections: React.FC = () => {
     })
   }
 
+  // Show error alert if there's an API error
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="space-y-6"
+      >
+        <Alert
+          type="error"
+          title="Error Loading Class Sections"
+          message={error.message || 'Failed to load class sections. Please try again.'}
+          show={true}
+        />
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -382,24 +332,44 @@ const ClassSections: React.FC = () => {
       transition={{ duration: 0.5 }}
       className="space-y-6"
     >
+      {/* Success/Error Alerts */}
+      {modalSuccess && (
+        <Alert
+          type="success"
+          message={modalSuccess}
+          onClose={() => handleModalClose()}
+          show={true}
+        />
+      )}
+      
+      {modalError && (
+        <Alert
+          type="error"
+          message={modalError}
+          onClose={() => handleModalClose()}
+          show={true}
+        />
+      )}
+
       {/* Header */}
-      <ClassSectionHeader onCreate={handleCreateClassSection} />
+      <ClassSectionHeader onCreate={handleCreate} />
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* First Column - Class Sections List */}
         <div className="space-y-4">
           <ClassSectionList
-            classSections={filteredClassSections}
+            classSections={classSections}
             selectedClassSection={selectedClassSection}
             gradeFilter={gradeFilter}
-            searchTerm={searchTerm}
+            searchTerm={searchValue}
             gradeLevels={gradeLevels}
-            onGradeFilterChange={setGradeFilter}
-            onSearchChange={setSearchTerm}
+            onGradeFilterChange={handleGradeFilterChange}
+            onSearchChange={handleSearchChange}
             onSelectClassSection={setSelectedClassSection}
-            onEdit={handleEditClassSection}
-            onDelete={handleDeleteClassSection}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            loading={loading}
           />
         </div>
 
@@ -418,11 +388,12 @@ const ClassSections: React.FC = () => {
 
       {/* Class Section Modal */}
       <ClassSectionModal
-        isOpen={isClassSectionModalOpen}
-        onClose={() => setIsClassSectionModalOpen(false)}
-        onSubmit={handleClassSectionSubmit}
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onSubmit={handleModalSubmit}
         classSection={editingClassSection}
         gradeLevels={gradeLevels}
+        loading={modalLoading}
       />
 
       {/* Subject Modal */}
@@ -440,13 +411,26 @@ const ClassSections: React.FC = () => {
         )}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal for Class Sections */}
       <ConfirmationModal
         isOpen={deleteConfirmation.isOpen}
-        onClose={() => setDeleteConfirmation({ isOpen: false, type: 'classSection', item: null, onConfirm: () => {} })}
+        onClose={handleDeleteConfirmationClose}
         onConfirm={deleteConfirmation.onConfirm}
-        title={`Delete ${deleteConfirmation.type === 'classSection' ? 'Class Section' : 'Subject'}`}
-        message={`Are you sure you want to delete this ${deleteConfirmation.type === 'classSection' ? 'class section' : 'subject'}? This action cannot be undone.`}
+        title={deleteConfirmation.title}
+        message={deleteConfirmation.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deleteConfirmation.loading}
+      />
+
+      {/* Delete Confirmation Modal for Subjects */}
+      <ConfirmationModal
+        isOpen={subjectDeleteConfirmation.isOpen}
+        onClose={() => setSubjectDeleteConfirmation({ isOpen: false, item: null, onConfirm: () => {} })}
+        onConfirm={subjectDeleteConfirmation.onConfirm}
+        title="Delete Subject"
+        message={`Are you sure you want to delete this subject? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"

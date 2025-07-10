@@ -13,6 +13,8 @@ export interface User {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  role?: Role;
+  user_institutions?: UserInstitution[];
 }
 
 export interface Role {
@@ -148,9 +150,11 @@ export interface UpdateUserData {
 // Class Section types
 export interface ClassSection {
   id: string;
+  institution_id: string;
   grade_level: string;
   title: string;
-  adviser: string;
+  adviser?: User;
+  academic_year?: string;
   created_at: string;
   updated_at: string;
 }
@@ -158,13 +162,15 @@ export interface ClassSection {
 export interface CreateClassSectionData {
   grade_level: string;
   title: string;
-  adviser: string;
+  adviser?: string;
+  academic_year?: string;
 }
 
 export interface UpdateClassSectionData {
   grade_level?: string;
   title?: string;
   adviser?: string;
+  academic_year?: string;
 }
 
 // Class Section Subject types
@@ -242,4 +248,47 @@ export interface UpdateStudentData {
   religion?: 'ISLAM' | 'CATHOLIC' | 'IGLESIA NI CRISTO' | 'BAPTISTS' | 'OTHERS';
   lrn?: string;
   profile_picture?: string;
+}
+
+// Staff types
+export interface CreateStaffData {
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  ext_name?: string;
+  gender: 'male' | 'female' | 'other';
+  birthdate: string;
+  email: string;
+  password: string;
+  role_id: string;
+}
+
+export interface UpdateStaffData {
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  ext_name?: string;
+  gender?: 'male' | 'female' | 'other';
+  birthdate?: string;
+  email?: string;
+  password?: string;
+  role_id?: string;
+}
+
+export interface UpdateStaffRoleData {
+  role_id: string;
+}
+
+// User Institution types
+export interface UserInstitution {
+  id: string;
+  user_id: string;
+  institution_id: string;
+  role_id: string;
+  is_default: boolean;
+  is_main: boolean;
+  created_at: string;
+  updated_at: string;
+  role?: Role;
+  institution?: Institution;
 } 

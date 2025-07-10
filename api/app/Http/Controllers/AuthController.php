@@ -77,6 +77,18 @@ class AuthController extends Controller
             ], 404);
         }
 
+        // Load the main role relationship first
+        $user->load('role');
+        
+        // Get the main role or fallback to any available role
+        $role = $user->role;
+        
+        // If no main role found, try to get any available role
+        if (!$role) {
+            $user->load('anyRole');
+            $role = $user->anyRole;
+        }
+
         return response()->json([
             'data' => [
                 'id' => $user->id,
@@ -89,9 +101,9 @@ class AuthController extends Controller
                 'birthdate' => $user->birthdate,
                 'is_new' => $user->is_new,
                 'is_active' => $user->is_active,
-                'role' => $user->role ? [
-                    'title' => $user->role->title,
-                    'slug' => $user->role->slug,
+                'role' => $role ? [
+                    'title' => $role->title,
+                    'slug' => $role->slug,
                 ] : null,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,

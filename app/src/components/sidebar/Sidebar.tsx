@@ -62,14 +62,14 @@ const menuItems: MenuItem[] = [
     label: 'Class Sections',
     icon: <GraduationCap className="w-5 h-5" />,
     path: '/class-sections',
-    allowedRoles: ['super-administrator'],
+    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
   {
     id: 'staffs',
     label: 'Staffs',
     icon: <UserCheck className="w-5 h-5" />,
     path: '/staffs',
-    allowedRoles: ['super-administrator'],
+    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
 ];
 

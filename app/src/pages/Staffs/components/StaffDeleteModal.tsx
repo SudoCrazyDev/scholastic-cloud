@@ -1,39 +1,47 @@
 import React from 'react';
 import { ConfirmationModal } from '../../../components/ConfirmationModal';
-
-interface Staff {
-  id?: number;
-  firstName: string;
-  middleName: string;
-  lastName: string;
-  extName: string;
-  gender: string;
-  birthdate: string;
-  email: string;
-  role: string;
-}
+import type { User } from '../../../types';
 
 interface StaffDeleteModalProps {
   open: boolean;
   onClose: () => void;
-  staff: Staff | null;
+  staff: User | null;
+  onConfirm: () => void;
+  loading?: boolean;
 }
 
-const StaffDeleteModal: React.FC<StaffDeleteModalProps> = ({ open, onClose, staff }) => {
+const StaffDeleteModal: React.FC<StaffDeleteModalProps> = ({ 
+  open, 
+  onClose, 
+  staff, 
+  onConfirm,
+  loading = false 
+}) => {
+  const getFullName = (staff: User) => {
+    const parts = [
+      staff.last_name,
+      staff.first_name,
+      staff.middle_name,
+      staff.ext_name
+    ].filter(Boolean);
+    return parts.join(', ');
+  };
+
   return (
     <ConfirmationModal
       isOpen={open}
       onClose={onClose}
-      title="Delete Staff"
+      title="Delete Staff Member"
       message={
         staff
-          ? `Are you sure you want to delete ${staff.lastName}, ${staff.firstName} ${staff.middleName}${staff.extName ? ' ' + staff.extName : ''}? This action cannot be undone.`
+          ? `Are you sure you want to delete ${getFullName(staff)}? This action cannot be undone.`
           : ''
       }
-      onConfirm={onClose} // Placeholder: replace with actual delete logic
-      confirmText="Delete"
+      onConfirm={onConfirm}
+      confirmText={loading ? 'Deleting...' : 'Delete'}
       cancelText="Cancel"
       variant="danger"
+      loading={loading}
     />
   );
 };

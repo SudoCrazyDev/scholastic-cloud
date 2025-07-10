@@ -10,3 +10,6 @@ export type { UseDataTableOptions, UseDataTableReturn } from '../hooks/useDataTa
 export { RoleModal } from '../pages/Roles/components/RoleModal'
 export { InstitutionModal } from '../pages/Institutions/components/InstitutionModal'
 export { ConfirmationModal } from './ConfirmationModal'
+
+// Form components
+export { Autocomplete } from './autocomplete'

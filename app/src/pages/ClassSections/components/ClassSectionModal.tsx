@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
+import { useFormik } from 'formik'
+import * as Yup from 'yup'
 import { Input } from '../../../components/input'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
+import { Autocomplete } from '../../../components/autocomplete'
+import { useTeachers } from '../../../hooks/useTeachers'
 import type { ClassSection, CreateClassSectionData } from '../../../types'
 
 interface ClassSectionModalProps {
@@ -16,6 +20,22 @@ interface ClassSectionModalProps {
   error?: string | null
 }
 
+// Validation schema
+const validationSchema = Yup.object().shape({
+  grade_level: Yup.string()
+    .required('Grade level is required'),
+  title: Yup.string()
+    .min(2, 'Title must be at least 2 characters')
+    .max(100, 'Title must be less than 100 characters')
+    .required('Title is required'),
+  adviser_id: Yup.string()
+    .nullable()
+    .optional(),
+  academic_year: Yup.string()
+    .max(20, 'Academic year must be less than 20 characters')
+    .optional(),
+})
+
 export function ClassSectionModal({ 
   isOpen, 
   onClose, 
@@ -25,85 +45,77 @@ export function ClassSectionModal({
   loading = false,
   error = null 
 }: ClassSectionModalProps) {
-  const [formData, setFormData] = useState({
-    grade_level: '',
-    title: '',
-    adviser: '',
-  })
-  const [errors, setErrors] = useState<{ [key: string]: string }>({})
+  const [selectedTeacher, setSelectedTeacher] = useState<{ id: string; label: string; description?: string } | null>(null)
+  
+  // Fetch teachers for autocomplete
+  const { teachers, loading: teachersLoading, getFullName } = useTeachers()
 
   const isEditing = !!classSection
+
+  const formik = useFormik({
+    initialValues: {
+      grade_level: '',
+      title: '',
+      adviser_id: '',
+      academic_year: '',
+    },
+    validationSchema,
+    onSubmit: async (values) => {
+      try {
+        const submitData: CreateClassSectionData = {
+          grade_level: values.grade_level,
+          title: values.title,
+          adviser: values.adviser_id || undefined,
+          academic_year: values.academic_year || undefined,
+        }
+        
+        await onSubmit(submitData)
+        onClose()
+      } catch (err) {
+        // Error handling is done by the parent component
+      }
+    },
+  })
 
   // Reset form when modal opens/closes or classSection changes
   useEffect(() => {
     if (isOpen) {
       if (classSection) {
-        setFormData({
+        formik.setValues({
           grade_level: classSection.grade_level,
           title: classSection.title,
-          adviser: classSection.adviser,
+          adviser_id: '', // We'll set this after finding the teacher
+          academic_year: classSection.academic_year || '',
         })
+        
+        // Find the teacher if adviser is set
+        if (classSection.adviser) {
+          const teacher = teachers.find(t => t.id === classSection.adviser?.id)
+          if (teacher) {
+            setSelectedTeacher({
+              id: teacher.id,
+              label: getFullName(teacher),
+              description: teacher.email
+            })
+            formik.setFieldValue('adviser_id', teacher.id)
+          } else {
+            setSelectedTeacher(null)
+            formik.setFieldValue('adviser_id', '')
+          }
+        } else {
+          setSelectedTeacher(null)
+          formik.setFieldValue('adviser_id', '')
+        }
       } else {
-        setFormData({
-          grade_level: '',
-          title: '',
-          adviser: '',
-        })
+        formik.resetForm()
+        setSelectedTeacher(null)
       }
-      setErrors({})
     }
-  }, [isOpen, classSection])
+  }, [isOpen, classSection, teachers])
 
-  const handleFieldChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {}
-
-    if (!formData.grade_level.trim()) {
-      newErrors.grade_level = 'Grade level is required'
-    }
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required'
-    } else if (formData.title.length < 2) {
-      newErrors.title = 'Title must be at least 2 characters'
-    } else if (formData.title.length > 100) {
-      newErrors.title = 'Title must be less than 100 characters'
-    }
-
-    if (!formData.adviser.trim()) {
-      newErrors.adviser = 'Adviser is required'
-    } else if (formData.adviser.length < 2) {
-      newErrors.adviser = 'Adviser name must be at least 2 characters'
-    } else if (formData.adviser.length > 100) {
-      newErrors.adviser = 'Adviser name must be less than 100 characters'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
-
-    try {
-      await onSubmit(formData)
-      onClose()
-    } catch (err) {
-      // Error handling is done by the parent component
-    }
+  const handleTeacherSelect = (teacher: { id: string; label: string; description?: string } | null) => {
+    setSelectedTeacher(teacher)
+    formik.setFieldValue('adviser_id', teacher?.id || '')
   }
 
   const handleClose = () => {
@@ -149,7 +161,7 @@ export function ClassSectionModal({
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <form onSubmit={formik.handleSubmit} className="p-6 space-y-6">
                 {error && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                     <p className="text-sm text-red-600">{error}</p>
@@ -162,17 +174,19 @@ export function ClassSectionModal({
                     Grade Level *
                   </label>
                   <Select
-                    value={formData.grade_level}
-                    onChange={(e) => handleFieldChange('grade_level', e.target.value)}
-                    className={errors.grade_level ? 'border-red-500' : ''}
+                    name="grade_level"
+                    value={formik.values.grade_level}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    className={formik.touched.grade_level && formik.errors.grade_level ? 'border-red-500' : ''}
                   >
                     <option value="">Select grade level</option>
                     {gradeLevels.map(grade => (
                       <option key={grade} value={grade}>{grade}</option>
                     ))}
                   </Select>
-                  {errors.grade_level && (
-                    <p className="mt-1 text-sm text-red-600">{errors.grade_level}</p>
+                  {formik.touched.grade_level && formik.errors.grade_level && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.grade_level}</p>
                   )}
                 </div>
 
@@ -183,30 +197,62 @@ export function ClassSectionModal({
                   </label>
                   <Input
                     type="text"
-                    value={formData.title}
-                    onChange={(e) => handleFieldChange('title', e.target.value)}
+                    name="title"
+                    value={formik.values.title}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="e.g., Section A, Alpha Section"
-                    className={errors.title ? 'border-red-500' : ''}
+                    className={formik.touched.title && formik.errors.title ? 'border-red-500' : ''}
                   />
-                  {errors.title && (
-                    <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+                  {formik.touched.title && formik.errors.title && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.title}</p>
                   )}
                 </div>
 
                 {/* Adviser */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Adviser *
+                    Adviser
+                  </label>
+                  <Autocomplete
+                    value={selectedTeacher}
+                    onChange={handleTeacherSelect}
+                    options={teachers.map(teacher => ({
+                      id: teacher.id,
+                      label: getFullName(teacher),
+                      description: teacher.email
+                    }))}
+                    placeholder="Search for a teacher..."
+                    className={formik.touched.adviser_id && formik.errors.adviser_id ? 'border-red-500' : ''}
+                    disabled={teachersLoading}
+                    error={!!(formik.touched.adviser_id && formik.errors.adviser_id)}
+                    filter={(option, query) => {
+                      const lowerQuery = query.toLowerCase()
+                      return option.label.toLowerCase().includes(lowerQuery) || 
+                             (option.description ? option.description.toLowerCase().includes(lowerQuery) : false)
+                    }}
+                  />
+                  {formik.touched.adviser_id && formik.errors.adviser_id && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.adviser_id}</p>
+                  )}
+                </div>
+
+                {/* Academic Year */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Academic Year
                   </label>
                   <Input
                     type="text"
-                    value={formData.adviser}
-                    onChange={(e) => handleFieldChange('adviser', e.target.value)}
-                    placeholder="e.g., John Doe"
-                    className={errors.adviser ? 'border-red-500' : ''}
+                    name="academic_year"
+                    value={formik.values.academic_year}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    placeholder="e.g., 2024-2025 (optional)"
+                    className={formik.touched.academic_year && formik.errors.academic_year ? 'border-red-500' : ''}
                   />
-                  {errors.adviser && (
-                    <p className="mt-1 text-sm text-red-600">{errors.adviser}</p>
+                  {formik.touched.academic_year && formik.errors.academic_year && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.academic_year}</p>
                   )}
                 </div>
 
@@ -222,10 +268,10 @@ export function ClassSectionModal({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || formik.isSubmitting}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
-                    {loading ? 'Saving...' : (isEditing ? 'Update Section' : 'Create Section')}
+                    {loading || formik.isSubmitting ? 'Saving...' : (isEditing ? 'Update Section' : 'Create Section')}
                   </Button>
                 </div>
               </form>
