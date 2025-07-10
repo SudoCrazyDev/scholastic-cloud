@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { motion, AnimatePresence } from 'framer-motion'
 import { ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { Button } from './button'
@@ -124,7 +124,6 @@ export function ConfirmationModal({
                   onClick={handleClose}
                   disabled={loading}
                   variant="outline"
-                  color="secondary"
                 >
                   {cancelText}
                 </Button>

@@ -202,4 +202,44 @@ export interface UpdateClassSectionSubjectData {
   subject_teacher?: string;
   parent_id?: string;
   order?: number;
+}
+
+// Student types
+export interface Student {
+  id: string;
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  ext_name?: string;
+  birthdate: string;
+  gender: 'male' | 'female' | 'other';
+  religion: 'ISLAM' | 'CATHOLIC' | 'IGLESIA NI CRISTO' | 'BAPTISTS' | 'OTHERS';
+  lrn: string;
+  profile_picture?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStudentData {
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  ext_name?: string;
+  birthdate: string;
+  gender: 'male' | 'female' | 'other';
+  religion: 'ISLAM' | 'CATHOLIC' | 'IGLESIA NI CRISTO' | 'BAPTISTS' | 'OTHERS';
+  lrn: string;
+  profile_picture?: string;
+}
+
+export interface UpdateStudentData {
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  ext_name?: string;
+  birthdate?: string;
+  gender?: 'male' | 'female' | 'other';
+  religion?: 'ISLAM' | 'CATHOLIC' | 'IGLESIA NI CRISTO' | 'BAPTISTS' | 'OTHERS';
+  lrn?: string;
+  profile_picture?: string;
 } 

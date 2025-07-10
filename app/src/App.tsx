@@ -11,6 +11,8 @@ import Roles from './pages/Roles';
 import Subscriptions from './pages/Subscriptions';
 import Staffs from './pages/Staffs';
 import ClassSections from './pages/ClassSections/ClassSections';
+import Students from './pages/Students/Students';
+import StudentDetail from './pages/Students/StudentDetail';
 
 function App() {
   return (
@@ -32,6 +34,8 @@ function App() {
               <Route path="roles" element={<Roles />} />
               <Route path="subscriptions" element={<Subscriptions />} />
               <Route path="staffs" element={<Staffs />} />
+              <Route path="students" element={<Students />} />
+              <Route path="students/:id" element={<StudentDetail />} />
               <Route path="class-sections" element={<ClassSections />} />
             </Route>
 
