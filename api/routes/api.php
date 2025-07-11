@@ -10,6 +10,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\StudentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,6 +40,9 @@ Route::middleware('auth.token')->group(function () {
     Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
     // User routes
     Route::apiResource('users', UserController::class);
+    // Student routes
+    Route::apiResource('students', StudentController::class);
+    Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
     // Staff routes
     Route::apiResource('staffs', StaffController::class);
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);

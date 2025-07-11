@@ -7,7 +7,8 @@ import {
   CalendarIcon,
   AcademicCapIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline'
 import { Checkbox } from '../../../components/checkbox'
 import { Badge } from '../../../components/badge'
@@ -20,6 +21,7 @@ interface StudentGridProps {
   selectedRows: Student[]
   onSelectionChange: (students: Student[]) => void
   onView: (student: Student) => void
+  onEdit: (student: Student) => void
   onDelete: (student: Student) => void
 }
 
@@ -30,6 +32,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
   selectedRows,
   onSelectionChange,
   onView,
+  onEdit,
   onDelete,
 }) => {
   const handleSelectAll = (checked: boolean) => {
@@ -76,11 +79,11 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
 
   const getReligionColor = (religion: string) => {
     switch (religion) {
-      case 'ISLAM': return 'green'
-      case 'CATHOLIC': return 'purple'
-      case 'IGLESIA NI CRISTO': return 'blue'
-      case 'BAPTISTS': return 'indigo'
-      case 'OTHERS': return 'zinc'
+      case 'Islam': return 'green'
+      case 'Catholic': return 'purple'
+      case 'Iglesia Ni Cristo': return 'blue'
+      case 'Baptists': return 'indigo'
+      case 'Others': return 'zinc'
       default: return 'zinc'
     }
   }
@@ -218,6 +221,13 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 title="View student details"
               >
                 <EyeIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onEdit(student)}
+                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                title="Edit student"
+              >
+                <PencilIcon className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onDelete(student)}

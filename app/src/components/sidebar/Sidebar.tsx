@@ -11,7 +11,8 @@ import {
   Menu,
   Lock,
   GraduationCap,
-  UserCheck
+  UserCheck,
+  GraduationCap as StudentsIcon
 } from 'lucide-react';
 
 interface MenuItem {
@@ -69,6 +70,13 @@ const menuItems: MenuItem[] = [
     label: 'Staffs',
     icon: <UserCheck className="w-5 h-5" />,
     path: '/staffs',
+    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'students',
+    label: 'Students',
+    icon: <StudentsIcon className="w-5 h-5" />,
+    path: '/students',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
 ];

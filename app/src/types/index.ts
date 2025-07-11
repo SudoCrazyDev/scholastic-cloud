@@ -276,7 +276,7 @@ export interface Student {
   ext_name?: string;
   birthdate: string;
   gender: 'male' | 'female' | 'other';
-  religion: 'ISLAM' | 'CATHOLIC' | 'IGLESIA NI CRISTO' | 'BAPTISTS' | 'OTHERS';
+  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
   lrn: string;
   profile_picture?: string;
   created_at: string;
@@ -290,7 +290,7 @@ export interface CreateStudentData {
   ext_name?: string;
   birthdate: string;
   gender: 'male' | 'female' | 'other';
-  religion: 'ISLAM' | 'CATHOLIC' | 'IGLESIA NI CRISTO' | 'BAPTISTS' | 'OTHERS';
+  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
   lrn: string;
   profile_picture?: string;
 }
@@ -302,7 +302,7 @@ export interface UpdateStudentData {
   ext_name?: string;
   birthdate?: string;
   gender?: 'male' | 'female' | 'other';
-  religion?: 'ISLAM' | 'CATHOLIC' | 'IGLESIA NI CRISTO' | 'BAPTISTS' | 'OTHERS';
+  religion?: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
   lrn?: string;
   profile_picture?: string;
 }

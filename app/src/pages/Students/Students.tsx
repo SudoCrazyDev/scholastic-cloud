@@ -1,6 +1,7 @@
 import { StudentHeader, StudentGrid, StudentModal } from './components'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { useStudents } from '../../hooks/useStudents'
+import { Toaster } from 'react-hot-toast'
 
 export default function Students() {
   const {
@@ -17,20 +18,42 @@ export default function Students() {
     deleteConfirmation,
     handleCreate,
     handleView,
+    handleEdit,
     handleDelete,
     handleBulkDelete,
     handleModalSubmit,
     handleModalClose,
     handleDeleteConfirmationClose,
     setSelectedRows,
-    modalSuccess,
   } = useStudents()
-
-  // Apply additional filters
-  const filteredStudents = students;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#10B981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: '#EF4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="mb-8">
@@ -51,12 +74,13 @@ export default function Students() {
 
         {/* Students Grid */}
         <StudentGrid
-          students={filteredStudents}
+          students={students}
           loading={loading}
           error={error}
           selectedRows={selectedRows}
           onSelectionChange={setSelectedRows}
           onView={handleView}
+          onEdit={handleEdit}
           onDelete={handleDelete}
         />
 
@@ -67,7 +91,7 @@ export default function Students() {
               <button
                 onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
                 disabled={pagination.currentPage <= 1}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Previous
               </button>
@@ -77,7 +101,7 @@ export default function Students() {
               <button
                 onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
                 disabled={pagination.currentPage >= pagination.totalPages}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Next
               </button>
@@ -93,7 +117,6 @@ export default function Students() {
           student={editingStudent}
           loading={modalLoading}
           error={modalError}
-          success={modalSuccess}
         />
 
         {/* Delete Confirmation Modal */}

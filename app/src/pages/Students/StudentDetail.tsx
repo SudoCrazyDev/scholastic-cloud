@@ -14,79 +14,8 @@ import {
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
+import { studentService } from '../../services/studentService'
 import type { Student } from '../../types'
-
-// Mock data for development
-const mockStudents: Student[] = [
-  {
-    id: '1',
-    first_name: 'John',
-    middle_name: 'Michael',
-    last_name: 'Doe',
-    ext_name: 'Jr.',
-    birthdate: '2008-05-15',
-    gender: 'male',
-    religion: 'CATHOLIC',
-    lrn: '123456789012',
-    profile_picture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: '2',
-    first_name: 'Jane',
-    middle_name: 'Elizabeth',
-    last_name: 'Smith',
-    ext_name: '',
-    birthdate: '2009-03-22',
-    gender: 'female',
-    religion: 'ISLAM',
-    lrn: '234567890123',
-    profile_picture: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-    created_at: '2024-01-02T00:00:00Z',
-    updated_at: '2024-01-02T00:00:00Z',
-  },
-  {
-    id: '3',
-    first_name: 'Carlos',
-    middle_name: 'Miguel',
-    last_name: 'Santos',
-    ext_name: 'III',
-    birthdate: '2007-11-08',
-    gender: 'male',
-    religion: 'IGLESIA NI CRISTO',
-    lrn: '345678901234',
-    created_at: '2024-01-03T00:00:00Z',
-    updated_at: '2024-01-03T00:00:00Z',
-  },
-  {
-    id: '4',
-    first_name: 'Maria',
-    middle_name: 'Clara',
-    last_name: 'Garcia',
-    ext_name: '',
-    birthdate: '2008-07-14',
-    gender: 'female',
-    religion: 'BAPTISTS',
-    lrn: '456789012345',
-    profile_picture: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-    created_at: '2024-01-04T00:00:00Z',
-    updated_at: '2024-01-04T00:00:00Z',
-  },
-  {
-    id: '5',
-    first_name: 'Ahmed',
-    middle_name: 'Hassan',
-    last_name: 'Al-Rashid',
-    ext_name: '',
-    birthdate: '2009-01-30',
-    gender: 'male',
-    religion: 'ISLAM',
-    lrn: '567890123456',
-    created_at: '2024-01-05T00:00:00Z',
-    updated_at: '2024-01-05T00:00:00Z',
-  },
-]
 
 const tabs = [
   { id: 'personal', name: 'Personal Details', icon: UserIcon },
@@ -101,27 +30,34 @@ export default function StudentDetail() {
   const [activeTab, setActiveTab] = useState('personal')
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
-    // Simulate API call to fetch student data
     const fetchStudent = async () => {
-      setLoading(true)
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500))
+      if (!id) return
       
-      const foundStudent = mockStudents.find(s => s.id === id)
-      if (foundStudent) {
-        setStudent(foundStudent)
-        setProfileImage(foundStudent.profile_picture || null)
+      setLoading(true)
+      setError(null)
+      
+      try {
+        const response = await studentService.getStudent(id)
+        if (response.success) {
+          setStudent(response.data)
+          setProfileImage(response.data.profile_picture || null)
+        } else {
+          setError('Failed to fetch student data')
+        }
+      } catch (err) {
+        console.error('Error fetching student:', err)
+        setError('Failed to load student details')
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
-    if (id) {
-      fetchStudent()
-    }
+    fetchStudent()
   }, [id])
 
   const handleBack = () => {
@@ -133,24 +69,51 @@ export default function StudentDetail() {
     navigate('/students', { state: { editStudent: student } })
   }
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      setIsUploading(true)
-      // Simulate upload delay
-      setTimeout(() => {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          setProfileImage(e.target?.result as string)
-          setIsUploading(false)
+    if (!file || !student) return
+
+    setIsUploading(true)
+    
+    try {
+      // Convert file to base64 for now (in a real app, you'd upload to a file server)
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const base64Image = e.target?.result as string
+        
+        // Update the student with the new profile picture
+        const response = await studentService.updateStudent(student.id, {
+          profile_picture: base64Image
+        })
+        
+        if (response.success) {
+          setProfileImage(base64Image)
+          setStudent(response.data)
         }
-        reader.readAsDataURL(file)
-      }, 1000)
+        setIsUploading(false)
+      }
+      reader.readAsDataURL(file)
+    } catch (err) {
+      console.error('Error uploading image:', err)
+      setIsUploading(false)
     }
   }
 
-  const handleRemoveImage = () => {
-    setProfileImage(null)
+  const handleRemoveImage = async () => {
+    if (!student) return
+
+    try {
+      const response = await studentService.updateStudent(student.id, {
+        profile_picture: undefined
+      })
+      
+      if (response.success) {
+        setProfileImage(null)
+        setStudent(response.data)
+      }
+    } catch (err) {
+      console.error('Error removing image:', err)
+    }
   }
 
   if (loading) {
@@ -162,12 +125,16 @@ export default function StudentDetail() {
     )
   }
 
-  if (!student) {
+  if (error || !student) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Student Not Found</h2>
-          <p className="text-gray-600 mb-4">The student you're looking for doesn't exist.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {error ? 'Error Loading Student' : 'Student Not Found'}
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {error || "The student you're looking for doesn't exist."}
+          </p>
           <Button onClick={handleBack} variant="outline">
             <ArrowLeftIcon className="w-4 h-4 mr-2" />
             Back to Students
@@ -214,11 +181,11 @@ export default function StudentDetail() {
 
   const getReligionColor = (religion: string) => {
     switch (religion) {
-      case 'ISLAM': return 'green'
-      case 'CATHOLIC': return 'purple'
-      case 'IGLESIA NI CRISTO': return 'blue'
-      case 'BAPTISTS': return 'indigo'
-      case 'OTHERS': return 'zinc'
+      case 'Islam': return 'green'
+      case 'Catholic': return 'purple'
+      case 'Iglesia Ni Cristo': return 'blue'
+      case 'Baptists': return 'indigo'
+      case 'Others': return 'zinc'
       default: return 'zinc'
     }
   }
@@ -422,27 +389,27 @@ export default function StudentDetail() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-                             <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={handleBack}
-                 className="flex items-center"
-               >
-                 <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                 Back to Students
-               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBack}
+                className="flex items-center"
+              >
+                <ArrowLeftIcon className="w-4 h-4 mr-2" />
+                Back to Students
+              </Button>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{getFullName(student)}</h1>
                 <p className="mt-1 text-gray-600">Student ID: {student.id}</p>
               </div>
             </div>
-                         <Button
-               onClick={() => handleEdit(student)}
-               className="bg-indigo-600 hover:bg-indigo-700 text-white"
-             >
-               <PencilIcon className="w-4 h-4 mr-2" />
-               Edit Student
-             </Button>
+            <Button
+              onClick={() => handleEdit(student)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              <PencilIcon className="w-4 h-4 mr-2" />
+              Edit Student
+            </Button>
           </div>
         </motion.div>
 
