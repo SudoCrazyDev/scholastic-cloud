@@ -36,4 +36,16 @@ class Student extends Model
     {
         return $this->hasMany(StudentInstitution::class);
     }
+
+    public function sections()
+    {
+        return $this->belongsToMany(ClassSection::class, 'student_sections', 'student_id', 'section_id')
+            ->withPivot('academic_year', 'is_active', 'is_promoted')
+            ->withTimestamps();
+    }
+
+    public function studentSections()
+    {
+        return $this->hasMany(StudentSection::class);
+    }
 } 

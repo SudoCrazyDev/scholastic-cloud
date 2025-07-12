@@ -13,6 +13,7 @@ import Staffs from './pages/Staffs';
 import ClassSections from './pages/ClassSections/ClassSections';
 import Students from './pages/Students/Students';
 import StudentDetail from './pages/Students/StudentDetail';
+import { MyClassSections, ClassSectionDetail } from './pages/MyClassSections';
 
 function App() {
   return (
@@ -37,6 +38,8 @@ function App() {
               <Route path="students" element={<Students />} />
               <Route path="students/:id" element={<StudentDetail />} />
               <Route path="class-sections" element={<ClassSections />} />
+              <Route path="my-class-sections" element={<MyClassSections />} />
+              <Route path="my-class-sections/:id" element={<ClassSectionDetail />} />
             </Route>
 
             {/* Catch all route */}

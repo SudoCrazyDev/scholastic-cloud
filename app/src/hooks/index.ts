@@ -6,6 +6,7 @@ export { useUsers } from './useUsers'
 export { useInstitutions } from './useInstitutions'
 export { useRoles } from './useRoles'
 export { useStaffs } from './useStaffs'
+export { useMyClassSections } from './useMyClassSections'
 
 // Generic data table hook
 export { useDataTable } from './useDataTable'

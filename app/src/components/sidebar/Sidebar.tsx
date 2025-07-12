@@ -12,7 +12,8 @@ import {
   Lock,
   GraduationCap,
   UserCheck,
-  GraduationCap as StudentsIcon
+  GraduationCap as StudentsIcon,
+  BookOpen
 } from 'lucide-react';
 
 interface MenuItem {
@@ -29,6 +30,13 @@ const menuItems: MenuItem[] = [
     label: 'Dashboard',
     icon: <LayoutDashboard className="w-5 h-5" />,
     path: '/dashboard',
+  },
+  {
+    id: 'my-class-sections',
+    label: 'My Class Sections',
+    icon: <BookOpen className="w-5 h-5" />,
+    path: '/my-class-sections',
+    allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
   },
   {
     id: 'users',

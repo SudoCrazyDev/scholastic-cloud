@@ -13,3 +13,4 @@ export { ConfirmationModal } from './ConfirmationModal'
 
 // Form components
 export { Autocomplete } from './autocomplete'
+export { SearchInput } from './search-input'

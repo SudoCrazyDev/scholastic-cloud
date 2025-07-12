@@ -7,6 +7,7 @@ use App\Models\StudentInstitution;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class StudentController extends Controller
@@ -23,14 +24,22 @@ class StudentController extends Controller
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
         
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
+        
         if (!$defaultInstitutionId) {
             return response()->json([
                 'success' => false, 
-                'error' => 'User does not have a default institution'
+                'error' => 'User does not have any institution assigned'
             ], 400);
         }
 
-        // Filter students by the user's default institution
+        // Filter students by the user's institution
         $query->whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
             $q->where('institution_id', $defaultInstitutionId);
         });
@@ -75,10 +84,18 @@ class StudentController extends Controller
         // Get the user's default institution
         $defaultInstitutionId = $user->getDefaultInstitutionId();
         
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
+        
         if (!$defaultInstitutionId) {
             return response()->json([
                 'success' => false, 
-                'error' => 'User does not have a default institution'
+                'error' => 'User does not have any institution assigned'
             ], 400);
         }
 
@@ -99,7 +116,7 @@ class StudentController extends Controller
         try {
             $student = Student::create($validated);
 
-            // Create only one institution relationship with the user's default institution
+            // Create only one institution relationship with the user's institution
             StudentInstitution::create([
                 'student_id' => $student->id,
                 'institution_id' => $defaultInstitutionId,
@@ -123,14 +140,22 @@ class StudentController extends Controller
      */
     public function show(Request $request, $id): JsonResponse
     {
-        // Get the authenticated user's default institution
+        // Get the authenticated user's institution
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
+
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
         
         if (!$defaultInstitutionId) {
             return response()->json([
                 'success' => false, 
-                'error' => 'User does not have a default institution'
+                'error' => 'User does not have any institution assigned'
             ], 400);
         }
 
@@ -151,14 +176,22 @@ class StudentController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
-        // Get the authenticated user's default institution
+        // Get the authenticated user's institution
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
+        
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
         
         if (!$defaultInstitutionId) {
             return response()->json([
                 'success' => false, 
-                'error' => 'User does not have a default institution'
+                'error' => 'User does not have any institution assigned'
             ], 400);
         }
 
@@ -191,14 +224,22 @@ class StudentController extends Controller
      */
     public function destroy(Request $request, $id): JsonResponse
     {
-        // Get the authenticated user's default institution
+        // Get the authenticated user's institution
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
+        
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
         
         if (!$defaultInstitutionId) {
             return response()->json([
                 'success' => false, 
-                'error' => 'User does not have a default institution'
+                'error' => 'User does not have any institution assigned'
             ], 400);
         }
 
@@ -218,14 +259,22 @@ class StudentController extends Controller
      */
     public function exists(Request $request): JsonResponse
     {
-        // Get the authenticated user's default institution
+        // Get the authenticated user's institution
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
+        
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
         
         if (!$defaultInstitutionId) {
             return response()->json([
                 'success' => false, 
-                'error' => 'User does not have a default institution'
+                'error' => 'User does not have any institution assigned'
             ], 400);
         }
 
@@ -247,5 +296,78 @@ class StudentController extends Controller
         }
         $exists = $query->exists();
         return response()->json(['exists' => $exists]);
+    }
+
+    /**
+     * Search students for assignment to class sections.
+     */
+    public function searchForAssignment(Request $request): JsonResponse
+    {
+        $perPage = $request->get('per_page', 20);
+        $search = $request->get('search', '');
+        $excludeSectionId = $request->get('exclude_section_id');
+
+        // Get the authenticated user's default institution
+        $user = $request->user();
+        $defaultInstitutionId = $user->getDefaultInstitutionId();
+        Log::info('Default institution ID:', ['default_institution_id' => $defaultInstitutionId]);
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
+        
+        if (!$defaultInstitutionId) {
+            return response()->json([
+                'success' => false, 
+                'error' => 'User does not have any institution assigned'
+            ], 400);
+        }
+
+        $query = Student::query();
+
+        // Filter students by the user's institution
+        $query->whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
+            $q->where('institution_id', $defaultInstitutionId);
+        });
+
+        // Exclude students already assigned to the specified section
+        if ($excludeSectionId) {
+            $query->whereDoesntHave('studentSections', function ($q) use ($excludeSectionId) {
+                $q->where('section_id', $excludeSectionId);
+            });
+        }
+
+        // Search functionality - if search is empty, show at least 5 students
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', '%' . $search . '%')
+                  ->orWhere('middle_name', 'like', '%' . $search . '%')
+                  ->orWhere('last_name', 'like', '%' . $search . '%')
+                  ->orWhere('lrn', 'like', '%' . $search . '%');
+            });
+        } else {
+            // If no search term, limit to 5 students to show some options
+            $perPage = min($perPage, 5);
+        }
+
+        $students = $query->orderBy('last_name', 'asc')
+                         ->orderBy('first_name', 'asc')
+                         ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $students->items(),
+            'pagination' => [
+                'current_page' => $students->currentPage(),
+                'last_page' => $students->lastPage(),
+                'per_page' => $students->perPage(),
+                'total' => $students->total(),
+                'from' => $students->firstItem(),
+                'to' => $students->lastItem(),
+            ]
+        ]);
     }
 } 

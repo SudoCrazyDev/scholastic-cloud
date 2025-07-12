@@ -33,4 +33,22 @@ class ClassSection extends Model
     {
         return $this->belongsTo(Institution::class);
     }
+
+    /**
+     * Get the students that belong to this class section.
+     */
+    public function students()
+    {
+        return $this->belongsToMany(Student::class, 'student_sections', 'section_id', 'student_id')
+            ->withPivot('academic_year', 'is_active', 'is_promoted')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the student sections for this class section.
+     */
+    public function studentSections()
+    {
+        return $this->hasMany(StudentSection::class, 'section_id');
+    }
 } 

@@ -257,4 +257,76 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get the current user's class sections.
+     */
+    public function getMyClassSections(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $perPage = $request->get('per_page', 15);
+            $search = $request->get('search', '');
+            $institutionId = $request->get('institution_id');
+
+            // Get user's institution IDs
+            $userInstitutionIds = $user->userInstitutions()
+                ->pluck('institution_id')
+                ->toArray();
+
+            if (empty($userInstitutionIds)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is not associated with any institutions'
+                ], 403);
+            }
+
+            // Build query for class sections
+            $query = \App\Models\ClassSection::with(['institution', 'adviser', 'students'])
+                ->where(function ($q) use ($userInstitutionIds, $user) {
+                    // Class sections in user's institutions
+                    $q->whereIn('institution_id', $userInstitutionIds);
+                })
+                ->orWhere(function ($q) use ($user) {
+                    // Class sections where user is the adviser
+                    $q->where('adviser', $user->id);
+                });
+
+            // Filter by specific institution if provided
+            if ($institutionId && in_array($institutionId, $userInstitutionIds)) {
+                $query->where('institution_id', $institutionId);
+            }
+
+            // Search functionality
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('grade_level', 'like', "%{$search}%")
+                      ->orWhere('academic_year', 'like', "%{$search}%");
+                });
+            }
+
+            $classSections = $query->orderBy('created_at', 'desc')
+                                  ->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $classSections->items(),
+                'pagination' => [
+                    'current_page' => $classSections->currentPage(),
+                    'last_page' => $classSections->lastPage(),
+                    'per_page' => $classSections->perPage(),
+                    'total' => $classSections->total(),
+                    'from' => $classSections->firstItem(),
+                    'to' => $classSections->lastItem(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve class sections',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 } 

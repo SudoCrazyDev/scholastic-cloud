@@ -11,6 +11,7 @@ class StudentService {
     middle_name?: string
     last_name?: string
     lrn?: string
+    class_section_id?: string
   }) {
     const queryParams = new URLSearchParams()
     
@@ -24,6 +25,11 @@ class StudentService {
     const url = `${this.baseUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     const response = await api.get<PaginatedResponse<Student>>(url)
     
+    return response.data
+  }
+
+  async getStudentsByClassSection(sectionId: string) {
+    const response = await api.get<{ success: boolean; data: any[] }>(`/student-sections?section_id=${sectionId}`)
     return response.data
   }
 
@@ -53,6 +59,39 @@ class StudentService {
     last_name?: string
   }) {
     const response = await api.post<{ exists: boolean }>(`${this.baseUrl}/exists`, data)
+    return response.data
+  }
+
+  async assignStudentsToSection(data: {
+    student_ids: string[]
+    section_id: string
+    academic_year: string
+  }) {
+    const response = await api.post<{ success: boolean; message: string; data: any[] }>('/student-sections/bulk-assign', data)
+    return response.data
+  }
+
+  async searchStudentsForAssignment(params: {
+    search?: string
+    page?: number
+    per_page?: number
+    exclude_section_id?: string
+  }) {
+    const queryParams = new URLSearchParams()
+    
+    if (params?.search) queryParams.append('search', params.search)
+    if (params?.page) queryParams.append('page', params.page.toString())
+    if (params?.per_page) queryParams.append('per_page', params.per_page.toString())
+    if (params?.exclude_section_id) queryParams.append('exclude_section_id', params.exclude_section_id)
+
+    const url = `${this.baseUrl}/search-for-assignment${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    const response = await api.get<PaginatedResponse<Student>>(url)
+    
+    return response.data
+  }
+
+  async removeStudentFromSection(studentSectionId: string) {
+    const response = await api.delete<{ success: boolean; message: string }>(`/student-sections/${studentSectionId}`)
     return response.data
   }
 }
