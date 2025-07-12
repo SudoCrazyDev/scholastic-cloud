@@ -281,16 +281,32 @@ class UserController extends Controller
                 ], 403);
             }
 
-            // Build query for class sections
-            $query = \App\Models\ClassSection::with(['institution', 'adviser', 'students'])
-                ->where(function ($q) use ($userInstitutionIds, $user) {
-                    // Class sections in user's institutions
-                    $q->whereIn('institution_id', $userInstitutionIds);
-                })
-                ->orWhere(function ($q) use ($user) {
-                    // Class sections where user is the adviser
-                    $q->where('adviser', $user->id);
-                });
+            // Get user's role from default institution
+            $defaultUserInstitution = $user->userInstitutions()
+                ->where('is_default', true)
+                ->with('role')
+                ->first();
+
+            if (!$defaultUserInstitution || !$defaultUserInstitution->role) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User role not found'
+                ], 403);
+            }
+
+            $userRole = $defaultUserInstitution->role;
+            $userRoleSlug = $userRole->slug;
+
+            // Build query for class sections based on user role
+            $query = \App\Models\ClassSection::with(['institution', 'adviser', 'students']);
+
+            if ($userRoleSlug === 'subject-teacher') {
+                // Subject teachers see only class sections where they are the adviser
+                $query->where('adviser', $user->id);
+            } else {
+                // Principal and Institution Administrator see all class sections in their institutions
+                $query->whereIn('institution_id', $userInstitutionIds);
+            }
 
             // Filter by specific institution if provided
             if ($institutionId && in_array($institutionId, $userInstitutionIds)) {

@@ -51,4 +51,12 @@ class ClassSection extends Model
     {
         return $this->hasMany(StudentSection::class, 'section_id');
     }
+
+    /**
+     * Get the subjects that belong to this class section.
+     */
+    public function subjects()
+    {
+        return $this->hasMany(Subject::class, 'class_section_id');
+    }
 } 

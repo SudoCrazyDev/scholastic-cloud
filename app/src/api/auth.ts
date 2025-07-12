@@ -1,4 +1,5 @@
 import api from './index';
+import { queryClient } from '../providers/QueryProvider';
 
 export interface LoginCredentials {
   email: string;
@@ -35,6 +36,9 @@ export const authAPI = {
   logout: async (): Promise<void> => {
     await api.post('/auth/logout');
     localStorage.removeItem('auth_token');
+    
+    // Clear all cached queries
+    queryClient.clear();
   },
 
   // Get current user profile

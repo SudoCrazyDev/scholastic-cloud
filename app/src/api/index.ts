@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { queryClient } from '../providers/QueryProvider';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -29,6 +30,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
+      
+      // Clear all cached queries
+      queryClient.clear();
+      
       window.location.href = '/login';
     }
     return Promise.reject(error);

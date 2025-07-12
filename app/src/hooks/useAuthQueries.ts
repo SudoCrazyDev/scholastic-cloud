@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { authService } from '../services/authService';
 import type { LoginRequest } from '../../../shared/src/types/auth';
+import { queryClient } from '../providers/QueryProvider';
 
 export const useLogin = () => {
   return useMutation({
@@ -11,6 +12,10 @@ export const useLogin = () => {
 export const useLogout = () => {
   return useMutation({
     mutationFn: () => authService.logout(),
+    onSuccess: () => {
+      // Clear all cached queries on successful logout
+      queryClient.clear();
+    },
   });
 };
 

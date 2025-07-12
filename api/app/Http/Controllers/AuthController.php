@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -78,10 +79,9 @@ class AuthController extends Controller
         }
 
         // Load the user with all necessary relationships
-        $user->load(['role', 'anyRole', 'directRole', 'userInstitutions.role', 'userInstitutions.institution']);
-        
-        // Use the improved getRole method which handles fallback logic
-        $role = $user->directRole;
+        $user->load(['userInstitutions.role', 'userInstitutions.institution', 'directRole']);
+        // Use the getRole method which checks for default/main institutions first, then falls back to direct role
+        $role = $user->getRole();
         
         return response()->json([
             'data' => [

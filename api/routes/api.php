@@ -40,8 +40,8 @@ Route::middleware('auth.token')->group(function () {
     Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
     Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
     // User routes
-    Route::apiResource('users', UserController::class);
     Route::get('users/my/class-sections', [UserController::class, 'getMyClassSections']);
+    Route::apiResource('users', UserController::class);
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);

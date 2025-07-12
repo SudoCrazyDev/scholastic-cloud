@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import type { LoginResponse } from '../../../shared/src/types/auth';
 import { authService } from '../services/authService';
+import { queryClient } from '../providers/QueryProvider';
 
 interface AuthContextType {
   user: any | null;
@@ -73,6 +74,9 @@ export const useAuthState = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     localStorage.removeItem('token_expiry');
+    
+    // Clear all cached queries
+    queryClient.clear();
   };
 
   const refreshProfile = async () => {

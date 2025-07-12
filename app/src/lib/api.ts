@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { queryClient } from '../providers/QueryProvider';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
 
@@ -34,6 +35,10 @@ api.interceptors.response.use(
         // Clear auth data and redirect to login
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        
+        // Clear all cached queries
+        queryClient.clear();
+        
         window.location.href = '/login';
       }
     }
