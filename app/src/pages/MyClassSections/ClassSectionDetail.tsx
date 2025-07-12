@@ -110,7 +110,8 @@ const ClassSectionDetail: React.FC = () => {
   const createSubjectMutation = useMutation({
     mutationFn: (data: any) => subjectService.createSubject(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      refetchSubjects()
       setSubjectModalSuccess('Subject created successfully!')
       setTimeout(() => setSubjectModalSuccess(null), 3000)
     },
@@ -124,7 +125,8 @@ const ClassSectionDetail: React.FC = () => {
   const updateSubjectMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => subjectService.updateSubject(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      refetchSubjects()
       setSubjectModalSuccess('Subject updated successfully!')
       setTimeout(() => setSubjectModalSuccess(null), 3000)
     },
@@ -138,7 +140,8 @@ const ClassSectionDetail: React.FC = () => {
   const deleteSubjectMutation = useMutation({
     mutationFn: (id: string) => subjectService.deleteSubject(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      refetchSubjects()
       setSubjectDeleteConfirmation({ isOpen: false, subject: null, loading: false })
     },
     onError: (error: any) => {
@@ -151,7 +154,8 @@ const ClassSectionDetail: React.FC = () => {
     mutationFn: (subjectOrders: Array<{ id: string; order: number }>) => 
       subjectService.reorderSubjects(id!, subjectOrders),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      refetchSubjects()
     },
     onError: (error: any) => {
       console.error('Failed to reorder subjects:', error)
@@ -653,6 +657,7 @@ const ClassSectionDetail: React.FC = () => {
                   onDeleteSubject={handleDeleteSubject}
                   onReorderSubjects={handleReorderSubjects}
                   reordering={reorderSubjectsMutation.isPending}
+                  onRefetch={refetchSubjects}
                 />
               </motion.div>
             )}

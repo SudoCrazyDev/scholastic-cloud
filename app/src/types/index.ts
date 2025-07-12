@@ -179,10 +179,10 @@ export interface Subject {
   institution_id: string;
   class_section_id: string;
   adviser?: string; // User ID of the subject teacher
-  adviserUser?: User; // Full user object
+  adviser_user?: User; // Full user object
   subject_type: 'parent' | 'child';
   parent_subject_id?: string; // Reference to parent subject
-  parentSubject?: Subject; // Full parent subject object
+  parent_subject?: Subject; // Full parent subject object
   title: string;
   variant?: string; // Optional variant (e.g., "Sewing", "Machineries", "Plumbing")
   start_time?: string;
@@ -191,8 +191,8 @@ export interface Subject {
   order: number; // Order for sorting subjects
   created_at: string;
   updated_at: string;
-  childSubjects?: Subject[]; // For nested display
-  classSection?: ClassSection;
+  child_subjects?: Subject[]; // For nested display
+  class_section?: ClassSection;
   institution?: Institution;
 }
 

@@ -1,69 +1,215 @@
-import React, { useState, useRef, useCallback } from 'react'
-import { motion, Reorder } from 'framer-motion'
+/**
+ * SubjectList Component
+ * 
+ * Features:
+ * - Hierarchical display of parent and child subjects
+ * - Drag and drop reordering for parent subjects only
+ * - Visual indicators for subjects without teachers
+ * - Expandable/collapsible parent subjects
+ * - Edit and delete actions for subjects
+ * 
+ * Drag and Drop:
+ * - Only parent subjects can be reordered
+ * - Drag handle appears on hover (grip icon on the left)
+ * - Visual feedback during dragging (scaling, shadow, color change)
+ * - Disabled during reordering operations
+ * - Uses @dnd-kit/core and @dnd-kit/sortable for smooth interactions
+ */
+
+import React, { useState, useRef, useCallback, useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { 
   Plus,
   Edit,
   Trash2,
-  GripVertical,
   Clock,
   User,
   BookOpen,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  ArrowUp,
+  ArrowDown,
+  RefreshCw
 } from 'lucide-react'
 import { Button } from '../../../components/button'
 import { Badge } from '../../../components/badge'
-import { Alert } from '../../../components/alert'
 import type { Subject } from '../../../types'
 
 interface SubjectListProps {
   subjects: Subject[]
   loading?: boolean
-  error?: any
-  reordering?: boolean
+  error?: Error | null
   onCreateSubject: () => void
   onEditSubject: (subject: Subject) => void
   onDeleteSubject: (subject: Subject) => void
-  onReorderSubjects: (subjectOrders: Array<{ id: string; order: number }>) => Promise<void>
+  onReorderSubjects?: (subjectOrders: Array<{ id: string; order: number }>) => void
+  reordering?: boolean
+  onRefetch?: () => void
+}
+
+// Build hierarchical structure - moved outside component to prevent recreation
+const buildSubjectHierarchy = (subjects: Subject[]) => {
+  const subjectMap = new Map<string, Subject>()
+  const rootSubjects: Subject[] = []
+
+  // First pass: create map and identify root subjects
+  subjects.forEach(subject => {
+    subjectMap.set(subject.id, { ...subject, child_subjects: [] })
+    if (!subject.parent_subject_id) {
+      rootSubjects.push(subjectMap.get(subject.id)!)
+    }
+  })
+
+  // Second pass: build hierarchy
+  subjects.forEach(subject => {
+    if (subject.parent_subject_id && subjectMap.has(subject.parent_subject_id)) {
+      const parent = subjectMap.get(subject.parent_subject_id)!
+      if (!parent.child_subjects) parent.child_subjects = []
+      parent.child_subjects.push(subjectMap.get(subject.id)!)
+    }
+  })
+
+  return rootSubjects
+}
+
+// Utility function - moved outside component to prevent recreation
+const getFullName = (user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => {
+  const parts = [user?.first_name, user?.middle_name, user?.last_name, user?.ext_name]
+  return parts.filter(Boolean).join(' ')
+}
+
+// Regular Subject Item Component - moved outside to prevent hook ordering issues
+const SubjectItem = ({ 
+  subject, 
+  index = 0, 
+  isChild = false,
+  onEditSubject,
+  onDeleteSubject
+}: { 
+  subject: Subject; 
+  index?: number; 
+  isChild?: boolean;
+  onEditSubject: (subject: Subject) => void;
+  onDeleteSubject: (subject: Subject) => void;
+}) => {
+  const hasNoAdviser = !subject.adviser_user
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className={`group relative p-4 rounded-lg border-2 transition-all duration-200 ${
+        hasNoAdviser 
+          ? 'border-red-200 bg-red-50'
+          : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md'
+      } ${isChild ? 'ml-6 border-l-4 border-l-indigo-200' : ''}`}
+    >
+      {/* Main Content */}
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center space-x-2 mb-2">
+            <BookOpen className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-indigo-600' : 'text-green-600'}`} />
+            <div className="flex-1 min-w-0">
+              <h3 className={`font-semibold truncate ${hasNoAdviser ? 'text-red-700' : 'text-gray-900'}`}>
+                {subject.title}
+                {subject.variant && (
+                  <span className="text-gray-600 font-normal ml-1">
+                    - {subject.variant}
+                  </span>
+                )}
+              </h3>
+            </div>
+            <Badge color={subject.subject_type === 'parent' ? 'green' : 'blue'}>
+              {subject.subject_type}
+            </Badge>
+            {hasNoAdviser && (
+              <div title="No teacher assigned">
+                <AlertCircle className="w-4 h-4 text-red-500" />
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-1">
+            {subject.start_time && subject.end_time && (
+              <div className="flex items-center text-sm text-gray-600">
+                <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span>{subject.start_time} - {subject.end_time}</span>
+              </div>
+            )}
+            {subject.adviser_user && (
+              <div className="flex items-center text-sm text-gray-600">
+                <User className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span className="truncate">
+                  {getFullName(subject.adviser_user)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-3">
+          <Button
+            onClick={() => onEditSubject(subject)}
+            variant="ghost"
+            size="sm"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            onClick={() => onDeleteSubject(subject)}
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  )
 }
 
 export const SubjectList: React.FC<SubjectListProps> = ({
   subjects,
   loading = false,
   error,
-  reordering = false,
   onCreateSubject,
   onEditSubject,
   onDeleteSubject,
   onReorderSubjects,
+  reordering = false,
+  onRefetch,
 }) => {
-  const [isDragging, setIsDragging] = useState(false)
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
-  const [draggedSubject, setDraggedSubject] = useState<Subject | null>(null)
-  const [dragOverSubject, setDragOverSubject] = useState<string | null>(null)
-  const [alert, setAlert] = useState<{
-    type: 'success' | 'error';
-    message: string;
-    show: boolean;
-  } | null>(null)
-  
-  // State for debounced reordering
-  const [localSubjects, setLocalSubjects] = useState<Subject[]>(subjects)
-  const [pendingChanges, setPendingChanges] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [orderedSubjects, setOrderedSubjects] = useState<Subject[]>(subjects)
+  const subjectsRef = useRef<Subject[]>(subjects)
+  const reorderTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [moveAnimationKey, setMoveAnimationKey] = useState(0)
 
-  // Update local subjects when props change
+  // Update ordered subjects when props change - use ref to avoid dependency issues
   React.useEffect(() => {
-    setLocalSubjects(subjects)
+    const subjectsIds = subjects.map(s => s.id).join(',')
+    const currentIds = subjectsRef.current.map(s => s.id).join(',')
+    
+    if (subjectsIds !== currentIds) {
+      subjectsRef.current = subjects
+      setOrderedSubjects(subjects)
+    }
   }, [subjects])
 
-  const getFullName = (user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => {
-    const parts = [user?.first_name, user?.middle_name, user?.last_name, user?.ext_name]
-    return parts.filter(Boolean).join(' ')
-  }
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (reorderTimeoutRef.current) {
+        clearTimeout(reorderTimeoutRef.current)
+      }
+    }
+  }, [])
 
-  const toggleParentExpansion = (parentId: string) => {
+  const toggleParentExpansion = useCallback((parentId: string) => {
     setExpandedParents(prev => {
       const newSet = new Set(prev)
       if (newSet.has(parentId)) {
@@ -73,259 +219,28 @@ export const SubjectList: React.FC<SubjectListProps> = ({
       }
       return newSet
     })
-  }
+  }, [])
 
-  const isParentExpanded = (parentId: string) => expandedParents.has(parentId)
+  const isParentExpanded = useCallback((parentId: string) => expandedParents.has(parentId), [expandedParents])
 
-  // Helper function to flatten hierarchical subjects for reordering
-  const flattenSubjectsForReorder = (subjects: Subject[]): Subject[] => {
-    const result: Subject[] = []
-    subjects.forEach(subject => {
-      result.push(subject)
-      if (subject.childSubjects && subject.childSubjects.length > 0) {
-        result.push(...flattenSubjectsForReorder(subject.childSubjects))
-      }
-    })
-    return result
-  }
+  const hierarchicalSubjects = useMemo(() => buildSubjectHierarchy(orderedSubjects), [orderedSubjects])
 
-  // Debounced save function
-  const debouncedSave = useCallback((subjectOrders: Array<{ id: string; order: number }>) => {
-    // Clear any existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current)
+  // Helper to move parent subject up/down
+  const moveParentSubject = (fromIdx: number, toIdx: number) => {
+    if (toIdx < 0 || toIdx >= orderedSubjects.length) return
+    const newOrder = [...orderedSubjects]
+    const [moved] = newOrder.splice(fromIdx, 1)
+    newOrder.splice(toIdx, 0, moved)
+    setOrderedSubjects(newOrder)
+    setMoveAnimationKey(prev => prev + 1)
+    // Debounce API call
+    if (onReorderSubjects) {
+      if (reorderTimeoutRef.current) clearTimeout(reorderTimeoutRef.current)
+      reorderTimeoutRef.current = setTimeout(() => {
+        const subjectOrders = newOrder.map((subject, idx) => ({ id: subject.id, order: idx + 1 }))
+        onReorderSubjects(subjectOrders)
+      }, 500)
     }
-
-    // Set new timeout for 2 seconds
-    debounceTimeoutRef.current = setTimeout(async () => {
-      try {
-        setIsSaving(true)
-        setPendingChanges(false)
-        
-        await onReorderSubjects(subjectOrders)
-        
-        // Show success message
-        setAlert({
-          type: 'success',
-          message: 'Subjects reordered successfully!',
-          show: true
-        })
-        
-        // Auto-hide success message after 3 seconds
-        setTimeout(() => {
-          setAlert(null)
-        }, 3000)
-      } catch (error) {
-        console.error('Failed to reorder subjects:', error)
-        // Show error message to user
-        setAlert({
-          type: 'error',
-          message: 'Failed to reorder subjects. Please try again.',
-          show: true
-        })
-        
-        // Reset local subjects to match server state
-        setLocalSubjects(subjects)
-      } finally {
-        setIsSaving(false)
-      }
-    }, 2000) // 2 second delay
-  }, [onReorderSubjects, subjects])
-
-  // Drag and drop handlers
-  const handleDragStart = (subject: Subject) => {
-    setDraggedSubject(subject)
-    setIsDragging(true)
-  }
-
-  const handleDragEnd = () => {
-    setIsDragging(false)
-    setDraggedSubject(null)
-    setDragOverSubject(null)
-  }
-
-  const handleDragOver = (e: React.DragEvent, subjectId: string) => {
-    e.preventDefault()
-    setDragOverSubject(subjectId)
-  }
-
-  const handleDrop = (e: React.DragEvent, targetSubjectId: string) => {
-    e.preventDefault()
-    if (!draggedSubject || draggedSubject.id === targetSubjectId) return
-
-    const newSubjects = [...localSubjects]
-    const draggedIndex = newSubjects.findIndex(s => s.id === draggedSubject.id)
-    const targetIndex = newSubjects.findIndex(s => s.id === targetSubjectId)
-
-    if (draggedIndex !== -1 && targetIndex !== -1) {
-      // Remove dragged item
-      const [draggedItem] = newSubjects.splice(draggedIndex, 1)
-      // Insert at target position
-      newSubjects.splice(targetIndex, 0, draggedItem)
-
-      setLocalSubjects(newSubjects)
-      setPendingChanges(true)
-
-      // Create new order array
-      const subjectOrders = newSubjects.map((subject, index) => ({
-        id: subject.id,
-        order: index + 1
-      }))
-
-      // Debounced save
-      debouncedSave(subjectOrders)
-    }
-  }
-
-  // Build hierarchical structure
-  const buildSubjectHierarchy = (subjects: Subject[]) => {
-    const subjectMap = new Map<string, Subject>()
-    const rootSubjects: Subject[] = []
-
-    // First pass: create map and identify root subjects
-    subjects.forEach(subject => {
-      subjectMap.set(subject.id, { ...subject, childSubjects: [] })
-      if (!subject.parent_subject_id) {
-        rootSubjects.push(subjectMap.get(subject.id)!)
-      }
-    })
-
-    // Second pass: build hierarchy
-    subjects.forEach(subject => {
-      if (subject.parent_subject_id && subjectMap.has(subject.parent_subject_id)) {
-        const parent = subjectMap.get(subject.parent_subject_id)!
-        if (!parent.childSubjects) parent.childSubjects = []
-        parent.childSubjects.push(subjectMap.get(subject.id)!)
-      }
-    })
-
-    return rootSubjects
-  }
-
-  const hierarchicalSubjects = buildSubjectHierarchy(localSubjects)
-
-  const SubjectItem = ({ subject, level = 0, index = 0 }: { subject: Subject; level?: number; index?: number }) => {
-    const hasChildren = subject.childSubjects && subject.childSubjects.length > 0
-    const isExpanded = isParentExpanded(subject.id)
-    const hasNoAdviser = !subject.adviserUser
-
-    return (
-      <motion.div
-        key={subject.id}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.05 }}
-        className={`relative group ${hasNoAdviser ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'} rounded-lg p-4 border hover:border-gray-300 transition-colors`}
-        draggable
-        onDragStart={() => handleDragStart(subject)}
-        onDragEnd={handleDragEnd}
-        onDragOver={(e) => handleDragOver(e, subject.id)}
-        onDrop={(e) => handleDrop(e, subject.id)}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3 flex-1">
-            {/* Drag handle */}
-            <div className="flex-shrink-0 cursor-grab active:cursor-grabbing">
-              <GripVertical className="w-4 h-4 text-gray-400" />
-            </div>
-
-            {/* Subject info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2">
-                <h4 className={`text-sm font-medium ${hasNoAdviser ? 'text-red-700' : 'text-gray-900'}`}>
-                  {subject.title}
-                  {subject.variant && (
-                    <span className="text-gray-500 ml-2">({subject.variant})</span>
-                  )}
-                </h4>
-                {hasNoAdviser && (
-                  <div title="No teacher assigned">
-                    <AlertCircle className="w-4 h-4 text-red-500" />
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-4 mt-1">
-                <Badge color={subject.subject_type === 'parent' ? 'green' : 'blue'}>
-                  {subject.subject_type}
-                </Badge>
-                {subject.start_time && subject.end_time && (
-                  <div className="flex items-center space-x-1 text-xs text-gray-500">
-                    <Clock className="w-3 h-3" />
-                    <span>{subject.start_time} - {subject.end_time}</span>
-                  </div>
-                )}
-                {subject.adviserUser && (
-                  <div className="flex items-center space-x-1 text-xs text-gray-500">
-                    <User className="w-3 h-3" />
-                    <span>{getFullName(subject.adviserUser)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Expand/collapse button for parent subjects */}
-            {hasChildren && (
-              <button
-                onClick={() => toggleParentExpansion(subject.id)}
-                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                {isExpanded ? (
-                  <BookOpen className="w-4 h-4" />
-                ) : (
-                  <BookOpen className="w-4 h-4" />
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-3">
-            <div title="Edit subject">
-              <Button
-                onClick={() => onEditSubject(subject)}
-                variant="ghost"
-                size="sm"
-                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-              >
-                <Edit className="w-4 h-4" />
-              </Button>
-            </div>
-            <div title="Delete subject">
-              <Button
-                onClick={() => onDeleteSubject(subject)}
-                variant="ghost"
-                size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Reorder indicator */}
-        {isDragging && dragOverSubject === subject.id && (
-          <div className="absolute inset-0 bg-indigo-50 border-2 border-dashed border-indigo-300 rounded-lg flex items-center justify-center">
-            <span className="text-indigo-600 font-medium">Drop to reorder</span>
-          </div>
-        )}
-
-        {/* Child subjects */}
-        {hasChildren && isExpanded && (
-          <div className="mt-3 ml-6 space-y-2">
-            {subject.childSubjects!.map((child, childIndex) => (
-              <SubjectItem
-                key={child.id}
-                subject={child}
-                level={level + 1}
-                index={childIndex}
-              />
-            ))}
-          </div>
-        )}
-      </motion.div>
-    )
   }
 
   if (loading) {
@@ -338,67 +253,56 @@ export const SubjectList: React.FC<SubjectListProps> = ({
 
   if (error) {
     return (
-      <Alert
-        type="error"
-        message="Failed to load subjects"
-        show={true}
-      />
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+          <p className="text-red-600 font-medium">Failed to load subjects</p>
+          <p className="text-gray-500 text-sm">Please try again later</p>
+        </div>
+      </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Alert */}
-      {alert && (
-        <Alert
-          type={alert.type}
-          message={alert.message}
-          show={alert.show}
-          onClose={() => setAlert(null)}
-        />
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium text-gray-900">Class Subjects</h3>
           <p className="text-sm text-gray-600">
             Manage subjects and their teachers for this class section
+            {reordering && (
+              <span className="ml-2 inline-flex items-center text-blue-600">
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                Saving order...
+              </span>
+            )}
           </p>
         </div>
-        <Button
-          onClick={onCreateSubject}
-          size="sm"
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Subject
-        </Button>
+        <div className="flex items-center space-x-2">
+          {onRefetch && (
+            <Button
+              onClick={onRefetch}
+              variant="outline"
+              size="sm"
+              disabled={loading || reordering}
+              className="text-gray-600 hover:text-gray-700"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          )}
+          <Button
+            onClick={onCreateSubject}
+            size="sm"
+            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={reordering}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Subject
+          </Button>
+        </div>
       </div>
-
-      {/* Pending Changes Indicator */}
-      {pendingChanges && (
-        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
-            <p className="text-sm text-yellow-700">
-              Changes will be saved automatically in a few seconds...
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Reordering Indicator */}
-      {reordering && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-            <p className="text-sm text-blue-700">
-              Reordering subjects...
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Subjects List */}
       {hierarchicalSubjects.length === 0 ? (
@@ -417,15 +321,59 @@ export const SubjectList: React.FC<SubjectListProps> = ({
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <motion.div key={moveAnimationKey} layout className="space-y-3">
           {hierarchicalSubjects.map((subject, index) => (
-            <SubjectItem
-              key={subject.id}
-              subject={subject}
-              index={index}
-            />
+            <div key={subject.id} className="space-y-2">
+              {/* Parent Subject */}
+              <div className="relative w-full">
+                <div className="flex items-center w-full">
+                  {/* Up/Down arrows for parent subjects only */}
+                  <div className="flex flex-col mr-2">
+                    <button
+                      className={`p-1 ${index === 0 || reordering ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                      onClick={() => moveParentSubject(index, index - 1)}
+                      disabled={index === 0 || reordering}
+                      aria-label="Move up"
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                    </button>
+                    <button
+                      className={`p-1 ${index === hierarchicalSubjects.length - 1 || reordering ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                      onClick={() => moveParentSubject(index, index + 1)}
+                      disabled={index === hierarchicalSubjects.length - 1 || reordering}
+                      aria-label="Move down"
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <SubjectItem 
+                      subject={subject} 
+                      index={index} 
+                      onEditSubject={onEditSubject}
+                      onDeleteSubject={onDeleteSubject}
+                    />
+                  </div>
+                </div>
+              </div>
+              {/* Child Subjects */}
+              {subject.child_subjects && subject.child_subjects.length > 0 && isParentExpanded(subject.id) && (
+                <div className="ml-6 space-y-2">
+                  {subject.child_subjects.map((child: Subject, childIndex: number) => (
+                    <SubjectItem 
+                      key={child.id} 
+                      subject={child} 
+                      index={childIndex} 
+                      isChild={true} 
+                      onEditSubject={onEditSubject}
+                      onDeleteSubject={onDeleteSubject}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       {/* Legend */}

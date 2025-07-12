@@ -95,7 +95,7 @@ const ClassSections: React.FC = () => {
 
     // First pass: create map and identify root subjects
     subjects.forEach(subject => {
-      subjectMap.set(subject.id, { ...subject, childSubjects: [] })
+      subjectMap.set(subject.id, { ...subject, child_subjects: [] })
       if (!subject.parent_subject_id) {
         rootSubjects.push(subjectMap.get(subject.id)!)
       }
@@ -105,8 +105,8 @@ const ClassSections: React.FC = () => {
     subjects.forEach(subject => {
       if (subject.parent_subject_id && subjectMap.has(subject.parent_subject_id)) {
         const parent = subjectMap.get(subject.parent_subject_id)!
-        if (!parent.childSubjects) parent.childSubjects = []
-        parent.childSubjects.push(subjectMap.get(subject.id)!)
+        if (!parent.child_subjects) parent.child_subjects = []
+        parent.child_subjects.push(subjectMap.get(subject.id)!)
       }
     })
 

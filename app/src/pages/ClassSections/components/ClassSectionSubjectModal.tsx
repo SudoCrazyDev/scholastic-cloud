@@ -55,8 +55,11 @@ const validationSchema = Yup.object().shape({
       return new Date(`2000-01-01T${value}`) > new Date(`2000-01-01T${start_time}`)
     }),
   adviser: Yup.string()
-    .nullable()
-    .optional(),
+    .when('subject_type', {
+      is: 'child',
+      then: (schema) => schema.required('Subject teacher is required for child subjects'),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
   is_limited_student: Yup.boolean()
     .optional(),
 })
@@ -144,12 +147,12 @@ export function ClassSectionSubjectModal({
           is_limited_student: subject.is_limited_student || false,
         })
         
-        // Find the teacher if adviser is set
-        if (subject.adviser && subject.adviserUser) {
+        // Set the teacher if adviser is set
+        if (subject.adviser && subject.adviser_user) {
           setSelectedTeacher({
             id: subject.adviser,
-            label: getFullName(subject.adviserUser),
-            description: subject.adviserUser.email
+            label: getFullName(subject.adviser_user),
+            description: subject.adviser_user.email
           })
         } else {
           setSelectedTeacher(null)
@@ -163,18 +166,18 @@ export function ClassSectionSubjectModal({
       setTeacherSearchQuery('')
       setDebouncedSearchQuery('')
     }
-  }, [isOpen, subject])
+  }, [isOpen, subject?.id])
 
-  // Separate effect to handle teacher selection when subject.adviserUser becomes available
+  // Handle teacher selection when subject's adviser user data becomes available
   useEffect(() => {
-    if (isOpen && subject && subject.adviser && subject.adviserUser && !selectedTeacher) {
+    if (isOpen && subject && subject.adviser && subject.adviser_user && !selectedTeacher) {
       setSelectedTeacher({
         id: subject.adviser,
-        label: getFullName(subject.adviserUser),
-        description: subject.adviserUser.email
+        label: getFullName(subject.adviser_user),
+        description: subject.adviser_user.email
       })
     }
-  }, [isOpen, subject, selectedTeacher, getFullName])
+  }, [isOpen, subject?.adviser_user, selectedTeacher])
 
   // Clear parent_subject_id when switching from child to parent subject type
   useEffect(() => {
@@ -361,8 +364,8 @@ export function ClassSectionSubjectModal({
                                         {selectedParent.start_time && selectedParent.end_time && (
                                           <p><strong>Schedule:</strong> {selectedParent.start_time} - {selectedParent.end_time}</p>
                                         )}
-                                        {selectedParent.adviserUser ? (
-                                          <p><strong>Teacher:</strong> {selectedParent.adviserUser.first_name} {selectedParent.adviserUser.last_name}</p>
+                                        {selectedParent.adviser_user ? (
+                                          <p><strong>Teacher:</strong> {selectedParent.adviser_user.first_name} {selectedParent.adviser_user.last_name}</p>
                                         ) : (
                                           <p className="text-red-600"><strong>Teacher:</strong> No teacher assigned</p>
                                         )}

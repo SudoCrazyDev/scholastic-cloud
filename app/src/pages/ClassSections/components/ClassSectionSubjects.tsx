@@ -75,8 +75,8 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
     const result: Subject[] = []
     subjects.forEach(subject => {
       result.push(subject)
-      if (subject.childSubjects && subject.childSubjects.length > 0) {
-        result.push(...flattenSubjectsForReorder(subject.childSubjects))
+      if (subject.child_subjects && subject.child_subjects.length > 0) {
+        result.push(...flattenSubjectsForReorder(subject.child_subjects))
       }
     })
     return result
@@ -266,11 +266,11 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
               <ClockIcon className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>{subject.start_time} - {subject.end_time}</span>
             </div>
-            {subject.adviserUser && (
+            {subject.adviser_user && (
               <div className="flex items-center text-sm text-gray-600">
                 <UserIcon className="w-4 h-4 mr-2 flex-shrink-0" />
                 <span className="truncate">
-                  {subject.adviserUser.first_name} {subject.adviserUser.last_name}
+                  {subject.adviser_user.first_name} {subject.adviser_user.last_name}
                 </span>
               </div>
             )}
@@ -390,7 +390,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
                 {/* Parent Subject */}
                 <div className="relative w-full">
                   <div className="flex items-center w-full">
-                    {subject.childSubjects && subject.childSubjects.length > 0 && (
+                    {subject.child_subjects && subject.child_subjects.length > 0 && (
                       <button
                         onClick={() => toggleParentExpansion(subject.id)}
                         className="p-1 text-gray-400 hover:text-gray-600 transition-colors mr-2 flex-shrink-0"
@@ -409,9 +409,9 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
                 </div>
 
                 {/* Child Subjects */}
-                {subject.childSubjects && subject.childSubjects.length > 0 && isParentExpanded(subject.id) && (
+                {subject.child_subjects && subject.child_subjects.length > 0 && isParentExpanded(subject.id) && (
                   <div className="ml-6 space-y-2">
-                    {subject.childSubjects.map((child: Subject) => (
+                    {subject.child_subjects.map((child: Subject) => (
                       <SubjectItem key={child.id} subject={child} isChild={true} />
                     ))}
                   </div>

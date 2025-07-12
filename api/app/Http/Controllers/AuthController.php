@@ -77,18 +77,12 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // Load the main role relationship first
-        $user->load('role');
+        // Load the user with all necessary relationships
+        $user->load(['role', 'anyRole', 'directRole', 'userInstitutions.role', 'userInstitutions.institution']);
         
-        // Get the main role or fallback to any available role
-        $role = $user->role;
+        // Use the improved getRole method which handles fallback logic
+        $role = $user->directRole;
         
-        // If no main role found, try to get any available role
-        if (!$role) {
-            $user->load('anyRole');
-            $role = $user->anyRole;
-        }
-
         return response()->json([
             'data' => [
                 'id' => $user->id,
@@ -105,6 +99,22 @@ class AuthController extends Controller
                     'title' => $role->title,
                     'slug' => $role->slug,
                 ] : null,
+                'user_institutions' => $user->userInstitutions->map(function ($userInstitution) {
+                    return [
+                        'institution_id' => $userInstitution->institution_id,
+                        'role_id' => $userInstitution->role_id,
+                        'is_default' => $userInstitution->is_default,
+                        'is_main' => $userInstitution->is_main,
+                        'role' => $userInstitution->role ? [
+                            'title' => $userInstitution->role->title,
+                            'slug' => $userInstitution->role->slug,
+                        ] : null,
+                        'institution' => $userInstitution->institution ? [
+                            'id' => $userInstitution->institution->id,
+                            'name' => $userInstitution->institution->name,
+                        ] : null,
+                    ];
+                }),
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
             ]
