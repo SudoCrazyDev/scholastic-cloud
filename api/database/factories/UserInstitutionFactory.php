@@ -23,8 +23,8 @@ class UserInstitutionFactory extends Factory
             'user_id' => User::factory(),
             'institution_id' => Institution::factory(),
             'role_id' => Role::factory(),
-            'is_default' => $this->faker->boolean(80), // 80% chance of being default
-            'is_main' => $this->faker->boolean(20), // 20% chance of being main
+            'is_default' => fake()->boolean(80), // 80% chance of being default
+            'is_main' => fake()->boolean(20), // 20% chance of being main
         ];
     }
 

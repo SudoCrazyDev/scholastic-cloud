@@ -17,7 +17,7 @@ class RoleFactory extends Factory
      */
     public function definition(): array
     {
-        $title = $this->faker->unique()->jobTitle();
+        $title = fake()->unique()->jobTitle();
         
         return [
             'title' => $title,
