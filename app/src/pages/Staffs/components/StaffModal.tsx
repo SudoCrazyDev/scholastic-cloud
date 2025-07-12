@@ -192,12 +192,9 @@ const StaffModal: React.FC<StaffModalProps> = ({
                         value={form.gender}
                         onChange={handleSelectChange}
                         required
-                      >
-                        <option value="" disabled>Select gender</option>
-                        {genderOptions.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </Select>
+                        placeholder="Select gender"
+                        options={genderOptions}
+                      />
                     </div>
                     <Input 
                       label="Birthdate" 
@@ -263,12 +260,12 @@ const StaffModal: React.FC<StaffModalProps> = ({
                       value={form.role_id}
                       onChange={handleSelectChange}
                       required
-                    >
-                      <option value="" disabled>Select a role</option>
-                      {roles.map(role => (
-                        <option key={role.id} value={role.id}>{role.title}</option>
-                      ))}
-                    </Select>
+                      placeholder="Select a role"
+                      options={roles.map(role => ({
+                        value: role.id.toString(),
+                        label: role.title
+                      }))}
+                    />
                   </div>
                 </div>
               </form>

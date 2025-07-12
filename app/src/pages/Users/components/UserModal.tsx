@@ -354,12 +354,13 @@ export function UserModal({
                         value={formData.gender}
                         onChange={(e) => handleFieldChange('gender', e.target.value)}
                         disabled={loading}
-                      >
-                        <option value="">Select gender</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="other">Other</option>
-                      </Select>
+                        placeholder="Select gender"
+                        options={[
+                          { value: "male", label: "Male" },
+                          { value: "female", label: "Female" },
+                          { value: "other", label: "Other" }
+                        ]}
+                      />
                       {errors.gender && (
                         <p className="mt-1 text-sm text-red-600">{errors.gender}</p>
                       )}
@@ -422,14 +423,12 @@ export function UserModal({
                         value={formData.role_id}
                         onChange={(e) => handleFieldChange('role_id', e.target.value)}
                         disabled={loading}
-                      >
-                        <option value="">Select a role</option>
-                        {roles.map((role) => (
-                          <option key={role.id} value={role.id}>
-                            {role.title}
-                          </option>
-                        ))}
-                      </Select>
+                        placeholder="Select a role"
+                        options={roles.map((role) => ({
+                          value: role.id.toString(),
+                          label: role.title
+                        }))}
+                      />
                       {errors.role_id && (
                         <p className="mt-1 text-sm text-red-600">{errors.role_id}</p>
                       )}
@@ -449,16 +448,14 @@ export function UserModal({
                             }
                           }}
                           disabled={loading}
-                        >
-                          <option value="">Add an institution...</option>
-                          {institutions
+                          placeholder="Add an institution..."
+                          options={institutions
                             .filter(inst => !formData.institution_ids.includes(inst.id))
-                            .map((institution) => (
-                              <option key={institution.id} value={institution.id}>
-                                {institution.title}
-                              </option>
-                            ))}
-                        </Select>
+                            .map((institution) => ({
+                              value: institution.id,
+                              label: institution.title
+                            }))}
+                        />
                         
                         {selectedInstitutions.length > 0 && (
                           <div className="space-y-2">

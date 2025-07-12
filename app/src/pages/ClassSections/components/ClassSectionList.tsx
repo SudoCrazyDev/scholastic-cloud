@@ -37,6 +37,12 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
   onDelete,
   loading = false,
 }) => {
+  // Convert grade levels to SelectOption format
+  const gradeOptions = [
+    { value: '', label: 'All Grade Levels' },
+    ...gradeLevels.map(grade => ({ value: grade, label: grade }))
+  ]
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="mb-6">
@@ -52,12 +58,8 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
             <Select
               value={gradeFilter}
               onChange={(e) => onGradeFilterChange(e.target.value)}
-            >
-              <option value="">All Grade Levels</option>
-              {gradeLevels.map(grade => (
-                <option key={grade} value={grade}>{grade}</option>
-              ))}
-            </Select>
+              options={gradeOptions}
+            />
           </div>
 
           {/* Search */}

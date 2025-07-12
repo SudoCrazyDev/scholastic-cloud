@@ -198,12 +198,12 @@ export function ClassSectionModal({
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
                     className={formik.touched.grade_level && formik.errors.grade_level ? 'border-red-500' : ''}
-                  >
-                    <option value="">Select grade level</option>
-                    {gradeLevels.map(grade => (
-                      <option key={grade} value={grade}>{grade}</option>
-                    ))}
-                  </Select>
+                    placeholder="Select grade level"
+                    options={gradeLevels.map(grade => ({
+                      value: grade,
+                      label: grade
+                    }))}
+                  />
                   {formik.touched.grade_level && formik.errors.grade_level && (
                     <p className="mt-1 text-sm text-red-600">{formik.errors.grade_level}</p>
                   )}

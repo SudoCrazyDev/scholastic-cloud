@@ -64,6 +64,7 @@ export const useInstitutions = (options: UseInstitutionsOptions = {}) => {
   })
 
   const subscriptions = subscriptionsResponse?.data || []
+  console.log('Subscriptions in useInstitutions:', subscriptions)
 
   // Create institution mutation
   const createMutation = useMutation({

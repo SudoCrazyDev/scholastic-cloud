@@ -20,7 +20,9 @@ class SubscriptionService {
     if (params?.sortDirection) queryParams.append('sort_direction', params.sortDirection)
 
     const url = `${this.baseUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    console.log('Fetching subscriptions from:', url)
     const response = await api.get<PaginatedResponse<Subscription>>(url)
+    console.log('Subscriptions response:', response.data)
     
     return response.data
   }

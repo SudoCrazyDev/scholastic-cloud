@@ -26,6 +26,7 @@ export function InstitutionModal({
   loading = false,
   error = null 
 }: InstitutionModalProps) {
+  console.log('InstitutionModal subscriptions:', subscriptions)
   const [formData, setFormData] = useState({
     title: '',
     abbr: '',
@@ -279,14 +280,14 @@ export function InstitutionModal({
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleFieldChange('subscription_id', e.target.value)}
                       disabled={loading}
                       className="w-full"
-                    >
-                      <option value="">Select a subscription (optional)</option>
-                      {subscriptions.map((subscription) => (
-                        <option key={subscription.id} value={subscription.id}>
-                          {subscription.title} - ${subscription.price}
-                        </option>
-                      ))}
-                    </Select>
+                      placeholder="Select a subscription (optional)"
+                      options={[
+                        ...subscriptions.map((subscription) => ({
+                          value: subscription.id.toString(),
+                          label: `${subscription.title} - $${subscription.price}`
+                        }))
+                      ]}
+                    />
                     <p className="mt-1 text-xs text-gray-500">
                       Optional: Assign a subscription to this institution
                     </p>
