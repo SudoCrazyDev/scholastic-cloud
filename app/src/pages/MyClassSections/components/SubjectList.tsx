@@ -207,7 +207,7 @@ export const SubjectList: React.FC<SubjectListProps> = ({
   const SubjectItem = ({ subject, level = 0, index = 0 }: { subject: Subject; level?: number; index?: number }) => {
     const hasChildren = subject.childSubjects && subject.childSubjects.length > 0
     const isExpanded = isParentExpanded(subject.id)
-    const hasNoAdviser = subject.subject_type === 'child' && !subject.adviserUser
+    const hasNoAdviser = !subject.adviserUser
 
     return (
       <motion.div

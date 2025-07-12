@@ -7,6 +7,7 @@ import { Alert } from '../../components/alert'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Badge } from '../../components/badge'
+import { CreateStudentModal } from './components/CreateStudentModal'
 import { 
   Search, 
   Users, 
@@ -15,14 +16,17 @@ import {
   Building2,
   User,
   ArrowRight,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react'
-import type { ClassSection } from '../../types'
+import type { ClassSection, Student } from '../../types'
 
 const MyClassSections: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [searchValue, setSearchValue] = useState('')
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [selectedClassSection, setSelectedClassSection] = useState<ClassSection | null>(null)
   
   const {
     classSections,
@@ -40,6 +44,21 @@ const MyClassSections: React.FC = () => {
 
   const handleClassSectionClick = (classSection: ClassSection) => {
     navigate(`/my-class-sections/${classSection.id}`)
+  }
+
+  const handleCreateStudent = (classSection: ClassSection) => {
+    setSelectedClassSection(classSection)
+    setIsCreateModalOpen(true)
+  }
+
+  const handleCreateModalClose = () => {
+    setIsCreateModalOpen(false)
+    setSelectedClassSection(null)
+  }
+
+  const handleCreateSuccess = (student: Student) => {
+    // Optionally navigate to the class section detail or show success message
+    console.log('Student created successfully:', student)
   }
 
   const getFullName = (user: any) => {
@@ -80,18 +99,20 @@ const MyClassSections: React.FC = () => {
             Manage and view your assigned class sections
           </p>
         </div>
-        <Button
-          onClick={() => refetch()}
-          disabled={loading}
-          variant="outline"
-          size="sm"
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            'Refresh'
-          )}
-        </Button>
+        <div className="flex items-center space-x-3">
+          <Button
+            onClick={() => refetch()}
+            disabled={loading}
+            variant="outline"
+            size="sm"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              'Refresh'
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -138,7 +159,35 @@ const MyClassSections: React.FC = () => {
                     {classSection.grade_level}
                   </Badge>
                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                <div className="flex items-center space-x-2">
+                  {/* <Button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedClassSection(null)
+                      setIsCreateModalOpen(true)
+                    }}
+                    variant="solid"
+                    color="primary"
+                    size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Create New Student
+                  </Button>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCreateStudent(classSection)
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Student
+                  </Button> */}
+                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -182,6 +231,14 @@ const MyClassSections: React.FC = () => {
           </p>
         </motion.div>
       )}
+
+      {/* Create Student Modal */}
+      <CreateStudentModal
+        isOpen={isCreateModalOpen}
+        onClose={handleCreateModalClose}
+        classSection={selectedClassSection}
+        onSuccess={handleCreateSuccess}
+      />
     </motion.div>
   )
 }

@@ -55,11 +55,8 @@ const validationSchema = Yup.object().shape({
       return new Date(`2000-01-01T${value}`) > new Date(`2000-01-01T${start_time}`)
     }),
   adviser: Yup.string()
-    .when('subject_type', {
-      is: 'child',
-      then: (schema) => schema.required('Subject teacher is required for child subjects'),
-      otherwise: (schema) => schema.nullable().optional(),
-    }),
+    .nullable()
+    .optional(),
   is_limited_student: Yup.boolean()
     .optional(),
 })
@@ -120,7 +117,7 @@ export function ClassSectionSubjectModal({
           variant: values.variant || undefined,
           start_time: values.start_time || undefined,
           end_time: values.end_time || undefined,
-          adviser: values.subject_type === 'child' ? values.adviser : undefined,
+          adviser: values.adviser || undefined,
           is_limited_student: values.is_limited_student,
         }
         
@@ -166,7 +163,25 @@ export function ClassSectionSubjectModal({
       setTeacherSearchQuery('')
       setDebouncedSearchQuery('')
     }
-  }, [isOpen, subject, teachers])
+  }, [isOpen, subject])
+
+  // Separate effect to handle teacher selection when subject.adviserUser becomes available
+  useEffect(() => {
+    if (isOpen && subject && subject.adviser && subject.adviserUser && !selectedTeacher) {
+      setSelectedTeacher({
+        id: subject.adviser,
+        label: getFullName(subject.adviserUser),
+        description: subject.adviserUser.email
+      })
+    }
+  }, [isOpen, subject, selectedTeacher, getFullName])
+
+  // Clear parent_subject_id when switching from child to parent subject type
+  useEffect(() => {
+    if (formik.values.subject_type === 'parent' && formik.values.parent_subject_id) {
+      formik.setFieldValue('parent_subject_id', '')
+    }
+  }, [formik.values.subject_type])
 
   const handleTeacherSelect = (teacher: { id: string; label: string; description?: string } | null) => {
     setSelectedTeacher(teacher)
@@ -269,22 +284,97 @@ export function ClassSectionSubjectModal({
                 {formik.values.subject_type === 'child' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parent Subject *
+                      Parent Subject * {availableParentSubjects.length > 0 && (
+                        <span className="text-xs text-gray-500 font-normal">
+                          ({availableParentSubjects.length} available)
+                        </span>
+                      )}
                     </label>
-                    <Select
-                      name="parent_subject_id"
-                      value={formik.values.parent_subject_id}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      className={formik.touched.parent_subject_id && formik.errors.parent_subject_id ? 'border-red-500' : ''}
-                    >
-                      <option value="">Select parent subject</option>
-                      {availableParentSubjects.map(parent => (
-                        <option key={parent.id} value={parent.id}>{parent.title}</option>
-                      ))}
-                    </Select>
-                    {formik.touched.parent_subject_id && formik.errors.parent_subject_id && (
-                      <p className="mt-1 text-sm text-red-600">{formik.errors.parent_subject_id}</p>
+                    {availableParentSubjects.length === 0 ? (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-yellow-800">
+                              No Parent Subjects Available
+                            </h3>
+                            <div className="mt-2 text-sm text-yellow-700">
+                              <p>
+                                You need to create a parent subject first before adding child subjects. 
+                                Switch to "Parent Subject" type to create one, or create child subjects 
+                                without a parent by selecting "Parent Subject" type.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Select
+                          name="parent_subject_id"
+                          value={formik.values.parent_subject_id}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          className={formik.touched.parent_subject_id && formik.errors.parent_subject_id ? 'border-red-500' : ''}
+                          placeholder="Choose a parent subject..."
+                          options={[
+                            ...availableParentSubjects.map(parent => ({
+                              value: parent.id,
+                              label: `${parent.title}${parent.variant ? ` - ${parent.variant}` : ''}`
+                            }))
+                          ]}
+                        />
+                        {formik.touched.parent_subject_id && formik.errors.parent_subject_id && (
+                          <p className="mt-1 text-sm text-red-600">{formik.errors.parent_subject_id}</p>
+                        )}
+                        
+                        {/* Parent Subject Info */}
+                        {formik.values.parent_subject_id && (
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <div className="flex items-start space-x-3">
+                              <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-blue-800">
+                                  Selected Parent Subject
+                                </p>
+                                <div className="mt-1 text-sm text-blue-700">
+                                  {(() => {
+                                    const selectedParent = availableParentSubjects.find(
+                                      p => p.id === formik.values.parent_subject_id
+                                    )
+                                    if (!selectedParent) return null
+                                    
+                                    return (
+                                      <div className="space-y-1">
+                                        <p><strong>Title:</strong> {selectedParent.title}</p>
+                                        {selectedParent.variant && (
+                                          <p><strong>Variant:</strong> {selectedParent.variant}</p>
+                                        )}
+                                        {selectedParent.start_time && selectedParent.end_time && (
+                                          <p><strong>Schedule:</strong> {selectedParent.start_time} - {selectedParent.end_time}</p>
+                                        )}
+                                        {selectedParent.adviserUser ? (
+                                          <p><strong>Teacher:</strong> {selectedParent.adviserUser.first_name} {selectedParent.adviserUser.last_name}</p>
+                                        ) : (
+                                          <p className="text-red-600"><strong>Teacher:</strong> No teacher assigned</p>
+                                        )}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -367,31 +457,34 @@ export function ClassSectionSubjectModal({
                   </div>
                 </div>
 
-                {/* Subject Teacher (only for child subjects) */}
-                {formik.values.subject_type === 'child' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Subject Teacher *
-                    </label>
-                    <Autocomplete
-                      value={selectedTeacher}
-                      onChange={handleTeacherSelect}
-                      onQueryChange={setTeacherSearchQuery}
-                      options={teachers.map(teacher => ({
-                        id: teacher.id,
-                        label: getFullName(teacher),
-                        description: teacher.email
-                      }))}
-                      placeholder="Search for a teacher..."
-                      className={formik.touched.adviser && formik.errors.adviser ? 'border-red-500' : ''}
-                      disabled={teachersLoading}
-                      error={!!(formik.touched.adviser && formik.errors.adviser)}
-                    />
-                    {formik.touched.adviser && formik.errors.adviser && (
-                      <p className="mt-1 text-sm text-red-600">{formik.errors.adviser}</p>
-                    )}
-                  </div>
-                )}
+                {/* Subject Teacher */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subject Teacher {formik.values.subject_type === 'child' && '*'}
+                  </label>
+                  <Autocomplete
+                    value={selectedTeacher}
+                    onChange={handleTeacherSelect}
+                    onQueryChange={setTeacherSearchQuery}
+                    options={teachers.map(teacher => ({
+                      id: teacher.id,
+                      label: getFullName(teacher),
+                      description: teacher.email
+                    }))}
+                    placeholder="Search for a teacher..."
+                    className={formik.touched.adviser && formik.errors.adviser ? 'border-red-500' : ''}
+                    disabled={teachersLoading}
+                    error={!!(formik.touched.adviser && formik.errors.adviser)}
+                  />
+                  {formik.touched.adviser && formik.errors.adviser && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.adviser}</p>
+                  )}
+                  {formik.values.subject_type === 'parent' && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Optional: Assign a teacher to this parent subject
+                    </p>
+                  )}
+                </div>
 
                 {/* Limited Student Option */}
                 <div>

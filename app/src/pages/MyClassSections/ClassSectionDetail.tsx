@@ -10,6 +10,7 @@ import { Button } from '../../components/button'
 import { Badge } from '../../components/badge'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { StudentAssignmentModal } from './components/StudentAssignmentModal'
+import { CreateStudentModal } from './components/CreateStudentModal'
 import { StudentModal } from '../Students/components/StudentModal'
 import { ClassSectionSubjectModal } from '../ClassSections/components/ClassSectionSubjectModal'
 import { SubjectList } from './components/SubjectList'
@@ -37,6 +38,7 @@ const ClassSectionDetail: React.FC = () => {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'students' | 'subjects'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
+  const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
   const [showRemoveModal, setShowRemoveModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [studentToRemove, setStudentToRemove] = useState<{ id: string; name: string; assignmentId: string } | null>(null)
@@ -475,11 +477,19 @@ const ClassSectionDetail: React.FC = () => {
                       />
                     </div>
                     <Button
+                      onClick={() => setShowCreateStudentModal(true)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Student
+                    </Button>
+                    <Button
                       onClick={() => setShowAssignmentModal(true)}
                       size="sm"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Students
+                      Assign Students
                     </Button>
                   </div>
                 </div>
@@ -649,6 +659,16 @@ const ClassSectionDetail: React.FC = () => {
           </AnimatePresence>
         </div>
       </motion.div>
+
+      {/* Create Student Modal */}
+      {classSectionData && (
+        <CreateStudentModal
+          isOpen={showCreateStudentModal}
+          onClose={() => setShowCreateStudentModal(false)}
+          classSection={classSectionData}
+          onSuccess={handleAssignmentSuccess}
+        />
+      )}
 
       {/* Student Assignment Modal */}
       {classSectionData && (
