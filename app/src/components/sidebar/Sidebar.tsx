@@ -14,7 +14,8 @@ import {
   UserCheck,
   GraduationCap as StudentsIcon,
   BookOpen,
-  BookOpen as AssignedSubjectsIcon
+  BookOpen as AssignedSubjectsIcon,
+  Clock
 } from 'lucide-react';
 
 interface MenuItem {
@@ -93,6 +94,13 @@ const menuItems: MenuItem[] = [
     label: 'Students',
     icon: <StudentsIcon className="w-5 h-5" />,
     path: '/students',
+    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'teacher-attendance',
+    label: 'Teacher Attendance',
+    icon: <Clock className="w-5 h-5" />,
+    path: '/teacher-attendance',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
 ];

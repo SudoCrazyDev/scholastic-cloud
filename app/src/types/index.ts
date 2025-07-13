@@ -395,4 +395,63 @@ export interface UserInstitution {
   updated_at: string;
   role?: Role;
   institution?: Institution;
+}
+
+// Teacher Attendance types
+export interface TeacherAttendance {
+  id: string;
+  user_id: string;
+  institution_id: string;
+  date: string;
+  check_in_time?: string;
+  check_out_time?: string;
+  break_out_time?: string;
+  break_in_time?: string;
+  status: 'present' | 'absent' | 'late' | 'on_break' | 'checked_out' | 'no_scan';
+  total_hours?: number;
+  created_at: string;
+  updated_at: string;
+  user?: User;
+  institution?: Institution;
+}
+
+export interface CreateAttendanceData {
+  user_id: string;
+  institution_id: string;
+  date: string;
+  check_in_time?: string;
+  check_out_time?: string;
+  break_out_time?: string;
+  break_in_time?: string;
+  status: 'present' | 'absent' | 'late' | 'on_break' | 'checked_out';
+}
+
+export interface UpdateAttendanceData {
+  check_in_time?: string;
+  check_out_time?: string;
+  break_out_time?: string;
+  break_in_time?: string;
+  status?: 'present' | 'absent' | 'late' | 'on_break' | 'checked_out';
+}
+
+export interface AttendanceStats {
+  total_teachers: number;
+  present_today: number;
+  absent_today: number;
+  late_today: number;
+  on_break: number;
+  checked_out: number;
+  no_scan_yet: number;
+}
+
+export interface TeacherAttendanceSummary {
+  user: User;
+  today_attendance?: TeacherAttendance;
+  last_attendance?: TeacherAttendance;
+  status: 'present' | 'absent' | 'late' | 'on_break' | 'checked_out' | 'no_scan';
+  check_in_time?: string;
+  check_out_time?: string;
+  break_out_time?: string;
+  break_in_time?: string;
+  total_hours?: number;
 } 

@@ -16,6 +16,8 @@ import StudentDetail from './pages/Students/StudentDetail';
 import { MyClassSections, ClassSectionDetail } from './pages/MyClassSections';
 import AssignedSubjects from './pages/AssignedSubjects/AssignedSubjects';
 import SubjectDetail from './pages/AssignedSubjects/SubjectDetail';
+import { TeacherAttendance } from './pages/TeacherAttendance';
+import TeacherAttendanceDemo from './pages/TeacherAttendanceDemo';
 
 function App() {
   return (
@@ -44,6 +46,8 @@ function App() {
               <Route path="my-class-sections/:id" element={<ClassSectionDetail />} />
               <Route path="assigned-subjects" element={<AssignedSubjects />} />
               <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
+              <Route path="teacher-attendance" element={<TeacherAttendance />} />
+              <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
             </Route>
 
             {/* Catch all route */}
