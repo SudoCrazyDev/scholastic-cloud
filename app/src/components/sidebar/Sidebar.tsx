@@ -13,7 +13,8 @@ import {
   GraduationCap,
   UserCheck,
   GraduationCap as StudentsIcon,
-  BookOpen
+  BookOpen,
+  BookOpen as AssignedSubjectsIcon
 } from 'lucide-react';
 
 interface MenuItem {
@@ -36,6 +37,13 @@ const menuItems: MenuItem[] = [
     label: 'My Class Sections',
     icon: <BookOpen className="w-5 h-5" />,
     path: '/my-class-sections',
+    allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'assigned-subjects',
+    label: 'My Assigned Subjects',
+    icon: <AssignedSubjectsIcon className="w-5 h-5" />,
+    path: '/assigned-subjects',
     allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
   },
   {

@@ -196,6 +196,53 @@ export interface Subject {
   institution?: Institution;
 }
 
+// Assigned Subject types (for user's assigned subjects)
+export interface AssignedSubject extends Subject {
+  class_section: ClassSection;
+  institution: Institution;
+  student_count?: number;
+  total_students?: number;
+}
+
+// Subject Detail types
+export interface ClassRecord {
+  id: string;
+  subject_id: string;
+  title: string;
+  description?: string;
+  date: string;
+  type: 'quiz' | 'assignment' | 'exam' | 'project' | 'other';
+  total_score: number;
+  passing_score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Topic {
+  id: string;
+  subject_id: string;
+  title: string;
+  description?: string;
+  order: number;
+  is_completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  subject_id: string;
+  title: string;
+  description?: string;
+  event_date: string;
+  event_type: 'exam' | 'assignment_due' | 'project_due' | 'holiday' | 'other';
+  is_all_day: boolean;
+  start_time?: string;
+  end_time?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CreateSubjectData {
   institution_id: string;
   class_section_id: string;

@@ -14,6 +14,8 @@ import ClassSections from './pages/ClassSections/ClassSections';
 import Students from './pages/Students/Students';
 import StudentDetail from './pages/Students/StudentDetail';
 import { MyClassSections, ClassSectionDetail } from './pages/MyClassSections';
+import AssignedSubjects from './pages/AssignedSubjects/AssignedSubjects';
+import SubjectDetail from './pages/AssignedSubjects/SubjectDetail';
 
 function App() {
   return (
@@ -40,6 +42,8 @@ function App() {
               <Route path="class-sections" element={<ClassSections />} />
               <Route path="my-class-sections" element={<MyClassSections />} />
               <Route path="my-class-sections/:id" element={<ClassSectionDetail />} />
+              <Route path="assigned-subjects" element={<AssignedSubjects />} />
+              <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
             </Route>
 
             {/* Catch all route */}
