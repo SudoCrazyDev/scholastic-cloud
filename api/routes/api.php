@@ -10,7 +10,6 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
-use App\Http\Controllers\SubjectEcrController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentSectionController;
 
@@ -55,8 +54,6 @@ Route::middleware('auth.token')->group(function () {
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);
     Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
-    // SubjectEcr routes
-    Route::apiResource('subjects-ecr', SubjectEcrController::class);
     // StudentSection routes
     Route::apiResource('student-sections', StudentSectionController::class);
     Route::post('student-sections/bulk-assign', [StudentSectionController::class, 'bulkAssign']);
