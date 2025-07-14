@@ -48,4 +48,12 @@ class Student extends Model
     {
         return $this->hasMany(StudentSection::class);
     }
+
+    /**
+     * Get the ECR item scores for the student.
+     */
+    public function ecrItemScores()
+    {
+        return $this->hasMany(StudentEcrItemScore::class);
+    }
 } 

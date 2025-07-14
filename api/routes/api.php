@@ -12,6 +12,7 @@ use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentSectionController;
+use App\Http\Controllers\StudentEcrItemScoreController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,4 +58,6 @@ Route::middleware('auth.token')->group(function () {
     // StudentSection routes
     Route::apiResource('student-sections', StudentSectionController::class);
     Route::post('student-sections/bulk-assign', [StudentSectionController::class, 'bulkAssign']);
+    // StudentEcrItemScore routes
+    Route::apiResource('student-ecr-item-scores', StudentEcrItemScoreController::class);
 });

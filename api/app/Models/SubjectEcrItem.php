@@ -14,10 +14,20 @@ class SubjectEcrItem extends Model
         'type',
         'title',
         'description',
+        'quarter',
+        'academic_year',
         'score',
     ];
 
     protected $casts = [
         'score' => 'decimal:2',
     ];
+
+    /**
+     * Get the student scores for this ECR item.
+     */
+    public function studentScores()
+    {
+        return $this->hasMany(StudentEcrItemScore::class);
+    }
 }
