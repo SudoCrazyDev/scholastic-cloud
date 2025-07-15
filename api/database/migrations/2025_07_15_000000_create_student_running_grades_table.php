@@ -27,10 +27,10 @@ return new class extends Migration
             // Add indexes for performance
             $table->index('student_id');
             $table->index('subject_id');
-            $table->index(['student_id', 'subject_id', 'quarter', 'academic_year']);
+            // $table->index(['student_id', 'subject_id', 'quarter', 'academic_year']);
             
             // Add unique constraint to prevent duplicate grades for the same student, subject, quarter, and academic year
-            $table->unique(['student_id', 'subject_id', 'quarter', 'academic_year']);
+            // $table->unique(['student_id', 'subject_id', 'quarter', 'academic_year']);
         });
     }
 

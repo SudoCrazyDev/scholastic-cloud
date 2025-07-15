@@ -7,6 +7,9 @@ interface AttendanceStatsCardProps {
   isLoading: boolean;
   error: any;
   currentTime: Date;
+  isFullscreen?: boolean;
+  statusFilter?: 'all' | 'present' | 'late' | 'on_break' | 'checked_out' | 'no_scan';
+  onStatusFilter?: (status: 'all' | 'present' | 'late' | 'on_break' | 'checked_out' | 'no_scan') => void;
 }
 
 export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
@@ -14,6 +17,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
   isLoading,
   error,
   currentTime,
+  isFullscreen = false,
+  statusFilter = 'all',
+  onStatusFilter,
 }) => {
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
@@ -31,8 +37,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       change: '',
       changeType: 'neutral' as const,
       color: 'bg-blue-50 text-blue-600',
+      filterStatus: 'all' as const,
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${isFullscreen ? 'w-8 h-8' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
@@ -44,8 +51,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       change: '',
       changeType: 'positive' as const,
       color: 'bg-green-50 text-green-600',
+      filterStatus: 'present' as const,
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${isFullscreen ? 'w-8 h-8' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
@@ -57,8 +65,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       change: '',
       changeType: 'negative' as const,
       color: 'bg-red-50 text-red-600',
+      filterStatus: 'no_scan' as const,
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${isFullscreen ? 'w-8 h-8' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       ),
@@ -70,8 +79,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       change: '',
       changeType: 'warning' as const,
       color: 'bg-yellow-50 text-yellow-600',
+      filterStatus: 'late' as const,
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${isFullscreen ? 'w-8 h-8' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
@@ -83,8 +93,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       change: '',
       changeType: 'neutral' as const,
       color: 'bg-orange-50 text-orange-600',
+      filterStatus: 'on_break' as const,
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${isFullscreen ? 'w-8 h-8' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
@@ -96,8 +107,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       change: '',
       changeType: 'neutral' as const,
       color: 'bg-gray-50 text-gray-600',
+      filterStatus: 'checked_out' as const,
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${isFullscreen ? 'w-8 h-8' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
         </svg>
       ),
@@ -109,8 +121,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       change: '',
       changeType: 'warning' as const,
       color: 'bg-purple-50 text-purple-600',
+      filterStatus: 'no_scan' as const,
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${isFullscreen ? 'w-8 h-8' : 'w-6 h-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
       ),
@@ -159,12 +172,12 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Current Time</h2>
-            <p className="text-indigo-100 text-sm">Last updated</p>
+            <h2 className={`font-semibold ${isFullscreen ? 'text-2xl' : 'text-lg'}`}>Current Time</h2>
+            <p className={`text-indigo-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>Last updated</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-mono font-bold">{formatTime(currentTime)}</div>
-            <div className="text-indigo-100 text-sm">
+            <div className={`font-mono font-bold ${isFullscreen ? 'text-4xl' : 'text-2xl'}`}>{formatTime(currentTime)}</div>
+            <div className={`text-indigo-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>
               {currentTime.toLocaleDateString('en-US', { 
                 weekday: 'long', 
                 year: 'numeric', 
@@ -178,23 +191,46 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {statsData.map((stat) => (
-          <motion.div
-            key={stat.id}
-            whileHover={{ y: -2, scale: 1.02 }}
-            className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 cursor-pointer transition-all duration-200"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600 mb-1">{stat.name}</p>
-                <p className="text-xl font-bold text-gray-900">{stat.value}</p>
+        {statsData.map((stat) => {
+          const isActive = statusFilter === stat.filterStatus;
+          return (
+            <motion.div
+              key={stat.id}
+              whileHover={{ y: -2, scale: 1.02 }}
+              onClick={() => onStatusFilter?.(stat.filterStatus)}
+              className={`bg-white rounded-xl shadow-sm border transition-all duration-200 cursor-pointer ${
+                isActive 
+                  ? 'border-blue-500 shadow-md ring-2 ring-blue-200' 
+                  : 'border-gray-200 hover:border-gray-300'
+              } ${isFullscreen ? 'p-6' : 'p-4'}`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`font-medium mb-1 ${isFullscreen ? 'text-lg' : 'text-xs'} ${
+                    isActive ? 'text-blue-600' : 'text-gray-600'
+                  }`}>
+                    {stat.name}
+                  </p>
+                  <p className={`font-bold ${isFullscreen ? 'text-3xl' : 'text-xl'} ${
+                    isActive ? 'text-blue-900' : 'text-gray-900'
+                  }`}>
+                    {stat.value}
+                  </p>
+                  {isActive && (
+                    <p className={`text-blue-600 font-medium ${isFullscreen ? 'text-sm' : 'text-xs'} mt-1`}>
+                      Active Filter
+                    </p>
+                  )}
+                </div>
+                <div className={`p-2 rounded-lg ${stat.color} ${isFullscreen ? 'p-3' : 'p-2'} ${
+                  isActive ? 'ring-2 ring-blue-300' : ''
+                }`}>
+                  {stat.icon}
+                </div>
               </div>
-              <div className={`p-2 rounded-lg ${stat.color}`}>
-                {stat.icon}
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );

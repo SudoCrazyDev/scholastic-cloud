@@ -60,4 +60,6 @@ Route::middleware('auth.token')->group(function () {
     Route::post('student-sections/bulk-assign', [StudentSectionController::class, 'bulkAssign']);
     // StudentEcrItemScore routes
     Route::apiResource('student-ecr-item-scores', StudentEcrItemScoreController::class);
+    // RealtimeAttendance GET route
+    Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
 });

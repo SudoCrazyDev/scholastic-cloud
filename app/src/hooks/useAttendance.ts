@@ -1,13 +1,25 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mockAttendanceService } from '../services/mockAttendanceService';
-import type { CreateAttendanceData, UpdateAttendanceData } from '../types';
+import { useQuery } from '@tanstack/react-query';
+import { attendanceService, type AttendanceResponse } from '../services/attendanceService';
 
+export const useRealtimeAttendance = (
+  authDate: string,
+  deviceName: string,
+  personName?: string
+) => {
+  return useQuery({
+    queryKey: ['realtime-attendance', authDate, deviceName, personName],
+    queryFn: () => attendanceService.getRealtimeAttendance(authDate, deviceName, personName),
+    enabled: !!authDate && !!deviceName,
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+  });
+};
+
+// Legacy hooks for backward compatibility (if needed)
 export const useAttendanceStats = (institutionId: string) => {
   return useQuery({
-    queryKey: ['attendance', 'stats', institutionId],
-    queryFn: () => mockAttendanceService.getStats(institutionId),
-    enabled: !!institutionId,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    queryKey: ['attendance-stats', institutionId],
+    queryFn: () => Promise.resolve({ data: null }),
+    enabled: false, // Disabled since we're using realtime attendance now
   });
 };
 
@@ -15,14 +27,13 @@ export const useTodayAttendance = (
   institutionId: string,
   page: number = 1,
   perPage: number = 20,
-  search?: string,
-  statusFilter?: string
+  searchValue: string = '',
+  filter?: string
 ) => {
   return useQuery({
-    queryKey: ['attendance', 'today', institutionId, page, perPage, search, statusFilter],
-    queryFn: () => mockAttendanceService.getTodayAttendance(institutionId, page, perPage, search, statusFilter),
-    enabled: !!institutionId,
-    refetchInterval: 15000, // Refetch every 15 seconds for real-time updates
+    queryKey: ['today-attendance', institutionId, page, perPage, searchValue, filter],
+    queryFn: () => Promise.resolve({ data: [], pagination: null }),
+    enabled: false, // Disabled since we're using realtime attendance now
   });
 };
 
@@ -38,8 +49,8 @@ export const useAttendanceRecords = (
 ) => {
   return useQuery({
     queryKey: ['attendance', 'records', institutionId, page, perPage, filters],
-    queryFn: () => mockAttendanceService.getAttendanceRecords(institutionId, page, perPage, filters),
-    enabled: !!institutionId,
+    queryFn: () => Promise.resolve({ data: [], pagination: null }),
+    enabled: false, // Disabled since we're using realtime attendance now
   });
 };
 
@@ -51,86 +62,91 @@ export const useTeacherHistory = (
 ) => {
   return useQuery({
     queryKey: ['attendance', 'teacher-history', userId, institutionId, page, perPage],
-    queryFn: () => mockAttendanceService.getAttendanceRecords(institutionId, page, perPage),
-    enabled: !!userId && !!institutionId,
+    queryFn: () => Promise.resolve({ data: [], pagination: null }),
+    enabled: false, // Disabled since we're using realtime attendance now
   });
 };
 
 export const useCheckIn = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ userId, institutionId }: { userId: string; institutionId: string }) =>
-      mockAttendanceService.checkIn(userId, institutionId),
-    onSuccess: (_, { institutionId }) => {
-      // Invalidate and refetch relevant queries
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'stats', institutionId] });
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'today', institutionId] });
+  // This hook is no longer needed as real-time attendance handles check-ins
+  // Keeping it for now, but it will always return a resolved promise
+  return {
+    mutate: async (data: { userId: string; institutionId: string }) => {
+      console.log('Check-in triggered (mock):', data);
+      return Promise.resolve({ success: true, message: 'Check-in successful (mock)' });
     },
-  });
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
 };
 
 export const useCheckOut = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ userId, institutionId }: { userId: string; institutionId: string }) =>
-      mockAttendanceService.checkOut(userId, institutionId),
-    onSuccess: (_, { institutionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'stats', institutionId] });
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'today', institutionId] });
+  // This hook is no longer needed as real-time attendance handles check-outs
+  // Keeping it for now, but it will always return a resolved promise
+  return {
+    mutate: async (data: { userId: string; institutionId: string }) => {
+      console.log('Check-out triggered (mock):', data);
+      return Promise.resolve({ success: true, message: 'Check-out successful (mock)' });
     },
-  });
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
 };
 
 export const useBreakOut = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ userId, institutionId }: { userId: string; institutionId: string }) =>
-      mockAttendanceService.breakOut(userId, institutionId),
-    onSuccess: (_, { institutionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'stats', institutionId] });
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'today', institutionId] });
+  // This hook is no longer needed as real-time attendance handles breaks
+  // Keeping it for now, but it will always return a resolved promise
+  return {
+    mutate: async (data: { userId: string; institutionId: string }) => {
+      console.log('Break-out triggered (mock):', data);
+      return Promise.resolve({ success: true, message: 'Break-out successful (mock)' });
     },
-  });
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
 };
 
 export const useBreakIn = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ userId, institutionId }: { userId: string; institutionId: string }) =>
-      mockAttendanceService.breakIn(userId, institutionId),
-    onSuccess: (_, { institutionId }) => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'stats', institutionId] });
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'today', institutionId] });
+  // This hook is no longer needed as real-time attendance handles breaks
+  // Keeping it for now, but it will always return a resolved promise
+  return {
+    mutate: async (data: { userId: string; institutionId: string }) => {
+      console.log('Break-in triggered (mock):', data);
+      return Promise.resolve({ success: true, message: 'Break-in successful (mock)' });
     },
-  });
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
 };
 
 export const useCreateAttendance = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (data: CreateAttendanceData) => mockAttendanceService.getStats(data.institution_id),
-    onSuccess: (_, data) => {
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'stats', data.institution_id] });
-      queryClient.invalidateQueries({ queryKey: ['attendance', 'today', data.institution_id] });
+  // This hook is no longer needed as real-time attendance handles attendance creation
+  // Keeping it for now, but it will always return a resolved promise
+  return {
+    mutate: async (data: any) => {
+      console.log('Create attendance triggered (mock):', data);
+      return Promise.resolve({ success: true, message: 'Attendance created (mock)' });
     },
-  });
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
 };
 
 export const useUpdateAttendance = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: () => mockAttendanceService.getStats('mock-institution'),
-    onSuccess: (updatedAttendance: any) => {
-      if (updatedAttendance.institution_id) {
-        queryClient.invalidateQueries({ queryKey: ['attendance', 'stats', updatedAttendance.institution_id] });
-        queryClient.invalidateQueries({ queryKey: ['attendance', 'today', updatedAttendance.institution_id] });
-      }
+  // This hook is no longer needed as real-time attendance handles attendance updates
+  // Keeping it for now, but it will always return a resolved promise
+  return {
+    mutate: async (data: any) => {
+      console.log('Update attendance triggered (mock):', data);
+      return Promise.resolve({ success: true, message: 'Attendance updated (mock)' });
     },
-  });
+    isLoading: false,
+    isError: false,
+    error: null,
+  };
 }; 
