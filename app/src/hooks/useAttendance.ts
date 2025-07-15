@@ -10,7 +10,7 @@ export const useRealtimeAttendance = (
     queryKey: ['realtime-attendance', authDate, deviceName, personName],
     queryFn: () => attendanceService.getRealtimeAttendance(authDate, deviceName, personName),
     enabled: !!authDate && !!deviceName,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    refetchInterval: 10000, // Refetch every 10 seconds for more responsive real-time updates
   });
 };
 

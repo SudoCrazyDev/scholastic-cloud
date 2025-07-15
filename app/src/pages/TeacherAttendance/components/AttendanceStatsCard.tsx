@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { AttendanceStats } from '../../../types';
 
@@ -12,7 +12,61 @@ interface AttendanceStatsCardProps {
   onStatusFilter?: (status: 'all' | 'present' | 'late' | 'on_break' | 'checked_out' | 'no_scan') => void;
 }
 
-export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
+// Memoized individual stat card component for better performance
+const StatCard = React.memo<{
+  stat: {
+    id: string;
+    name: string;
+    value: number;
+    color: string;
+    filterStatus: 'all' | 'present' | 'late' | 'on_break' | 'checked_out' | 'no_scan';
+    icon: React.ReactNode;
+  };
+  isActive: boolean;
+  isFullscreen: boolean;
+  onClick: () => void;
+}>(({ stat, isActive, isFullscreen, onClick }) => {
+  return (
+    <motion.div
+      whileHover={{ y: -2, scale: 1.02 }}
+      onClick={onClick}
+      className={`bg-white rounded-xl shadow-sm border transition-all duration-200 cursor-pointer ${
+        isActive 
+          ? 'border-blue-500 shadow-md ring-2 ring-blue-200' 
+          : 'border-gray-200 hover:border-gray-300'
+      } ${isFullscreen ? 'p-6' : 'p-4'}`}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className={`font-medium mb-1 ${isFullscreen ? 'text-lg' : 'text-xs'} ${
+            isActive ? 'text-blue-600' : 'text-gray-600'
+          }`}>
+            {stat.name}
+          </p>
+          <p className={`font-bold ${isFullscreen ? 'text-3xl' : 'text-xl'} ${
+            isActive ? 'text-blue-900' : 'text-gray-900'
+          }`}>
+            {stat.value}
+          </p>
+          {isActive && (
+            <p className={`text-blue-600 font-medium ${isFullscreen ? 'text-sm' : 'text-xs'} mt-1`}>
+              Active Filter
+            </p>
+          )}
+        </div>
+        <div className={`p-2 rounded-lg ${stat.color} ${isFullscreen ? 'p-3' : 'p-2'} ${
+          isActive ? 'ring-2 ring-blue-300' : ''
+        }`}>
+          {stat.icon}
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+StatCard.displayName = 'StatCard';
+
+export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = React.memo(({
   stats,
   isLoading,
   error,
@@ -21,15 +75,26 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
   statusFilter = 'all',
   onStatusFilter,
 }) => {
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
+  // Memoize the formatted time and date
+  const formattedTime = useMemo(() => {
+    return currentTime.toLocaleTimeString('en-US', {
       hour12: true,
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
+  }, [currentTime]);
 
-  const statsData = [
+  const formattedDate = useMemo(() => {
+    return currentTime.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  }, [currentTime]);
+
+  // Memoize the stats data array
+  const statsData = useMemo(() => [
     {
       id: 'total',
       name: 'Total Teachers',
@@ -128,7 +193,12 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
         </svg>
       ),
     },
-  ];
+  ], [stats, isFullscreen]);
+
+  // Memoize the click handler
+  const handleStatClick = useCallback((filterStatus: 'all' | 'present' | 'late' | 'on_break' | 'checked_out' | 'no_scan') => {
+    onStatusFilter?.(filterStatus);
+  }, [onStatusFilter]);
 
   if (isLoading) {
     return (
@@ -176,14 +246,9 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
             <p className={`text-indigo-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>Last updated</p>
           </div>
           <div className="text-right">
-            <div className={`font-mono font-bold ${isFullscreen ? 'text-4xl' : 'text-2xl'}`}>{formatTime(currentTime)}</div>
+            <div className={`font-mono font-bold ${isFullscreen ? 'text-4xl' : 'text-2xl'}`}>{formattedTime}</div>
             <div className={`text-indigo-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>
-              {currentTime.toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+              {formattedDate}
             </div>
           </div>
         </div>
@@ -194,44 +259,18 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = ({
         {statsData.map((stat) => {
           const isActive = statusFilter === stat.filterStatus;
           return (
-            <motion.div
+            <StatCard
               key={stat.id}
-              whileHover={{ y: -2, scale: 1.02 }}
-              onClick={() => onStatusFilter?.(stat.filterStatus)}
-              className={`bg-white rounded-xl shadow-sm border transition-all duration-200 cursor-pointer ${
-                isActive 
-                  ? 'border-blue-500 shadow-md ring-2 ring-blue-200' 
-                  : 'border-gray-200 hover:border-gray-300'
-              } ${isFullscreen ? 'p-6' : 'p-4'}`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`font-medium mb-1 ${isFullscreen ? 'text-lg' : 'text-xs'} ${
-                    isActive ? 'text-blue-600' : 'text-gray-600'
-                  }`}>
-                    {stat.name}
-                  </p>
-                  <p className={`font-bold ${isFullscreen ? 'text-3xl' : 'text-xl'} ${
-                    isActive ? 'text-blue-900' : 'text-gray-900'
-                  }`}>
-                    {stat.value}
-                  </p>
-                  {isActive && (
-                    <p className={`text-blue-600 font-medium ${isFullscreen ? 'text-sm' : 'text-xs'} mt-1`}>
-                      Active Filter
-                    </p>
-                  )}
-                </div>
-                <div className={`p-2 rounded-lg ${stat.color} ${isFullscreen ? 'p-3' : 'p-2'} ${
-                  isActive ? 'ring-2 ring-blue-300' : ''
-                }`}>
-                  {stat.icon}
-                </div>
-              </div>
-            </motion.div>
+              stat={stat}
+              isActive={isActive}
+              isFullscreen={isFullscreen}
+              onClick={() => handleStatClick(stat.filterStatus)}
+            />
           );
         })}
       </div>
     </div>
   );
-}; 
+});
+
+AttendanceStatsCard.displayName = 'AttendanceStatsCard'; 

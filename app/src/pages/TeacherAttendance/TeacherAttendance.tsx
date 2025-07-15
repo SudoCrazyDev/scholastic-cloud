@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useRealtimeAttendance } from '../../hooks/useAttendance';
-import { AttendanceStatsCard, RealtimeIndicator, AttendanceList } from './components';
+import { AttendanceStatsCard, RealtimeClock, AttendanceList } from './components';
 import { isLate, getTeacherStatus, formatCutoffTime, DEFAULT_LATE_CUTOFF } from '../../utils/attendanceUtils';
 
 const TeacherAttendance: React.FC = () => {
@@ -38,8 +38,45 @@ const TeacherAttendance: React.FC = () => {
     return attendanceData.filter(person => getTeacherStatus(person.entries) === statusFilter);
   }, [attendanceData, statusFilter]);
 
+  // Memoize stats calculation to prevent unnecessary re-computations
+  const attendanceStats = useMemo(() => ({
+    total_teachers: attendanceData.length,
+    present_today: attendanceData.filter(person => 
+      getTeacherStatus(person.entries) === 'present'
+    ).length,
+    absent_today: attendanceData.filter(person => 
+      getTeacherStatus(person.entries) === 'no_scan'
+    ).length,
+    late_today: attendanceData.filter(person => 
+      getTeacherStatus(person.entries) === 'late'
+    ).length,
+    on_break: attendanceData.filter(person => 
+      getTeacherStatus(person.entries) === 'on_break'
+    ).length,
+    checked_out: attendanceData.filter(person => 
+      getTeacherStatus(person.entries) === 'checked_out'
+    ).length,
+    no_scan_yet: attendanceData.filter(person => 
+      getTeacherStatus(person.entries) === 'no_scan'
+    ).length,
+  }), [attendanceData]);
+
+  // Set up timer to update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, []);
+
+  // Memoize the time update callback
+  const handleTimeUpdate = useCallback((newTime: Date) => {
+    setCurrentTime(newTime);
+  }, []);
+
   // Fullscreen functions
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => {
         setIsFullscreen(true);
@@ -53,7 +90,7 @@ const TeacherAttendance: React.FC = () => {
         console.error('Error attempting to exit fullscreen:', err);
       });
     }
-  };
+  }, []);
 
   // Handle fullscreen change events
   useEffect(() => {
@@ -152,26 +189,17 @@ const TeacherAttendance: React.FC = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
-
-  // Update current time every 30 seconds to match data refresh rate
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30000);
-
-    return () => clearInterval(timer);
-  }, []);
+  }, [isFullscreen, toggleFullscreen]);
 
   // Handle status filter changes
-  const handleStatusFilter = (status: 'all' | 'present' | 'late' | 'on_break' | 'checked_out' | 'no_scan') => {
+  const handleStatusFilter = useCallback((status: 'all' | 'present' | 'late' | 'on_break' | 'checked_out' | 'no_scan') => {
     if (statusFilter === status) {
       // If clicking the same filter, clear it
       setStatusFilter('all');
     } else {
       setStatusFilter(status);
     }
-  };
+  }, [statusFilter]);
   
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -229,7 +257,10 @@ const TeacherAttendance: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-4">
-          <RealtimeIndicator currentTime={currentTime} isFullscreen={isFullscreen} />
+          <RealtimeClock 
+            isFullscreen={isFullscreen} 
+            onTimeUpdate={handleTimeUpdate}
+          />
           
           {/* Fullscreen Toggle Button */}
           <button
@@ -261,27 +292,7 @@ const TeacherAttendance: React.FC = () => {
       {/* Stats Cards */}
       <motion.div variants={itemVariants}>
         <AttendanceStatsCard 
-          stats={{
-            total_teachers: attendanceData.length,
-            present_today: attendanceData.filter(person => 
-              getTeacherStatus(person.entries) === 'present'
-            ).length,
-            absent_today: attendanceData.filter(person => 
-              getTeacherStatus(person.entries) === 'no_scan'
-            ).length,
-            late_today: attendanceData.filter(person => 
-              getTeacherStatus(person.entries) === 'late'
-            ).length,
-            on_break: attendanceData.filter(person => 
-              getTeacherStatus(person.entries) === 'on_break'
-            ).length,
-            checked_out: attendanceData.filter(person => 
-              getTeacherStatus(person.entries) === 'checked_out'
-            ).length,
-            no_scan_yet: attendanceData.filter(person => 
-              getTeacherStatus(person.entries) === 'no_scan'
-            ).length,
-          }}
+          stats={attendanceStats}
           isLoading={attendanceLoading}
           error={attendanceError}
           currentTime={currentTime}

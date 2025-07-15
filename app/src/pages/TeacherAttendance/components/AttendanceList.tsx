@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { AttendancePerson } from '../../../services/attendanceService';
 import { getTeacherStatus } from '../../../utils/attendanceUtils';
@@ -15,7 +15,150 @@ interface AttendanceListProps {
 
 type SortOrder = 'asc' | 'desc' | 'none';
 
-const AttendanceList: React.FC<AttendanceListProps> = ({
+// Memoized individual attendance item component for better performance
+const AttendanceItem = React.memo<{
+  person: AttendancePerson;
+  index: number;
+  isFullscreen: boolean;
+}>(({ person, index, isFullscreen }) => {
+  const status = useMemo(() => getTeacherStatus(person.entries), [person.entries]);
+  
+  const getStatusColor = useCallback((status: string) => {
+    switch (status) {
+      case 'checked_out':
+        return 'bg-green-100 text-green-800';
+      case 'on_break':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'present':
+        return 'bg-blue-100 text-blue-800';
+      case 'late':
+        return 'bg-orange-100 text-orange-800';
+      case 'no_scan':
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  }, []);
+
+  const getStatusText = useCallback((status: string) => {
+    switch (status) {
+      case 'checked_out':
+        return 'Checked Out';
+      case 'on_break':
+        return 'On Break';
+      case 'present':
+        return 'Present';
+      case 'late':
+        return 'Late';
+      case 'no_scan':
+      default:
+        return 'Not Checked In';
+    }
+  }, []);
+
+  const initials = useMemo(() => 
+    person.person_name.split(' ').map(n => n[0]).join('').toUpperCase(), 
+    [person.person_name]
+  );
+
+  const checkInTime = useMemo(() => 
+    person.entries.find(entry => entry['check-in'])?.['check-in'] || '--', 
+    [person.entries]
+  );
+  
+  const breakOutTime = useMemo(() => 
+    person.entries.find(entry => entry['break-out'])?.['break-out'] || '--', 
+    [person.entries]
+  );
+  
+  const breakInTime = useMemo(() => 
+    person.entries.find(entry => entry['break-in'])?.['break-in'] || '--', 
+    [person.entries]
+  );
+  
+  const checkOutTime = useMemo(() => 
+    person.entries.find(entry => entry['check-out'])?.['check-out'] || '--', 
+    [person.entries]
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }} // Reduced delay for faster rendering
+      className={`hover:bg-gray-50 transition-colors duration-150 ${
+        isFullscreen ? 'p-8' : 'p-6'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className={`bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center ${
+            isFullscreen ? 'w-16 h-16' : 'w-12 h-12'
+          }`}>
+            <span className={`text-white font-semibold ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+              {initials}
+            </span>
+          </div>
+          <div>
+            <h4 className={`font-medium text-gray-900 ${isFullscreen ? 'text-2xl' : 'text-lg'}`}>
+              {person.person_name}
+            </h4>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-medium ${getStatusColor(status)} ${
+              isFullscreen ? 'text-lg' : 'text-xs'
+            }`}>
+              {getStatusText(status)}
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-6">
+          {/* Check-in Time */}
+          <div className="text-center">
+            <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
+              Check-in
+            </div>
+            <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+              {checkInTime}
+            </div>
+          </div>
+
+          {/* Break-out Time */}
+          <div className="text-center">
+            <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
+              Break-out
+            </div>
+            <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+              {breakOutTime}
+            </div>
+          </div>
+
+          {/* Break-in Time */}
+          <div className="text-center">
+            <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
+              Break-in
+            </div>
+            <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+              {breakInTime}
+            </div>
+          </div>
+
+          {/* Check-out Time */}
+          <div className="text-center">
+            <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
+              Check-out
+            </div>
+            <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
+              {checkOutTime}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+
+AttendanceItem.displayName = 'AttendanceItem';
+
+const AttendanceList: React.FC<AttendanceListProps> = React.memo(({
   attendanceData,
   totalCount,
   isLoading,
@@ -64,15 +207,15 @@ const AttendanceList: React.FC<AttendanceListProps> = ({
     });
   }, [attendanceData, sortOrder]);
 
-  const handleSortToggle = () => {
+  const handleSortToggle = useCallback(() => {
     setSortOrder(prev => {
       if (prev === 'none') return 'asc';
       if (prev === 'asc') return 'desc';
       return 'none';
     });
-  };
+  }, []);
 
-  const getSortIcon = () => {
+  const getSortIcon = useCallback(() => {
     switch (sortOrder) {
       case 'asc':
         return (
@@ -93,7 +236,13 @@ const AttendanceList: React.FC<AttendanceListProps> = ({
           </svg>
         );
     }
-  };
+  }, [sortOrder, isFullscreen]);
+
+  // Memoize the formatted time string
+  const formattedLastUpdated = useMemo(() => 
+    currentTime.toLocaleTimeString(), 
+    [currentTime]
+  );
 
   if (isLoading) {
     return (
@@ -147,42 +296,6 @@ const AttendanceList: React.FC<AttendanceListProps> = ({
     );
   }
 
-  const getStatusColor = (entries: any[]) => {
-    const status = getTeacherStatus(entries);
-    
-    switch (status) {
-      case 'checked_out':
-        return 'bg-green-100 text-green-800';
-      case 'on_break':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'present':
-        return 'bg-blue-100 text-blue-800';
-      case 'late':
-        return 'bg-orange-100 text-orange-800';
-      case 'no_scan':
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (entries: any[]) => {
-    const status = getTeacherStatus(entries);
-    
-    switch (status) {
-      case 'checked_out':
-        return 'Checked Out';
-      case 'on_break':
-        return 'On Break';
-      case 'present':
-        return 'Present';
-      case 'late':
-        return 'Late';
-      case 'no_scan':
-      default:
-        return 'Not Checked In';
-    }
-  };
-
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       <div className="px-6 py-4 border-b border-gray-200">
@@ -197,7 +310,7 @@ const AttendanceList: React.FC<AttendanceListProps> = ({
               )}
             </h3>
             <p className={`text-gray-600 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>
-              Last updated: {currentTime.toLocaleTimeString()}
+              Last updated: {formattedLastUpdated}
               {statusFilter !== 'all' && (
                 <span className="ml-2 text-blue-600">
                   Showing {attendanceData.length} of {totalCount} teachers
@@ -218,83 +331,18 @@ const AttendanceList: React.FC<AttendanceListProps> = ({
       </div>
       <div className="divide-y divide-gray-200">
         {sortedAttendanceData.map((person, index) => (
-          <motion.div
+          <AttendanceItem
             key={person.person_name}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className={`hover:bg-gray-50 transition-colors duration-150 ${
-              isFullscreen ? 'p-8' : 'p-6'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className={`bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center ${
-                  isFullscreen ? 'w-16 h-16' : 'w-12 h-12'
-                }`}>
-                  <span className={`text-white font-semibold ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                    {person.person_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <h4 className={`font-medium text-gray-900 ${isFullscreen ? 'text-2xl' : 'text-lg'}`}>
-                    {person.person_name}
-                  </h4>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-medium ${getStatusColor(person.entries)} ${
-                    isFullscreen ? 'text-lg' : 'text-xs'
-                  }`}>
-                    {getStatusText(person.entries)}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-6">
-                {/* Check-in Time */}
-                <div className="text-center">
-                  <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
-                    Check-in
-                  </div>
-                  <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                    {person.entries.find(entry => entry['check-in'])?.['check-in'] || '--'}
-                  </div>
-                </div>
-
-                {/* Break-out Time */}
-                <div className="text-center">
-                  <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
-                    Break-out
-                  </div>
-                  <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                    {person.entries.find(entry => entry['break-out'])?.['break-out'] || '--'}
-                  </div>
-                </div>
-
-                {/* Break-in Time */}
-                <div className="text-center">
-                  <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
-                    Break-in
-                  </div>
-                  <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                    {person.entries.find(entry => entry['break-in'])?.['break-in'] || '--'}
-                  </div>
-                </div>
-
-                {/* Check-out Time */}
-                <div className="text-center">
-                  <div className={`font-medium text-gray-500 uppercase tracking-wide ${isFullscreen ? 'text-lg' : 'text-xs'}`}>
-                    Check-out
-                  </div>
-                  <div className={`font-semibold text-gray-900 ${isFullscreen ? 'text-xl' : 'text-sm'}`}>
-                    {person.entries.find(entry => entry['check-out'])?.['check-out'] || '--'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+            person={person}
+            index={index}
+            isFullscreen={isFullscreen}
+          />
         ))}
       </div>
     </div>
   );
-};
+});
+
+AttendanceList.displayName = 'AttendanceList';
 
 export default AttendanceList; 
