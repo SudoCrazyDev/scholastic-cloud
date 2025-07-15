@@ -13,6 +13,8 @@ use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentSectionController;
 use App\Http\Controllers\StudentEcrItemScoreController;
+use App\Http\Controllers\UserAddressController;
+use App\Http\Controllers\UserWorkExperienceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +45,32 @@ Route::middleware('auth.token')->group(function () {
     // User routes
     Route::get('users/my/class-sections', [UserController::class, 'getMyClassSections']);
     Route::apiResource('users', UserController::class);
+    // UserOtherPersonalInfo routes (one-to-one, no index)
+    Route::post('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'store']);
+    Route::get('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'show']);
+    Route::put('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'update']);
+    Route::patch('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'update']);
+    Route::delete('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'destroy']);
+    // UserFamily routes (one-to-one, no index)
+    Route::post('user-family', [\App\Http\Controllers\UserFamilyController::class, 'store']);
+    Route::get('user-family', [\App\Http\Controllers\UserFamilyController::class, 'show']);
+    Route::put('user-family', [\App\Http\Controllers\UserFamilyController::class, 'update']);
+    Route::patch('user-family', [\App\Http\Controllers\UserFamilyController::class, 'update']);
+    Route::delete('user-family', [\App\Http\Controllers\UserFamilyController::class, 'destroy']);
+    // UserAddress routes (one-to-one, no index)
+    Route::apiResource('user-addresses', UserAddressController::class)->only(['store', 'show', 'update', 'destroy']);
+    // UserChildren routes (CRUD)
+    Route::apiResource('user-childrens', \App\Http\Controllers\UserChildrenController::class);
+    // UserEducationalBackground routes (one-to-one, no index)
+    Route::post('user-educational-background', [\App\Http\Controllers\UserEducationalBackgroundController::class, 'store']);
+    Route::get('user-educational-background', [\App\Http\Controllers\UserEducationalBackgroundController::class, 'show']);
+    Route::put('user-educational-background', [\App\Http\Controllers\UserEducationalBackgroundController::class, 'update']);
+    Route::patch('user-educational-background', [\App\Http\Controllers\UserEducationalBackgroundController::class, 'update']);
+    Route::delete('user-educational-background', [\App\Http\Controllers\UserEducationalBackgroundController::class, 'destroy']);
+    // UserCivilServiceEligibility routes (CRUD)
+    Route::apiResource('user-civil-service-eligibility', \App\Http\Controllers\UserCivilServiceEligibilityController::class);
+    // UserWorkExperience routes (CRUD)
+    Route::apiResource('user-work-experience', App\Http\Controllers\UserWorkExperienceController::class);
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
