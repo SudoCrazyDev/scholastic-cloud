@@ -71,6 +71,12 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('user-civil-service-eligibility', \App\Http\Controllers\UserCivilServiceEligibilityController::class);
     // UserWorkExperience routes (CRUD)
     Route::apiResource('user-work-experience', App\Http\Controllers\UserWorkExperienceController::class);
+    // UserLearningDevelopment routes (one-to-one, no index)
+    Route::post('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'store']);
+    Route::get('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'show']);
+    Route::put('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'update']);
+    Route::patch('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'update']);
+    Route::delete('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'destroy']);
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);

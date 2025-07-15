@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 const Topbar: React.FC = () => {
   const { user, logout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const navigate = useNavigate();
   
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -128,6 +130,20 @@ const Topbar: React.FC = () => {
                     <p className="text-sm text-gray-500">{user?.email}</p>
                   </div>
                   <div className="p-2">
+                    <motion.button
+                      whileHover={{ backgroundColor: '#f3f4f6' }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        navigate('/user-profile');
+                        setIsProfileOpen(false);
+                      }}
+                      className="w-full flex items-center px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors duration-200 cursor-pointer mb-1"
+                    >
+                      <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      User Profile
+                    </motion.button>
                     <motion.button
                       whileHover={{ backgroundColor: '#f3f4f6' }}
                       whileTap={{ scale: 0.95 }}

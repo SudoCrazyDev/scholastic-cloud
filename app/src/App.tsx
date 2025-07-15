@@ -18,6 +18,7 @@ import AssignedSubjects from './pages/AssignedSubjects/AssignedSubjects';
 import SubjectDetail from './pages/AssignedSubjects/SubjectDetail';
 import { TeacherAttendance } from './pages/TeacherAttendance';
 import TeacherAttendanceDemo from './pages/TeacherAttendanceDemo';
+import UserProfile from './pages/Users/UserProfile';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
             <Route element={<PrivateLayout />}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="users" element={<Users />} />
+              <Route path="user-profile" element={<UserProfile />} />
               <Route path="institutions" element={<Institutions />} />
               <Route path="roles" element={<Roles />} />
               <Route path="subscriptions" element={<Subscriptions />} />
