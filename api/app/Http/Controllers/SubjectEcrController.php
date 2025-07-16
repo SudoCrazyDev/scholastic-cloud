@@ -97,6 +97,15 @@ class SubjectEcrController extends Controller
                 ], 404);
             }
 
+            // Check if the total percentage for this subject_id exceeds 100
+            $currentTotal = SubjectEcr::where('subject_id', $validated['subject_id'])->sum('percentage');
+            if (($currentTotal + $validated['percentage']) > 100) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Total percentage for this subject exceeds 100%.'
+                ], 422);
+            }
+
             $subjectEcr = SubjectEcr::create($validated);
 
             return response()->json([

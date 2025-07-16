@@ -12,23 +12,43 @@ import {
   ListBulletIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline'
-import { useAssignedSubjects } from '@hooks'
+import { useSubjects, useSubjectDetail } from '@hooks'
 import { ClassRecordTab } from './components/ClassRecordTab'
 import { TopicsTab } from './components/TopicsTab'
 import { CalendarTab } from './components/CalendarTab'
 import { StudentScoresTab } from './components/StudentScoresTab'
+import SummativeAssessmentTab from './components/SummativeAssessmentTab'
+import type { Subject, Student, ClassSection } from '../../types'
 
-type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores'
+type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment'
+
+// Extend types locally to allow students array on class_section
+interface ClassSectionWithStudents extends ClassSection {
+  students?: Student[];
+}
+interface SubjectWithClassSectionStudents extends Subject {
+  class_section?: ClassSectionWithStudents;
+}
 
 const SubjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
-  const { assignedSubjects } = useAssignedSubjects()
+  const { data, isLoading, error } = useSubjectDetail(id)
   const [activeTab, setActiveTab] = useState<TabType>('class-record')
 
-  // Find the subject by ID
-  const subject = assignedSubjects.find(s => s.id === id)
+  const subject = data?.data as SubjectWithClassSectionStudents;
+  
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <span className="ml-3 text-gray-600">Loading subject info...</span>
+        </div>
+      </div>
+    )
+  }
 
-  if (!subject) {
+  if (error || !subject) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="text-center py-12">
@@ -36,7 +56,7 @@ const SubjectDetail: React.FC = () => {
             <BookOpenIcon className="w-8 h-8 text-red-600" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Subject Not Found</h3>
-          <p className="text-gray-500 mb-6">The subject you're looking for doesn't exist.</p>
+          <p className="text-gray-500 mb-6">{error ? (error as any).message : "The subject you're looking for doesn't exist."}</p>
           <Link
             to="/assigned-subjects"
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
@@ -58,6 +78,11 @@ const SubjectDetail: React.FC = () => {
       id: 'student-scores' as TabType,
       label: 'Student Scores',
       icon: UserGroupIcon,
+    },
+    {
+      id: 'summative-assessment' as TabType,
+      label: 'Components of Summative Assessment',
+      icon: ListBulletIcon,
     },
     {
       id: 'topics' as TabType,
@@ -104,12 +129,12 @@ const SubjectDetail: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <AcademicCapIcon className="w-4 h-4" />
-            <span>{subject.class_section.grade_level} - {subject.class_section.title}</span>
+            <span>{subject.class_section?.grade_level} - {subject.class_section?.title}</span>
           </div>
           
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <BuildingOfficeIcon className="w-4 h-4" />
-            <span>{subject.institution.title}</span>
+            <span>{subject.institution?.title}</span>
           </div>
           
           {subject.start_time && subject.end_time && (
@@ -118,10 +143,9 @@ const SubjectDetail: React.FC = () => {
               <span>{subject.start_time} - {subject.end_time}</span>
             </div>
           )}
-          
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <UserGroupIcon className="w-4 h-4" />
-            <span>{subject.student_count || 0} / {subject.total_students || 0} students</span>
+            <span>{subject.class_section?.students?.length ?? 0} students</span>
           </div>
         </div>
       </div>
@@ -155,6 +179,7 @@ const SubjectDetail: React.FC = () => {
         <div className="p-6">
           {activeTab === 'class-record' && <ClassRecordTab subjectId={subject.id} />}
           {activeTab === 'student-scores' && <StudentScoresTab subjectId={subject.id} classSectionId={subject.class_section_id} />}
+          {activeTab === 'summative-assessment' && <SummativeAssessmentTab subjectId={subject.id} />}
           {activeTab === 'topics' && <TopicsTab subjectId={subject.id} />}
           {activeTab === 'calendar' && <CalendarTab subjectId={subject.id} />}
         </div>

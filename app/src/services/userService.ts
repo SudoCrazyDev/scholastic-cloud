@@ -1,5 +1,6 @@
 import { api } from '../lib/api'
 import type { User, PaginatedResponse } from '../types'
+import type { AssignedSubject } from '../types'
 
 export interface CreateUserData {
   first_name: string
@@ -108,6 +109,13 @@ class UserService {
     const response = await api.get<PaginatedResponse<any>>(url)
     
     return response.data
+  }
+
+  async getMySubjects() {
+    const response = await api.get<{ data: AssignedSubject[]; success: boolean; message?: string }>(
+      '/users/my/subjects'
+    )
+    return response.data.data
   }
 }
 

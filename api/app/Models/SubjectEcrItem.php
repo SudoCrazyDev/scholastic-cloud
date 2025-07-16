@@ -9,6 +9,13 @@ class SubjectEcrItem extends Model
 {
     use HasUuids;
     
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     *
+     * Note: 'type' is nullable in the database.
+     */
     protected $fillable = [
         'subject_ecr_id',
         'type',

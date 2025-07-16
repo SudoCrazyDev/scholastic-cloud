@@ -108,12 +108,12 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
                 </div>
 
                 {/* Institution */}
-                <div className="flex items-center text-xs text-gray-600">
+                {/* <div className="flex items-center text-xs text-gray-600">
                   <BuildingOfficeIcon className="w-3 h-3 mr-1 flex-shrink-0" />
                   <span className="truncate" title={subject.institution?.title}>
                     {subject.institution?.abbr}
                   </span>
-                </div>
+                </div> */}
 
                 {/* Time */}
                 {subject.start_time && subject.end_time && (

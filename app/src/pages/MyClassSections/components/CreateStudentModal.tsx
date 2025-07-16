@@ -82,8 +82,8 @@ const validationSchema = Yup.object({
     .oneOf(['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'Others'], 'Please select a valid religion'),
   
   lrn: Yup.string()
-    .required('LRN is required')
-    .matches(/^\d{12}$/, 'LRN must be exactly 12 digits'),
+    .matches(/^[0-9]{12}$/, 'LRN must be exactly 12 digits')
+    .notRequired(),
 })
 
 export function CreateStudentModal({ 
@@ -448,14 +448,14 @@ export function CreateStudentModal({
                         {/* LRN */}
                         <div>
                           <label htmlFor="lrn" className="block text-sm font-medium text-gray-700">
-                            LRN (Learner Reference Number) *
+                            LRN (Learner Reference Number)
                           </label>
                           <Field
                             as={Input}
                             id="lrn"
                             name="lrn"
                             type="text"
-                            placeholder="Enter 12-digit LRN"
+                            placeholder="Enter 12-digit LRN (optional)"
                             maxLength={12}
                             error={touched.lrn && errors.lrn}
                           />

@@ -1,20 +1,16 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
+import {
   XMarkIcon,
   DocumentTextIcon,
   AcademicCapIcon,
   UserGroupIcon,
   CalendarIcon
 } from '@heroicons/react/24/outline'
-// Mock service for development
-const mockScoreService = {
-  createGradeItem: async (data: any) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    return { success: true, data: { id: Date.now().toString(), ...data } }
-  }
-}
+import { useFormik } from 'formik'
+import * as Yup from 'yup'
+import { useCreateSubjectEcrItem } from '../../../hooks/useSubjectEcrItems'
+import { useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
 
 interface AddGradeItemModalProps {
   isOpen: boolean
@@ -23,13 +19,17 @@ interface AddGradeItemModalProps {
   onSuccess: () => void
 }
 
-interface GradeItemForm {
-  title: string
-  description: string
-  date: string
-  total_score: number
-  category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment'
-  quarter: 'First Quarter' | 'Second Quarter' | 'Third Quarter' | 'Fourth Quarter'
+const categoryTypeMap = {
+  'Written Works': 'written',
+  'Performance Tasks': 'performance',
+  'Quarterly Assessment': 'quarterly',
+}
+
+const quarterTypeMap = {
+  'First Quarter': 'Q1',
+  'Second Quarter': 'Q2',
+  'Third Quarter': 'Q3',
+  'Fourth Quarter': 'Q4',
 }
 
 export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
@@ -38,63 +38,49 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
   subjectId,
   onSuccess
 }) => {
-  const [form, setForm] = useState<GradeItemForm>({
-    title: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
-    total_score: 10,
-    category: 'Written Works',
-    quarter: 'First Quarter'
-  })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const createMutation = useCreateSubjectEcrItem()
+  const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
+  const subjectEcrs = subjectEcrsData?.data || []
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!form.title.trim() || !form.description.trim()) {
-      setError('Please fill in all required fields')
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const result = await mockScoreService.createGradeItem({
-        ...form,
-        subject_id: subjectId
-      })
-      
-      if (result.success) {
+  const formik = useFormik({
+    initialValues: {
+      title: '',
+      description: '',
+      date: new Date().toISOString().split('T')[0],
+      total_score: 10,
+      subject_ecr_id: '',
+      quarter: '1',
+    },
+    validationSchema: Yup.object({
+      title: Yup.string().required('Title is required'),
+      description: Yup.string().required('Description is required'),
+      date: Yup.string().required('Date is required'),
+      total_score: Yup.number().min(1).required('Total score is required'),
+      subject_ecr_id: Yup.string().required('Component is required'),
+      quarter: Yup.string().required('Quarter is required'),
+    }),
+    onSubmit: async (values, { resetForm, setSubmitting, setErrors }) => {
+      try {
+        // Find the selected subject_ecr to infer type if possible
+        const selectedEcr = subjectEcrs.find((ecr: any) => ecr.id === values.subject_ecr_id)
+        await createMutation.mutateAsync({
+          ...values,
+          subject_ecr_id: values.subject_ecr_id,
+          ...(selectedEcr?.type ? { type: selectedEcr.type } : {}),
+          title: values.title,
+          description: values.description,
+          score: values.total_score,
+        })
         onSuccess()
         onClose()
-        // Reset form
-        setForm({
-          title: '',
-          description: '',
-          date: new Date().toISOString().split('T')[0],
-          total_score: 10,
-          category: 'Written Works',
-          quarter: 'First Quarter'
-        })
-      } else {
-        setError('Failed to create grade item')
+        resetForm()
+      } catch (err: any) {
+        setErrors({ title: err?.message || 'Failed to create grade item' })
+      } finally {
+        setSubmitting(false)
       }
-    } catch (err) {
-      console.error('Error creating grade item:', err)
-      setError('Failed to create grade item')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleInputChange = (field: keyof GradeItemForm, value: string | number) => {
-    setForm(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
+    },
+  })
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -150,7 +136,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={formik.handleSubmit} className="space-y-6">
                 {/* Title */}
                 <div>
                   <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
@@ -159,12 +145,13 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                   <input
                     type="text"
                     id="title"
-                    value={form.title}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
+                    {...formik.getFieldProps('title')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="e.g., Quiz 1: Basic Operations"
-                    required
                   />
+                  {formik.touched.title && formik.errors.title && (
+                    <div className="text-xs text-red-600 mt-1">{formik.errors.title}</div>
+                  )}
                 </div>
 
                 {/* Description */}
@@ -174,17 +161,19 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                   </label>
                   <textarea
                     id="description"
-                    value={form.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    {...formik.getFieldProps('description')}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="Brief description of the assessment or activity"
-                    required
                   />
+                  {formik.touched.description && formik.errors.description && (
+                    <div className="text-xs text-red-600 mt-1">{formik.errors.description}</div>
+                  )}
                 </div>
 
                 {/* Date and Total Score */}
                 <div className="grid grid-cols-2 gap-4">
+                  {/*
                   <div>
                     <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
                       Date
@@ -194,12 +183,15 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                       <input
                         type="date"
                         id="date"
-                        value={form.date}
-                        onChange={(e) => handleInputChange('date', e.target.value)}
+                        {...formik.getFieldProps('date')}
                         className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       />
+                      {formik.touched.date && formik.errors.date && (
+                        <div className="text-xs text-red-600 mt-1">{formik.errors.date}</div>
+                      )}
                     </div>
                   </div>
+                  */}
                   <div>
                     <label htmlFor="total_score" className="block text-sm font-medium text-gray-700 mb-2">
                       Total Score
@@ -207,30 +199,41 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                     <input
                       type="number"
                       id="total_score"
-                      value={form.total_score}
-                      onChange={(e) => handleInputChange('total_score', Number(e.target.value))}
+                      {...formik.getFieldProps('total_score')}
                       min="1"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
+                    {formik.touched.total_score && formik.errors.total_score && (
+                      <div className="text-xs text-red-600 mt-1">{formik.errors.total_score}</div>
+                    )}
                   </div>
                 </div>
 
-                {/* Category and Quarter */}
+                {/* Category (Component) and Quarter */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                      Category
+                    <label htmlFor="subject_ecr_id" className="block text-sm font-medium text-gray-700 mb-2">
+                      Component
                     </label>
-                    <select
-                      id="category"
-                      value={form.category}
-                      onChange={(e) => handleInputChange('category', e.target.value as any)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="Written Works">Written Works (30%)</option>
-                      <option value="Performance Tasks">Performance Tasks (50%)</option>
-                      <option value="Quarterly Assessment">Quarterly Assessment (20%)</option>
-                    </select>
+                    {subjectEcrsLoading ? (
+                      <div className="text-gray-500 text-sm">Loading components...</div>
+                    ) : subjectEcrsError ? (
+                      <div className="text-red-600 text-sm">Failed to load components.</div>
+                    ) : (
+                      <select
+                        id="subject_ecr_id"
+                        {...formik.getFieldProps('subject_ecr_id')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">Select a component</option>
+                        {subjectEcrs.map((ecr: any) => (
+                          <option key={ecr.id} value={ecr.id}>{ecr.title} ({ecr.percentage}%)</option>
+                        ))}
+                      </select>
+                    )}
+                    {formik.touched.subject_ecr_id && formik.errors.subject_ecr_id && (
+                      <div className="text-xs text-red-600 mt-1">{formik.errors.subject_ecr_id}</div>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="quarter" className="block text-sm font-medium text-gray-700 mb-2">
@@ -238,35 +241,24 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                     </label>
                     <select
                       id="quarter"
-                      value={form.quarter}
-                      onChange={(e) => handleInputChange('quarter', e.target.value as any)}
+                      {...formik.getFieldProps('quarter')}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     >
-                      <option value="First Quarter">First Quarter</option>
-                      <option value="Second Quarter">Second Quarter</option>
-                      <option value="Third Quarter">Third Quarter</option>
-                      <option value="Fourth Quarter">Fourth Quarter</option>
+                      <option value="1">First Quarter</option>
+                      <option value="2">Second Quarter</option>
+                      <option value="3">Third Quarter</option>
+                      <option value="4">Fourth Quarter</option>
                     </select>
+                    {formik.touched.quarter && formik.errors.quarter && (
+                      <div className="text-xs text-red-600 mt-1">{formik.errors.quarter}</div>
+                    )}
                   </div>
-                </div>
-
-                {/* Category Info */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-center space-x-2 mb-2">
-                    {getCategoryIcon(form.category)}
-                    <span className="text-sm font-medium text-blue-900">{form.category}</span>
-                  </div>
-                  <p className="text-xs text-blue-800">
-                    {form.category === 'Written Works' && 'Quizzes, assignments, and written assessments (30% of quarter grade)'}
-                    {form.category === 'Performance Tasks' && 'Projects, presentations, and hands-on activities (50% of quarter grade)'}
-                    {form.category === 'Quarterly Assessment' && 'Major exams and comprehensive assessments (20% of quarter grade)'}
-                  </p>
                 </div>
 
                 {/* Error Message */}
-                {error && (
+                {formik.errors.title && typeof formik.errors.title === 'string' && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm text-red-800">{error}</p>
+                    <p className="text-sm text-red-800">{formik.errors.title}</p>
                   </div>
                 )}
 
@@ -281,10 +273,10 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={formik.isSubmitting || createMutation.status === 'pending'}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? (
+                    {formik.isSubmitting || createMutation.status === 'pending' ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Creating...

@@ -1,153 +1,7 @@
 import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { userService } from '../services/userService'
 import type { AssignedSubject } from '../types'
-
-// Placeholder data for assigned subjects
-const placeholderAssignedSubjects: AssignedSubject[] = [
-  {
-    id: '1',
-    institution_id: '1',
-    class_section_id: '1',
-    adviser: '1',
-    adviser_user: {
-      id: '1',
-      first_name: 'John',
-      last_name: 'Doe',
-      gender: 'male',
-      birthdate: '1990-01-01',
-      email: 'john.doe@example.com',
-      is_new: false,
-      is_active: true,
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    subject_type: 'parent',
-    title: 'Mathematics',
-    variant: 'Advanced Algebra',
-    start_time: '08:00',
-    end_time: '09:30',
-    is_limited_student: false,
-    order: 1,
-    created_at: '2024-01-01',
-    updated_at: '2024-01-01',
-    class_section: {
-      id: '1',
-      institution_id: '1',
-      grade_level: 'Grade 10',
-      title: 'Section A',
-      academic_year: '2024-2025',
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    institution: {
-      id: '1',
-      title: 'Sample High School',
-      abbr: 'SHS',
-      address: '123 Main St',
-      division: 'Division A',
-      region: 'Region I',
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    student_count: 25,
-    total_students: 30,
-  },
-  {
-    id: '2',
-    institution_id: '1',
-    class_section_id: '1',
-    adviser: '1',
-    adviser_user: {
-      id: '1',
-      first_name: 'John',
-      last_name: 'Doe',
-      gender: 'male',
-      birthdate: '1990-01-01',
-      email: 'john.doe@example.com',
-      is_new: false,
-      is_active: true,
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    subject_type: 'parent',
-    title: 'Science',
-    variant: 'Physics',
-    start_time: '10:00',
-    end_time: '11:30',
-    is_limited_student: false,
-    order: 2,
-    created_at: '2024-01-01',
-    updated_at: '2024-01-01',
-    class_section: {
-      id: '1',
-      institution_id: '1',
-      grade_level: 'Grade 10',
-      title: 'Section A',
-      academic_year: '2024-2025',
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    institution: {
-      id: '1',
-      title: 'Sample High School',
-      abbr: 'SHS',
-      address: '123 Main St',
-      division: 'Division A',
-      region: 'Region I',
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    student_count: 28,
-    total_students: 30,
-  },
-  {
-    id: '3',
-    institution_id: '1',
-    class_section_id: '2',
-    adviser: '1',
-    adviser_user: {
-      id: '1',
-      first_name: 'John',
-      last_name: 'Doe',
-      gender: 'male',
-      birthdate: '1990-01-01',
-      email: 'john.doe@example.com',
-      is_new: false,
-      is_active: true,
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    subject_type: 'parent',
-    title: 'English',
-    variant: 'Literature',
-    start_time: '13:00',
-    end_time: '14:30',
-    is_limited_student: false,
-    order: 1,
-    created_at: '2024-01-01',
-    updated_at: '2024-01-01',
-    class_section: {
-      id: '2',
-      institution_id: '1',
-      grade_level: 'Grade 11',
-      title: 'Section B',
-      academic_year: '2024-2025',
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    institution: {
-      id: '1',
-      title: 'Sample High School',
-      abbr: 'SHS',
-      address: '123 Main St',
-      division: 'Division A',
-      region: 'Region I',
-      created_at: '2024-01-01',
-      updated_at: '2024-01-01',
-    },
-    student_count: 22,
-    total_students: 25,
-  },
-]
 
 export const useAssignedSubjects = () => {
   const [search, setSearch] = useState('')
@@ -155,12 +9,22 @@ export const useAssignedSubjects = () => {
     field: 'title',
     direction: 'asc',
   })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  const {
+    data: assignedSubjectsRaw = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['my-assigned-subjects'],
+    queryFn: () => userService.getMySubjects(),
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
 
   // Filter and sort subjects
   const assignedSubjects = useMemo(() => {
-    let filtered = placeholderAssignedSubjects
+    let filtered = assignedSubjectsRaw
 
     // Apply search filter
     if (search) {
@@ -173,7 +37,7 @@ export const useAssignedSubjects = () => {
     }
 
     // Apply sorting
-    filtered.sort((a, b) => {
+    filtered = [...filtered].sort((a, b) => {
       let aValue: any
       let bValue: any
 
@@ -207,7 +71,7 @@ export const useAssignedSubjects = () => {
     })
 
     return filtered
-  }, [search, sorting])
+  }, [assignedSubjectsRaw, search, sorting])
 
   const handleSearch = (value: string) => {
     setSearch(value)
@@ -224,12 +88,13 @@ export const useAssignedSubjects = () => {
     // Data
     assignedSubjects,
     loading,
-    error,
+    error: error?.message || null,
     search,
     sorting,
 
     // Actions
     handleSearch,
     handleSort,
+    refetch,
   }
 } 

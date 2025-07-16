@@ -345,4 +345,25 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get the current user's advised subjects.
+     */
+    public function getMySubjects(Request $request): \Illuminate\Http\JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $subjects = $user->advisedSubjects()->with(['classSection', 'adviserUser', 'parentSubject'])->orderBy('order', 'asc')->orderBy('created_at', 'desc')->get();
+            return response()->json([
+                'success' => true,
+                'data' => $subjects
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve subjects',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 } 

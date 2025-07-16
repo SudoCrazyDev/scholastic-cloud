@@ -202,3 +202,17 @@ export const useSubjects = (options: UseSubjectsOptions = {}) => {
     refetch,
   }
 } 
+
+// Hook for fetching a single subject by ID
+export const useSubjectDetail = (id?: string) => {
+  return useQuery({
+    queryKey: ['subject-detail', id],
+    queryFn: () => {
+      if (!id) throw new Error('No subject ID provided')
+      return subjectService.getSubject(id)
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
+} 

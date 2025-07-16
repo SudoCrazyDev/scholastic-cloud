@@ -44,6 +44,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
     // User routes
     Route::get('users/my/class-sections', [UserController::class, 'getMyClassSections']);
+    Route::get('users/my/subjects', [UserController::class, 'getMySubjects']);
     Route::apiResource('users', UserController::class);
     // UserOtherPersonalInfo routes (one-to-one, no index)
     Route::post('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'store']);
@@ -89,6 +90,11 @@ Route::middleware('auth.token')->group(function () {
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);
     Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
+    // SubjectEcr routes
+    Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class);
+    Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class);
+    // SubjectSummativeAssessment routes
+    Route::apiResource('subject-summative-assessments', \App\Http\Controllers\SubjectSummativeAssessmentController::class);
     // StudentSection routes
     Route::apiResource('student-sections', StudentSectionController::class);
     Route::post('student-sections/bulk-assign', [StudentSectionController::class, 'bulkAssign']);

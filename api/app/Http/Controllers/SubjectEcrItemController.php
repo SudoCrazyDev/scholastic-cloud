@@ -6,6 +6,7 @@ use App\Models\SubjectEcrItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class SubjectEcrItemController extends Controller
 {
@@ -16,9 +17,14 @@ class SubjectEcrItemController extends Controller
     {
         $query = SubjectEcrItem::query();
         
-        // Filter by subject_ecr_id if provided
+        // Filter by subject_ecr_id if provided (support multiple IDs)
         if ($request->has('subject_ecr_id')) {
-            $query->where('subject_ecr_id', $request->query('subject_ecr_id'));
+            $subjectEcrIds = $request->query('subject_ecr_id');
+            if (is_array($subjectEcrIds)) {
+                $query->whereIn('subject_ecr_id', $subjectEcrIds);
+            } else {
+                $query->where('subject_ecr_id', $subjectEcrIds);
+            }
         }
         
         // Filter by type if provided
@@ -42,7 +48,7 @@ class SubjectEcrItemController extends Controller
         try {
             $validatedData = $request->validate([
                 'subject_ecr_id' => 'required|uuid',
-                'type' => 'required|string|max:255',
+                'type' => 'nullable|string|max:255',
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'score' => 'nullable|numeric|min:0|max:999999.99',
@@ -100,7 +106,7 @@ class SubjectEcrItemController extends Controller
             
             $validatedData = $request->validate([
                 'subject_ecr_id' => 'sometimes|required|uuid',
-                'type' => 'sometimes|required|string|max:255',
+                'type' => 'nullable|string|max:255',
                 'title' => 'sometimes|required|string|max:255',
                 'description' => 'nullable|string',
                 'score' => 'nullable|numeric|min:0|max:999999.99',

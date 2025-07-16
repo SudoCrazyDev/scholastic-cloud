@@ -152,7 +152,7 @@ class SubjectController extends Controller
                 ], 403);
             }
 
-            $subject = Subject::with(['institution', 'classSection', 'adviserUser', 'parentSubject', 'childSubjects'])
+            $subject = Subject::with(['institution', 'classSection.students', 'adviserUser', 'parentSubject', 'childSubjects'])
                 ->where('institution_id', $defaultInstitution->institution_id)
                 ->findOrFail($id);
 

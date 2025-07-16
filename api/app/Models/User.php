@@ -235,4 +235,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(ClassSection::class, 'adviser');
     }
+
+    /**
+     * Get the subjects that this user advises.
+     */
+    public function advisedSubjects()
+    {
+        return $this->hasMany(\App\Models\Subject::class, 'adviser');
+    }
 }

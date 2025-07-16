@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast'
 import { studentService } from '../services/studentService'
 import type { Student, CreateStudentData, UpdateStudentData } from '../types'
 
-export function useStudents() {
+export function useStudents(options?: { class_section_id?: string }) {
   const queryClient = useQueryClient()
   const [searchValue, setSearchValue] = useState('')
   const [selectedRows, setSelectedRows] = useState<Student[]>([])
@@ -38,9 +38,10 @@ export function useStudents() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['students', searchParams],
+    queryKey: ['students', { ...searchParams, ...options }],
     queryFn: () => studentService.getStudents({
       ...searchParams,
+      ...options,
       per_page: 15,
     }),
     staleTime: 5 * 60 * 1000, // 5 minutes

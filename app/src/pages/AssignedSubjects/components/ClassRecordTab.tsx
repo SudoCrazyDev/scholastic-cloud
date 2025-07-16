@@ -8,8 +8,7 @@ import {
   ChevronRightIcon,
   AcademicCapIcon,
   CalendarIcon,
-  IdentificationIcon,
-  HeartIcon
+  IdentificationIcon
 } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import type { Student } from '../../../types'

@@ -1,6 +1,6 @@
 // TanStack Query hooks
 export { useClassSections } from './useClassSections'
-export { useSubjects } from './useSubjects'
+export { useSubjects, useSubjectDetail } from './useSubjects'
 export { useSubscriptions } from './useSubscriptions'
 export { useUsers } from './useUsers'
 export { useInstitutions } from './useInstitutions'
@@ -8,6 +8,7 @@ export { useRoles } from './useRoles'
 export { useStaffs } from './useStaffs'
 export { useMyClassSections } from './useMyClassSections'
 export { useAssignedSubjects } from './useAssignedSubjects'
+export * from './useSubjectEcrItems';
 
 // Generic data table hook
 export { useDataTable } from './useDataTable'

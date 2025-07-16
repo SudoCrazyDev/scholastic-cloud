@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('subject_ecr_items', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('subject_ecr_id');
-            $table->string('type');
+            $table->string('type')->nullable();
             $table->string('title');
             $table->text('description')->nullable();
             $table->decimal('score', 8, 2)->nullable();

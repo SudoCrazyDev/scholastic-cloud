@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { 
+import {
   UserGroupIcon,
   DocumentTextIcon,
   CheckCircleIcon,
-  ClockIcon,
-  ExclamationTriangleIcon,
   PlusIcon,
-  TrashIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   AcademicCapIcon,
   CalendarIcon,
   ArrowDownTrayIcon,
-  XMarkIcon,
   UserIcon,
   UsersIcon
 } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { AddGradeItemModal } from './AddGradeItemModal'
+import { useSubjectEcrItems, useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
+import { useStudents } from '../../../hooks/useStudents'
+import { toast } from 'react-hot-toast'
+import { ErrorHandler } from '../../../utils/errorHandler'
+import { Alert } from '../../../components/alert'
 
 interface StudentScoresTabProps {
   subjectId: string
@@ -54,99 +54,6 @@ interface Student {
   profile_picture?: string
 }
 
-// Placeholder data for grade items
-const placeholderGradeItems: GradeItem[] = [
-  // First Quarter - Written Works
-  { id: 'q1-ww-1', title: 'Quiz 1: Basic Operations', date: '2024-08-15', description: 'Addition and subtraction', total_score: 10, category: 'Written Works', quarter: 'First Quarter' },
-  { id: 'q1-ww-2', title: 'Quiz 2: Multiplication', date: '2024-08-20', description: 'Multiplication tables', total_score: 10, category: 'Written Works', quarter: 'First Quarter' },
-  { id: 'q1-ww-3', title: 'Assignment 1: Word Problems', date: '2024-08-25', description: 'Simple word problems', total_score: 10, category: 'Written Works', quarter: 'First Quarter' },
-  
-  // First Quarter - Performance Tasks
-  { id: 'q1-pt-1', title: 'Group Project: Math Games', date: '2024-08-18', description: 'Create educational games', total_score: 10, category: 'Performance Tasks', quarter: 'First Quarter' },
-  { id: 'q1-pt-2', title: 'Individual Presentation', date: '2024-08-25', description: 'Present math concepts', total_score: 10, category: 'Performance Tasks', quarter: 'First Quarter' },
-  
-  // First Quarter - Quarterly Assessment
-  { id: 'q1-qa-1', title: 'First Quarter Exam', date: '2024-10-25', description: 'Comprehensive quarter exam', total_score: 100, category: 'Quarterly Assessment', quarter: 'First Quarter' },
-  
-  // Second Quarter - Written Works
-  { id: 'q2-ww-1', title: 'Quiz 1: Advanced Topics', date: '2024-11-01', description: 'Advanced math topic 1', total_score: 10, category: 'Written Works', quarter: 'Second Quarter' },
-  { id: 'q2-ww-2', title: 'Quiz 2: Complex Operations', date: '2024-11-08', description: 'Complex math operations', total_score: 10, category: 'Written Works', quarter: 'Second Quarter' },
-  
-  // Second Quarter - Performance Tasks
-  { id: 'q2-pt-1', title: 'Performance Task 1', date: '2024-11-05', description: 'Advanced performance task 1', total_score: 10, category: 'Performance Tasks', quarter: 'Second Quarter' },
-  { id: 'q2-pt-2', title: 'Performance Task 2', date: '2024-11-12', description: 'Advanced performance task 2', total_score: 10, category: 'Performance Tasks', quarter: 'Second Quarter' },
-  
-  // Second Quarter - Quarterly Assessment
-  { id: 'q2-qa-1', title: 'Second Quarter Exam', date: '2024-12-15', description: 'Comprehensive quarter exam', total_score: 100, category: 'Quarterly Assessment', quarter: 'Second Quarter' },
-]
-
-// Placeholder students data with 60 students for better demonstration
-const placeholderStudents: Student[] = [
-  // Male Students (30)
-  { id: '1', lrn: '123456789001', first_name: 'Alejandro', last_name: 'Aguilar', gender: 'male' },
-  { id: '2', lrn: '123456789002', first_name: 'Benjamin', last_name: 'Alvarez', gender: 'male' },
-  { id: '3', lrn: '123456789003', first_name: 'Carlos', last_name: 'Andrade', gender: 'male' },
-  { id: '4', lrn: '123456789004', first_name: 'Daniel', last_name: 'Bautista', gender: 'male' },
-  { id: '5', lrn: '123456789005', first_name: 'Eduardo', last_name: 'Cabrera', gender: 'male' },
-  { id: '6', lrn: '123456789006', first_name: 'Fernando', last_name: 'Campos', gender: 'male' },
-  { id: '7', lrn: '123456789007', first_name: 'Gabriel', last_name: 'Cardenas', gender: 'male' },
-  { id: '8', lrn: '123456789008', first_name: 'Hector', last_name: 'Castillo', gender: 'male' },
-  { id: '9', lrn: '123456789009', first_name: 'Ignacio', last_name: 'Cervantes', gender: 'male' },
-  { id: '10', lrn: '123456789010', first_name: 'Javier', last_name: 'Chavez', gender: 'male' },
-  { id: '11', lrn: '123456789011', first_name: 'Kevin', last_name: 'Cruz', gender: 'male' },
-  { id: '12', lrn: '123456789012', first_name: 'Luis', last_name: 'Dela Cruz', gender: 'male' },
-  { id: '13', lrn: '123456789013', first_name: 'Manuel', last_name: 'Diaz', gender: 'male' },
-  { id: '14', lrn: '123456789014', first_name: 'Nicolas', last_name: 'Escobar', gender: 'male' },
-  { id: '15', lrn: '123456789015', first_name: 'Oscar', last_name: 'Espinoza', gender: 'male' },
-  { id: '16', lrn: '123456789016', first_name: 'Pablo', last_name: 'Fernandez', gender: 'male' },
-  { id: '17', lrn: '123456789017', first_name: 'Quentin', last_name: 'Flores', gender: 'male' },
-  { id: '18', lrn: '123456789018', first_name: 'Rafael', last_name: 'Garcia', gender: 'male' },
-  { id: '19', lrn: '123456789019', first_name: 'Samuel', last_name: 'Gomez', gender: 'male' },
-  { id: '20', lrn: '123456789020', first_name: 'Tomas', last_name: 'Gonzalez', gender: 'male' },
-  { id: '21', lrn: '123456789021', first_name: 'Victor', last_name: 'Gutierrez', gender: 'male' },
-  { id: '22', lrn: '123456789022', first_name: 'Xavier', last_name: 'Hernandez', gender: 'male' },
-  { id: '23', lrn: '123456789023', first_name: 'Yago', last_name: 'Jimenez', gender: 'male' },
-  { id: '24', lrn: '123456789024', first_name: 'Zachary', last_name: 'Lopez', gender: 'male' },
-  { id: '25', lrn: '123456789025', first_name: 'Adrian', last_name: 'Martinez', gender: 'male' },
-  { id: '26', lrn: '123456789026', first_name: 'Bruno', last_name: 'Mendoza', gender: 'male' },
-  { id: '27', lrn: '123456789027', first_name: 'Cesar', last_name: 'Morales', gender: 'male' },
-  { id: '28', lrn: '123456789028', first_name: 'David', last_name: 'Moreno', gender: 'male' },
-  { id: '29', lrn: '123456789029', first_name: 'Emilio', last_name: 'Navarro', gender: 'male' },
-  { id: '30', lrn: '123456789030', first_name: 'Felipe', last_name: 'Ortiz', gender: 'male' },
-  
-  // Female Students (30)
-  { id: '31', lrn: '123456789031', first_name: 'Adriana', last_name: 'Perez', gender: 'female' },
-  { id: '32', lrn: '123456789032', first_name: 'Beatriz', last_name: 'Ramirez', gender: 'female' },
-  { id: '33', lrn: '123456789033', first_name: 'Camila', last_name: 'Reyes', gender: 'female' },
-  { id: '34', lrn: '123456789034', first_name: 'Daniela', last_name: 'Rivera', gender: 'female' },
-  { id: '35', lrn: '123456789035', first_name: 'Elena', last_name: 'Rodriguez', gender: 'female' },
-  { id: '36', lrn: '123456789036', first_name: 'Fatima', last_name: 'Romero', gender: 'female' },
-  { id: '37', lrn: '123456789037', first_name: 'Gabriela', last_name: 'Ruiz', gender: 'female' },
-  { id: '38', lrn: '123456789038', first_name: 'Helena', last_name: 'Salazar', gender: 'female' },
-  { id: '39', lrn: '123456789039', first_name: 'Isabella', last_name: 'Sanchez', gender: 'female' },
-  { id: '40', lrn: '123456789040', first_name: 'Julia', last_name: 'Santos', gender: 'female' },
-  { id: '41', lrn: '123456789041', first_name: 'Karina', last_name: 'Silva', gender: 'female' },
-  { id: '42', lrn: '123456789042', first_name: 'Laura', last_name: 'Soto', gender: 'female' },
-  { id: '43', lrn: '123456789043', first_name: 'Maria', last_name: 'Torres', gender: 'female' },
-  { id: '44', lrn: '123456789044', first_name: 'Natalia', last_name: 'Valdez', gender: 'female' },
-  { id: '45', lrn: '123456789045', first_name: 'Olivia', last_name: 'Vargas', gender: 'female' },
-  { id: '46', lrn: '123456789046', first_name: 'Patricia', last_name: 'Vega', gender: 'female' },
-  { id: '47', lrn: '123456789047', first_name: 'Quinn', last_name: 'Villa', gender: 'female' },
-  { id: '48', lrn: '123456789048', first_name: 'Rosa', last_name: 'Villanueva', gender: 'female' },
-  { id: '49', lrn: '123456789049', first_name: 'Sofia', last_name: 'Villareal', gender: 'female' },
-  { id: '50', lrn: '123456789050', first_name: 'Teresa', last_name: 'Zamora', gender: 'female' },
-  { id: '51', lrn: '123456789051', first_name: 'Valentina', last_name: 'Zavala', gender: 'female' },
-  { id: '52', lrn: '123456789052', first_name: 'Wendy', last_name: 'Zuniga', gender: 'female' },
-  { id: '53', lrn: '123456789053', first_name: 'Ximena', last_name: 'Acosta', gender: 'female' },
-  { id: '54', lrn: '123456789054', first_name: 'Yolanda', last_name: 'Aguirre', gender: 'female' },
-  { id: '55', lrn: '123456789055', first_name: 'Zara', last_name: 'Alvarado', gender: 'female' },
-  { id: '56', lrn: '123456789056', first_name: 'Ana', last_name: 'Arias', gender: 'female' },
-  { id: '57', lrn: '123456789057', first_name: 'Bianca', last_name: 'Avila', gender: 'female' },
-  { id: '58', lrn: '123456789058', first_name: 'Carmen', last_name: 'Barajas', gender: 'female' },
-  { id: '59', lrn: '123456789059', first_name: 'Diana', last_name: 'Beltran', gender: 'female' },
-  { id: '60', lrn: '123456789060', first_name: 'Eva', last_name: 'Bravo', gender: 'female' },
-]
-
 interface ScoreInputProps {
   student: Student
   item: GradeItem
@@ -154,10 +61,10 @@ interface ScoreInputProps {
   onScoreChange: (studentId: string, itemId: string, score: number) => void
 }
 
-const ScoreInput: React.FC<ScoreInputProps> = ({ 
-  student, 
-  item, 
-  currentScore, 
+const ScoreInput: React.FC<ScoreInputProps> = ({
+  student,
+  item,
+  currentScore,
   onScoreChange
 }) => {
   const [score, setScore] = useState(currentScore)
@@ -201,13 +108,13 @@ const ScoreInput: React.FC<ScoreInputProps> = ({
           </div>
         </div>
       </div>
-      
+
       <div className="flex items-center space-x-3">
         <div className={`text-sm font-medium ${getScoreColor(score, item.total_score)}`}>
           <span>{score}</span>
           <span className="text-gray-400">/{item.total_score}</span>
         </div>
-        
+
         <div className="w-24">
           <Input
             type="number"
@@ -233,12 +140,12 @@ interface StudentGroupProps {
   onScoreChange: (studentId: string, itemId: string, score: number) => void
 }
 
-const StudentGroup: React.FC<StudentGroupProps> = ({ 
-  gender, 
-  students, 
-  item, 
-  scores, 
-  onScoreChange 
+const StudentGroup: React.FC<StudentGroupProps> = ({
+  gender,
+  students,
+  item,
+  scores,
+  onScoreChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -277,7 +184,7 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
 
   return (
     <div className={`rounded-lg border ${getGenderColor(gender)}`}>
-      <div 
+      <div
         className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -288,7 +195,7 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
             <p className="text-xs text-gray-500">{students.length} students</p>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <div className="text-xs text-gray-500">
             {isExpanded ? 'Collapse' : 'Expand'}
@@ -300,12 +207,12 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
           )}
         </div>
       </div>
-      
+
       {isExpanded && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg">
           {students.map((student) => {
             const score = scores.find(s => s.student_id === student.id && s.item_id === item.id)?.score || 0
-            
+
             return (
               <ScoreInput
                 key={`${student.id}-${item.id}`}
@@ -329,11 +236,11 @@ interface GradeItemSectionProps {
   onScoreChange: (studentId: string, itemId: string, score: number) => void
 }
 
-const GradeItemSection: React.FC<GradeItemSectionProps> = ({ 
-  item, 
-  students, 
-  scores, 
-  onScoreChange 
+const GradeItemSection: React.FC<GradeItemSectionProps> = ({
+  item,
+  students,
+  scores,
+  onScoreChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -384,7 +291,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
 
   return (
     <div className={`rounded-lg border ${getCategoryColor(item.category)}`}>
-      <div 
+      <div
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -403,7 +310,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <div className="text-right">
             <div className="text-sm font-medium text-gray-900">
@@ -420,7 +327,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
           )}
         </div>
       </div>
-      
+
       {isExpanded && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg p-4 space-y-4">
           {Object.entries(groupedStudents).map(([gender, studentsInGroup]) => (
@@ -440,92 +347,75 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
 }
 
 export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, classSectionId }) => {
-  const [students, setStudents] = useState<Student[]>([])
-  const [gradeItems, setGradeItems] = useState<GradeItem[]>(placeholderGradeItems)
-  const [scores, setScores] = useState<StudentScore[]>([
-    // Mock initial scores for demonstration
-    { student_id: '1', item_id: 'q1-ww-1', score: 8 },
-    { student_id: '2', item_id: 'q1-ww-1', score: 9 },
-    { student_id: '3', item_id: 'q1-ww-1', score: 7 },
-    { student_id: '4', item_id: 'q1-ww-1', score: 10 },
-    { student_id: '5', item_id: 'q1-ww-1', score: 8 },
-    { student_id: '1', item_id: 'q1-pt-1', score: 9 },
-    { student_id: '2', item_id: 'q1-pt-1', score: 8 },
-    { student_id: '3', item_id: 'q1-pt-1', score: 10 },
-    { student_id: '4', item_id: 'q1-pt-1', score: 7 },
-    { student_id: '5', item_id: 'q1-pt-1', score: 9 },
-    { student_id: '1', item_id: 'q1-qa-1', score: 85 },
-    { student_id: '2', item_id: 'q1-qa-1', score: 92 },
-    { student_id: '3', item_id: 'q1-qa-1', score: 78 },
-    { student_id: '4', item_id: 'q1-qa-1', score: 88 },
-    { student_id: '5', item_id: 'q1-qa-1', score: 90 },
-  ])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [activeQuarter, setActiveQuarter] = useState<string>('First Quarter')
+  // Fetch students
+  const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId })
+  // Fetch all subject_ecr for this subject
+  const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
+  // Extract all subject_ecr_id
+  const subjectEcrIds = subjectEcrsData?.data?.map((ecr: any) => ecr.id) || []
+  // Fetch grade items for all subject_ecr_id
+  const { data: gradeItemsData, isLoading: gradeItemsLoading, error: gradeItemsError, refetch: refetchGradeItems } = useSubjectEcrItems(subjectEcrIds.length > 0 ? { subject_ecr_id: subjectEcrIds } : undefined)
+  // TODO: Fetch scores from API (implement useStudentScores hook or similar)
+
+  const [scores, setScores] = useState<StudentScore[]>([])
+  const [activeQuarter, setActiveQuarter] = useState<string>('All')
   const [activeCategory, setActiveCategory] = useState<string>('All')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Load mock data
-  useEffect(() => {
-    const loadMockData = () => {
-      setLoading(true)
-      // Simulate API delay
-      setTimeout(() => {
-        setStudents(placeholderStudents)
-        setLoading(false)
-      }, 500)
-    }
-
-    loadMockData()
-  }, [classSectionId])
-
+  // Add a stub for handleScoreChange for now
   const handleScoreChange = (studentId: string, itemId: string, score: number) => {
+    // TODO: Implement score update API call
     setScores(prev => {
       const existingIndex = prev.findIndex(s => s.student_id === studentId && s.item_id === itemId)
-      
       if (existingIndex >= 0) {
-        // Update existing score
         const newScores = [...prev]
         newScores[existingIndex] = { ...newScores[existingIndex], score }
         return newScores
       } else {
-        // Add new score
         return [...prev, { student_id: studentId, item_id: itemId, score }]
       }
     })
   }
 
+  // Handle errors
+  useEffect(() => {
+    if (studentsError) {
+      setAlert({ type: 'error', message: ErrorHandler.handle(studentsError).message })
+    } else if (gradeItemsError) {
+      setAlert({ type: 'error', message: ErrorHandler.handle(gradeItemsError).message })
+    } else if (subjectEcrsError) {
+      setAlert({ type: 'error', message: ErrorHandler.handle(subjectEcrsError).message })
+    } else {
+      setAlert(null)
+    }
+  }, [studentsError, gradeItemsError, subjectEcrsError])
+
+  // Handle add grade item success
+  const handleGradeItemSuccess = () => {
+    toast.success('Grade item created successfully!')
+    refetchGradeItems()
+  }
+
+  // Handle save all scores (TODO: implement real API call)
   const handleSaveAllScores = async () => {
     try {
-      // Mock API call - simulate saving
-      console.log('Saving scores:', scores)
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API delay
-      alert('Scores saved successfully!')
+      // TODO: Call API to save all scores
+      toast.success('Scores saved successfully!')
     } catch (error) {
-      console.error('Error saving scores:', error)
-      alert('Failed to save scores')
+      const err = ErrorHandler.handle(error)
+      toast.error(err.message)
     }
   }
 
-  const handleAddGradeItem = () => {
-    setShowAddModal(true)
-  }
-
-  const handleGradeItemSuccess = () => {
-    // In a real implementation, you would fetch the updated grade items
-    // For now, just show success message
-    alert('Grade item created successfully!')
-    // You could also add the new item to the local state here
-  }
-
-  const quarters = ['First Quarter', 'Second Quarter', 'Third Quarter', 'Fourth Quarter']
+  // Filtered items
+  const quarters = ['1', '2', '3', '4']
   const categories = ['All', 'Written Works', 'Performance Tasks', 'Quarterly Assessment']
-
-  const filteredItems = gradeItems.filter(item => {
+  const gradeItems = gradeItemsData?.data || []
+  const filteredItems = gradeItems.filter((item: GradeItem) => {
     const quarterMatch = activeQuarter === 'All' || item.quarter === activeQuarter
     const categoryMatch = activeCategory === 'All' || item.category === activeCategory
-    return quarterMatch && categoryMatch
+    return quarterMatch
   })
 
   // Calculate statistics
@@ -535,12 +425,12 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   const completionRate = totalItems > 0 ? Math.round((totalScores / (totalStudents * totalItems)) * 100) : 0
 
   // Gender distribution
-  const genderDistribution = students.reduce((acc, student) => {
+  const genderDistribution = students.reduce((acc: any, student: any) => {
     acc[student.gender] = (acc[student.gender] || 0) + 1
     return acc
-  }, {} as Record<string, number>)
+  }, {})
 
-  if (loading) {
+  if (studentsLoading || gradeItemsLoading || subjectEcrsLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -548,18 +438,16 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
     )
   }
 
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <ExclamationTriangleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Data</h3>
-        <p className="text-gray-500">{error}</p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
+      {alert && (
+        <Alert
+          type={alert.type}
+          message={alert.message}
+          onClose={() => setAlert(null)}
+          show={true}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -574,8 +462,8 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
             <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
             Save All Scores
           </button>
-          <button 
-            onClick={handleAddGradeItem}
+          <button
+            onClick={() => setShowAddModal(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
@@ -597,7 +485,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center">
             <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -609,7 +497,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center">
             <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -621,7 +509,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center">
             <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
@@ -722,7 +610,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
             <p className="text-gray-500">No grade items match the current filters.</p>
           </div>
         ) : (
-          filteredItems.map((item) => (
+          filteredItems.map((item: any) => (
             <GradeItemSection
               key={item.id}
               item={item}
