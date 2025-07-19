@@ -36,7 +36,6 @@ export function useStudents(options?: { class_section_id?: string }) {
     data: studentsData,
     isLoading: loading,
     error,
-    refetch,
   } = useQuery({
     queryKey: ['students', { ...searchParams, ...options }],
     queryFn: () => studentService.getStudents({
@@ -62,7 +61,7 @@ export function useStudents(options?: { class_section_id?: string }) {
   // Create student mutation
   const createMutation = useMutation({
     mutationFn: (data: CreateStudentData) => studentService.createStudent(data),
-    onSuccess: (response) => {
+    onSuccess: () => {
       toast.success('Student created successfully!')
       queryClient.invalidateQueries({ queryKey: ['students'] })
       setIsModalOpen(false)
@@ -78,7 +77,7 @@ export function useStudents(options?: { class_section_id?: string }) {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateStudentData }) => 
       studentService.updateStudent(id, data),
-    onSuccess: (response) => {
+    onSuccess: () => {
       toast.success('Student updated successfully!')
       queryClient.invalidateQueries({ queryKey: ['students'] })
       setIsModalOpen(false)
@@ -93,7 +92,7 @@ export function useStudents(options?: { class_section_id?: string }) {
   // Delete student mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => studentService.deleteStudent(id),
-    onSuccess: (response) => {
+    onSuccess: () => {
       toast.success('Student deleted successfully!')
       queryClient.invalidateQueries({ queryKey: ['students'] })
       setSelectedRows([])

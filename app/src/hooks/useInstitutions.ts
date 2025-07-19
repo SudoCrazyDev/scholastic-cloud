@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { institutionService } from '../services/institutionService'
 import { subscriptionService } from '../services/subscriptionService'
-import type { Institution, CreateInstitutionData, UpdateInstitutionData, Subscription } from '../types'
+import type { Institution, CreateInstitutionData, UpdateInstitutionData } from '../types'
 
 interface DeleteConfirmation {
   isOpen: boolean

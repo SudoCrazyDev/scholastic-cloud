@@ -8,11 +8,10 @@ import {
   UserGroupIcon,
   AcademicCapIcon,
   BuildingOfficeIcon,
-  CalendarIcon,
   ListBulletIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline'
-import { useSubjects, useSubjectDetail } from '@hooks'
+import { useSubjectDetail } from '@hooks'
 import { ClassRecordTab } from './components/ClassRecordTab'
 import { TopicsTab } from './components/TopicsTab'
 import { CalendarTab } from './components/CalendarTab'

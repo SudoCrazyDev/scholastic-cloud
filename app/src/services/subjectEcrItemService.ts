@@ -1,6 +1,4 @@
 import { api } from '@/lib/api';
-// @ts-expect-error: No type definitions for 'qs'
-import qs from 'qs';
 
 export interface SubjectEcrItem {
   id?: string;

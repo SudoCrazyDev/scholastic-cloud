@@ -183,7 +183,7 @@ export const useClassSections = (options: UseClassSectionsOptions = {}) => {
         await createMutation.mutateAsync(data)
       }
       setIsModalOpen(false)
-    } catch (error) {
+    } catch {
       // Error is handled in mutation onError
     } finally {
       setModalLoading(false)

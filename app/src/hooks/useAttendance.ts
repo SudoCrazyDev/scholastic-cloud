@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { attendanceService, type AttendanceResponse } from '../services/attendanceService';
+import { attendanceService } from '../services/attendanceService';
 
 export const useRealtimeAttendance = (
   authDate: string,

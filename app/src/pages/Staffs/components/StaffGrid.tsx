@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from '../../../components/button';
 import { EnvelopeIcon, CakeIcon, UserIcon } from '@heroicons/react/24/outline';
 import { Pencil, Trash2, UserCog } from 'lucide-react';
 import type { User } from '../../../types';

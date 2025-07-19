@@ -10,9 +10,6 @@ const Institutions: React.FC = () => {
     institutions,
     loading,
     error,
-    pagination,
-    search,
-    sorting,
     selectedRows,
     subscriptions,
 

@@ -5,7 +5,7 @@ import { Input } from '../../../components/input';
 import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
 import { Alert } from '../../../components/alert';
-import type { User, Role, CreateStaffData, UpdateStaffData } from '../../../types';
+import type { User, Role, CreateStaffData } from '../../../types';
 
 interface StaffModalProps {
   open: boolean;
