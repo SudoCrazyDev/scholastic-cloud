@@ -8,6 +8,8 @@ export function useSubjectEcrItems(params?: { subject_ecr_id?: string | string[]
   return useQuery({
     queryKey: ['subjectEcrItems', params],
     queryFn: () => subjectEcrItemService.list(params),
+    enabled: !!params?.subject_ecr_id && (Array.isArray(params.subject_ecr_id) ? params.subject_ecr_id.length > 0 : true),
+    staleTime: 0, // Always consider data stale to ensure fresh data on subject change
   });
 }
 
@@ -58,5 +60,6 @@ export function useSubjectEcrs(subjectId?: string) {
       return subjectEcrService.getBySubject(subjectId);
     },
     enabled: !!subjectId,
+    staleTime: 0, // Always consider data stale to ensure fresh data on subject change
   });
 } 

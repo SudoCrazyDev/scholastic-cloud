@@ -32,7 +32,7 @@ class SubjectEcrItemController extends Controller
             $query->where('type', $request->query('type'));
         }
         
-        $items = $query->orderBy('created_at', 'desc')->get();
+        $items = $query->with('subjectEcr')->orderBy('created_at', 'desc')->get();
         
         return response()->json([
             'success' => true,
@@ -51,6 +51,7 @@ class SubjectEcrItemController extends Controller
                 'type' => 'nullable|string|max:255',
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string',
+                'quarter' => 'nullable|string',
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 

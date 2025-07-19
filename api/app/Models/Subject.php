@@ -55,4 +55,12 @@ class Subject extends Model
     {
         return $this->hasMany(Subject::class, 'parent_subject_id');
     }
+
+    /**
+     * Get the subject ECRs for this subject.
+     */
+    public function subjectEcrs(): HasMany
+    {
+        return $this->hasMany(SubjectEcr::class);
+    }
 }

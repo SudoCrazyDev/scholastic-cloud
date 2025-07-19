@@ -33,7 +33,7 @@ interface SubjectWithClassSectionStudents extends Subject {
 const SubjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading, error } = useSubjectDetail(id)
-  const [activeTab, setActiveTab] = useState<TabType>('class-record')
+  const [activeTab, setActiveTab] = useState<TabType>('student-scores')
 
   const subject = data?.data as SubjectWithClassSectionStudents;
   
@@ -84,16 +84,16 @@ const SubjectDetail: React.FC = () => {
       label: 'Components of Summative Assessment',
       icon: ListBulletIcon,
     },
-    {
-      id: 'topics' as TabType,
-      label: 'Topics',
-      icon: ListBulletIcon,
-    },
-    {
-      id: 'calendar' as TabType,
-      label: 'Calendar of Events',
-      icon: CalendarIcon,
-    },
+    // {
+    //   id: 'topics' as TabType,
+    //   label: 'Topics',
+    //   icon: ListBulletIcon,
+    // },
+    // {
+    //   id: 'calendar' as TabType,
+    //   label: 'Calendar of Events',
+    //   icon: CalendarIcon,
+    // },
   ]
 
   return (
@@ -177,8 +177,8 @@ const SubjectDetail: React.FC = () => {
 
         {/* Tab Content */}
         <div className="p-6">
-          {activeTab === 'class-record' && <ClassRecordTab subjectId={subject.id} />}
-          {activeTab === 'student-scores' && <StudentScoresTab subjectId={subject.id} classSectionId={subject.class_section_id} />}
+          {activeTab === 'class-record' && <ClassRecordTab key={`${subject.id}-${subject.class_section_id}`} subjectId={subject.id} classSectionId={subject.class_section_id} />}
+          {activeTab === 'student-scores' && <StudentScoresTab key={`${subject.id}-${subject.class_section_id}`} subjectId={subject.id} classSectionId={subject.class_section_id} />}
           {activeTab === 'summative-assessment' && <SummativeAssessmentTab subjectId={subject.id} />}
           {activeTab === 'topics' && <TopicsTab subjectId={subject.id} />}
           {activeTab === 'calendar' && <CalendarTab subjectId={subject.id} />}

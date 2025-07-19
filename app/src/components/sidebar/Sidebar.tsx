@@ -15,7 +15,8 @@ import {
   GraduationCap as StudentsIcon,
   BookOpen,
   BookOpen as AssignedSubjectsIcon,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
 
 interface MenuItem {
@@ -24,6 +25,10 @@ interface MenuItem {
   icon: React.ReactNode;
   path: string;
   allowedRoles?: string[];
+}
+
+interface SidebarProps {
+  onMobileClose?: () => void;
 }
 
 const menuItems: MenuItem[] = [
@@ -105,7 +110,7 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user } = useAuth();
   const userRoleSlug = user?.role?.slug;
@@ -122,7 +127,7 @@ const Sidebar: React.FC = () => {
       initial={{ x: -250 }}
       animate={{ x: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`bg-white shadow-lg border-r border-gray-200 h-screen flex flex-col ${
+      className={`bg-white shadow-lg border-r border-gray-200 h-screen flex flex-col lg:relative fixed left-0 top-0 ${
         isCollapsed ? 'w-16' : 'w-64'
       } transition-all duration-300 ease-in-out`}
     >
@@ -141,12 +146,24 @@ const Sidebar: React.FC = () => {
             <span className="text-xl font-bold text-gray-900">ScholasticCloud</span>
           </motion.div>
         )}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
-        >
-          <Menu className="w-4 h-4 text-gray-600" />
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Mobile close button */}
+          {onMobileClose && (
+            <button
+              onClick={onMobileClose}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 cursor-pointer lg:hidden"
+            >
+              <X className="w-4 h-4 text-gray-600" />
+            </button>
+          )}
+          {/* Desktop collapse button */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 cursor-pointer hidden lg:block"
+          >
+            <Menu className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
       </div>
 
       {/* Navigation Menu */}
@@ -155,6 +172,7 @@ const Sidebar: React.FC = () => {
           <NavLink
             key={item.id}
             to={item.path}
+            onClick={onMobileClose} // Close mobile sidebar when clicking a link
             className={({ isActive }) =>
               `flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer group ${
                 isActive

@@ -10,19 +10,37 @@ import {
   CalendarIcon,
   ArrowDownTrayIcon,
   UserIcon,
-  UsersIcon
+  UsersIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { AddGradeItemModal } from './AddGradeItemModal'
+import { EditGradeItemModal } from './EditGradeItemModal'
 import { useSubjectEcrItems, useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
 import { useStudents } from '../../../hooks/useStudents'
+import { useStudentScores } from '../../../hooks/useStudentScores'
 import { toast } from 'react-hot-toast'
 import { ErrorHandler } from '../../../utils/errorHandler'
 import { Alert } from '../../../components/alert'
+import { StudentScoreInput } from './StudentScoreInput';
+
 
 interface StudentScoresTabProps {
   subjectId: string
   classSectionId: string
+}
+
+interface StudentScore {
+  id?: string
+  student_id: string
+  subject_ecr_item_id: string
+  score: number
+  date_submitted?: string
+  created_at?: string
+  updated_at?: string
+  student?: Student
+  academic_year?: string
+  subjectEcrItem?: any
 }
 
 // Types for the grading system
@@ -31,17 +49,16 @@ interface GradeItem {
   title: string
   date: string
   description: string
-  total_score: number
+  score: number
   category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment'
   quarter: 'First Quarter' | 'Second Quarter' | 'Third Quarter' | 'Fourth Quarter'
+  subject_ecr: {
+    id: string
+    title: string
+  }
 }
 
-interface StudentScore {
-  student_id: string
-  item_id: string
-  score: number
-  date_submitted?: string
-}
+
 
 interface Student {
   id: string
@@ -71,7 +88,7 @@ const ScoreInput: React.FC<ScoreInputProps> = ({
 
   const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const numValue = Number(e.target.value)
-    if (numValue >= 0 && numValue <= item.total_score) {
+    if (numValue >= 0 && numValue <= item.score) {
       setScore(numValue)
       onScoreChange(student.id, item.id, numValue)
     }
@@ -110,16 +127,16 @@ const ScoreInput: React.FC<ScoreInputProps> = ({
       </div>
 
       <div className="flex items-center space-x-3">
-        <div className={`text-sm font-medium ${getScoreColor(score, item.total_score)}`}>
+        <div className={`text-sm font-medium ${getScoreColor(score, item.score)}`}>
           <span>{score}</span>
-          <span className="text-gray-400">/{item.total_score}</span>
+          <span className="text-gray-400">/{item.score}</span>
         </div>
 
         <div className="w-24">
           <Input
             type="number"
             min="0"
-            max={item.total_score}
+            max={item.score}
             value={score}
                          onChange={handleScoreChange}
             size="sm"
@@ -137,7 +154,6 @@ interface StudentGroupProps {
   students: Student[]
   item: GradeItem
   scores: StudentScore[]
-  onScoreChange: (studentId: string, itemId: string, score: number) => void
 }
 
 const StudentGroup: React.FC<StudentGroupProps> = ({
@@ -145,7 +161,6 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
   students,
   item,
   scores,
-  onScoreChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -211,16 +226,40 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
       {isExpanded && (
         <div className="border-t border-gray-200 bg-white rounded-b-lg">
           {students.map((student) => {
-            const score = scores.find(s => s.student_id === student.id && s.item_id === item.id)?.score || 0
-
+            const scoreObj = scores.find(s => s.student_id === student.id && s.subject_ecr_item_id === item.id)
             return (
-              <ScoreInput
-                key={`${student.id}-${item.id}`}
-                student={student}
-                item={item}
-                currentScore={score}
-                onScoreChange={onScoreChange}
-              />
+              <div key={`${student.id}-${item.id}`} className="flex items-center justify-between py-3 px-4 bg-white border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-medium text-indigo-600">
+                        {student.first_name.charAt(0)}{student.last_name.charAt(0)}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-gray-900 truncate">
+                        {student.first_name} {student.last_name}
+                      </h4>
+                      <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="text-sm font-medium">
+                    <span>{scoreObj?.score ?? 0}</span>
+                    <span className="text-gray-400">/{item.score}</span>
+                  </div>
+                  <div className="w-24">
+                    <StudentScoreInput
+                      studentId={student.id}
+                      itemId={item.id}
+                      maxScore={item.score}
+                      initialScore={scoreObj?.score ?? 0}
+                      scoreId={scoreObj?.id}
+                    />
+                  </div>
+                </div>
+              </div>
             )
           })}
         </div>
@@ -233,14 +272,14 @@ interface GradeItemSectionProps {
   item: GradeItem
   students: Student[]
   scores: StudentScore[]
-  onScoreChange: (studentId: string, itemId: string, score: number) => void
+  onEditItem: (item: any) => void
 }
 
 const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   item,
   students,
   scores,
-  onScoreChange
+  onEditItem,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -304,7 +343,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
               <CalendarIcon className="w-3 h-3 text-gray-400" />
               <span className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()}</span>
               <span className="text-xs text-gray-400">•</span>
-              <span className="text-xs text-gray-500">{item.category}</span>
+              <span className="text-xs text-gray-500">{item.subject_ecr?.title || item.category}</span>
               <span className="text-xs text-gray-400">•</span>
               <span className="text-xs text-gray-500">{item.quarter}</span>
             </div>
@@ -317,9 +356,19 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
               {students.length} students
             </div>
             <div className="text-xs text-gray-500">
-              Max: {item.total_score} pts
+              Max: {item.score} pts
             </div>
           </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onEditItem(item)
+            }}
+            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+            title="Edit grade item"
+          >
+            <PencilIcon className="w-4 h-4" />
+          </button>
           {isExpanded ? (
             <ChevronDownIcon className="w-4 h-4 text-gray-400" />
           ) : (
@@ -337,7 +386,6 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
               students={studentsInGroup}
               item={item}
               scores={scores}
-              onScoreChange={onScoreChange}
             />
           ))}
         </div>
@@ -354,29 +402,29 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   // Extract all subject_ecr_id
   const subjectEcrIds = subjectEcrsData?.data?.map((ecr: any) => ecr.id) || []
   // Fetch grade items for all subject_ecr_id
-  const { data: gradeItemsData, isLoading: gradeItemsLoading, error: gradeItemsError, refetch: refetchGradeItems } = useSubjectEcrItems(subjectEcrIds.length > 0 ? { subject_ecr_id: subjectEcrIds } : undefined)
-  // TODO: Fetch scores from API (implement useStudentScores hook or similar)
+  const { data: gradeItemsData, isLoading: gradeItemsLoading, error: gradeItemsError, refetch: refetchGradeItems } = useSubjectEcrItems(
+    subjectEcrIds.length > 0 ? { subject_ecr_id: subjectEcrIds } : undefined
+  )
+  // Fetch scores for all students and items
+  const { data: studentScoresData, isLoading: scoresLoading, error: scoresError, refetch: refetchScores } = useStudentScores({ subjectId, classSectionId })
 
-  const [scores, setScores] = useState<StudentScore[]>([])
+  // Reset filters and refetch data when subject changes
+  useEffect(() => {
+    setActiveQuarter('All')
+    setActiveCategory('All')
+    // Force refetch when subject changes
+    if (subjectId && classSectionId) {
+      refetchGradeItems()
+      refetchScores()
+    }
+  }, [subjectId, classSectionId, refetchGradeItems, refetchScores])
+
   const [activeQuarter, setActiveQuarter] = useState<string>('All')
   const [activeCategory, setActiveCategory] = useState<string>('All')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedGradeItem, setSelectedGradeItem] = useState<any>(null)
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-
-  // Add a stub for handleScoreChange for now
-  const handleScoreChange = (studentId: string, itemId: string, score: number) => {
-    // TODO: Implement score update API call
-    setScores(prev => {
-      const existingIndex = prev.findIndex(s => s.student_id === studentId && s.item_id === itemId)
-      if (existingIndex >= 0) {
-        const newScores = [...prev]
-        newScores[existingIndex] = { ...newScores[existingIndex], score }
-        return newScores
-      } else {
-        return [...prev, { student_id: studentId, item_id: itemId, score }]
-      }
-    })
-  }
 
   // Handle errors
   useEffect(() => {
@@ -386,10 +434,12 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
       setAlert({ type: 'error', message: ErrorHandler.handle(gradeItemsError).message })
     } else if (subjectEcrsError) {
       setAlert({ type: 'error', message: ErrorHandler.handle(subjectEcrsError).message })
+    } else if (scoresError) {
+      setAlert({ type: 'error', message: ErrorHandler.handle(scoresError).message })
     } else {
       setAlert(null)
     }
-  }, [studentsError, gradeItemsError, subjectEcrsError])
+  }, [studentsError, gradeItemsError, subjectEcrsError, scoresError])
 
   // Handle add grade item success
   const handleGradeItemSuccess = () => {
@@ -397,31 +447,36 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
     refetchGradeItems()
   }
 
-  // Handle save all scores (TODO: implement real API call)
-  const handleSaveAllScores = async () => {
-    try {
-      // TODO: Call API to save all scores
-      toast.success('Scores saved successfully!')
-    } catch (error) {
-      const err = ErrorHandler.handle(error)
-      toast.error(err.message)
-    }
+  // Handle edit grade item
+  const handleEditGradeItem = (item: any) => {
+    setSelectedGradeItem(item)
+    setShowEditModal(true)
+  }
+
+  // Handle edit grade item success
+  const handleEditGradeItemSuccess = () => {
+    toast.success('Grade item updated successfully!')
+    refetchGradeItems()
   }
 
   // Filtered items
   const quarters = ['1', '2', '3', '4']
-  const categories = ['All', 'Written Works', 'Performance Tasks', 'Quarterly Assessment']
+  
+  // Get unique categories from subject_ecr titles
+  const uniqueCategories = [...new Set(gradeItemsData?.data?.map((item: GradeItem) => item.subject_ecr?.title).filter(Boolean) || [])]
+  const categories = ['All', ...uniqueCategories] as string[]
+  
   const gradeItems = gradeItemsData?.data || []
   const filteredItems = gradeItems.filter((item: GradeItem) => {
     const quarterMatch = activeQuarter === 'All' || item.quarter === activeQuarter
-    const categoryMatch = activeCategory === 'All' || item.category === activeCategory
-    return quarterMatch
+    const categoryMatch = activeCategory === 'All' || item.subject_ecr?.title === activeCategory
+    return quarterMatch && categoryMatch
   })
-
+  
   // Calculate statistics
   const totalStudents = students.length
   const totalItems = filteredItems.length
-  const totalScores = scores.length
+  const totalScores = studentScoresData?.data?.length || 0
   const completionRate = totalItems > 0 ? Math.round((totalScores / (totalStudents * totalItems)) * 100) : 0
 
   // Gender distribution
@@ -430,7 +485,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
     return acc
   }, {})
 
-  if (studentsLoading || gradeItemsLoading || subjectEcrsLoading) {
+  if (studentsLoading || gradeItemsLoading || subjectEcrsLoading || scoresLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -455,13 +510,6 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
           <p className="text-sm text-gray-500">Manage grades for {students.length} students</p>
         </div>
         <div className="flex items-center space-x-4">
-          <button
-            onClick={handleSaveAllScores}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-          >
-            <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-            Save All Scores
-          </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
@@ -577,7 +625,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
               onChange={(e) => setActiveCategory(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
-              {categories.map(category => (
+              {categories.map((category: string) => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
@@ -615,8 +663,8 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
               key={item.id}
               item={item}
               students={students}
-              scores={scores}
-              onScoreChange={handleScoreChange}
+              scores={studentScoresData?.data || []}
+              onEditItem={handleEditGradeItem}
             />
           ))
         )}
@@ -628,6 +676,18 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         onClose={() => setShowAddModal(false)}
         subjectId={subjectId}
         onSuccess={handleGradeItemSuccess}
+      />
+
+      {/* Edit Grade Item Modal */}
+      <EditGradeItemModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false)
+          setSelectedGradeItem(null)
+        }}
+        subjectId={subjectId}
+        onSuccess={handleEditGradeItemSuccess}
+        gradeItem={selectedGradeItem}
       />
     </div>
   )

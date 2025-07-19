@@ -99,7 +99,12 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('student-sections', StudentSectionController::class);
     Route::post('student-sections/bulk-assign', [StudentSectionController::class, 'bulkAssign']);
     // StudentEcrItemScore routes
+    Route::get('student-ecr-item-scores/by-subject-section', [StudentEcrItemScoreController::class, 'getScoresBySubjectAndSection']);
+    Route::get('student-ecr-item-scores/by-student-subject', [StudentEcrItemScoreController::class, 'getByStudentAndSubject']);
     Route::apiResource('student-ecr-item-scores', StudentEcrItemScoreController::class);
+    // StudentRunningGrade routes
+    Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
+    Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
     // RealtimeAttendance GET route
     Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
 });

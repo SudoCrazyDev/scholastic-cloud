@@ -139,13 +139,17 @@ class StudentEcrItemScoreController extends Controller
                 ->first();
 
             if ($existingScore) {
-                return response()->json([
-                    'success' => false, 
-                    'error' => 'A score already exists for this student and item'
-                ], 422);
+                // Update existing score instead of returning error
+                $existingScore->update(['score' => $validated['score']]);
+                $score = $existingScore->fresh();
+            } else {
+                // Create new score
+                $score = StudentEcrItemScore::create($validated);
             }
 
-            $score = StudentEcrItemScore::create($validated);
+            // --- K-12 Running Grade Calculation ---
+            $this->recalculateRunningGrade($validated['student_id'], $validated['subject_ecr_item_id']);
+            // --- End K-12 Running Grade Calculation ---
 
             DB::commit();
             return response()->json([
@@ -246,6 +250,10 @@ class StudentEcrItemScoreController extends Controller
         try {
             $score->update($validated);
 
+            // --- K-12 Running Grade Calculation ---
+            $this->recalculateRunningGrade($score->student_id, $score->subject_ecr_item_id);
+            // --- End K-12 Running Grade Calculation ---
+
             DB::commit();
             return response()->json([
                 'success' => true, 
@@ -304,5 +312,205 @@ class StudentEcrItemScoreController extends Controller
             Log::error('Error deleting student ECR item score: ' . $e->getMessage());
             return response()->json(['success' => false, 'error' => 'Failed to delete score'], 500);
         }
+    }
+
+    /**
+     * Get scores by student and subject
+     */
+    public function getByStudentAndSubject(Request $request): JsonResponse
+    {
+        $request->validate([
+            'student_id' => 'required|string|exists:students,id',
+            'subject_id' => 'required|string|exists:subjects,id',
+        ]);
+
+        // Get the authenticated user's default institution
+        $user = $request->user();
+        $defaultInstitutionId = $user->getDefaultInstitutionId();
+        
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
+        
+        if (!$defaultInstitutionId) {
+            return response()->json([
+                'success' => false, 
+                'error' => 'User does not have any institution assigned'
+            ], 400);
+        }
+
+        // Get all subject ECR items for the subject
+        $subjectEcrItems = \App\Models\SubjectEcrItem::whereHas('subjectEcr', function ($q) use ($request) {
+            $q->where('subject_id', $request->subject_id);
+        })->get();
+
+        $subjectEcrItemIds = $subjectEcrItems->pluck('id');
+
+        // Get all scores for this student and these items
+        $scores = StudentEcrItemScore::where('student_id', $request->student_id)
+            ->whereIn('subject_ecr_item_id', $subjectEcrItemIds)
+            ->with([
+                'student:id,lrn,first_name,middle_name,last_name,ext_name,gender',
+                'subjectEcrItem:id,title,score,subject_ecr_id'
+            ])
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $scores
+        ]);
+    }
+
+    /**
+     * Get scores for a specific subject and class section
+     */
+    public function getScoresBySubjectAndSection(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'subject_id' => 'required|uuid',
+                'class_section_id' => 'required|uuid',
+            ]);
+
+            // Get the authenticated user's default institution
+            $user = $request->user();
+            $defaultInstitutionId = $user->getDefaultInstitutionId();
+            
+            if (!$defaultInstitutionId) {
+                $firstUserInstitution = $user->userInstitutions()->first();
+                if ($firstUserInstitution) {
+                    $defaultInstitutionId = $firstUserInstitution->institution_id;
+                }
+            }
+            
+            if (!$defaultInstitutionId) {
+                return response()->json([
+                    'success' => false, 
+                    'error' => 'User does not have any institution assigned'
+                ], 400);
+            }
+
+            // Check if subject exists and belongs to user's institution
+            $subject = \App\Models\Subject::where('id', $validated['subject_id'])
+                ->where('institution_id', $defaultInstitutionId)
+                ->first();
+
+            if (!$subject) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Subject not found or access denied'
+                ], 404);
+            }
+
+            // Check if class section exists and belongs to user's institution
+            $classSection = \App\Models\ClassSection::where('id', $validated['class_section_id'])
+                ->where('institution_id', $defaultInstitutionId)
+                ->first();
+
+            if (!$classSection) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Class section not found or access denied'
+                ], 404);
+            }
+
+            // Get all subject ECR items for the subject
+            $subjectEcrItems = \App\Models\SubjectEcrItem::whereHas('subjectEcr', function ($q) use ($validated) {
+                $q->where('subject_id', $validated['subject_id']);
+            })->get();
+
+            $subjectEcrItemIds = $subjectEcrItems->pluck('id');
+
+            // Get all students in the class section
+            $students = \App\Models\Student::whereHas('studentSections', function ($q) use ($validated) {
+                $q->where('section_id', $validated['class_section_id']);
+            })->whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
+                $q->where('institution_id', $defaultInstitutionId);
+            })->get();
+
+            $studentIds = $students->pluck('id');
+
+            // Get all scores for these students and items
+            $scores = StudentEcrItemScore::whereIn('student_id', $studentIds)
+                ->whereIn('subject_ecr_item_id', $subjectEcrItemIds)
+                ->with([
+                    'student:id,lrn,first_name,middle_name,last_name,ext_name,gender',
+                    'subjectEcrItem:id,title,score,subject_ecr_id'
+                ])
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $scores
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid parameters provided',
+                'details' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error fetching scores by subject and section: ' . $e->getMessage());
+            return response()->json(['success' => false, 'error' => 'Failed to fetch scores'], 500);
+        }
+    }
+
+    /**
+     * Recalculate and update the running grade for a student after a score is added or updated.
+     */
+    protected function recalculateRunningGrade($studentId, $subjectEcrItemId)
+    {
+        // Get the ECR item
+        $ecrItem = \App\Models\SubjectEcrItem::with('subjectEcr')->findOrFail($subjectEcrItemId);
+        $subjectEcr = $ecrItem->subjectEcr;
+        $subjectId = $subjectEcr->subject_id;
+        $quarter = $ecrItem->quarter;
+        $academicYear = $ecrItem->academic_year;
+
+        // Get all ECRs for this subject (categories and their percentages)
+        $subjectEcrs = \App\Models\SubjectEcr::where('subject_id', $subjectId)->get();
+
+        $totalGrade = 0;
+        foreach ($subjectEcrs as $categoryEcr) {
+            $category = $categoryEcr->title; // e.g., 'Written Works', 'Performance Tasks', 'Quarterly Assessment'
+            $categoryPercentage = $categoryEcr->percentage;
+
+            // Get all ECR items for this subject, quarter, academic year, and category
+            $categoryItems = \App\Models\SubjectEcrItem::where('subject_ecr_id', $categoryEcr->id)
+                ->where('quarter', $quarter)
+                ->where('academic_year', $academicYear)
+                ->get();
+
+            $totalPossible = $categoryItems->sum('score');
+            if ($totalPossible == 0) {
+                continue; // Avoid division by zero
+            }
+
+            // Get all student scores for these items
+            $studentScores = \App\Models\StudentEcrItemScore::where('student_id', $studentId)
+                ->whereIn('subject_ecr_item_id', $categoryItems->pluck('id'))
+                ->get();
+            $totalStudentScore = $studentScores->sum('score');
+
+            // Raw percentage for this category
+            $rawPercent = ($totalStudentScore / $totalPossible) * 100;
+            // Weighted score for this category
+            $weighted = ($rawPercent * $categoryPercentage) / 100;
+            $totalGrade += $weighted;
+        }
+
+        // Save or update the running grade
+        $runningGrade = \App\Models\StudentRunningGrade::firstOrNew([
+            'student_id' => $studentId,
+            'subject_id' => $subjectId,
+            'quarter' => $quarter,
+            'academic_year' => $academicYear ?? '2025-2026',
+        ]);
+        $runningGrade->grade = round($totalGrade, 2);
+        $runningGrade->save();
     }
 }
