@@ -137,7 +137,7 @@ export const useSubjects = (options: UseSubjectsOptions = {}) => {
         await createMutation.mutateAsync(data as CreateSubjectData)
       }
       setIsModalOpen(false)
-    } catch (error) {
+    } catch {
       // Error is handled in mutation onError
     } finally {
       setModalLoading(false)

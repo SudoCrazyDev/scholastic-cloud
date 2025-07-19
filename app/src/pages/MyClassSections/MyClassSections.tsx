@@ -10,14 +10,11 @@ import { Badge } from '../../components/badge'
 import { CreateStudentModal } from './components/CreateStudentModal'
 import { 
   Search, 
-  Users, 
   BookOpen, 
   Calendar,
-  Building2,
   User,
   ArrowRight,
-  Loader2,
-  Plus
+  Loader2
 } from 'lucide-react'
 import type { ClassSection, Student } from '../../types'
 

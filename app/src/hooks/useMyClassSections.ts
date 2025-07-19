@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { userService } from '../services/userService'
-import type { ClassSection } from '../types'
 
 interface UseMyClassSectionsOptions {
   page?: number
