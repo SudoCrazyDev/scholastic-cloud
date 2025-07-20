@@ -21,6 +21,9 @@ import {
 } from 'lucide-react'
 import type { ClassSection, Student } from '../../types'
 
+// Tab types
+type TabType = 'class-sections'
+
 const MyClassSections: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -37,6 +40,8 @@ const MyClassSections: React.FC = () => {
     search: searchValue,
     per_page: 50,
   })
+
+
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchValue(e.target.value)
@@ -66,57 +71,12 @@ const MyClassSections: React.FC = () => {
     return parts.filter(Boolean).join(' ')
   }
 
-  if (error) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="space-y-6"
-      >
-        <Alert
-          type="error"
-          title="Error Loading Class Sections"
-          message={error.message || 'Failed to load your class sections. Please try again.'}
-          show={true}
-        />
-      </motion.div>
-    )
-  }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-6"
-    >
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Class Sections</h1>
-          <p className="text-gray-600 mt-1">
-            Manage and view your assigned class sections
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <Button
-            onClick={() => refetch()}
-            disabled={loading}
-            variant="outline"
-            size="sm"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              'Refresh'
-            )}
-          </Button>
-        </div>
-      </div>
 
+  const renderClassSections = () => (
+    <>
       {/* Search */}
-      <div className="relative">
+      <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         <Input
           type="text"
@@ -160,32 +120,6 @@ const MyClassSections: React.FC = () => {
                   </Badge>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {/* <Button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedClassSection(null)
-                      setIsCreateModalOpen(true)
-                    }}
-                    variant="solid"
-                    color="primary"
-                    size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Create New Student
-                  </Button>
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleCreateStudent(classSection)
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Student
-                  </Button> */}
                   <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
                 </div>
               </div>
@@ -204,8 +138,6 @@ const MyClassSections: React.FC = () => {
                     <span>Adviser: {getFullName(classSection.adviser)}</span>
                   </div>
                 )}
-
-                {/* Students count will be shown in the detail view */}
               </div>
             </motion.div>
           ))}
@@ -231,6 +163,62 @@ const MyClassSections: React.FC = () => {
           </p>
         </motion.div>
       )}
+    </>
+  )
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="space-y-6"
+      >
+        <Alert
+          type="error"
+          title="Error Loading Class Sections"
+          message={error.message || 'Failed to load your class sections. Please try again.'}
+          show={true}
+        />
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Class Sections</h1>
+          <p className="text-gray-600 mt-1">
+            Manage and view your assigned class sections, report cards, and consolidated grades
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <Button
+            onClick={() => refetch()}
+            disabled={loading}
+            variant="outline"
+            size="sm"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              'Refresh'
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Class Sections Content */}
+      <div className="mt-6">
+        {renderClassSections()}
+      </div>
 
       {/* Create Student Modal */}
       <CreateStudentModal

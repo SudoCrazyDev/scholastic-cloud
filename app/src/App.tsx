@@ -21,6 +21,7 @@ import { TeacherAttendance } from './pages/TeacherAttendance';
 import TeacherAttendanceDemo from './pages/TeacherAttendanceDemo';
 import UserProfile from './pages/Users/UserProfile';
 
+
 function App() {
   return (
     <QueryProvider>
@@ -51,6 +52,7 @@ function App() {
               <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
               <Route path="teacher-attendance" element={<TeacherAttendance />} />
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
+
             </Route>
 
             {/* Catch all route */}

@@ -14,6 +14,7 @@ import { CreateStudentModal } from './components/CreateStudentModal'
 import { StudentModal } from '../Students/components/StudentModal'
 import { ClassSectionSubjectModal } from '../ClassSections/components/ClassSectionSubjectModal'
 import { SubjectList } from './components/SubjectList'
+import StudentRankingTab from './components/StudentRankingTab'
 import { useAuth } from '../../hooks/useAuth'
 import {
   ArrowLeft,
@@ -27,7 +28,12 @@ import {
   Plus,
   Trash2,
   Search,
-  Edit
+  Edit,
+  Trophy,
+  FileText,
+  BarChart3,
+  Download,
+  Eye
 } from 'lucide-react'
 import type { Student, Subject } from '../../types'
 
@@ -36,7 +42,7 @@ const ClassSectionDetail: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<'students' | 'subjects'>('students')
+  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
   const [showRemoveModal, setShowRemoveModal] = useState(false)
@@ -61,6 +67,9 @@ const ClassSectionDetail: React.FC = () => {
     subject: null,
     loading: false
   })
+
+  // Report cards and consolidated grades state
+  const [selectedQuarter, setSelectedQuarter] = useState('1st Quarter')
 
   const institutionId = user?.user_institutions?.[0]?.institution_id || ''
 
@@ -289,6 +298,27 @@ const ClassSectionDetail: React.FC = () => {
     }
   }
 
+  // Report cards and consolidated grades handlers
+  const handleViewReportCard = (studentId: string) => {
+    console.log('View report card for student:', studentId)
+    // Placeholder for PDF viewing functionality
+  }
+
+  const handleDownloadReportCard = (studentId: string) => {
+    console.log('Download report card for student:', studentId)
+    // Placeholder for PDF download functionality
+  }
+
+  const handleViewConsolidatedGrades = () => {
+    console.log('View consolidated grades for quarter:', selectedQuarter)
+    // Placeholder for PDF viewing functionality
+  }
+
+  const handleDownloadConsolidatedGrades = () => {
+    console.log('Download consolidated grades for quarter:', selectedQuarter)
+    // Placeholder for PDF download functionality
+  }
+
   if (classSectionLoading) {
     return (
       <motion.div
@@ -420,6 +450,45 @@ const ClassSectionDetail: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <BookOpen className="w-4 h-4" />
                 <span>Subjects ({subjects.length})</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('ranking')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'ranking'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Trophy className="w-4 h-4" />
+                <span>Student Ranking</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('report-cards')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'report-cards'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <FileText className="w-4 h-4" />
+                <span>Report Cards</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('consolidated-grades')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'consolidated-grades'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="w-4 h-4" />
+                <span>Consolidated Grades</span>
               </div>
             </button>
           </nav>
@@ -659,6 +728,203 @@ const ClassSectionDetail: React.FC = () => {
                   reordering={reorderSubjectsMutation.isPending}
                   onRefetch={refetchSubjects}
                 />
+              </motion.div>
+            )}
+
+            {activeTab === 'ranking' && (
+              <motion.div
+                key="ranking"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <StudentRankingTab
+                  students={students}
+                  classSectionTitle={classSectionData?.title || 'Class Section'}
+                />
+              </motion.div>
+            )}
+
+            {activeTab === 'report-cards' && (
+              <motion.div
+                key="report-cards"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="space-y-6">
+                  {/* Search */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      placeholder="Search students..."
+                      value={studentSearchTerm}
+                      onChange={(e) => setStudentSearchTerm(e.target.value)}
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm w-full"
+                    />
+                  </div>
+
+                  {/* Students List */}
+                  <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900">Student Report Cards</h3>
+                      <p className="text-sm text-gray-600 mt-1">View and download individual student report cards</p>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Student Name
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Grade Level
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Section
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredStudents.map((student) => (
+                            <tr key={student.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{getFullName(student)}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{classSectionData.grade_level}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{classSectionData.title}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <Badge color="green" className="text-xs">
+                                  Active
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div className="flex items-center justify-end space-x-2">
+                                  <Button
+                                    onClick={() => handleViewReportCard(student.id)}
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    <Eye className="w-4 h-4 mr-1" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleDownloadReportCard(student.id)}
+                                    variant="solid"
+                                    color="primary"
+                                    size="sm"
+                                  >
+                                    <Download className="w-4 h-4 mr-1" />
+                                    Download
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'consolidated-grades' && (
+              <motion.div
+                key="consolidated-grades"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="space-y-6">
+                  {/* Quarter Filter */}
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-gray-700">Quarter:</span>
+                      <select
+                        value={selectedQuarter}
+                        onChange={(e) => setSelectedQuarter(e.target.value)}
+                        className="w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        {['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'].map((quarter) => (
+                          <option key={quarter} value={quarter}>
+                            {quarter}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        onClick={handleViewConsolidatedGrades}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View PDF
+                      </Button>
+                      <Button
+                        onClick={handleDownloadConsolidatedGrades}
+                        variant="solid"
+                        color="primary"
+                        size="sm"
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        Download PDF
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Consolidated Grades Preview */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">Consolidated Grades - {selectedQuarter}</h3>
+                        <p className="text-sm text-gray-600 mt-1">All students' subject grades for the selected quarter</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                      <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h4 className="text-lg font-medium text-gray-900 mb-2">Consolidated Grades Report</h4>
+                      <p className="text-gray-600 mb-4">
+                        This will display a comprehensive PDF report showing all students' grades across all subjects for {selectedQuarter.toLowerCase()}.
+                      </p>
+                      <div className="flex items-center justify-center space-x-4">
+                        <Button
+                          onClick={handleViewConsolidatedGrades}
+                          variant="outline"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Preview Report
+                        </Button>
+                        <Button
+                          onClick={handleDownloadConsolidatedGrades}
+                          variant="solid"
+                          color="primary"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download Report
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

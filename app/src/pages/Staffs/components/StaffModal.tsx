@@ -44,7 +44,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
     gender: 'male',
     birthdate: '',
     email: '',
-    password: '',
+    password: 'password',
     role_id: '',
   });
 
@@ -70,7 +70,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
         gender: 'male',
         birthdate: '',
         email: '',
-        password: '',
+        password: 'password',
         role_id: '',
       });
     }
@@ -95,8 +95,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
       form.last_name.trim() !== '' &&
       form.birthdate !== '' &&
       form.email.trim() !== '' &&
-      form.role_id !== '' &&
-      (mode === 'create' ? form.password.trim() !== '' : true)
+      form.role_id !== ''
     );
   };
 
@@ -223,32 +222,7 @@ const StaffModal: React.FC<StaffModalProps> = ({
                     placeholder="Enter email address"
                   />
 
-                  {mode === 'create' && (
-                    <Input 
-                      label="Password" 
-                      name="password" 
-                      type="password" 
-                      value={form.password} 
-                      onChange={handleChange} 
-                      required 
-                      minLength={8}
-                      placeholder="Enter password (minimum 8 characters)"
-                      helperText="Password must be at least 8 characters long"
-                    />
-                  )}
 
-                  {mode === 'update' && (
-                    <Input 
-                      label="New Password" 
-                      name="password" 
-                      type="password" 
-                      value={form.password} 
-                      onChange={handleChange} 
-                      minLength={8}
-                      placeholder="Leave blank to keep current password"
-                      helperText="Optional: Enter new password to update (minimum 8 characters)"
-                    />
-                  )}
 
                   <div>
                     <label htmlFor="role_id" className="block text-sm font-medium text-gray-700 mb-2">

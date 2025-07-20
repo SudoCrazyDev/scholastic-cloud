@@ -16,6 +16,7 @@ import {
   BookOpen,
   BookOpen as AssignedSubjectsIcon,
   Clock,
+
   X
 } from 'lucide-react';
 
@@ -108,6 +109,7 @@ const menuItems: MenuItem[] = [
     path: '/teacher-attendance',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
+
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
