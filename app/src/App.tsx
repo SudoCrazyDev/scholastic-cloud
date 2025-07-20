@@ -20,6 +20,8 @@ import SubjectDetail from './pages/AssignedSubjects/SubjectDetail';
 import { TeacherAttendance } from './pages/TeacherAttendance';
 import TeacherAttendanceDemo from './pages/TeacherAttendanceDemo';
 import UserProfile from './pages/Users/UserProfile';
+import ConsolidatedGrades from './pages/ConsolidatedGrades/ConsolidatedGrades';
+import SectionGrades from './pages/ConsolidatedGrades/SectionGrades';
 
 
 function App() {
@@ -52,6 +54,8 @@ function App() {
               <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
               <Route path="teacher-attendance" element={<TeacherAttendance />} />
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
+              <Route path="consolidated-grades" element={<ConsolidatedGrades />} />
+              <Route path="consolidated-grades/:sectionId/:quarter" element={<SectionGrades />} />
 
             </Route>
 

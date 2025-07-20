@@ -16,7 +16,7 @@ import {
   BookOpen,
   BookOpen as AssignedSubjectsIcon,
   Clock,
-
+  BarChart3,
   X
 } from 'lucide-react';
 
@@ -108,6 +108,13 @@ const menuItems: MenuItem[] = [
     icon: <Clock className="w-5 h-5" />,
     path: '/teacher-attendance',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'consolidated-grades',
+    label: 'Consolidated Grades',
+    icon: <BarChart3 className="w-5 h-5" />,
+    path: '/consolidated-grades',
+    allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
   },
 
 ];

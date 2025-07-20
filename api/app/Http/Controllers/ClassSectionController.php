@@ -13,7 +13,26 @@ class ClassSectionController extends Controller
         $user = $request->user();
         $institutionId = $user->getDefaultInstitutionId();
         
-        $query = ClassSection::where('institution_id', $institutionId)->with('adviser');
+        // If no default institution, get all institutions the user has access to
+        if (!$institutionId) {
+            $userInstitutions = $user->userInstitutions()->pluck('institution_id');
+            if ($userInstitutions->isEmpty()) {
+                return response()->json([
+                    'data' => [],
+                    'pagination' => [
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'per_page' => 15,
+                        'total' => 0,
+                    ]
+                ]);
+            }
+            $query = ClassSection::whereIn('institution_id', $userInstitutions);
+        } else {
+            $query = ClassSection::where('institution_id', $institutionId);
+        }
+        
+        $query = $query->with('adviser');
         
         // Search by title
         if ($request->has('search') && $request->search) {
@@ -24,6 +43,8 @@ class ClassSectionController extends Controller
         if ($request->has('grade_level') && $request->grade_level) {
             $query->where('grade_level', $request->grade_level);
         }
+        
+
         
         $sections = $query->paginate($request->get('per_page', 15));
         
@@ -84,5 +105,63 @@ class ClassSectionController extends Controller
         $section = ClassSection::where('institution_id', $institutionId)->findOrFail($id);
         $section->delete();
         return response()->json(['message' => 'Deleted successfully']);
+    }
+
+    /**
+     * Get class sections by institution ID
+     */
+    public function getByInstitution(Request $request, $institutionId = null)
+    {
+        $user = $request->user();
+        
+        // If no institution ID provided, use default institution
+        if (!$institutionId) {
+            $institutionId = $user->getDefaultInstitutionId();
+        }
+        
+        // If still no institution ID, get all institutions the user has access to
+        if (!$institutionId) {
+            $userInstitutions = $user->userInstitutions()->pluck('institution_id');
+            if ($userInstitutions->isEmpty()) {
+                return response()->json([
+                    'data' => [],
+                    'pagination' => [
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'per_page' => 15,
+                        'total' => 0,
+                    ]
+                ]);
+            }
+            $query = ClassSection::whereIn('institution_id', $userInstitutions);
+        } else {
+            $query = ClassSection::where('institution_id', $institutionId);
+        }
+        
+        $query = $query->with('adviser');
+        
+        // Search by title
+        if ($request->has('search') && $request->search) {
+            $query->where('title', 'like', '%' . $request->search . '%');
+        }
+        
+        // Filter by grade_level
+        if ($request->has('grade_level') && $request->grade_level) {
+            $query->where('grade_level', $request->grade_level);
+        }
+        
+
+        
+        $sections = $query->paginate($request->get('per_page', 15));
+        
+        return response()->json([
+            'data' => $sections->items(),
+            'pagination' => [
+                'current_page' => $sections->currentPage(),
+                'last_page' => $sections->lastPage(),
+                'per_page' => $sections->perPage(),
+                'total' => $sections->total(),
+            ]
+        ]);
     }
 } 

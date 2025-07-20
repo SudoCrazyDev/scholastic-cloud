@@ -13,6 +13,7 @@ use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentSectionController;
 use App\Http\Controllers\StudentEcrItemScoreController;
+use App\Http\Controllers\SectionConsolidatedGradesController;
 use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\UserWorkExperienceController;
 
@@ -86,6 +87,7 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('staffs', StaffController::class);
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);
     // ClassSection routes
+    Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
     Route::apiResource('class-sections', ClassSectionController::class);
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);
@@ -105,6 +107,8 @@ Route::middleware('auth.token')->group(function () {
     // StudentRunningGrade routes
     Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
+    // Section Consolidated Grades route
+    Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
     // RealtimeAttendance GET route
     Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
 });

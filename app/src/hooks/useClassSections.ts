@@ -16,6 +16,7 @@ interface UseClassSectionsOptions {
   per_page?: number
   search?: string
   grade_level?: string
+  institution_id?: string
 }
 
 export const useClassSections = (options: UseClassSectionsOptions = {}) => {
@@ -46,7 +47,12 @@ export const useClassSections = (options: UseClassSectionsOptions = {}) => {
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => classSectionService.getClassSections(options),
+    queryFn: () => {
+      if (options.institution_id) {
+        return classSectionService.getClassSectionsByInstitution(options.institution_id, options)
+      }
+      return classSectionService.getClassSections(options)
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   })
