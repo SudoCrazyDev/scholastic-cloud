@@ -47,10 +47,22 @@ const PAPER_SIZES = {
 };
 
 // Draggable Element Component
-const DraggableElement: React.FC<{ element: Element; children: React.ReactNode; onClick: () => void }> = ({ 
-  element, 
-  children, 
-  onClick 
+interface DraggableElementProps {
+  element: Element;
+  children: React.ReactNode;
+  onClick: (e: React.MouseEvent) => void;
+  isDragging?: boolean;
+  isSelected?: boolean;
+  onResize?: (id: string, updates: Partial<Element>) => void;
+}
+
+const DraggableElement: React.FC<DraggableElementProps> = ({
+  element,
+  children,
+  onClick,
+  isDragging = false,
+  isSelected = false,
+  onResize,
 }) => {
   const {
     attributes,
@@ -69,6 +81,84 @@ const DraggableElement: React.FC<{ element: Element; children: React.ReactNode; 
     height: element.height,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px) rotate(${element.rotation}deg)` : `rotate(${element.rotation}deg)`,
     cursor: 'move',
+    opacity: isDragging ? 0.3 : 1,
+    border: isDragging ? '2px dashed #3b82f6' : undefined,
+    transition: 'opacity 0.2s, border 0.2s',
+    boxSizing: 'border-box' as const,
+  };
+
+  // --- Resize logic ---
+  const resizingRef = useRef<{ handle: string; startX: number; startY: number; startW: number; startH: number; startLeft: number; startTop: number } | null>(null);
+
+  const handleMouseDown = (e: React.MouseEvent, handle: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizingRef.current = {
+      handle,
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: element.width,
+      startH: element.height,
+      startLeft: element.x,
+      startTop: element.y,
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!resizingRef.current || !onResize) return;
+    const { handle, startX, startY, startW, startH, startLeft, startTop } = resizingRef.current;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    let newW = startW;
+    let newH = startH;
+    let newX = startLeft;
+    let newY = startTop;
+
+    switch (handle) {
+      case 'nw':
+        newW = Math.max(20, startW - dx);
+        newH = Math.max(20, startH - dy);
+        newX = startLeft + dx;
+        newY = startTop + dy;
+        break;
+      case 'ne':
+        newW = Math.max(20, startW + dx);
+        newH = Math.max(20, startH - dy);
+        newY = startTop + dy;
+        break;
+      case 'sw':
+        newW = Math.max(20, startW - dx);
+        newH = Math.max(20, startH + dy);
+        newX = startLeft + dx;
+        break;
+      case 'se':
+        newW = Math.max(20, startW + dx);
+        newH = Math.max(20, startH + dy);
+        break;
+    }
+    onResize(element.id, { width: newW, height: newH, x: newX, y: newY });
+  };
+
+  const handleMouseUp = () => {
+    resizingRef.current = null;
+    window.removeEventListener('mousemove', handleMouseMove);
+    window.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  // --- Render corner handles if selected ---
+  const handleSize = 12;
+  const handleStyle = {
+    position: 'absolute' as const,
+    width: handleSize,
+    height: handleSize,
+    background: '#fff',
+    border: '2px solid #3b82f6',
+    borderRadius: 3,
+    zIndex: 10,
+    cursor: 'pointer',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
   };
 
   return (
@@ -77,9 +167,33 @@ const DraggableElement: React.FC<{ element: Element; children: React.ReactNode; 
       style={style}
       {...listeners}
       {...attributes}
-      onClick={onClick}
+      onClick={e => { e.stopPropagation(); onClick(e); }}
     >
       {children}
+      {isSelected && (
+        <>
+          {/* NW */}
+          <div
+            style={{ ...handleStyle, left: -handleSize/2, top: -handleSize/2, cursor: 'nwse-resize' }}
+            onMouseDown={e => handleMouseDown(e, 'nw')}
+          />
+          {/* NE */}
+          <div
+            style={{ ...handleStyle, right: -handleSize/2, top: -handleSize/2, cursor: 'nesw-resize' }}
+            onMouseDown={e => handleMouseDown(e, 'ne')}
+          />
+          {/* SW */}
+          <div
+            style={{ ...handleStyle, left: -handleSize/2, bottom: -handleSize/2, cursor: 'nesw-resize' }}
+            onMouseDown={e => handleMouseDown(e, 'sw')}
+          />
+          {/* SE */}
+          <div
+            style={{ ...handleStyle, right: -handleSize/2, bottom: -handleSize/2, cursor: 'nwse-resize' }}
+            onMouseDown={e => handleMouseDown(e, 'se')}
+          />
+        </>
+      )}
     </div>
   );
 };
@@ -92,6 +206,7 @@ const CertificateBuilder: React.FC = () => {
     orientation: 'portrait',
   });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [canvasBgColor, setCanvasBgColor] = useState<string>('#ffffff');
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -164,7 +279,7 @@ const CertificateBuilder: React.FC = () => {
           : element
       )
     );
-    
+    setSelectedElement(active.id as string); // Keep the element selected after drag
     setActiveId(null);
   };
 
@@ -220,11 +335,13 @@ const CertificateBuilder: React.FC = () => {
 
   // Render element
   const renderElement = (element: Element) => {
+    const isDragging = activeId === element.id;
+    const isSelected = selectedElement === element.id;
     const elementContent = (() => {
       const commonStyle = {
         width: '100%',
         height: '100%',
-        border: selectedElement === element.id ? '2px solid #3b82f6' : 'none',
+        border: (isSelected || isDragging) ? '2px solid #3b82f6' : 'none',
         boxSizing: 'border-box' as const,
       };
 
@@ -258,9 +375,19 @@ const CertificateBuilder: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 border: '2px dashed #d1d5db',
+                overflow: 'hidden',
               }}
             >
-              <Image className="w-8 h-8 text-gray-400" />
+              {element.content ? (
+                <img
+                  src={element.content}
+                  alt=""
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  draggable={false}
+                />
+              ) : (
+                <Image className="w-8 h-8 text-gray-400" />
+              )}
             </div>
           );
         
@@ -286,6 +413,9 @@ const CertificateBuilder: React.FC = () => {
         key={element.id}
         element={element} 
         onClick={() => setSelectedElement(element.id)}
+        isDragging={isDragging}
+        isSelected={isSelected}
+        onResize={updateElement}
       >
         {elementContent}
       </DraggableElement>
@@ -341,6 +471,18 @@ const CertificateBuilder: React.FC = () => {
                   <option value="portrait">Portrait</option>
                   <option value="landscape">Landscape</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Page Background Color
+                </label>
+                <input
+                  type="color"
+                  value={canvasBgColor}
+                  onChange={e => setCanvasBgColor(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent h-10"
+                  style={{ padding: 0, minHeight: 0 }}
+                />
               </div>
             </div>
           </div>
@@ -424,7 +566,22 @@ const CertificateBuilder: React.FC = () => {
                         </div>
                       </>
                     )}
-                    
+                    {element.type === 'image' && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Image URL
+                          </label>
+                          <input
+                            type="text"
+                            value={element.content}
+                            onChange={e => updateElement(element.id, { content: e.target.value })}
+                            placeholder="Paste image URL here"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      </>
+                    )}
                     {element.type === 'shape' && (
                       <>
                         <div>
@@ -509,14 +666,12 @@ const CertificateBuilder: React.FC = () => {
                 style={{
                   width: canvasDimensions.width,
                   height: canvasDimensions.height,
+                  background: canvasBgColor,
                 }}
+                onClick={() => setSelectedElement(null)}
               >
                 {elements.map(renderElement)}
               </div>
-
-              <DragOverlay>
-                {activeId ? renderElement(elements.find(el => el.id === activeId)!) : null}
-              </DragOverlay>
             </DndContext>
           </div>
         </div>
