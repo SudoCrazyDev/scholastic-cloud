@@ -17,7 +17,8 @@ import {
   BookOpen as AssignedSubjectsIcon,
   Clock,
   BarChart3,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 
 interface MenuItem {
@@ -115,6 +116,12 @@ const menuItems: MenuItem[] = [
     icon: <BarChart3 className="w-5 h-5" />,
     path: '/consolidated-grades',
     allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
+  },
+  {
+    id: 'certificate-builder',
+    label: 'Certificate Builder',
+    icon: <FileText className="w-5 h-5" />,
+    path: '/certificate-builder',
   },
 
 ];

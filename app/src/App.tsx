@@ -22,6 +22,7 @@ import TeacherAttendanceDemo from './pages/TeacherAttendanceDemo';
 import UserProfile from './pages/Users/UserProfile';
 import ConsolidatedGrades from './pages/ConsolidatedGrades/ConsolidatedGrades';
 import SectionGrades from './pages/ConsolidatedGrades/SectionGrades';
+import CertificateBuilder from './pages/CertificateBuilder';
 
 
 function App() {
@@ -56,6 +57,7 @@ function App() {
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
               <Route path="consolidated-grades" element={<ConsolidatedGrades />} />
               <Route path="consolidated-grades/:sectionId/:quarter" element={<SectionGrades />} />
+              <Route path="certificate-builder" element={<CertificateBuilder />} />
 
             </Route>
 
