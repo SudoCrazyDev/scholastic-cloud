@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { userService } from '../services/userService'
 import { roleService } from '../services/roleService'
 import { institutionService } from '../services/institutionService'
-import type { User, Role, Institution, CreateUserData, UpdateUserData } from '../types'
+import type { User, CreateUserData, UpdateUserData } from '../types'
 
 interface DeleteConfirmation {
   isOpen: boolean

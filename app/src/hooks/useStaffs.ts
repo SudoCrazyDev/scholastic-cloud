@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { staffService } from '../services/staffService'
 import { roleService } from '../services/roleService'
-import type { User, Role, CreateStaffData, UpdateStaffData, UpdateStaffRoleData } from '../types'
+import type { User, CreateStaffData, UpdateStaffData, UpdateStaffRoleData } from '../types'
 
 interface DeleteConfirmation {
   isOpen: boolean

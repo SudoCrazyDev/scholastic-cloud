@@ -6,8 +6,6 @@ import {
   UserIcon,
   CalendarIcon,
   AcademicCapIcon,
-  CheckCircleIcon,
-  XCircleIcon,
   PencilIcon
 } from '@heroicons/react/24/outline'
 import { Checkbox } from '../../../components/checkbox'

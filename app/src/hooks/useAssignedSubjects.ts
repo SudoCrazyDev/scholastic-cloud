@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { userService } from '../services/userService'
-import type { AssignedSubject } from '../types'
 
 export const useAssignedSubjects = () => {
   const [search, setSearch] = useState('')

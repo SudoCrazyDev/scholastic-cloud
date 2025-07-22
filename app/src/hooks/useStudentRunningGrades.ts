@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentRunningGradeService } from '../services/studentRunningGradeService';
-import type { StudentRunningGrade, StudentRunningGradeUpdateData } from '../services/studentRunningGradeService';
+import type { StudentRunningGradeUpdateData } from '../services/studentRunningGradeService';
 import { toast } from 'react-hot-toast';
 
 interface UseStudentRunningGradesParams {
@@ -57,7 +57,7 @@ export const useUpdateStudentRunningGrade = () => {
       const result = await studentRunningGradeService.update(id, data);
       return result;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       // Enhanced success message with grade details
       const studentName = data?.student?.first_name 
         ? `${data.student.first_name} ${data.student.last_name}`
