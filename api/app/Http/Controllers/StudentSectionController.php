@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use App\Models\StudentInstitution;
 
 class StudentSectionController extends Controller
 {
@@ -218,6 +219,16 @@ class StudentSectionController extends Controller
         $sectionId = $request->section_id;
         $academicYear = $request->academic_year;
 
+        // Get the current user's default institution_id
+        $user = $request->user();
+        $institutionId = $user->getDefaultInstitutionId();
+        if (!$institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No default institution found for authenticated user'
+            ], 403);
+        }
+
         // Check for existing assignments
         $existingAssignments = StudentSection::where('section_id', $sectionId)
             ->where('academic_year', $academicYear)
@@ -233,9 +244,23 @@ class StudentSectionController extends Controller
             ], 409);
         }
 
-        // Create new assignments
+        // Create new assignments and ensure student_institution exists
         $assignments = [];
         foreach ($studentIds as $studentId) {
+            // Check if student_institution exists for this student, institution, and academic year
+            $hasInstitution = StudentInstitution::where('student_id', $studentId)
+                ->where('institution_id', $institutionId)
+                ->where('academic_year', $academicYear)
+                ->exists();
+            if (!$hasInstitution) {
+                StudentInstitution::create([
+                    'student_id' => $studentId,
+                    'institution_id' => $institutionId,
+                    'is_active' => true,
+                    'academic_year' => $academicYear,
+                ]);
+            }
+
             $assignment = StudentSection::create([
                 'student_id' => $studentId,
                 'section_id' => $sectionId,

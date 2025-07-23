@@ -310,7 +310,6 @@ class StudentController extends Controller
         // Get the authenticated user's default institution
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
-        Log::info('Default institution ID:', ['default_institution_id' => $defaultInstitutionId]);
         // If no default institution, try to get the first available institution
         if (!$defaultInstitutionId) {
             $firstUserInstitution = $user->userInstitutions()->first();
@@ -329,9 +328,9 @@ class StudentController extends Controller
         $query = Student::query();
 
         // Filter students by the user's institution
-        $query->whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
-            $q->where('institution_id', $defaultInstitutionId);
-        });
+        // $query->whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
+        //     $q->where('institution_id', $defaultInstitutionId);
+        // });
 
         // Exclude students already assigned to the specified section
         if ($excludeSectionId) {

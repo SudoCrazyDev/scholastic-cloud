@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreignUuid('institution_id')->references('id')->on('institutions')->onDelete('cascade');
-            $table->foreignId('role_id')->references('id')->on('roles')->onDelete('cascade');
+            $table->foreignId('role_id')->nullable()->references('id')->on('roles')->onDelete('cascade');
             $table->boolean('is_default')->default(false);
             $table->boolean('is_main')->default(false);
             $table->timestamps();
