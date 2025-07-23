@@ -29,7 +29,8 @@ import {
   AlertCircle,
   ArrowUp,
   ArrowDown,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react'
 import { Button } from '../../../components/button'
 import { Badge } from '../../../components/badge'
@@ -84,13 +85,19 @@ const SubjectItem = ({
   index = 0, 
   isChild = false,
   onEditSubject,
-  onDeleteSubject
+  onDeleteSubject,
+  isParent = false,
+  expanded = false,
+  onToggleExpand,
 }: { 
   subject: Subject; 
   index?: number; 
   isChild?: boolean;
   onEditSubject: (subject: Subject) => void;
   onDeleteSubject: (subject: Subject) => void;
+  isParent?: boolean;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }) => {
   const hasNoAdviser = !subject.adviser_user
 
@@ -107,47 +114,45 @@ const SubjectItem = ({
     >
       {/* Main Content */}
       <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-2">
-            <BookOpen className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-indigo-600' : 'text-green-600'}`} />
-            <div className="flex-1 min-w-0">
-              <h3 className={`font-semibold truncate ${hasNoAdviser ? 'text-red-700' : 'text-gray-900'}`}>
-                {subject.title}
-                {subject.variant && (
-                  <span className="text-gray-600 font-normal ml-1">
-                    - {subject.variant}
-                  </span>
-                )}
-              </h3>
-            </div>
-            <Badge color={subject.subject_type === 'parent' ? 'green' : 'blue'}>
-              {subject.subject_type}
-            </Badge>
-            {hasNoAdviser && (
-              <div title="No teacher assigned">
-                <AlertCircle className="w-4 h-4 text-red-500" />
-              </div>
-            )}
-          </div>
-          
-          <div className="space-y-1">
-            {subject.start_time && subject.end_time && (
-              <div className="flex items-center text-sm text-gray-600">
-                <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
-                <span>{subject.start_time} - {subject.end_time}</span>
-              </div>
-            )}
-            {subject.adviser_user && (
-              <div className="flex items-center text-sm text-gray-600">
-                <User className="w-4 h-4 mr-2 flex-shrink-0" />
-                <span className="truncate">
-                  {getFullName(subject.adviser_user)}
+        <div className="flex-1 min-w-0 flex items-center">
+          {/* Expand/Collapse button for parent subjects with children */}
+          {isParent && subject.child_subjects && subject.child_subjects.length > 0 && (
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              className="mr-2 flex items-center focus:outline-none group/chevron"
+              aria-label={expanded ? 'Collapse' : 'Expand'}
+              tabIndex={0}
+            >
+              <ChevronDown
+                className={`w-5 h-5 text-gray-500 transition-transform duration-200 group-hover/chevron:text-indigo-600 ${expanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+          )}
+          <BookOpen className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-indigo-600' : 'text-green-600'} mr-2`} />
+          <div className="flex-1 min-w-0">
+            <h3 className={`font-semibold truncate ${hasNoAdviser ? 'text-red-700' : 'text-gray-900'}`}
+              // Make the title clickable to also toggle expand/collapse
+              onClick={isParent && subject.child_subjects && subject.child_subjects.length > 0 ? onToggleExpand : undefined}
+              style={{ cursor: isParent && subject.child_subjects && subject.child_subjects.length > 0 ? 'pointer' : 'default' }}
+            >
+              {subject.title}
+              {subject.variant && (
+                <span className="text-gray-600 font-normal ml-1">
+                  - {subject.variant}
                 </span>
-              </div>
-            )}
+              )}
+            </h3>
           </div>
+          <Badge color={subject.subject_type === 'parent' ? 'green' : 'blue'}>
+            {subject.subject_type}
+          </Badge>
+          {hasNoAdviser && (
+            <div title="No teacher assigned">
+              <AlertCircle className="w-4 h-4 text-red-500" />
+            </div>
+          )}
         </div>
-
         {/* Actions */}
         <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-3">
           <Button
@@ -352,6 +357,9 @@ export const SubjectList: React.FC<SubjectListProps> = ({
                       index={index} 
                       onEditSubject={onEditSubject}
                       onDeleteSubject={onDeleteSubject}
+                      isParent={true}
+                      expanded={isParentExpanded(subject.id)}
+                      onToggleExpand={() => toggleParentExpansion(subject.id)}
                     />
                   </div>
                 </div>
