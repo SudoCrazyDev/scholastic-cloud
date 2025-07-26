@@ -217,3 +217,44 @@ export const useUpsertFinalGrade = () => {
     },
   });
 }; 
+
+export const useDeleteStudentRunningGrade = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await studentRunningGradeService.delete(id);
+    },
+    onSuccess: (data) => {
+      toast.success(
+        `🗑️ Grade deleted successfully`,
+        {
+          duration: 4000,
+          icon: '🗑️',
+          style: {
+            background: '#ef4444',
+            color: 'white',
+            fontWeight: '600',
+          },
+        }
+      );
+      queryClient.invalidateQueries({ queryKey: ['student-running-grades'] });
+      queryClient.invalidateQueries({ queryKey: ['student-running-grades-by-student'] });
+      queryClient.invalidateQueries({ queryKey: ['student-scores'] });
+    },
+    onError: (error: any) => {
+      toast.error(
+        `❌ Failed to delete grade: ${error?.response?.data?.message || 'Unknown error'}`,
+        {
+          duration: 5000,
+          icon: '⚠️',
+          style: {
+            background: '#ef4444',
+            color: 'white',
+            fontWeight: '600',
+          },
+        }
+      );
+    },
+  });
+}; 

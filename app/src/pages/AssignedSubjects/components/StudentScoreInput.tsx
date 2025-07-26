@@ -7,6 +7,7 @@ import { studentScoreService } from '../../../services/studentScoreService';
 import { toast } from 'react-hot-toast';
 import { ErrorHandler } from '../../../utils/errorHandler';
 import { Input } from '../../../components/input';
+import { TrashIcon } from '@heroicons/react/24/outline';
 
 interface StudentScoreInputProps {
   studentId: string;
@@ -90,6 +91,24 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentScoreId) throw new Error('No score ID to delete');
+      return await studentScoreService.delete(currentScoreId);
+    },
+    onSuccess: () => {
+      setCurrentScoreId(undefined);
+      setHasExistingScore(false);
+      toast.success('Score deleted!');
+      queryClient.invalidateQueries({ queryKey: ['student-scores'] });
+      onSuccess?.({} as StudentScore);
+    },
+    onError: (error) => {
+      const err = ErrorHandler.handle(error);
+      toast.error(err.message);
+    },
+  });
+
   const handleScoreChange = async (score: number) => {
     // Additional validation to prevent unnecessary API calls
     if (score === initialScore) {
@@ -104,7 +123,7 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
   };
 
   const isLoading = createMutation.status === 'pending' || updateMutation.status === 'pending';
-
+  console.log("FUCKER");
   return (
     <Formik
       initialValues={{ score: initialScore }}
@@ -117,7 +136,7 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
     >
       {({ errors, touched, isSubmitting, handleBlur, values }) => (
         <Form>
-          <div className="relative">
+          <div className="relative flex items-center space-x-1">
             <Field name="score">
               {({ field }: any) => (
                 <Input
@@ -150,6 +169,18 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
                 />
               )}
             </Field>
+            {/* Delete button for existing score */}
+            {hasExistingScore && (
+              <button
+                type="button"
+                className="ml-1 p-1 rounded hover:bg-red-100"
+                title="Delete score"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.status === 'pending' || disabled}
+              >
+                <TrashIcon className="w-4 h-4 text-red-500" />
+              </button>
+            )}
             {/* Visual indicator for existing score */}
             {hasExistingScore && (
               <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>

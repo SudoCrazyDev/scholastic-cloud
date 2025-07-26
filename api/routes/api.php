@@ -16,6 +16,7 @@ use App\Http\Controllers\StudentEcrItemScoreController;
 use App\Http\Controllers\SectionConsolidatedGradesController;
 use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\UserWorkExperienceController;
+use App\Http\Controllers\CoreValueMarkingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -111,4 +112,6 @@ Route::middleware('auth.token')->group(function () {
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
     // RealtimeAttendance GET route
     Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
+    // Core Value Marking routes
+    Route::apiResource('core-value-markings', CoreValueMarkingController::class);
 });

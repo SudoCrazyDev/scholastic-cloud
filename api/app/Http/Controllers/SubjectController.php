@@ -38,7 +38,7 @@ class SubjectController extends Controller
             ]);
         }
 
-        $subjects = Subject::with(['institution', 'classSection', 'adviserUser', 'parentSubject'])
+        $subjects = Subject::with(['institution', 'classSection', 'adviserUser', 'parentSubject', 'childSubjects'])
             ->where('institution_id', $defaultInstitution->institution_id)
             ->where('class_section_id', $classSectionId)
             ->orderBy('order', 'asc')

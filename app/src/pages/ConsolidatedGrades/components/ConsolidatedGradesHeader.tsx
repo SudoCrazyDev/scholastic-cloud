@@ -35,13 +35,9 @@ export function ConsolidatedGradesHeader({
               value={selectedQuarter}
               onChange={(e) => onQuarterChange(e.target.value)}
               className="w-48"
-            >
-              {quarters.map((quarter) => (
-                <option key={quarter.value} value={quarter.value}>
-                  {quarter.label}
-                </option>
-              ))}
-            </Select>
+              options={quarters}
+              placeholder="Select quarter"
+            />
           </div>
 
           <div className="flex flex-col gap-2">
@@ -53,13 +49,9 @@ export function ConsolidatedGradesHeader({
               value={selectedAcademicYear}
               onChange={(e) => onAcademicYearChange(e.target.value)}
               className="w-48"
-            >
-              {academicYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </Select>
+              options={academicYears.map(year => ({ value: year, label: year }))}
+              placeholder="Select academic year"
+            />
           </div>
         </div>
 

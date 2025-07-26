@@ -72,7 +72,14 @@ const styles = StyleSheet.create({
     width: '8%',
     borderRightWidth: 1,
     borderRightColor: '#d1d5db',
-    padding: 8,
+    padding: 4, // reduce padding for more columns
+  },
+  tableColChildSubject: {
+    width: '8%',
+    borderRightWidth: 1,
+    borderRightColor: '#d1d5db',
+    padding: 2,
+    backgroundColor: '#f9fafb',
   },
   tableColFinalGrade: {
     width: '12%',
@@ -87,7 +94,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   tableCell: {
-    fontSize: 10,
+    fontSize: 8,
     textAlign: 'center',
   },
   tableCellStudent: {
@@ -95,7 +102,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   tableCellHeader: {
-    fontSize: 10,
+    fontSize: 8, // smaller font for subject headers
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -103,6 +110,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     textAlign: 'left',
+  },
+  tableCellHeaderChild: {
+    fontSize: 7,
+    fontWeight: 'normal',
+    textAlign: 'center',
+    color: '#6b7280',
   },
   subjectHeader: {
     fontSize: 8,
@@ -131,6 +144,7 @@ interface ConsolidatedGradesPDFProps {
       student_id: string;
       student_name: string;
       lrn: string;
+      gender?: string;
       subjects: Array<{
         subject_id: string;
         subject_title: string;
@@ -148,7 +162,7 @@ const formatGrade = (grade: number | string | null) => {
   if (grade === null || grade === undefined) return 'N/A';
   const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
   if (isNaN(numGrade)) return 'N/A';
-  return numGrade.toFixed(2);
+  return Math.round(numGrade).toString();
 };
 
 const getQuarterLabel = (quarter: number) => {
@@ -177,11 +191,10 @@ const calculateFinalGrade = (subjects: Array<{ grade: number | string | null }>)
 
 const getRemarks = (finalGrade: number | null) => {
   if (finalGrade === null) return 'N/A';
-  if (finalGrade >= 90) return 'Outstanding';
-  if (finalGrade >= 85) return 'Very Satisfactory';
-  if (finalGrade >= 80) return 'Satisfactory';
-  if (finalGrade >= 75) return 'Fairly Satisfactory';
-  return 'Did Not Meet Expectations';
+  if (finalGrade >= 98) return 'With Highest Honors';
+  if (finalGrade >= 95) return 'With High Honor';
+  if (finalGrade >= 90) return 'With Honors';
+  return '';
 };
 
 export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({ 
@@ -189,6 +202,45 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
   institutionName = 'School Institution' 
 }) => {
   const { section, students, quarter } = data;
+
+  // Helper to get base subject title
+  const getBaseTitle = (title: string) => title.split(/[-(]/)[0].trim();
+
+  // --- Group subjects by base and variants for table columns (flattened for header/columns) ---
+  const subjectGroups = React.useMemo(() => {
+    if (!students.length) return [];
+    const map: Record<string, { base: string; variants: string[] }> = {};
+    students[0].subjects.forEach((subject: any) => {
+      const base = getBaseTitle(subject.subject_title);
+      if (!map[base]) map[base] = { base, variants: [] };
+      if (!map[base].variants.includes(subject.subject_title)) {
+        map[base].variants.push(subject.subject_title);
+      }
+    });
+    return Object.values(map);
+  }, [students]);
+
+  // --- Flatten all subject columns for header/rows ---
+  const allSubjectColumns = React.useMemo(() => {
+    return subjectGroups.flatMap(group => group.variants.map(variant => ({
+      base: group.base,
+      variant,
+    })));
+  }, [subjectGroups]);
+
+  // Group students by gender
+  const studentsWithGender = students as (typeof students[number] & { gender?: string })[];
+  const groupedStudents: Record<string, typeof studentsWithGender> = studentsWithGender.reduce((acc, student) => {
+    const gender = student.gender ? student.gender.toLowerCase() : 'other';
+    if (!acc[gender]) acc[gender] = [];
+    acc[gender].push(student);
+    return acc;
+  }, {} as Record<string, typeof studentsWithGender>);
+  const genderLabels: Record<string, string> = {
+    male: 'Male',
+    female: 'Female',
+    other: 'Other',
+  };
 
   return (
     <Document>
@@ -204,60 +256,86 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
           </Text>
         </View>
 
-        {/* Table */}
-        <View style={styles.table}>
-          {/* Table Header */}
-          <View style={[styles.tableRow, styles.tableRowHeader]}>
-            <View style={styles.tableColStudent}>
-              <Text style={styles.tableCellHeaderStudent}>Student Name</Text>
-            </View>
-            {students[0]?.subjects.map((subject) => (
-              <View key={subject.subject_id} style={styles.tableColSubject}>
-                <Text style={styles.tableCellHeader}>{subject.subject_title}</Text>
-                {subject.subject_variant && (
-                  <Text style={styles.subjectHeader}>{subject.subject_variant}</Text>
-                )}
-              </View>
-            ))}
-            <View style={styles.tableColFinalGrade}>
-              <Text style={styles.tableCellHeader}>Final Grade</Text>
-            </View>
-            <View style={styles.tableColRemarks}>
-              <Text style={styles.tableCellHeader}>Remarks</Text>
-            </View>
-          </View>
-
-          {/* Table Rows */}
-          {students.map((student) => (
-            <View key={student.student_id} style={styles.tableRow}>
-              <View style={styles.tableColStudent}>
-                <Text style={styles.tableCellStudent}>{student.student_name}</Text>
-              </View>
-              {student.subjects.map((subject) => (
-                <View key={subject.subject_id} style={styles.tableColSubject}>
-                  <Text style={styles.tableCell}>
-                    {formatGrade(subject.grade)}
-                  </Text>
+        {/* Table for each gender group */}
+        {Object.entries(groupedStudents).map(([gender, studentsList]) => (
+          studentsList.length === 0 ? null : (
+            <View key={gender} wrap={false}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 6, color: '#374151' }}>
+                {genderLabels[gender] || 'Other'} Students
+              </Text>
+              <View style={styles.table}>
+                {/* Single Header Row: Show full subject titles (including child/variant) */}
+                <View style={[styles.tableRow, styles.tableRowHeader]}>
+                  <View style={styles.tableColStudent}>
+                    <Text style={styles.tableCellHeaderStudent}>Student Name</Text>
+                  </View>
+                  {allSubjectColumns.map(({ base, variant }) => {
+                    // Split variant into parent and child (e.g., "Math - Written Work")
+                    let parent = base;
+                    let child = variant.replace(base, '').replace(/^[-\s]+/, '');
+                    // If no child, just show parent
+                    return (
+                      <View key={base + variant} style={styles.tableColChildSubject}>
+                        <Text style={styles.tableCellHeader}>
+                          {parent}
+                        </Text>
+                        {child ? (
+                          <Text style={styles.tableCellHeaderChild}>{child}</Text>
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                  <View style={styles.tableColFinalGrade}>
+                    <Text style={styles.tableCellHeader}>Final Grade</Text>
+                  </View>
+                  <View style={styles.tableColRemarks}>
+                    <Text style={styles.tableCellHeader}>Remarks</Text>
+                  </View>
                 </View>
-              ))}
-              <View style={styles.tableColFinalGrade}>
-                <Text style={styles.tableCell}>
-                  {formatGrade(calculateFinalGrade(student.subjects))}
-                </Text>
-              </View>
-              <View style={styles.tableColRemarks}>
-                <Text style={styles.tableCell}>
-                  {getRemarks(calculateFinalGrade(student.subjects))}
-                </Text>
+                {/* Table Rows */}
+                {studentsList.map((student, index) => {
+                  // Group grades by base and variant
+                  const grouped: Record<string, { [variant: string]: number | string | null }> = {};
+                  student.subjects.forEach((subject: any) => {
+                    const base = getBaseTitle(subject.subject_title);
+                    if (!grouped[base]) grouped[base] = {};
+                    grouped[base][subject.subject_title] = subject.grade;
+                  });
+                  // For each base, average grades for final grade
+                  const allGrades = Object.values(grouped)
+                    .flatMap(variants => Object.values(variants)
+                      .map(g => typeof g === 'string' ? parseFloat(g) : g)
+                      .filter((g): g is number => g !== null && !isNaN(g)));
+                  const finalGrade = allGrades.length > 0 ? Math.round(allGrades.reduce((a, b) => a + b, 0) / allGrades.length) : null;
+                  return (
+                    <View key={student.student_id} style={styles.tableRow}>
+                      <View style={styles.tableColStudent}>
+                        <Text style={styles.tableCellStudent}>{student.student_name}</Text>
+                      </View>
+                      {/* Render each subject variant as its own column */}
+                      {allSubjectColumns.map(({ base, variant }) => (
+                        <View key={base + variant} style={styles.tableColChildSubject}>
+                          <Text style={styles.tableCell}>{formatGrade(grouped[base]?.[variant])}</Text>
+                        </View>
+                      ))}
+                      <View style={styles.tableColFinalGrade}>
+                        <Text style={styles.tableCell}>{formatGrade(finalGrade)}</Text>
+                      </View>
+                      <View style={styles.tableColRemarks}>
+                        <Text style={styles.tableCell}>{getRemarks(finalGrade)}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             </View>
-          ))}
-        </View>
+          )
+        ))}
 
         {/* Summary */}
         <View style={styles.summary}>
           <Text>Total Students: {students.length}</Text>
-          <Text>Total Subjects: {students[0]?.subjects.length || 0}</Text>
+          <Text>Total Subjects: {allSubjectColumns.length}</Text>
           <Text>Generated on: {new Date().toLocaleDateString()}</Text>
         </View>
       </Page>

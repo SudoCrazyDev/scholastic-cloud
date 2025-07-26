@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Input } from '../../../components/input';
-import { CalculatorIcon } from '@heroicons/react/24/outline';
-import { useUpdateFinalGrade, useUpsertFinalGrade } from '../../../hooks/useStudentRunningGrades';
+import { CalculatorIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useUpdateFinalGrade, useUpsertFinalGrade, useDeleteStudentRunningGrade } from '../../../hooks/useStudentRunningGrades';
 import { toast } from 'react-hot-toast';
 import { formatGrade, getGradeColor, getGradeBackground, toNumber } from '../../../utils/gradeUtils';
 
@@ -28,6 +28,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const updateFinalGradeMutation = useUpdateFinalGrade();
   const upsertFinalGradeMutation = useUpsertFinalGrade();
+  const deleteStudentRunningGradeMutation = useDeleteStudentRunningGrade();
 
   const handleFinalGradeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
@@ -177,7 +178,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
       </div>
 
       {/* Final Grade Input */}
-      <div className="relative">
+      <div className="relative flex items-center space-x-1">
         <Input
           type="number"
           min="0"
@@ -194,8 +195,20 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
           size="sm"
           className="text-center w-16 h-10 text-sm font-medium"
           variant="outlined"
-          disabled={updateFinalGradeMutation.isPending || upsertFinalGradeMutation.isPending}
+          disabled={updateFinalGradeMutation.isPending || upsertFinalGradeMutation.isPending || deleteStudentRunningGradeMutation.status === 'pending'}
         />
+        {/* Delete button for existing running grade */}
+        {gradeId && (
+          <button
+            type="button"
+            className="ml-1 p-1 rounded hover:bg-red-100"
+            title="Delete running grade"
+            onClick={() => deleteStudentRunningGradeMutation.mutate(gradeId)}
+            disabled={deleteStudentRunningGradeMutation.status === 'pending'}
+          >
+            <TrashIcon className="w-4 h-4 text-red-500" />
+          </button>
+        )}
       </div>
     </div>
   );

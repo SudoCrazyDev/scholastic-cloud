@@ -3,7 +3,6 @@ import { useRoleAccess } from '../../hooks/useRoleAccess';
 import { useClassSections } from '../../hooks/useClassSections';
 import { ConsolidatedGradesHeader, ConsolidatedGradesGrid } from './components';
 import { Navigate } from 'react-router-dom';
-import type { ClassSection } from '../../types';
 
 export default function ConsolidatedGrades() {
   const { hasAccess } = useRoleAccess(['principal', 'curriculum-head', 'assistant-principal']);
@@ -22,17 +21,9 @@ export default function ConsolidatedGrades() {
     section.academic_year === selectedAcademicYear
   );
 
-  // Debug logging
-  console.log('Class Sections:', classSections);
-  console.log('Available Academic Years:', availableAcademicYears);
-  console.log('Selected Academic Year:', selectedAcademicYear);
-  console.log('Filtered Sections:', filteredSections);
-
   if (!hasAccess) {
     return <Navigate to="/dashboard" replace />;
   }
-
-
 
   const quarters = [
     { value: '1', label: 'First Quarter' },

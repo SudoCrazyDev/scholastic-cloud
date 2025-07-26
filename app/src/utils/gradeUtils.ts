@@ -70,3 +70,22 @@ export const toNumber = (grade: number | string | null | undefined): number => {
   const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
   return isNaN(numGrade) ? 0 : numGrade;
 }; 
+
+/**
+ * Calculates the final grade (GPA) for a student from an array of subject grades.
+ * Returns null if no valid grades are present.
+ * @param subjects - Array of objects with a grade property (number | string | null)
+ * @returns The rounded average grade, or null if no valid grades
+ */
+export const calculateFinalGrade = (subjects: Array<{ grade: number | string | null }>): number | null => {
+  const validGrades = subjects
+    .map(subject => {
+      const grade = typeof subject.grade === 'string' ? parseFloat(subject.grade) : subject.grade;
+      return isNaN(grade as number) ? null : grade;
+    })
+    .filter(grade => grade !== null) as number[];
+
+  if (validGrades.length === 0) return null;
+  const sum = validGrades.reduce((acc, grade) => acc + grade, 0);
+  return Math.round(sum / validGrades.length);
+}; 
