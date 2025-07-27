@@ -1,5 +1,8 @@
 {
   "dependencies": {
     "qs": "^6.14.0"
+  },
+  "devDependencies": {
+    "electron-vite": "^4.0.0"
   }
 }
