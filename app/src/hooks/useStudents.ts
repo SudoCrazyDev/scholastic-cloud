@@ -41,7 +41,7 @@ export function useStudents(options?: { class_section_id?: string }) {
     queryFn: () => studentService.getStudents({
       ...searchParams,
       ...options,
-      per_page: 15,
+      per_page: 70,
     }),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes

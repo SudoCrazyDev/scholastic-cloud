@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Trophy, 
   Medal, 
   Award, 
   GraduationCap, 
-  Eye
+  Eye,
+  Filter
 } from 'lucide-react';
 import { Button } from '../../../components/button';
+import { Select } from '../../../components/select';
 import type { Student } from '../../../types';
 import { useConsolidatedGrades } from '../../../hooks/useConsolidatedGrades';
 import { calculateFinalGrade } from '../../../utils/gradeUtils';
@@ -36,12 +38,21 @@ const getRemarks = (finalGrade: number | null) => {
 };
 
 const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSectionTitle, sectionId, quarter }) => {
-  const { data, isLoading, error } = useConsolidatedGrades(sectionId, quarter);
+  const [selectedQuarter, setSelectedQuarter] = useState(quarter);
+  const { data, isLoading, error } = useConsolidatedGrades(sectionId, selectedQuarter);
 
   const getFullName = (student: Student) => {
     const parts = [student.first_name, student.middle_name, student.last_name, student.ext_name];
     return parts.filter(Boolean).join(' ');
   };
+
+  // Quarter options
+  const quarterOptions = [
+    { value: '1', label: '1st Quarter' },
+    { value: '2', label: '2nd Quarter' },
+    { value: '3', label: '3rd Quarter' },
+    { value: '4', label: '4th Quarter' },
+  ];
 
   // Map consolidated grades to student rankings
   let studentsWithRanking: StudentWithRanking[] = [];
@@ -139,13 +150,29 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center space-x-3 mb-6">
-        <div className="p-3 bg-indigo-100 rounded-lg">
-          <Trophy className="w-8 h-8 text-indigo-600" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="p-3 bg-indigo-100 rounded-lg">
+            <Trophy className="w-8 h-8 text-indigo-600" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Student Ranking</h2>
+            <p className="text-gray-600">Academic excellence recognition for {classSectionTitle}</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Student Ranking</h2>
-          <p className="text-gray-600">Academic excellence recognition for {classSectionTitle}</p>
+        
+        {/* Quarter Filter */}
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">Quarter:</span>
+          </div>
+          <Select
+            value={selectedQuarter.toString()}
+            onChange={(e) => setSelectedQuarter(parseInt(e.target.value))}
+            options={quarterOptions}
+            className="w-40"
+          />
         </div>
       </div>
 
@@ -161,7 +188,7 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
         <div className="text-center py-12">
           <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No students found</h3>
-          <p className="text-gray-600">No students to display.</p>
+          <p className="text-gray-600">No students to display for {quarterOptions.find(q => q.value === selectedQuarter.toString())?.label}.</p>
         </div>
       )}
     </div>

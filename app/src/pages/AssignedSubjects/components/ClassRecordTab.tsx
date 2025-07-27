@@ -1162,7 +1162,7 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
     subjectId,
     classSectionId,
   });
-
+console.log(students);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   
   // Quarter filter state for mobile/tablet
