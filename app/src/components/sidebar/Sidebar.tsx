@@ -118,11 +118,18 @@ const menuItems: MenuItem[] = [
     allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
   },
   {
-    id: 'certificate-builder',
-    label: 'Certificate Builder',
+    id: 'sf9',
+    label: 'SF9 Generation',
     icon: <FileText className="w-5 h-5" />,
-    path: '/certificate-builder',
+    path: '/sf9',
+    allowedRoles: ['principal', 'curriculum-head', 'assistant-principal', 'subject-teacher'],
   },
+  // {
+  //   id: 'certificate-builder',
+  //   label: 'Certificate Builder',
+  //   icon: <FileText className="w-5 h-5" />,
+  //   path: '/certificate-builder',
+  // },
 
 ];
 

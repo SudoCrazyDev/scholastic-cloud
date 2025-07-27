@@ -10,7 +10,8 @@ import {
   PencilIcon,
   CameraIcon,
   XMarkIcon,
-  PhotoIcon
+  PhotoIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
@@ -67,6 +68,11 @@ export default function StudentDetail() {
   const handleEdit = (student: Student) => {
     // Navigate back to students page and open edit modal
     navigate('/students', { state: { editStudent: student } })
+  }
+
+  const handleGenerateSF9 = () => {
+    // Navigate to SF9 page with student pre-selected
+    navigate('/sf9', { state: { selectedStudentId: student?.id } })
   }
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -403,13 +409,23 @@ export default function StudentDetail() {
                 <p className="mt-1 text-gray-600">Student ID: {student.id}</p>
               </div>
             </div>
-            <Button
-              onClick={() => handleEdit(student)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              <PencilIcon className="w-4 h-4 mr-2" />
-              Edit Student
-            </Button>
+            <div className="flex items-center space-x-3">
+              <Button
+                onClick={handleGenerateSF9}
+                variant="outline"
+                className="border-green-600 text-green-600 hover:bg-green-50"
+              >
+                <DocumentTextIcon className="w-4 h-4 mr-2" />
+                Generate SF9
+              </Button>
+              <Button
+                onClick={() => handleEdit(student)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <PencilIcon className="w-4 h-4 mr-2" />
+                Edit Student
+              </Button>
+            </div>
           </div>
         </motion.div>
 

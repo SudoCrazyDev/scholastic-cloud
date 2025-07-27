@@ -17,6 +17,7 @@ use App\Http\Controllers\SectionConsolidatedGradesController;
 use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\UserWorkExperienceController;
 use App\Http\Controllers\CoreValueMarkingController;
+use App\Http\Controllers\SF9Controller;
 
 /*
 |--------------------------------------------------------------------------
@@ -114,4 +115,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
     // Core Value Marking routes
     Route::apiResource('core-value-markings', CoreValueMarkingController::class);
+    // SF9 routes
+    Route::post('sf9/generate', [SF9Controller::class, 'generate']);
+    Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears']);
 });
