@@ -10,7 +10,7 @@ interface StaffGridProps {
   onChangeRole: (staff: User) => void;
 }
 
-const genderAvatar = (gender: string) => (
+const genderAvatar = () => (
   <div className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 bg-white">
     <UserIcon className="w-6 h-6 text-gray-400" />
   </div>
@@ -49,7 +49,7 @@ const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onDelete, onChang
             className="bg-white border border-gray-200 rounded-xl p-5 flex gap-4 items-center transition-transform hover:scale-[1.01] hover:border-gray-300 animate-fade-in min-h-[120px]"
           >
             {/* Avatar */}
-            {genderAvatar(staff.gender)}
+            {genderAvatar()}
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="font-medium text-base truncate text-gray-900">

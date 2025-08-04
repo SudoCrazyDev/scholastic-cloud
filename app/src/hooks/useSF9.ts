@@ -1,9 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sf9Service, type SF9Data, type GenerateSF9Request } from '../services/sf9Service';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { sf9Service, type GenerateSF9Request } from '../services/sf9Service';
 import { toast } from 'react-hot-toast';
 
 export const useSF9 = () => {
-  const queryClient = useQueryClient();
 
   /**
    * Generate SF9 data for a student

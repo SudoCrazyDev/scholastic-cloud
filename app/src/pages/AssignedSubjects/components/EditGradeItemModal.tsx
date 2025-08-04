@@ -3,9 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   XMarkIcon,
   DocumentTextIcon,
-  AcademicCapIcon,
-  UserGroupIcon,
-  CalendarIcon
 } from '@heroicons/react/24/outline'
 import { useFormik } from 'formik'
 import * as Yup from 'yup'
@@ -25,19 +22,6 @@ interface EditGradeItemModalProps {
     subject_ecr_id: string
     quarter?: string
   } | null
-}
-
-const categoryTypeMap = {
-  'Written Works': 'written',
-  'Performance Tasks': 'performance',
-  'Quarterly Assessment': 'quarterly',
-}
-
-const quarterTypeMap = {
-  'First Quarter': 'Q1',
-  'Second Quarter': 'Q2',
-  'Third Quarter': 'Q3',
-  'Fourth Quarter': 'Q4',
 }
 
 export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
@@ -109,19 +93,6 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
       })
     }
   }, [gradeItem])
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'Written Works':
-        return <DocumentTextIcon className="w-4 h-4 text-blue-600" />
-      case 'Performance Tasks':
-        return <AcademicCapIcon className="w-4 h-4 text-green-600" />
-      case 'Quarterly Assessment':
-        return <UserGroupIcon className="w-4 h-4 text-purple-600" />
-      default:
-        return <DocumentTextIcon className="w-4 h-4 text-gray-600" />
-    }
-  }
 
   return (
     <AnimatePresence>

@@ -4,7 +4,8 @@ import { institutionService } from '../services/institutionService'
 import { classSectionService } from '../services/classSectionService'
 import { subjectService } from '../services/subjectService'
 import { studentRunningGradeService } from '../services/studentRunningGradeService'
-import type { Student, Institution, ClassSection, Subject, StudentRunningGrade } from '../types'
+import type { Student, Institution, ClassSection, Subject } from '../types'
+import type { StudentRunningGrade } from '../services/studentRunningGradeService'
 
 interface UseStudentReportCardParams {
   studentId: string

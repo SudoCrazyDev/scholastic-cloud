@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
-export interface UseDataTableOptions {
+export interface UseDataTableOptions<T = any> {
   queryKey: string[]
-  queryFn: (params: DataTableParams) => Promise<any>
+  queryFn: (params: DataTableParams) => Promise<{ data: T[]; pagination: any }>
   initialPage?: number
   initialItemsPerPage?: number
   initialSearch?: string

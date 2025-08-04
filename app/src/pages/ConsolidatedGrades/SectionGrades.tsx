@@ -231,7 +231,7 @@ export default function SectionGrades() {
                   }
                   fileName={`consolidated-grades-${section.title}-q${quarter}-${section.academic_year}.pdf`}
                 >
-                  {({ blob, url, loading, error }) => (
+                  {({ loading }) => (
                     <Button 
                       variant="outline" 
                       size="sm"

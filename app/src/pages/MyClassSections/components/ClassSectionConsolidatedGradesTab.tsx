@@ -209,7 +209,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                 }
                 fileName={`consolidated-grades-${section.title}-q${selectedQuarter}-${section.academic_year}.pdf`}
               >
-                {({ blob, url, loading, error }) => (
+                {({loading }) => (
                   <Button 
                     variant="outline" 
                     size="sm"

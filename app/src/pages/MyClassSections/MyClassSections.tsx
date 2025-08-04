@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useMyClassSections } from '../../hooks/useMyClassSections'
-import { useAuth } from '../../hooks/useAuth'
 import { Alert } from '../../components/alert'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
@@ -18,12 +17,8 @@ import {
 } from 'lucide-react'
 import type { ClassSection, Student } from '../../types'
 
-// Tab types
-type TabType = 'class-sections'
-
 const MyClassSections: React.FC = () => {
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [searchValue, setSearchValue] = useState('')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedClassSection, setSelectedClassSection] = useState<ClassSection | null>(null)
@@ -46,11 +41,6 @@ const MyClassSections: React.FC = () => {
 
   const handleClassSectionClick = (classSection: ClassSection) => {
     navigate(`/my-class-sections/${classSection.id}`)
-  }
-
-  const handleCreateStudent = (classSection: ClassSection) => {
-    setSelectedClassSection(classSection)
-    setIsCreateModalOpen(true)
   }
 
   const handleCreateModalClose = () => {

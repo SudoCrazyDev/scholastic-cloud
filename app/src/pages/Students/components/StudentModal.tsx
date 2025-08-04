@@ -231,7 +231,7 @@ export function StudentModal({
                 }}
                 enableReinitialize
               >
-                {({ values, errors, touched, isSubmitting, setFieldValue }) => (
+                {({ errors, touched, isSubmitting }) => (
                   <Form className="px-4 pb-4">
                     <div className="space-y-6">
                       {/* Profile Picture */}

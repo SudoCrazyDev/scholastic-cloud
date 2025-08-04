@@ -1,9 +1,7 @@
 
 import { Page, Text, View, Document, PDFViewer, Image, StyleSheet } from '@react-pdf/renderer';
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
-import { calculateFinalGrade, getGradeRemarks, getPassFailRemarks, getQuarterGrade, calculateAge } from '../../utils/gradeUtils';
-import type { Student, Institution, ClassSection, Subject } from '../../types';
-import type { StudentRunningGrade } from '../../services/studentRunningGradeService';
+import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAge } from '../../utils/gradeUtils';
 
 const styles = StyleSheet.create({
     attendanceMonthContainer: {width: '7%', textAlign: 'center', borderRight: '1px solid black'},
@@ -11,16 +9,16 @@ const styles = StyleSheet.create({
 });
 
 interface PrintReportCardProps {
-    studentId: string;
-    classSectionId: string;
-    institutionId: string;
+    studentId?: string;
+    classSectionId?: string;
+    institutionId?: string;
     academicYear?: string;
 }
 
 export default function PrintReportCard({ 
-    studentId, 
-    classSectionId, 
-    institutionId, 
+    studentId = "", 
+    classSectionId = "", 
+    institutionId = "", 
     academicYear = '2024-2025' 
 }: PrintReportCardProps) {
     const { 
@@ -170,6 +168,9 @@ export default function PrintReportCard({
                                 <View style={{width: '100%', display: 'flex', flexDirection: 'row', borderBottom: '1px solid black'}}>
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of days present</Text>
+                                    </View>
+                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
                                     <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>

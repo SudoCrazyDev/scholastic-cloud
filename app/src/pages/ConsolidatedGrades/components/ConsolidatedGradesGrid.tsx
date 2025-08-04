@@ -8,14 +8,12 @@ interface ConsolidatedGradesGridProps {
   sections: ClassSection[];
   selectedQuarter: string;
   selectedAcademicYear: string;
-  onViewGrades: (sectionId: string) => void;
 }
 
 export function ConsolidatedGradesGrid({
   sections,
   selectedQuarter,
   selectedAcademicYear,
-  onViewGrades,
 }: ConsolidatedGradesGridProps) {
   const navigate = useNavigate();
   if (sections.length === 0) {

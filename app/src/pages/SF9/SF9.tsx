@@ -4,7 +4,7 @@ import { useInstitutions } from '../../hooks/useInstitutions';
 import { useSF9 } from '../../hooks/useSF9';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocation } from 'react-router-dom';
-import { Loader2, FileText, Download, Search, User, Calendar, Building } from 'lucide-react';
+import { Loader2, FileText, Download, Search, User, Building } from 'lucide-react';
 import { Button } from '../../components/button';
 import { Select } from '../../components/select';
 import { Input } from '../../components/input';
@@ -18,7 +18,6 @@ const SF9: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
   const [selectedStudent, setSelectedStudent] = useState<string>('');
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('2025-2026');
   const [selectedInstitution, setSelectedInstitution] = useState<string>('');
   const [sf9Data, setSf9Data] = useState<SF9Data | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,10 +36,7 @@ const SF9: React.FC = () => {
   // Hooks
   const { students, loading: studentsLoading } = useStudents();
   const { institutions, loading: institutionsLoading } = useInstitutions();
-  const { generateSF9, generateSF9Loading, useAcademicYears } = useSF9();
-
-  // Academic year is now fixed to 2025-2026
-  const academicYears = ['2025-2026'];
+  const { generateSF9, generateSF9Loading } = useSF9();
 
   // Filter students based on search term
   const filteredStudents = students?.filter((student: any) => {
@@ -57,7 +53,7 @@ const SF9: React.FC = () => {
     try {
       const response = await generateSF9({
         student_id: selectedStudent,
-        academic_year: selectedAcademicYear,
+        academic_year: "2025-2026",
         institution_id: selectedInstitution,
       });
 
@@ -199,9 +195,9 @@ const SF9: React.FC = () => {
               {sf9Data && (
                 <PDFDownloadLink
                   document={<SF9PDF data={sf9Data} />}
-                  fileName={`SF9-${getStudentName(selectedStudent).replace(/[^a-zA-Z0-9]/g, '-')}-${selectedAcademicYear}.pdf`}
+                  fileName={`SF9-${getStudentName(selectedStudent).replace(/[^a-zA-Z0-9]/g, '-')}-${"2025-2026"}.pdf`}
                 >
-                  {({ blob, url, loading, error }) => (
+                  {({ loading }) => (
                     <Button variant="outline" disabled={loading} className="flex items-center gap-2">
                       <Download className="w-4 h-4" />
                       {loading ? 'Preparing PDF...' : 'Download PDF'}

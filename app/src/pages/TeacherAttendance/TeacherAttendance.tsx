@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useRealtimeAttendance } from '../../hooks/useAttendance';
 import { AttendanceStatsCard, RealtimeClock, AttendanceList } from './components';
-import { isLate, getTeacherStatus, formatCutoffTime, DEFAULT_LATE_CUTOFF } from '../../utils/attendanceUtils';
+import { getTeacherStatus, formatCutoffTime, DEFAULT_LATE_CUTOFF } from '../../utils/attendanceUtils';
 
 const TeacherAttendance: React.FC = () => {
   const { user } = useAuth();

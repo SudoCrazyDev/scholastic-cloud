@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon, CameraIcon, PhotoIcon } from '@heroicons/react/24/outline'
 import { Loader2 } from 'lucide-react'
@@ -126,7 +126,7 @@ export function CreateStudentModal({
   const assignToSectionMutation = useMutation({
     mutationFn: (data: { student_ids: string[], section_id: string, academic_year: string }) =>
       studentService.assignStudentsToSection(data),
-    onSuccess: (response) => {
+    onSuccess: () => {
       toast.success('Student assigned to section successfully!')
       queryClient.invalidateQueries({ queryKey: ['my-class-sections'] })
       queryClient.invalidateQueries({ queryKey: ['students-by-section'] })
@@ -282,7 +282,7 @@ export function CreateStudentModal({
                 onSubmit={handleSubmit}
                 enableReinitialize
               >
-                {({ values, errors, touched, isSubmitting, setFieldValue }) => (
+                {({ errors, touched }) => (
                   <Form className="px-4 pb-4">
                     <div className="space-y-6">
                       {/* Profile Picture */}

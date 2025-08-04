@@ -6,7 +6,7 @@ import type { TeacherAttendanceSummary } from '../../../types';
 interface TeacherAttendanceGridProps {
   teachers: TeacherAttendanceSummary[];
   isLoading: boolean;
-  error: any;
+  error: Error | null;
   institutionId: string;
   compact?: boolean;
   onPageChange?: (page: number) => void;
@@ -272,7 +272,7 @@ export const TeacherAttendanceGrid: React.FC<TeacherAttendanceGridProps> = ({
                       key={action.key}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleAction(action.key as any, teacher.user.id);
+                        handleAction(action.key as 'check-in' | 'check-out' | 'break-out' | 'break-in', teacher.user.id);
                       }}
                       disabled={checkInMutation.isPending || checkOutMutation.isPending || breakOutMutation.isPending || breakInMutation.isPending}
                       className={`px-2 py-1 rounded text-xs font-medium text-white transition-colors duration-200 ${action.color} disabled:opacity-50 disabled:cursor-not-allowed ${compact ? 'w-full' : ''}`}

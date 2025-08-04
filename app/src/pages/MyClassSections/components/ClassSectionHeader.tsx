@@ -8,7 +8,7 @@ interface ClassSectionHeaderProps {
   user: any;
 }
 
-const ClassSectionHeader: React.FC<ClassSectionHeaderProps> = ({ classSectionData, getFullName, user }) => {
+const ClassSectionHeader: React.FC<ClassSectionHeaderProps> = ({ classSectionData, getFullName }) => {
   return (
     <div className="w-full max-w-5xl mx-auto">
       <div className="bg-gradient-to-br from-indigo-100 via-white to-purple-100 rounded-2xl shadow-xl border border-gray-200 p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 transition-all duration-300">

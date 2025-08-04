@@ -1,4 +1,3 @@
-import React from 'react';
 import PrintReportCard from './studentReportCard';
 
 interface StudentReportCardExampleProps {

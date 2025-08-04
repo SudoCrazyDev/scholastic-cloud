@@ -25,7 +25,6 @@ const SummativeAssessmentTab: React.FC<SummativeAssessmentTabProps> = ({ subject
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isReadOnly, setIsReadOnly] = useState(false);
 
   useEffect(() => {
@@ -65,7 +64,6 @@ const SummativeAssessmentTab: React.FC<SummativeAssessmentTabProps> = ({ subject
       updated[index][field] = value;
     }
     setComponents(updated);
-    setValidationErrors({});
   };
 
   const handleAdd = () => {
@@ -98,7 +96,6 @@ const SummativeAssessmentTab: React.FC<SummativeAssessmentTabProps> = ({ subject
     setIsReadOnly(false);
     setError(null);
     setSuccess(null);
-    setValidationErrors({});
     setOriginalComponents(components.map((c) => ({ ...c })));
   };
 
@@ -106,7 +103,6 @@ const SummativeAssessmentTab: React.FC<SummativeAssessmentTabProps> = ({ subject
     setIsReadOnly(true);
     setError(null);
     setSuccess(null);
-    setValidationErrors({});
     setComponents(originalComponents.map((c) => ({ ...c })));
   };
 
@@ -126,7 +122,6 @@ const SummativeAssessmentTab: React.FC<SummativeAssessmentTabProps> = ({ subject
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    setValidationErrors({});
     if (isReadOnly) return;
     if (!isValid) {
       setError('Please ensure all fields are filled and total percentage is exactly 100%.');

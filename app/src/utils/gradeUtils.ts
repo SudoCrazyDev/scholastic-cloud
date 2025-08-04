@@ -77,7 +77,7 @@ export const toNumber = (grade: number | string | null | undefined): number => {
  * @param subjects - Array of objects with a grade property (number | string | null)
  * @returns The rounded average grade, or null if no valid grades
  */
-import type { StudentRunningGrade } from '../types'
+import type { StudentRunningGrade } from '../services/studentRunningGradeService'
 
 export const calculateFinalGrade = (grades: StudentRunningGrade[]): number => {
   if (grades.length === 0) return 0

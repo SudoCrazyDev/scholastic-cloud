@@ -17,8 +17,7 @@ import {
   BookOpen as AssignedSubjectsIcon,
   Clock,
   BarChart3,
-  X,
-  FileText
+  X
 } from 'lucide-react';
 
 interface MenuItem {

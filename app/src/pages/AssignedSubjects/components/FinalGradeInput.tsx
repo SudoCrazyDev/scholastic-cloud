@@ -25,7 +25,6 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   academicYear = '2025-2026',
 }) => {
   const [finalGrade, setFinalGrade] = useState(toNumber(currentFinalGrade));
-  const [isEditing, setIsEditing] = useState(false);
   const updateFinalGradeMutation = useUpdateFinalGrade();
   const upsertFinalGradeMutation = useUpsertFinalGrade();
   const deleteStudentRunningGradeMutation = useDeleteStudentRunningGrade();
@@ -41,8 +40,6 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
     // Check if the value has actually changed
     const originalGrade = toNumber(currentFinalGrade);
     if (finalGrade === originalGrade) {
-      // No change, don't make API call
-      setIsEditing(false);
       toast.success('No changes to save', {
         duration: 2000,
         icon: 'ℹ️',
@@ -82,7 +79,6 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
           academicYear,
         });
       }
-      setIsEditing(false);
       // Dismiss loading toast (success toast will show from mutation)
       toast.dismiss(loadingToast);
     } catch (error) {
@@ -103,7 +99,6 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
     if (numCalculatedGrade === currentFinalGradeNum) {
       // No change, just update the local state and don't make API call
       setFinalGrade(numCalculatedGrade);
-      setIsEditing(false);
       toast.success('Calculated grade is already applied', {
         duration: 2000,
         icon: 'ℹ️',
@@ -144,7 +139,6 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
         });
       }
       setFinalGrade(numCalculatedGrade);
-      setIsEditing(false);
       // Dismiss loading toast (success toast will show from mutation)
       toast.dismiss(loadingToast);
     } catch (error) {

@@ -130,7 +130,7 @@ const mockAttendanceData = generateAttendanceData();
 
 export const mockAttendanceService = {
   // Get attendance statistics
-  getStats: async (institutionId: string): Promise<AttendanceStats> => {
+  getStats: async (): Promise<AttendanceStats> => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -154,7 +154,6 @@ export const mockAttendanceService = {
 
   // Get today's attendance summary for all teachers with pagination
   getTodayAttendance: async (
-    institutionId: string,
     page: number = 1,
     perPage: number = 20,
     search?: string,
@@ -204,11 +203,6 @@ export const mockAttendanceService = {
     institutionId: string,
     page: number = 1,
     perPage: number = 15,
-    filters?: {
-      date?: string;
-      status?: string;
-      user_id?: string;
-    }
   ): Promise<PaginatedResponse<TeacherAttendance>> => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 600));

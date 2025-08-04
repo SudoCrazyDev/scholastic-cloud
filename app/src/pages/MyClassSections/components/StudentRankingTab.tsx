@@ -5,14 +5,13 @@ import {
   Medal, 
   Award, 
   GraduationCap, 
-  Eye,
   Filter
 } from 'lucide-react';
-import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
 import type { Student } from '../../../types';
 import { useConsolidatedGrades } from '../../../hooks/useConsolidatedGrades';
 import { calculateFinalGrade } from '../../../utils/gradeUtils';
+import type { StudentRunningGrade } from '@/services/studentRunningGradeService';
 
 interface StudentRankingTabProps {
   students: (Student & { assignmentId: string })[];
@@ -59,7 +58,7 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
   if (data && data.students) {
     studentsWithRanking = data.students
       .map((student) => {
-        const gpa = calculateFinalGrade(student.subjects);
+        const gpa = calculateFinalGrade(student.subjects as unknown as StudentRunningGrade[]);
         return {
           ...students.find(s => s.id === student.student_id)!,
           assignmentId: students.find(s => s.id === student.student_id)?.assignmentId || '',

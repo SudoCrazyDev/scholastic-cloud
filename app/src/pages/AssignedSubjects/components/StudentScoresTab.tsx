@@ -8,12 +8,10 @@ import {
   ChevronRightIcon,
   AcademicCapIcon,
   CalendarIcon,
-  ArrowDownTrayIcon,
   UserIcon,
   UsersIcon,
   PencilIcon
 } from '@heroicons/react/24/outline'
-import { Input } from '../../../components/input'
 import { AddGradeItemModal } from './AddGradeItemModal'
 import { EditGradeItemModal } from './EditGradeItemModal'
 import { useSubjectEcrItems, useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
@@ -70,85 +68,6 @@ interface Student {
   gender: 'male' | 'female' | 'other'
   profile_picture?: string
 }
-
-interface ScoreInputProps {
-  student: Student
-  item: GradeItem
-  currentScore: number
-  onScoreChange: (studentId: string, itemId: string, score: number) => void
-}
-
-const ScoreInput: React.FC<ScoreInputProps> = ({
-  student,
-  item,
-  currentScore,
-  onScoreChange
-}) => {
-  const [score, setScore] = useState(currentScore)
-
-  const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const numValue = Number(e.target.value)
-    if (numValue >= 0 && numValue <= item.score) {
-      setScore(numValue)
-      onScoreChange(student.id, item.id, numValue)
-    }
-  }
-
-  const getScoreColor = (score: number, total: number) => {
-    const percentage = (score / total) * 100
-    if (percentage >= 90) return 'text-green-600'
-    if (percentage >= 75) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getScoreBackground = (score: number, total: number) => {
-    const percentage = (score / total) * 100
-    if (percentage >= 90) return 'bg-green-50 border-green-200'
-    if (percentage >= 75) return 'bg-yellow-50 border-yellow-200'
-    return 'bg-red-50 border-red-200'
-  }
-
-  return (
-    <div className="flex items-center justify-between py-3 px-4 bg-white border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-            <span className="text-xs font-medium text-indigo-600">
-              {student.first_name.charAt(0)}{student.last_name.charAt(0)}
-            </span>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-sm font-medium text-gray-900 truncate">
-              {student.first_name} {student.last_name}
-            </h4>
-            <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-3">
-        <div className={`text-sm font-medium ${getScoreColor(score, item.score)}`}>
-          <span>{score}</span>
-          <span className="text-gray-400">/{item.score}</span>
-        </div>
-
-        <div className="w-24">
-          <Input
-            type="number"
-            min="0"
-            max={item.score}
-            value={score}
-                         onChange={handleScoreChange}
-            size="sm"
-            className="text-center"
-            variant="outlined"
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 interface StudentGroupProps {
   gender: 'male' | 'female' | 'other'
   students: Student[]

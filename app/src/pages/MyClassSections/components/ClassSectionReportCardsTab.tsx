@@ -1,29 +1,24 @@
 import React, { useMemo } from 'react';
-import { Search, Eye } from 'lucide-react';
-import { Badge } from '../../../components/badge';
+import { Search } from 'lucide-react';
 import { Button } from '../../../components/button';
 import type { Student } from '../../../types';
 
 interface ClassSectionReportCardsTabProps {
   filteredStudents: (Student & { assignmentId: string })[];
-  classSectionData: any;
   getFullName: (student: any) => string;
   studentSearchTerm: string;
   setStudentSearchTerm: (term: string) => void;
   handleViewTempReportCard: (studentId: string) => void;
   handleViewReportCard: (studentId: string) => void;
-  handleDownloadReportCard: (studentId: string) => void;
 }
 
 const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
   filteredStudents,
-  classSectionData,
   getFullName,
   studentSearchTerm,
   setStudentSearchTerm,
   handleViewTempReportCard,
   handleViewReportCard,
-  handleDownloadReportCard,
 }) => {
   // Group students by gender and sort alphabetically by last name
   const groupedStudents = useMemo(() => {

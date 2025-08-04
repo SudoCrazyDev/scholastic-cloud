@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon, UserIcon, CheckIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { Formik, Form, Field } from 'formik'
@@ -45,7 +45,6 @@ export function StudentAssignmentModal({
     data: searchResults,
     isLoading: searchLoading,
     error: searchError,
-    refetch: refetchSearch
   } = useQuery({
     queryKey: ['students-search-assignment', searchTerm, classSection.id],
     queryFn: () => studentService.searchStudentsForAssignment({
@@ -352,7 +351,7 @@ export function StudentAssignmentModal({
                   validationSchema={assignmentValidationSchema}
                   onSubmit={handleAssignment}
                 >
-                  {({ values, errors, touched, isSubmitting }) => (
+                  {({ errors, touched, isSubmitting }) => (
                     <Form>
                       <div className="space-y-4">
                         <div>

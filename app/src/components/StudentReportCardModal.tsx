@@ -14,7 +14,6 @@ export function StudentReportCardModal({
   isOpen,
   onClose,
   studentName,
-  studentId,
 }: StudentReportCardModalProps) {
   const handleClose = () => {
     onClose()

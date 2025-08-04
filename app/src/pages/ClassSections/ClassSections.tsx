@@ -14,7 +14,6 @@ const ClassSections: React.FC = () => {
   
   // State for search and filters
   const [searchValue, setSearchValue] = useState<string>('')
-  const [currentPage, setCurrentPage] = useState<number>(1)
   const [gradeFilter, setGradeFilter] = useState<string>('')
 
   // API integration with TanStack Query
@@ -35,11 +34,10 @@ const ClassSections: React.FC = () => {
     handleModalClose,
     handleDeleteConfirmationClose,
     handleSearchChange: hookHandleSearchChange,
-    handlePageChange: hookHandlePageChange,
     handleGradeFilterChange: hookHandleGradeFilterChange,
   } = useClassSections({
     search: searchValue,
-    page: currentPage,
+    page: 1,
     grade_level: gradeFilter,
   })
 
@@ -52,11 +50,6 @@ const ClassSections: React.FC = () => {
     hookHandleSearchChange(value)
   }
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    hookHandlePageChange(page)
-  }
-
   const handleGradeFilterChange = (grade: string) => {
     setGradeFilter(grade)
     hookHandleGradeFilterChange(grade)
@@ -66,7 +59,6 @@ const ClassSections: React.FC = () => {
   const {
     subjects,
     loading: subjectsLoading,
-    error: subjectsError,
     isModalOpen: isSubjectModalOpen,
     editingSubject,
     modalLoading: subjectModalLoading,
@@ -80,7 +72,6 @@ const ClassSections: React.FC = () => {
     handleModalClose: handleSubjectModalClose,
     handleDeleteConfirmationClose: handleSubjectDeleteConfirmationClose,
     reorderMutation,
-    refetch: refetchSubjects,
   } = useSubjects({
     class_section_id: selectedClassSection?.id,
     institution_id: institutionId,

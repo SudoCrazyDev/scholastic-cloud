@@ -22,8 +22,6 @@ import {
   Plus,
   Edit,
   Trash2,
-  Clock,
-  User,
   BookOpen,
   Loader2,
   AlertCircle,
@@ -71,12 +69,6 @@ const buildSubjectHierarchy = (subjects: Subject[]) => {
   })
 
   return rootSubjects
-}
-
-// Utility function - moved outside component to prevent recreation
-const getFullName = (user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => {
-  const parts = [user?.first_name, user?.middle_name, user?.last_name, user?.ext_name]
-  return parts.filter(Boolean).join(' ')
 }
 
 // Regular Subject Item Component - moved outside to prevent hook ordering issues

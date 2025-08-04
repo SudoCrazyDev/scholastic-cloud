@@ -225,7 +225,7 @@ export const useDeleteStudentRunningGrade = () => {
     mutationFn: async (id: string) => {
       return await studentRunningGradeService.delete(id);
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success(
         `🗑️ Grade deleted successfully`,
         {

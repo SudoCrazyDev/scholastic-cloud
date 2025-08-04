@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { attendanceService } from '../services/attendanceService';
 
 export const useRealtimeAttendance = (
@@ -68,85 +68,103 @@ export const useTeacherHistory = (
 };
 
 export const useCheckIn = () => {
-  // This hook is no longer needed as real-time attendance handles check-ins
-  // Keeping it for now, but it will always return a resolved promise
-  return {
-    mutate: async (data: { userId: string; institutionId: string }) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: { userId: string; institutionId: string }) => {
       console.log('Check-in triggered (mock):', data);
+      // TODO: Replace with actual API call when backend is ready
       return Promise.resolve({ success: true, message: 'Check-in successful (mock)' });
     },
-    isLoading: false,
-    isError: false,
-    error: null,
-  };
+    onSuccess: () => {
+      // Invalidate relevant queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['realtime-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['today-attendance'] });
+    },
+  });
 };
 
 export const useCheckOut = () => {
-  // This hook is no longer needed as real-time attendance handles check-outs
-  // Keeping it for now, but it will always return a resolved promise
-  return {
-    mutate: async (data: { userId: string; institutionId: string }) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: { userId: string; institutionId: string }) => {
       console.log('Check-out triggered (mock):', data);
+      // TODO: Replace with actual API call when backend is ready
       return Promise.resolve({ success: true, message: 'Check-out successful (mock)' });
     },
-    isLoading: false,
-    isError: false,
-    error: null,
-  };
+    onSuccess: () => {
+      // Invalidate relevant queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['realtime-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['today-attendance'] });
+    },
+  });
 };
 
 export const useBreakOut = () => {
-  // This hook is no longer needed as real-time attendance handles breaks
-  // Keeping it for now, but it will always return a resolved promise
-  return {
-    mutate: async (data: { userId: string; institutionId: string }) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: { userId: string; institutionId: string }) => {
       console.log('Break-out triggered (mock):', data);
+      // TODO: Replace with actual API call when backend is ready
       return Promise.resolve({ success: true, message: 'Break-out successful (mock)' });
     },
-    isLoading: false,
-    isError: false,
-    error: null,
-  };
+    onSuccess: () => {
+      // Invalidate relevant queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['realtime-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['today-attendance'] });
+    },
+  });
 };
 
 export const useBreakIn = () => {
-  // This hook is no longer needed as real-time attendance handles breaks
-  // Keeping it for now, but it will always return a resolved promise
-  return {
-    mutate: async (data: { userId: string; institutionId: string }) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: { userId: string; institutionId: string }) => {
       console.log('Break-in triggered (mock):', data);
+      // TODO: Replace with actual API call when backend is ready
       return Promise.resolve({ success: true, message: 'Break-in successful (mock)' });
     },
-    isLoading: false,
-    isError: false,
-    error: null,
-  };
+    onSuccess: () => {
+      // Invalidate relevant queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['realtime-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['today-attendance'] });
+    },
+  });
 };
 
 export const useCreateAttendance = () => {
-  // This hook is no longer needed as real-time attendance handles attendance creation
-  // Keeping it for now, but it will always return a resolved promise
-  return {
-    mutate: async (data: any) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: any) => {
       console.log('Create attendance triggered (mock):', data);
+      // TODO: Replace with actual API call when backend is ready
       return Promise.resolve({ success: true, message: 'Attendance created (mock)' });
     },
-    isLoading: false,
-    isError: false,
-    error: null,
-  };
+    onSuccess: () => {
+      // Invalidate relevant queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['realtime-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['today-attendance'] });
+    },
+  });
 };
 
 export const useUpdateAttendance = () => {
-  // This hook is no longer needed as real-time attendance handles attendance updates
-  // Keeping it for now, but it will always return a resolved promise
-  return {
-    mutate: async (data: any) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: any) => {
       console.log('Update attendance triggered (mock):', data);
+      // TODO: Replace with actual API call when backend is ready
       return Promise.resolve({ success: true, message: 'Attendance updated (mock)' });
     },
-    isLoading: false,
-    isError: false,
-    error: null,
-  };
+    onSuccess: () => {
+      // Invalidate relevant queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['realtime-attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['today-attendance'] });
+    },
+  });
 }; 

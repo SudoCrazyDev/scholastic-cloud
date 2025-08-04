@@ -55,10 +55,6 @@ export default function ConsolidatedGrades() {
     setSelectedAcademicYear(year);
   };
 
-  const handleViewGrades = (sectionId: string) => {
-    // This function is no longer needed as navigation is handled in the grid component
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -91,7 +87,6 @@ export default function ConsolidatedGrades() {
             sections={filteredSections}
             selectedQuarter={selectedQuarter}
             selectedAcademicYear={selectedAcademicYear}
-            onViewGrades={handleViewGrades}
           />
         )}
 

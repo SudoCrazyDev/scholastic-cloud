@@ -1,6 +1,6 @@
 import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
-import React, { forwardRef } from 'react'
+import { forwardRef } from 'react'
 
 export interface SelectOption {
   value: string

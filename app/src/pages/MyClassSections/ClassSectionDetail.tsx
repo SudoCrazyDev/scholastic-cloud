@@ -13,7 +13,6 @@ import { StudentAssignmentModal } from './components/StudentAssignmentModal'
 import { CreateStudentModal } from './components/CreateStudentModal'
 import { StudentModal } from '../Students/components/StudentModal'
 import { ClassSectionSubjectModal } from '../ClassSections/components/ClassSectionSubjectModal'
-import StudentRankingTab from './components/StudentRankingTab'
 import { useAuth } from '../../hooks/useAuth'
 import {
   ArrowLeft,
@@ -55,7 +54,6 @@ const ClassSectionDetail: React.FC = () => {
   const [showSubjectModal, setShowSubjectModal] = useState(false)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [subjectModalError, setSubjectModalError] = useState<string | null>(null)
-  const [subjectModalSuccess, setSubjectModalSuccess] = useState<string | null>(null)
   const [subjectDeleteConfirmation, setSubjectDeleteConfirmation] = useState<{
     isOpen: boolean
     subject: Subject | null
@@ -122,8 +120,6 @@ const ClassSectionDetail: React.FC = () => {
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
       refetchSubjects()
-      setSubjectModalSuccess('Subject created successfully!')
-      setTimeout(() => setSubjectModalSuccess(null), 3000)
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to create subject'
@@ -137,8 +133,6 @@ const ClassSectionDetail: React.FC = () => {
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
       refetchSubjects()
-      setSubjectModalSuccess('Subject updated successfully!')
-      setTimeout(() => setSubjectModalSuccess(null), 3000)
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update subject'
@@ -221,14 +215,12 @@ const ClassSectionDetail: React.FC = () => {
   const handleCreateSubject = () => {
     setEditingSubject(null)
     setSubjectModalError(null)
-    setSubjectModalSuccess(null)
     setShowSubjectModal(true)
   }
 
   const handleEditSubject = (subject: Subject) => {
     setEditingSubject(subject)
     setSubjectModalError(null)
-    setSubjectModalSuccess(null)
     setShowSubjectModal(true)
   }
 
@@ -257,7 +249,6 @@ const ClassSectionDetail: React.FC = () => {
     setShowSubjectModal(false)
     setEditingSubject(null)
     setSubjectModalError(null)
-    setSubjectModalSuccess(null)
   }
 
   const handleReorderSubjects = async (subjectOrders: Array<{ id: string; order: number }>) => {
@@ -320,11 +311,6 @@ const ClassSectionDetail: React.FC = () => {
       })
       setShowStudentReportCardModal(true)
     }
-  }
-
-  const handleDownloadReportCard = (studentId: string) => {
-    console.log('Download report card for student:', studentId)
-    // Placeholder for PDF download functionality
   }
 
   if (classSectionLoading) {
@@ -564,13 +550,11 @@ const ClassSectionDetail: React.FC = () => {
                 >
                   <ClassSectionReportCardsTab
                     filteredStudents={filteredStudents}
-                    classSectionData={classSectionData}
                     getFullName={getFullName}
                     studentSearchTerm={studentSearchTerm}
                     setStudentSearchTerm={setStudentSearchTerm}
                     handleViewTempReportCard={handleViewTempReportCard}
                     handleViewReportCard={handleViewReportCard}
-                    handleDownloadReportCard={handleDownloadReportCard}
                   />
                 </motion.div>
               )}

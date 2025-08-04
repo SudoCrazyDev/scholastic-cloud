@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react'
-import { motion, Reorder } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { 
   PlusIcon,
   PencilIcon, 
@@ -35,7 +35,6 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
   loading = false,
 }) => {
   const [isDragging, setIsDragging] = useState(false)
-  const [isReordering, setIsReordering] = useState(false)
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
   const [draggedSubject, setDraggedSubject] = useState<Subject | null>(null)
   const [dragOverSubject, setDragOverSubject] = useState<string | null>(null)
@@ -174,7 +173,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
     }))
 
     // Update local state immediately for smooth UI
-    setLocalSubjects(prev => {
+    setLocalSubjects(() => {
       // This is a simplified update - in a real implementation you'd need to
       // properly reconstruct the hierarchical structure
       return reorderedWithUpdatedOrder
@@ -208,7 +207,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
   const SubjectItem = ({ subject, isChild = false }: { subject: Subject; isChild?: boolean }) => (
     <motion.div
       layout
-      draggable={!isReordering && !isSaving}
+      draggable={!isSaving}
       onDragStart={() => handleDragStart(subject)}
       onDragEnd={handleDragEnd}
       onDragOver={(e) => handleDragOver(e, subject.id)}
@@ -218,16 +217,16 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
           ? 'border-indigo-500 bg-indigo-50 shadow-lg scale-105'
           : dragOverSubject === subject.id
           ? 'border-green-500 bg-green-50'
-          : isReordering || isSaving
+          : isSaving
           ? 'border-gray-200 bg-gray-50 opacity-75'
           : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md'
       } ${isChild ? 'ml-6 border-l-4 border-l-indigo-200' : ''}`}
     >
       {/* Drag Handle */}
       <div className={`absolute left-2 top-1/2 transform -translate-y-1/2 p-1 rounded transition-colors ${
-        isReordering || isSaving ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing hover:bg-gray-100'
+        isSaving ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing hover:bg-gray-100'
       }`}>
-        {isReordering || isSaving ? (
+        {isSaving ? (
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
         ) : (
           <Bars3Icon className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />

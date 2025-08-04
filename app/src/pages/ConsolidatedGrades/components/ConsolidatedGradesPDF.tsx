@@ -175,20 +175,6 @@ const getQuarterLabel = (quarter: number) => {
   return quarters[quarter as keyof typeof quarters] || `Quarter ${quarter}`;
 };
 
-const calculateFinalGrade = (subjects: Array<{ grade: number | string | null }>) => {
-  const validGrades = subjects
-    .map(subject => {
-      const grade = typeof subject.grade === 'string' ? parseFloat(subject.grade) : subject.grade;
-      return isNaN(grade as number) ? null : grade;
-    })
-    .filter(grade => grade !== null) as number[];
-
-  if (validGrades.length === 0) return null;
-  
-  const sum = validGrades.reduce((acc, grade) => acc + grade, 0);
-  return sum / validGrades.length;
-};
-
 const getRemarks = (finalGrade: number | null) => {
   if (finalGrade === null) return 'N/A';
   if (finalGrade >= 98) return 'With Highest Honors';
@@ -293,7 +279,7 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
                   </View>
                 </View>
                 {/* Table Rows */}
-                {studentsList.map((student, index) => {
+                {studentsList.map((student) => {
                   // Group grades by base and variant
                   const grouped: Record<string, { [variant: string]: number | string | null }> = {};
                   student.subjects.forEach((subject: any) => {
