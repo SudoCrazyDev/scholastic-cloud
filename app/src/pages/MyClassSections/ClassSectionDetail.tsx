@@ -7,6 +7,8 @@ import { subjectService } from '../../services/subjectService'
 import { studentService } from '../../services/studentService'
 import { Alert } from '../../components/alert'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
+import { ReportCardModal } from '../../components/ReportCardModal'
+import { StudentReportCardModal } from '../../components/StudentReportCardModal'
 import { StudentAssignmentModal } from './components/StudentAssignmentModal'
 import { CreateStudentModal } from './components/CreateStudentModal'
 import { StudentModal } from '../Students/components/StudentModal'
@@ -66,6 +68,9 @@ const ClassSectionDetail: React.FC = () => {
 
   // Report cards and consolidated grades state
   const [selectedQuarter, setSelectedQuarter] = useState<string>('1')
+  const [showReportCardModal, setShowReportCardModal] = useState(false)
+  const [showStudentReportCardModal, setShowStudentReportCardModal] = useState(false)
+  const [selectedStudentForReport, setSelectedStudentForReport] = useState<{ id: string; name: string } | null>(null)
 
   const institutionId = user?.user_institutions?.[0]?.institution_id || ''
 
@@ -181,7 +186,7 @@ const ClassSectionDetail: React.FC = () => {
   })
 
   const getFullName = (user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => {
-    const parts = [user?.first_name, user?.middle_name, user?.last_name, user?.ext_name]
+    const parts = [`${user?.last_name},`, user?.first_name, `${user?.middle_name ? user?.middle_name.charAt(0) + "." : ""}`,  user?.ext_name]
     return parts.filter(Boolean).join(' ')
   }
 
@@ -295,23 +300,30 @@ const ClassSectionDetail: React.FC = () => {
   }
 
   // Report cards and consolidated grades handlers
+  const handleViewTempReportCard = (studentId: string) => {
+    const student = students.find(s => s.id === studentId)
+    if (student) {
+      setSelectedStudentForReport({
+        id: studentId,
+        name: getFullName(student)
+      })
+      setShowReportCardModal(true)
+    }
+  }
+
   const handleViewReportCard = (studentId: string) => {
-    console.log('View report card for student:', studentId)
-    // Placeholder for PDF viewing functionality
+    const student = students.find(s => s.id === studentId)
+    if (student) {
+      setSelectedStudentForReport({
+        id: studentId,
+        name: getFullName(student)
+      })
+      setShowStudentReportCardModal(true)
+    }
   }
 
   const handleDownloadReportCard = (studentId: string) => {
     console.log('Download report card for student:', studentId)
-    // Placeholder for PDF download functionality
-  }
-
-  const handleViewConsolidatedGrades = () => {
-    console.log('View consolidated grades for quarter:', selectedQuarter)
-    // Placeholder for PDF viewing functionality
-  }
-
-  const handleDownloadConsolidatedGrades = () => {
-    console.log('Download consolidated grades for quarter:', selectedQuarter)
     // Placeholder for PDF download functionality
   }
 
@@ -556,6 +568,7 @@ const ClassSectionDetail: React.FC = () => {
                     getFullName={getFullName}
                     studentSearchTerm={studentSearchTerm}
                     setStudentSearchTerm={setStudentSearchTerm}
+                    handleViewTempReportCard={handleViewTempReportCard}
                     handleViewReportCard={handleViewReportCard}
                     handleDownloadReportCard={handleDownloadReportCard}
                   />
@@ -690,6 +703,28 @@ const ClassSectionDetail: React.FC = () => {
         cancelText="Cancel"
         variant="danger"
         loading={subjectDeleteConfirmation.loading}
+      />
+
+      {/* Report Card Modal */}
+      <ReportCardModal
+        isOpen={showReportCardModal}
+        onClose={() => {
+          setShowReportCardModal(false)
+          setSelectedStudentForReport(null)
+        }}
+        studentName={selectedStudentForReport?.name}
+        studentId={selectedStudentForReport?.id}
+      />
+
+      {/* Student Report Card Modal */}
+      <StudentReportCardModal
+        isOpen={showStudentReportCardModal}
+        onClose={() => {
+          setShowStudentReportCardModal(false)
+          setSelectedStudentForReport(null)
+        }}
+        studentName={selectedStudentForReport?.name}
+        studentId={selectedStudentForReport?.id}
       />
     </motion.div>
   )

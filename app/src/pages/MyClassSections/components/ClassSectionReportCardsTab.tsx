@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Eye, Download } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Search, Eye } from 'lucide-react';
 import { Badge } from '../../../components/badge';
 import { Button } from '../../../components/button';
 import type { Student } from '../../../types';
@@ -10,6 +10,7 @@ interface ClassSectionReportCardsTabProps {
   getFullName: (student: any) => string;
   studentSearchTerm: string;
   setStudentSearchTerm: (term: string) => void;
+  handleViewTempReportCard: (studentId: string) => void;
   handleViewReportCard: (studentId: string) => void;
   handleDownloadReportCard: (studentId: string) => void;
 }
@@ -20,9 +21,103 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
   getFullName,
   studentSearchTerm,
   setStudentSearchTerm,
+  handleViewTempReportCard,
   handleViewReportCard,
   handleDownloadReportCard,
 }) => {
+  // Group students by gender and sort alphabetically by last name
+  const groupedStudents = useMemo(() => {
+    const groups = {
+      male: [] as (Student & { assignmentId: string })[],
+      female: [] as (Student & { assignmentId: string })[],
+      other: [] as (Student & { assignmentId: string })[]
+    };
+    
+    filteredStudents.forEach(student => {
+      groups[student.gender].push(student);
+    });
+    
+    // Sort each group alphabetically by last name, then first name
+    Object.keys(groups).forEach(gender => {
+      groups[gender as keyof typeof groups].sort((a, b) => {
+        const lastNameA = a.last_name.toLowerCase();
+        const lastNameB = b.last_name.toLowerCase();
+        const firstNameA = a.first_name.toLowerCase();
+        const firstNameB = b.first_name.toLowerCase();
+        
+        // First compare by last name
+        const lastNameComparison = lastNameA.localeCompare(lastNameB);
+        if (lastNameComparison !== 0) {
+          return lastNameComparison;
+        }
+        
+        // If last names are the same, compare by first name
+        return firstNameA.localeCompare(firstNameB);
+      });
+    });
+    
+    return groups;
+  }, [filteredStudents]);
+
+  const renderStudentGroup = (gender: 'male' | 'female' | 'other', students: (Student & { assignmentId: string })[]) => {
+    if (students.length === 0) return null;
+    
+    const genderLabels = {
+      male: 'Male Students',
+      female: 'Female Students',
+      other: 'Other Students'
+    };
+
+    return (
+      <div key={gender} className="mb-8">
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+          <h4 className="text-md font-medium text-gray-700">{genderLabels[gender]} ({students.length})</h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Student Name
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {students.map((student) => (
+                <tr key={student.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900 uppercase">{getFullName(student)}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button
+                        onClick={() => handleViewTempReportCard(student.id)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Temp Report Card
+                      </Button>
+                      <Button
+                        onClick={() => handleViewReportCard(student.id)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Report Card
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Search */}
@@ -40,71 +135,12 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Student Report Cards</h3>
-          <p className="text-sm text-gray-600 mt-1">View and download individual student report cards</p>
+          <p className="text-sm text-gray-600 mt-1">View individual student report cards</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Student Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Grade Level
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Section
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{getFullName(student)}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{classSectionData.grade_level}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{classSectionData.title}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge color="green" className="text-xs">
-                      Active
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <Button
-                        onClick={() => handleViewReportCard(student.id)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
-                      <Button
-                        onClick={() => handleDownloadReportCard(student.id)}
-                        variant="solid"
-                        color="primary"
-                        size="sm"
-                      >
-                        <Download className="w-4 h-4 mr-1" />
-                        Download
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div>
+          {renderStudentGroup('male', groupedStudents.male)}
+          {renderStudentGroup('female', groupedStudents.female)}
+          {renderStudentGroup('other', groupedStudents.other)}
         </div>
       </div>
     </div>

@@ -77,15 +77,44 @@ export const toNumber = (grade: number | string | null | undefined): number => {
  * @param subjects - Array of objects with a grade property (number | string | null)
  * @returns The rounded average grade, or null if no valid grades
  */
-export const calculateFinalGrade = (subjects: Array<{ grade: number | string | null }>): number | null => {
-  const validGrades = subjects
-    .map(subject => {
-      const grade = typeof subject.grade === 'string' ? parseFloat(subject.grade) : subject.grade;
-      return isNaN(grade as number) ? null : grade;
-    })
-    .filter(grade => grade !== null) as number[];
+import type { StudentRunningGrade } from '../types'
 
-  if (validGrades.length === 0) return null;
-  const sum = validGrades.reduce((acc, grade) => acc + grade, 0);
-  return Math.round(sum / validGrades.length);
-}; 
+export const calculateFinalGrade = (grades: StudentRunningGrade[]): number => {
+  if (grades.length === 0) return 0
+  
+  const validGrades = grades.filter(grade => grade.grade > 0)
+  if (validGrades.length === 0) return 0
+  
+  const sum = validGrades.reduce((total, grade) => total + grade.grade, 0)
+  return Math.round((sum / validGrades.length) * 100) / 100
+}
+
+export const getGradeRemarks = (grade: number): string => {
+  if (grade >= 90) return 'Outstanding'
+  if (grade >= 85) return 'Very Satisfactory'
+  if (grade >= 80) return 'Satisfactory'
+  if (grade >= 75) return 'Fairly Satisfactory'
+  return 'Did Not Meet Expectations'
+}
+
+export const getPassFailRemarks = (grade: number): string => {
+  return grade >= 75 ? 'Passed' : 'Failed'
+}
+
+export const getQuarterGrade = (grades: StudentRunningGrade[], quarter: '1' | '2' | '3' | '4'): number => {
+  const quarterGrade = grades.find(grade => grade.quarter === quarter)
+  return quarterGrade?.grade || 0
+}
+
+export const calculateAge = (birthdate: string): number => {
+  const birth = new Date(birthdate)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const monthDiff = today.getMonth() - birth.getMonth()
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--
+  }
+  
+  return age
+} 

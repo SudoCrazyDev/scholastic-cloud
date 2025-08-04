@@ -1,3 +1,5 @@
+import { api } from '../lib/api';
+
 export interface User {
   id: string;
   firstName: string;
@@ -14,10 +16,24 @@ export interface User {
   roleId?: number;
   roleTitle?: string;
   roleSlug?: string;
+  role?: {
+    slug: string;
+    title: string;
+  }
   isActive: boolean;
   lastLogin?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  token_expiry: string;
 }
 
 export interface AuthResponse {
@@ -35,53 +51,70 @@ export interface AuthResponse {
 
 class AuthService {
   private currentUser: User | null = null;
-  private sessionId: string | null = null;
 
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
-      // Initialize database if needed
-      await window.api.database.initialize();
+      const response = await api.post('/login', credentials);
+      // Handle both wrapped and unwrapped response formats
+      const responseData = response.data?.data || response.data;
       
-      // Use the desktop app's database API
-      const response = await window.api.database.authenticate(email, password);
-      
-      if (response.success && response.user && response.session) {
-        this.currentUser = response.user;
-        this.sessionId = response.session.id;
-        
-        // Store session in localStorage for persistence
-        localStorage.setItem('sessionId', response.session.id);
-        localStorage.setItem('user', JSON.stringify(response.user));
+      if (!responseData || !responseData.token) {
+        throw new Error('Invalid response structure from server');
       }
       
-      return response;
+      return responseData;
+    } catch (error: any) {
+      console.error('AuthService: Login error:', error);
+      console.error('AuthService: Error response:', error.response);
+      console.error('AuthService: Error message:', error.message);
+      throw error;
+    }
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await api.post('/logout');
     } catch (error) {
-      console.error('Login error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Login failed'
-      };
+      console.error('Logout error:', error);
+    } finally {
+      this.currentUser = null;
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('token_expiry');
+    }
+  }
+
+  async getProfile(): Promise<any> {
+    try {
+      const response = await api.get('/profile');
+      return response.data.data;
+    } catch (error) {
+      console.error('Get profile error:', error);
+      throw error;
     }
   }
 
   async validateSession(): Promise<AuthResponse> {
     try {
-      const sessionId = localStorage.getItem('sessionId');
-      if (!sessionId) {
-        return { success: false, error: 'No session found' };
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        return { success: false, error: 'No token found' };
       }
 
-      // Initialize database if needed
-      await window.api.database.initialize();
-
-      const response = await window.api.database.validateSession(sessionId);
+      const userData = await this.getProfile();
+      this.currentUser = userData;
       
-      if (response.success && response.user && response.session) {
-        this.currentUser = response.user;
-        this.sessionId = response.session.id;
-      }
-      
-      return response;
+      return {
+        success: true,
+        user: userData,
+        session: {
+          id: 'session-id',
+          userId: userData.id,
+          token: token,
+          expiresAt: localStorage.getItem('token_expiry') || '',
+          createdAt: new Date().toISOString()
+        }
+      };
     } catch (error) {
       console.error('Session validation error:', error);
       return {
@@ -91,24 +124,9 @@ class AuthService {
     }
   }
 
-  async logout(): Promise<void> {
-    try {
-      if (this.sessionId) {
-        await window.api.database.logout(this.sessionId);
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      this.currentUser = null;
-      this.sessionId = null;
-      localStorage.removeItem('sessionId');
-      localStorage.removeItem('user');
-    }
-  }
-
   getCurrentUser(): User | null {
     if (!this.currentUser) {
-      const userStr = localStorage.getItem('user');
+      const userStr = localStorage.getItem('auth_user');
       if (userStr) {
         try {
           this.currentUser = JSON.parse(userStr);
@@ -121,23 +139,23 @@ class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return this.getCurrentUser() !== null;
+    const token = localStorage.getItem('auth_token');
+    return token !== null;
   }
 
   hasRole(roleSlug: string): boolean {
     const user = this.getCurrentUser();
-    return user?.roleSlug === roleSlug;
+    return user?.role?.slug === roleSlug;
   }
 
   isSubjectTeacher(): boolean {
-    return this.hasRole('teacher');
+    return this.hasRole('subject-teacher');
   }
 
   // Initialize auth state from localStorage
   async initialize(): Promise<AuthResponse> {
-    const user = this.getCurrentUser();
-    if (user) {
-      this.currentUser = user;
+    const token = localStorage.getItem('auth_token');
+    if (token) {
       return await this.validateSession();
     }
     return { success: false, error: 'No stored session' };

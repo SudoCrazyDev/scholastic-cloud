@@ -117,13 +117,13 @@ const menuItems: MenuItem[] = [
     path: '/consolidated-grades',
     allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
   },
-  {
-    id: 'sf9',
-    label: 'SF9 Generation',
-    icon: <FileText className="w-5 h-5" />,
-    path: '/sf9',
-    allowedRoles: ['principal', 'curriculum-head', 'assistant-principal', 'subject-teacher'],
-  },
+  // {
+  //   id: 'sf9',
+  //   label: 'SF9 Generation',
+  //   icon: <FileText className="w-5 h-5" />,
+  //   path: '/sf9',
+  //   allowedRoles: ['principal', 'curriculum-head', 'assistant-principal', 'subject-teacher'],
+  // },
   // {
   //   id: 'certificate-builder',
   //   label: 'Certificate Builder',

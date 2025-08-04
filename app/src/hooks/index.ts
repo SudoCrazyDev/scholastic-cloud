@@ -11,6 +11,7 @@ export { useAssignedSubjects } from './useAssignedSubjects'
 export * from './useSubjectEcrItems';
 export { useStudentScores } from './useStudentScores';
 export * from './useStudentRunningGrades';
+export { useStudentReportCard } from './useStudentReportCard';
 
 // Generic data table hook
 export { useDataTable } from './useDataTable'

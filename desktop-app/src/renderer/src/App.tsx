@@ -3,25 +3,19 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DashboardLayout from './components/layouts/DashboardLayout';
 import UnauthorizedRole from './pages/UnauthorizedRole';
+import { useAuth } from './hooks/useAuth';
+import { AuthProvider } from './providers/AuthProvider';
 import { authService } from './services/authService';
 
 type AppState = 'loading' | 'login' | 'dashboard' | 'unauthorized';
 
-function App(): React.JSX.Element {
+function AppContent(): React.JSX.Element {
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [appState, setAppState] = useState<AppState>('loading');
-  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    initializeApp();
-  }, []);
-
-  const initializeApp = async () => {
-    try {
-      const response = await authService.initialize();
-      
-      if (response.success && response.user) {
-        setCurrentUser(response.user);
-        
+    if (!isLoading) {
+      if (isAuthenticated && user) {
         // Check if user has subject-teacher role
         if (authService.isSubjectTeacher()) {
           setAppState('dashboard');
@@ -31,16 +25,12 @@ function App(): React.JSX.Element {
       } else {
         setAppState('login');
       }
-    } catch (error) {
-      console.error('App initialization error:', error);
-      setAppState('login');
     }
-  };
+  }, [isAuthenticated, user, isLoading]);
 
-  const handleLogin = (user: any) => {
-    setCurrentUser(user);
-    
-    // Check if user has subject-teacher role
+  const handleLogin = (_loginData: any) => {
+    // The login is handled by the AuthProvider
+    // This callback is called after successful login
     if (authService.isSubjectTeacher()) {
       setAppState('dashboard');
     } else {
@@ -50,12 +40,11 @@ function App(): React.JSX.Element {
 
   const handleLogout = async () => {
     await authService.logout();
-    setCurrentUser(null);
     setAppState('login');
   };
 
   // Show loading state
-  if (appState === 'loading') {
+  if (isLoading || appState === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -81,6 +70,14 @@ function App(): React.JSX.Element {
     <DashboardLayout onLogout={handleLogout}>
       <Dashboard />
     </DashboardLayout>
+  );
+}
+
+function App(): React.JSX.Element {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
