@@ -22,7 +22,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('student_id')->references('id')->on('students')->onDelete('cascade');
-            $table->unique(['student_id', 'quarter', 'core_value', 'behavior_statement', 'academic_year'], 'uq_core_value_marking');
         });
     }
 
