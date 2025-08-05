@@ -1,13 +1,13 @@
 import React from 'react';
 import { EnvelopeIcon, CakeIcon, UserIcon } from '@heroicons/react/24/outline';
-import { Pencil, Trash2, UserCog } from 'lucide-react';
+import { Pencil, UserCog, Key } from 'lucide-react';
 import type { User } from '../../../types';
 
 interface StaffGridProps {
   staffs: User[];
   onEdit: (staff: User) => void;
-  onDelete: (staff: User) => void;
   onChangeRole: (staff: User) => void;
+  onResetPassword: (staff: User) => void;
 }
 
 const genderAvatar = () => (
@@ -37,7 +37,7 @@ const getFullName = (staff: User) => {
   return parts.join(', ');
 };
 
-const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onDelete, onChangeRole }) => {
+const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onChangeRole, onResetPassword }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up">
       {staffs.length === 0 ? (
@@ -72,11 +72,14 @@ const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onDelete, onChang
               <button className={iconBtnClass} title="Edit" onClick={() => onEdit(staff)}>
                 <Pencil size={18} />
               </button>
-              <button className={iconBtnClass} title="Delete" onClick={() => onDelete(staff)}>
-                <Trash2 size={18} />
-              </button>
               <button className={iconBtnClass} title="Change Role" onClick={() => onChangeRole(staff)}>
                 <UserCog size={18} />
+              </button>
+              <button className={iconBtnClass} title="Reset Password" onClick={() => {
+                console.log('Reset password button clicked for staff:', staff);
+                onResetPassword(staff);
+              }}>
+                <Key size={18} />
               </button>
             </div>
           </div>

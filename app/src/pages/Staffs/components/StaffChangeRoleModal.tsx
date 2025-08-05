@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog } from '../../../components/dialog';
+import { Dialog as HeadlessDialog } from '@headlessui/react';
 import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
 import { Alert } from '../../../components/alert';
@@ -47,9 +47,17 @@ const StaffChangeRoleModal: React.FC<StaffChangeRoleModalProps> = ({
     return roleId !== '';
   };
 
+  // Transform roles into options format for Select component
+  const roleOptions = roles.map(role => ({
+    value: role.id,
+    label: role.title
+  }));
+
   return (
-    <Dialog open={open} onClose={onClose}>
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+    <HeadlessDialog open={open} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <HeadlessDialog.Panel className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             Change Staff Role
@@ -89,13 +97,10 @@ const StaffChangeRoleModal: React.FC<StaffChangeRoleModalProps> = ({
               id="role_id"
               value={roleId}
               onChange={e => setRoleId(e.target.value)}
+              options={roleOptions}
+              placeholder="Select role"
               required
-            >
-              <option value="" disabled>Select role</option>
-              {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.title}</option>
-              ))}
-            </Select>
+            />
           </div>
 
           {/* Action Buttons */}
@@ -118,8 +123,9 @@ const StaffChangeRoleModal: React.FC<StaffChangeRoleModalProps> = ({
             </Button>
           </div>
         </form>
+        </HeadlessDialog.Panel>
       </div>
-    </Dialog>
+    </HeadlessDialog>
   );
 };
 

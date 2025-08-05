@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import DashboardLayout from './DashboardLayout';
 
 const PrivateLayout = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -15,6 +15,11 @@ const PrivateLayout = () => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // If user is new, redirect to set new password page
+  if (user && user.is_new) {
+    return <Navigate to="/set-new-password" replace />;
   }
 
   return <DashboardLayout />;

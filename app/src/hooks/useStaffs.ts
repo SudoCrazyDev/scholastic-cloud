@@ -2,15 +2,8 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { staffService } from '../services/staffService'
 import { roleService } from '../services/roleService'
+import { toast } from 'react-hot-toast'
 import type { User, CreateStaffData, UpdateStaffData, UpdateStaffRoleData } from '../types'
-
-interface DeleteConfirmation {
-  isOpen: boolean
-  title: string
-  message: string
-  onConfirm: () => void
-  loading: boolean
-}
 
 interface UseStaffsOptions {
   page?: number
@@ -28,15 +21,6 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
   const [modalError, setModalError] = useState<string | null>(null)
   const [modalSuccess, setModalSuccess] = useState<string | null>(null)
   const [selectedRows, setSelectedRows] = useState<User[]>([])
-  
-  // Delete confirmation modal state
-  const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-    loading: false,
-  })
 
   // Change role modal state
   const [isChangeRoleModalOpen, setIsChangeRoleModalOpen] = useState(false)
@@ -45,8 +29,28 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
   const [changeRoleError, setChangeRoleError] = useState<string | null>(null)
   const [changeRoleSuccess, setChangeRoleSuccess] = useState<string | null>(null)
 
-  // Query key for staffs
-  const queryKey = ['staffs', options]
+  // Reset password modal state
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)
+  const [resettingPasswordStaff, setResettingPasswordStaff] = useState<User | null>(null)
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null)
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState<string | null>(null)
+
+  // Search and pagination state
+  const [searchValue, setSearchValue] = useState(options.search || '')
+  const [currentPage, setCurrentPage] = useState(options.page || 1)
+
+  // Build query parameters
+  const queryParams = {
+    page: currentPage,
+    limit: options.limit || 15,
+    search: searchValue,
+    sortBy: options.sortBy,
+    sortDirection: options.sortDirection,
+  }
+
+  // Query key for staffs - include search and pagination parameters
+  const queryKey = ['staffs', queryParams]
 
   // Fetch staffs query
   const {
@@ -56,7 +60,7 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => staffService.getStaffs(options),
+    queryFn: () => staffService.getStaffs(queryParams),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   })
@@ -145,59 +149,49 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     },
   })
 
-  // Delete staff mutation
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => staffService.deleteStaff(id),
-    onSuccess: () => {
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: (id: string) => staffService.resetPassword(id),
+    onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['staffs'] })
-      setDeleteConfirmation(prev => ({ ...prev, isOpen: false, loading: false }))
+      setResetPasswordSuccess('Password reset successfully!')
+      setResetPasswordError(null)
+      
+      // Show success toast notification
+      toast.success('✅ Password reset successfully!', {
+        duration: 4000,
+        icon: '🔐',
+        style: {
+          background: '#10b981',
+          color: 'white',
+          fontWeight: '600',
+        },
+      })
     },
     onError: (error: any) => {
-      console.error('Error deleting staff:', error)
-      setDeleteConfirmation(prev => ({ 
-        ...prev, 
-        loading: false,
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to delete staff member. Please try again.',
-        onConfirm: () => setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
-      }))
+      console.error('Error resetting password:', error)
+      if (error.response?.data?.message) {
+        setResetPasswordError(error.response.data.message)
+      } else if (error.response?.data?.errors) {
+        const errors = error.response.data.errors
+        const errorMessages = Object.values(errors).flat().join(', ')
+        setResetPasswordError(errorMessages)
+      } else {
+        setResetPasswordError('Failed to reset password. Please try again.')
+      }
     },
   })
 
-  // Bulk delete mutation
-  const bulkDeleteMutation = useMutation({
-    mutationFn: (ids: string[]) => Promise.all(ids.map(id => staffService.deleteStaff(id))),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staffs'] })
-      setSelectedRows([])
-      setDeleteConfirmation(prev => ({ ...prev, isOpen: false, loading: false }))
-    },
-    onError: (error: any) => {
-      console.error('Error deleting staffs:', error)
-      setDeleteConfirmation(prev => ({ 
-        ...prev, 
-        loading: false,
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to delete some staff members. Please try again.',
-        onConfirm: () => setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
-      }))
-    },
-  })
-
-  const [searchValue, setSearchValue] = useState(options.search || '')
-  const [currentPage, setCurrentPage] = useState(options.page || 1)
-
-  // Handler for search
+  // Handler for search - reset to page 1 when searching
   const handleSearchChange = useCallback((value: string) => {
     setSearchValue(value)
-    queryClient.invalidateQueries({ queryKey: ['staffs'] })
-  }, [queryClient])
+    setCurrentPage(1) // Reset to first page when searching
+  }, [])
 
   // Handler for pagination
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page)
-    queryClient.invalidateQueries({ queryKey: ['staffs'] })
-  }, [queryClient])
+  }, [])
 
   const handleCreate = () => {
     setEditingStaff(null)
@@ -213,39 +207,19 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (staff: User) => {
-    setDeleteConfirmation({
-      isOpen: true,
-      title: 'Delete Staff Member',
-      message: `Are you sure you want to delete ${staff.first_name} ${staff.last_name}? This action cannot be undone.`,
-      onConfirm: async () => {
-        setDeleteConfirmation(prev => ({ ...prev, loading: true }))
-        await deleteMutation.mutateAsync(staff.id)
-      },
-      loading: false,
-    })
-  }
-
-  const handleBulkDelete = async () => {
-    if (selectedRows.length === 0) return
-
-    setDeleteConfirmation({
-      isOpen: true,
-      title: 'Delete Multiple Staff Members',
-      message: `Are you sure you want to delete ${selectedRows.length} staff member(s)? This action cannot be undone.`,
-      onConfirm: async () => {
-        setDeleteConfirmation(prev => ({ ...prev, loading: true }))
-        await bulkDeleteMutation.mutateAsync(selectedRows.map(staff => staff.id))
-      },
-      loading: false,
-    })
-  }
-
   const handleChangeRole = (staff: User) => {
     setChangingRoleStaff(staff)
     setChangeRoleError(null)
     setChangeRoleSuccess(null)
     setIsChangeRoleModalOpen(true)
+  }
+
+  const handleResetPassword = (staff: User) => {
+    console.log('handleResetPassword called with staff:', staff);
+    setResettingPasswordStaff(staff)
+    setResetPasswordError(null)
+    setResetPasswordSuccess(null)
+    setIsResetPasswordModalOpen(true)
   }
 
   const handleModalSubmit = async (data: CreateStaffData) => {
@@ -274,6 +248,18 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     }
   }
 
+  const handleResetPasswordSubmit = async () => {
+    if (!resettingPasswordStaff) return
+    
+    setResetPasswordLoading(true)
+    try {
+      await resetPasswordMutation.mutateAsync(resettingPasswordStaff.id)
+      setIsResetPasswordModalOpen(false)
+    } finally {
+      setResetPasswordLoading(false)
+    }
+  }
+
   const handleModalClose = () => {
     setIsModalOpen(false)
     setEditingStaff(null)
@@ -288,8 +274,11 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     setChangeRoleSuccess(null)
   }
 
-  const handleDeleteConfirmationClose = () => {
-    setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
+  const handleResetPasswordModalClose = () => {
+    setIsResetPasswordModalOpen(false)
+    setResettingPasswordStaff(null)
+    setResetPasswordError(null)
+    setResetPasswordSuccess(null)
   }
 
   return {
@@ -314,8 +303,12 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     changeRoleError,
     changeRoleSuccess,
     
-    // Delete confirmation
-    deleteConfirmation,
+    // Reset password modal states
+    isResetPasswordModalOpen,
+    resettingPasswordStaff,
+    resetPasswordLoading,
+    resetPasswordError,
+    resetPasswordSuccess,
     
     // Selection
     selectedRows,
@@ -330,20 +323,19 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     // Handlers
     handleCreate,
     handleEdit,
-    handleDelete,
-    handleBulkDelete,
     handleChangeRole,
+    handleResetPassword,
     handleModalSubmit,
     handleChangeRoleSubmit,
+    handleResetPasswordSubmit,
     handleModalClose,
     handleChangeRoleModalClose,
-    handleDeleteConfirmationClose,
-    
+    handleResetPasswordModalClose,
+
     // Mutations
     createMutation,
     updateMutation,
     updateRoleMutation,
-    deleteMutation,
-    bulkDeleteMutation,
+    resetPasswordMutation,
   }
 } 

@@ -23,6 +23,7 @@ import UserProfile from './pages/Users/UserProfile';
 import ConsolidatedGrades from './pages/ConsolidatedGrades/ConsolidatedGrades';
 import SectionGrades from './pages/ConsolidatedGrades/SectionGrades';
 import SF9 from './pages/SF9';
+import SetNewPassword from './pages/SetNewPassword';
 
 
 function App() {
@@ -36,6 +37,9 @@ function App() {
               <Route index element={<Navigate to="/login" replace />} />
               <Route path="login" element={<Login />} />
             </Route>
+
+            {/* Set New Password Route - Separate from PrivateLayout */}
+            <Route path="set-new-password" element={<SetNewPassword />} />
 
             {/* Private Routes */}
             <Route element={<PrivateLayout />}>

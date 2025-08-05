@@ -29,4 +29,9 @@ export const authService = {
     const response = await api.get('/profile');
     return response.data.data;
   },
+
+  async updatePassword(password: string): Promise<void> {
+    const response = await api.put('/profile/password', { password });
+    return response.data;
+  },
 }; 

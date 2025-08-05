@@ -20,7 +20,7 @@ class StaffController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->get('per_page', 15);
+        $perPage = $request->get('limit', $request->get('per_page', 15));
         $search = $request->get('search', '');
         $authenticatedUser = $request->user();
 
@@ -414,6 +414,75 @@ class StaffController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update staff role',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Reset password for a staff member.
+     * Sets password to 'password' and is_new to 1.
+     */
+    public function resetPassword(string $id): JsonResponse
+    {
+        try {
+            $authenticatedUser = request()->user();
+
+            // Get the authenticated user's default institution
+            $defaultInstitution = $authenticatedUser->userInstitutions()
+                ->where('is_default', true)
+                ->first();
+
+            if (!$defaultInstitution) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No default institution found for authenticated user'
+                ], 403);
+            }
+
+            // Get super administrator role ID
+            $superAdminRole = Role::where('slug', 'super-administrator')->first();
+            $superAdminRoleId = $superAdminRole ? $superAdminRole->id : null;
+
+            // Find staff member from the same institution
+            $staff = User::whereHas('userInstitutions', function ($q) use ($defaultInstitution, $superAdminRoleId) {
+                $q->where('institution_id', $defaultInstitution->institution_id);
+                
+                // Exclude super administrators
+                if ($superAdminRoleId) {
+                    $q->where('role_id', '!=', $superAdminRoleId);
+                }
+            })->find($id);
+
+            if (!$staff) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Staff member not found'
+                ], 404);
+            }
+
+            // Prevent resetting own password
+            if ($staff->id === $authenticatedUser->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot reset your own password'
+                ], 403);
+            }
+
+            // Reset password to 'password' and set is_new to 1
+            $staff->update([
+                'password' => Hash::make('password'),
+                'is_new' => 1,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password reset successfully. The staff member will be prompted to change their password on next login.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to reset password',
                 'error' => $e->getMessage()
             ], 500);
         }

@@ -79,6 +79,11 @@ class StaffService {
     return response.data
   }
 
+  async resetPassword(id: string) {
+    const response = await api.post<{ message: string }>(`${this.baseUrl}/${id}/reset-password`)
+    return response.data
+  }
+
   async deleteStaff(id: string) {
     await api.delete(`${this.baseUrl}/${id}`)
   }

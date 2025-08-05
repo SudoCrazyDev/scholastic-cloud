@@ -1,5 +1,5 @@
 import React from 'react';
-import { Input } from '../../../components/input';
+import { SearchInput } from '../../../components/search-input';
 import { Button } from '../../../components/button';
 
 interface StaffHeaderProps {
@@ -11,11 +11,12 @@ interface StaffHeaderProps {
 const StaffHeader: React.FC<StaffHeaderProps> = ({ search, onSearch, onCreate }) => {
   return (
     <div className="flex items-center justify-between mb-4 animate-fade-in">
-      <Input
+      <SearchInput
         value={search}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onSearch(e.target.value)}
+        onChange={onSearch}
         placeholder="Search staff by name or email..."
-        className="w-1/3"
+        className="w-full"
+        debounceMs={300}
       />
       <Button onClick={onCreate} className="ml-4">
         + Create Staff

@@ -37,6 +37,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
+    Route::put('/profile/password', [AuthController::class, 'updatePassword']);
     // Role routes
     Route::apiResource('roles', RoleController::class);
     // Subscription routes
@@ -86,8 +87,9 @@ Route::middleware('auth.token')->group(function () {
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
     Route::apiResource('students', StudentController::class);
     // Staff routes
-    Route::apiResource('staffs', StaffController::class);
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);
+    Route::post('staffs/{id}/reset-password', [StaffController::class, 'resetPassword']);
+    Route::apiResource('staffs', StaffController::class);
     // ClassSection routes
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
     Route::apiResource('class-sections', ClassSectionController::class);

@@ -66,6 +66,34 @@ class AuthController extends Controller
     }
 
     /**
+     * Update user password
+     */
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'password' => 'required|string|min:8',
+        ]);
+
+        $user = $request->user();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        // Update password and set is_new to false
+        $user->update([
+            'password' => Hash::make($request->password),
+            'is_new' => false,
+        ]);
+
+        return response()->json([
+            'message' => 'Password updated successfully'
+        ]);
+    }
+
+    /**
      * Get current user profile
      */
     public function profile(Request $request)

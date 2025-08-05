@@ -1,12 +1,11 @@
-// Staffs Page - Grid, Search, CRUD Modals (Placeholder, no API)
-// Follows Users page layout and reuses components
-// TODO: Integrate with API and implement real CRUD logic
 import React from 'react';
-import { StaffHeader, StaffGrid, StaffModal, StaffDeleteModal, StaffChangeRoleModal } from './components';
+import { StaffHeader, StaffGrid, StaffModal, StaffChangeRoleModal, StaffResetPasswordModal } from './components';
 import { useStaffs } from '../../hooks/useStaffs';
 import { Alert } from '../../components/alert';
+import { Toaster } from 'react-hot-toast';
 
 const Staffs: React.FC = () => {
+  console.log('Staffs component rendering');
   const {
     // Data
     staffs,
@@ -29,8 +28,14 @@ const Staffs: React.FC = () => {
     changeRoleError,
     changeRoleSuccess,
     
-    // Delete confirmation
-    deleteConfirmation,
+    // Reset password modal states
+    isResetPasswordModalOpen,
+    resettingPasswordStaff,
+    resetPasswordLoading,
+    resetPasswordError,
+    resetPasswordSuccess,
+    
+
     
     // Search and pagination
     searchValue,
@@ -41,21 +46,55 @@ const Staffs: React.FC = () => {
     // Handlers
     handleCreate,
     handleEdit,
-    handleDelete,
     handleChangeRole,
+    handleResetPassword,
     handleModalSubmit,
     handleChangeRoleSubmit,
+    handleResetPasswordSubmit,
     handleModalClose,
     handleChangeRoleModalClose,
-    handleDeleteConfirmationClose,
+    handleResetPasswordModalClose,
   } = useStaffs({
     search: '',
     page: 1,
     limit: 15,
   });
 
+  console.log('Staffs component state:', { 
+    isResetPasswordModalOpen, 
+    resettingPasswordStaff,
+    isChangeRoleModalOpen,
+    changingRoleStaff 
+  });
+
   return (
     <div className="p-6">
+      {/* Toast Notifications */}
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      
       {/* Global Error Alert */}
       {error && (
         <Alert
@@ -85,8 +124,8 @@ const Staffs: React.FC = () => {
         <StaffGrid 
           staffs={staffs} 
           onEdit={handleEdit} 
-          onDelete={handleDelete} 
           onChangeRole={handleChangeRole} 
+          onResetPassword={handleResetPassword}
         />
       )}
 
@@ -128,14 +167,7 @@ const Staffs: React.FC = () => {
         onSubmit={handleModalSubmit}
       />
 
-      {/* Delete Confirmation Modal */}
-      <StaffDeleteModal
-        open={deleteConfirmation.isOpen}
-        onClose={handleDeleteConfirmationClose}
-        staff={editingStaff}
-        onConfirm={deleteConfirmation.onConfirm}
-        loading={deleteConfirmation.loading}
-      />
+
 
       {/* Change Role Modal */}
       <StaffChangeRoleModal
@@ -147,6 +179,17 @@ const Staffs: React.FC = () => {
         error={changeRoleError}
         success={changeRoleSuccess}
         onSubmit={handleChangeRoleSubmit}
+      />
+
+      {/* Reset Password Modal */}
+      <StaffResetPasswordModal
+        open={isResetPasswordModalOpen}
+        onClose={handleResetPasswordModalClose}
+        staff={resettingPasswordStaff}
+        loading={resetPasswordLoading}
+        error={resetPasswordError}
+        success={resetPasswordSuccess}
+        onSubmit={handleResetPasswordSubmit}
       />
     </div>
   );
