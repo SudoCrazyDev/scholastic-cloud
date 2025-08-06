@@ -121,3 +121,11 @@ Route::middleware('auth.token')->group(function () {
     Route::post('sf9/generate', [SF9Controller::class, 'generate']);
     Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears']);
 });
+
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'healthy',
+        'timestamp' => now(),
+        'version' => config('app.version', '1.0.0')
+    ]);
+});

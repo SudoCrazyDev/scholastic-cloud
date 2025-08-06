@@ -1,0 +1,91 @@
+name: Deploy APP to Production
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd app
+        npm ci
+        
+    - name: Build application
+      run: |
+        cd app
+        npm run build
+      env:
+        VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
+          
+    - name: Create deployment package
+      run: |
+        cd app/dist
+        tar -czf ../../app-deployment.tar.gz .
+        
+    - name: Upload deployment package
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.HOSTINGER_HOST }}
+        username: ${{ secrets.HOSTINGER_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        source: "app-deployment.tar.gz"
+        target: "/tmp/"
+        
+    - name: Deploy to Hostinger via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOSTINGER_HOST }}
+        username: ${{ secrets.HOSTINGER_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        script: |
+          # Navigate to APP directory
+          cd ${{ secrets.APP_DEPLOY_PATH }}
+          
+          # Backup current version
+          if [ -d "current" ]; then
+            cp -r current backup-$(date +%Y%m%d-%H%M%S)
+          fi
+          
+          # Create new deployment directory
+          mkdir -p deploy-$(date +%Y%m%d-%H%M%S)
+          cd deploy-$(date +%Y%m%d-%H%M%S)
+          
+          # Extract deployment package
+          tar -xzf /tmp/app-deployment.tar.gz
+          
+          # Set proper permissions
+          chmod -R 755 .
+          
+          # Switch to new version
+          cd ..
+          rm -f current
+          ln -s deploy-$(date +%Y%m%d-%H%M%S) current
+          
+          # Cleanup old backups (keep last 3)
+          ls -dt backup-* | tail -n +4 | xargs -r rm -rf
+          ls -dt deploy-* | tail -n +4 | xargs -r rm -rf
+          
+    - name: Health check
+      run: |
+        sleep 10
+        curl -f ${{ secrets.APP_URL }} || exit 1 
