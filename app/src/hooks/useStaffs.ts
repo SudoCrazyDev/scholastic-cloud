@@ -152,7 +152,7 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: (id: string) => staffService.resetPassword(id),
-    onSuccess: (response, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staffs'] })
       setResetPasswordSuccess('Password reset successfully!')
       setResetPasswordError(null)
