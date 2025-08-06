@@ -41,8 +41,8 @@ jobs:
       - name: Deploy to FTP server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ftp.scholastic.cloud
-          username: u825103209.scholastic.cloud
-          password: 127.0.0.1ismyhomE
+          server: ${{ secrets.DEPLOYMENT_SERVER }}
+          username: ${{ secrets.DEPLOYMENT_USERNAME }}
+          password: ${{ secrets.DEPLOYMENT_PASSWORD }}
           local-dir: app/dist/
-          server-dir: /public_html/v2/app/
+          server-dir: ${{ secrets.DEPLOYMENT_DIRECTORY }}
