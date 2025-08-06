@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    environment: prod
     steps:
       # Step 1: Checkout the repository
       - name: Checkout repository
