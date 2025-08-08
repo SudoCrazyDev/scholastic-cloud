@@ -93,7 +93,7 @@ jobs:
           username: ${{ secrets.DEPLOYMENT_USERNAME }}
           password: ${{ secrets.DEPLOYMENT_PASSWORD }}
           local-dir: ./
-          server-dir: /public_html/v2/
+          server-dir: ~/domains/scholastic.cloud/public_html/v2/
           dangerous-clean-slate: false
           exclude: |
             **/*
@@ -110,7 +110,22 @@ jobs:
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           script: |
             cd ~/domains/scholastic.cloud/public_html/v2/
-            
+            echo "Current directory: $(pwd)"
+            echo "Listing files before extraction:"
+            ls -la
+
+            # Ensure zip exists here; if not, try copying from fallback location
+            if [ ! -f api-deployment.zip ]; then
+              echo "api-deployment.zip not found in $(pwd). Checking parent locations..."
+              if [ -f ~/api-deployment.zip ]; then
+                cp ~/api-deployment.zip ./
+              elif [ -f ~/domains/scholastic.cloud/public_html/api-deployment.zip ]; then
+                cp ~/domains/scholastic.cloud/public_html/api-deployment.zip ./
+              else
+                echo "Zip not found in expected locations" && exit 1
+              fi
+            fi
+
             # Backup existing api directory if it exists
             if [ -d "api" ]; then
               mv api api-backup-$(date +%Y%m%d-%H%M%S)
@@ -118,6 +133,8 @@ jobs:
             
             # Extract the new deployment
             unzip -o api-deployment.zip -d api/
+            echo "Extraction complete. Listing api directory:"
+            ls -la api/
 
       # Step 11: Post-deployment cleanup
       - name: Cleanup deployment files
