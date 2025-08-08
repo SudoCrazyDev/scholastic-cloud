@@ -38,12 +38,6 @@ jobs:
           cd api
           composer install --optimize-autoloader --no-dev
 
-      # Step 5: Generate application key (if needed)
-      - name: Generate application key
-        run: |
-          cd api
-          php artisan key:generate --force
-
       # Step 7: Clear and cache Laravel configurations
       - name: Optimize Laravel
         run: |
