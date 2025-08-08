@@ -11,6 +11,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: prod
+    env:
+      ZIP_NAME: api-deployment-${{ github.run_id }}-${{ github.sha }}.zip
     steps:
       # Step 1: Checkout the repository
       - name: Checkout repository
@@ -82,26 +84,33 @@ jobs:
           
           # Create deployment zip file
           cd deploy-temp
-          zip -r ../api-deployment.zip .
+          zip -r ../${ZIP_NAME} .
           cd ..
+          
+          # Move zip to a dedicated upload directory
+          mkdir -p deploy-out
+          mv -f ${ZIP_NAME} deploy-out/
 
-      # Step 9: Upload zip file to server
-      - name: Upload deployment zip
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      # Step 8.5: Verify zip exists
+      - name: Verify deployment zip exists
+        run: |
+          echo "Runner working directory: $(pwd)"
+          ls -lah
+          echo "Contents of deploy-out/"
+          ls -lah deploy-out
+
+      # Step 9: Upload zip file to server via SFTP
+      - name: Upload deployment zip (SFTP)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          server: ${{ secrets.DEPLOYMENT_SERVER }}
-          username: ${{ secrets.DEPLOYMENT_USERNAME }}
-          password: ${{ secrets.DEPLOYMENT_PASSWORD }}
-          local-dir: ./
-          server-dir: ~/domains/scholastic.cloud/public_html/v2/
-          dangerous-clean-slate: false
-          exclude: |
-            **/*
-          include: |
-            api-deployment.zip
+          host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
+          username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
+          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
+          port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
+          source: "deploy-out/${{ env.ZIP_NAME }}"
+          target: "~/domains/scholastic.cloud/public_html/v2/"
 
       # Step 10: Post-deployment cleanup
       - name: Cleanup deployment files
         run: |
-          rm -rf deploy-temp
-          rm -f api-deployment.zip
+          rm -rf deploy-temp deploy-out
