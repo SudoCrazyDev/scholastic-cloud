@@ -109,7 +109,7 @@ jobs:
           password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           script: |
-            cd /public_html/v2/
+            cd ~/domains/scholastic.cloud/public_html/v2/
             
             # Backup existing api directory if it exists
             if [ -d "api" ]; then
