@@ -225,8 +225,32 @@ export interface Topic {
   description?: string;
   order: number;
   is_completed: boolean;
+  quarter?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateTopicData {
+  subject_id: string;
+  title: string;
+  description?: string;
+  is_completed?: boolean;
+  quarter?: string;
+}
+
+export interface UpdateTopicData {
+  title?: string;
+  description?: string;
+  is_completed?: boolean;
+  quarter?: string;
+}
+
+export interface ReorderTopicsData {
+  subject_id: string;
+  topic_orders: Array<{
+    id: string;
+    order: number;
+  }>;
 }
 
 export interface CalendarEvent {

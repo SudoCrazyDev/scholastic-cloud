@@ -63,4 +63,12 @@ class Subject extends Model
     {
         return $this->hasMany(SubjectEcr::class);
     }
+
+    /**
+     * Get the topics for this subject.
+     */
+    public function topics(): HasMany
+    {
+        return $this->hasMany(Topic::class)->orderBy('order');
+    }
 }

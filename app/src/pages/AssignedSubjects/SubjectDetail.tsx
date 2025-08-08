@@ -83,11 +83,11 @@ const SubjectDetail: React.FC = () => {
       label: 'Components of Summative Assessment',
       icon: ListBulletIcon,
     },
-    // {
-    //   id: 'topics' as TabType,
-    //   label: 'Topics',
-    //   icon: ListBulletIcon,
-    // },
+    {
+      id: 'topics' as TabType,
+      label: 'Topics',
+      icon: ListBulletIcon,
+    },
     // {
     //   id: 'calendar' as TabType,
     //   label: 'Calendar of Events',

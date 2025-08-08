@@ -96,6 +96,15 @@ Route::middleware('auth.token')->group(function () {
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);
     Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
+    // Topic routes
+    Route::get('topics', [App\Http\Controllers\TopicController::class, 'index']);
+    Route::post('topics', [App\Http\Controllers\TopicController::class, 'store']);
+    Route::get('topics/{id}', [App\Http\Controllers\TopicController::class, 'show']);
+    Route::put('topics/{id}', [App\Http\Controllers\TopicController::class, 'update']);
+    Route::patch('topics/{id}', [App\Http\Controllers\TopicController::class, 'update']);
+    Route::delete('topics/{id}', [App\Http\Controllers\TopicController::class, 'destroy']);
+    Route::post('topics/reorder', [App\Http\Controllers\TopicController::class, 'reorder']);
+    Route::patch('topics/{id}/toggle-completion', [App\Http\Controllers\TopicController::class, 'toggleCompletion']);
     // SubjectEcr routes
     Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class);
     Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class);

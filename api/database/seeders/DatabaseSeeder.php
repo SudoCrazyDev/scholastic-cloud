@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             //InstitutionSeeder::class,
             // UserSeeder::class,
             // RealtimeAttendanceSeeder::class,
+            TopicSeeder::class,
         ]);
     }
 }

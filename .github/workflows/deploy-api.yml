@@ -1,0 +1,114 @@
+name: Deploy API to Production
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'api/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Setup PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, iconv, json, mbstring, pdo
+
+      # Step 3: Cache Composer dependencies
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: api/vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      # Step 4: Install Composer dependencies
+      - name: Install Composer dependencies
+        run: |
+          cd api
+          composer install --optimize-autoloader --no-dev
+
+      # Step 5: Generate application key (if needed)
+      - name: Generate application key
+        run: |
+          cd api
+          php artisan key:generate --force
+
+      # Step 7: Clear and cache Laravel configurations
+      - name: Optimize Laravel
+        run: |
+          cd api
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+
+      # Step 8: Create deployment package (excluding node_modules and vendor)
+      - name: Create deployment package
+        run: |
+          # Create a temporary directory for deployment files
+          mkdir -p deploy-temp
+          
+          # Copy API files excluding node_modules, vendor, and other unwanted files
+          rsync -av --exclude='node_modules' \
+                   --exclude='vendor' \
+                   --exclude='.git' \
+                   --exclude='.env.example' \
+                   --exclude='storage/logs/*' \
+                   --exclude='storage/framework/cache/*' \
+                   --exclude='storage/framework/sessions/*' \
+                   --exclude='storage/framework/views/*' \
+                   --exclude='tests' \
+                   --exclude='phpunit.xml' \
+                   --exclude='Dockerfile' \
+                   --exclude='README.md' \
+                   api/ deploy-temp/
+          
+          # Ensure storage directories exist with proper structure
+          mkdir -p deploy-temp/storage/app/public
+          mkdir -p deploy-temp/storage/framework/cache/data
+          mkdir -p deploy-temp/storage/framework/sessions
+          mkdir -p deploy-temp/storage/framework/views
+          mkdir -p deploy-temp/storage/logs
+          
+          # Create empty index.html files for security
+          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/index.php
+          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/app/index.php
+          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/framework/index.php
+          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/logs/index.php
+
+      # Step 9: Deploy to FTP server
+      - name: Deploy to FTP server
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.DEPLOYMENT_SERVER }}
+          username: ${{ secrets.DEPLOYMENT_USERNAME }}
+          password: ${{ secrets.DEPLOYMENT_PASSWORD }}
+          local-dir: deploy-temp/
+          server-dir: /public-html/v2/api
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/vendor/**
+            **/.env.example
+            **/tests/**
+            **/phpunit.xml
+            **/Dockerfile
+            **/README.md
+            **/.DS_Store
+            **/Thumbs.db
+
+      # Step 10: Post-deployment cleanup
+      - name: Cleanup deployment files
+        run: |
+          rm -rf deploy-temp
