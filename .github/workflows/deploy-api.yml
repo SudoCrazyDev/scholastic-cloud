@@ -94,7 +94,11 @@ jobs:
           password: ${{ secrets.DEPLOYMENT_PASSWORD }}
           local-dir: ./
           server-dir: /public_html/v2/
-          include: api-deployment.zip
+          dangerous-clean-slate: false
+          exclude: |
+            **/*
+          include: |
+            api-deployment.zip
 
       # Step 10: Extract and deploy on server
       - name: Extract and deploy on server
