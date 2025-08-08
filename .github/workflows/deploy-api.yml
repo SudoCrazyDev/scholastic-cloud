@@ -56,31 +56,13 @@ jobs:
           
           # Copy API files excluding node_modules, vendor, and other unwanted files
           rsync -av --exclude='node_modules' \
-                   --exclude='vendor' \
                    --exclude='.git' \
                    --exclude='.env.example' \
-                   --exclude='storage/logs/*' \
-                   --exclude='storage/framework/cache/*' \
-                   --exclude='storage/framework/sessions/*' \
-                   --exclude='storage/framework/views/*' \
                    --exclude='tests' \
                    --exclude='phpunit.xml' \
                    --exclude='Dockerfile' \
                    --exclude='README.md' \
                    api/ deploy-temp/
-          
-          # Ensure storage directories exist with proper structure
-          mkdir -p deploy-temp/storage/app/public
-          mkdir -p deploy-temp/storage/framework/cache/data
-          mkdir -p deploy-temp/storage/framework/sessions
-          mkdir -p deploy-temp/storage/framework/views
-          mkdir -p deploy-temp/storage/logs
-          
-          # Create empty index.html files for security
-          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/index.php
-          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/app/index.php
-          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/framework/index.php
-          echo "<?php http_response_code(404); ?>" > deploy-temp/storage/logs/index.php
           
           # Create deployment zip file
           cd deploy-temp
