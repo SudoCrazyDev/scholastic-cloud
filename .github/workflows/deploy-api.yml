@@ -118,21 +118,6 @@ jobs:
             
             # Extract the new deployment
             unzip -o api-deployment.zip -d api/
-            
-            # Set proper permissions
-            chmod -R 755 api/
-            chmod -R 777 api/storage/
-            chmod -R 777 api/bootstrap/cache/
-            
-            # Remove the zip file
-            rm api-deployment.zip
-            
-            # Clear Laravel caches
-            cd api
-            php artisan config:clear
-            php artisan route:clear
-            php artisan view:clear
-            php artisan cache:clear
 
       # Step 11: Post-deployment cleanup
       - name: Cleanup deployment files
