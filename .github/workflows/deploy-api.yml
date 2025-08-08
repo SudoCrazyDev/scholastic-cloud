@@ -110,6 +110,41 @@ jobs:
           source: "deploy-out/${{ env.ZIP_NAME }}"
           target: "~/domains/scholastic.cloud/public_html/v2/"
 
+      # Step 10: Extract on server (extract zip from deploy-out/ into parent directory)
+      - name: Extract deployment package on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
+          username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
+          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
+          port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
+          script: |
+            set -e
+            cd ~/domains/scholastic.cloud/public_html/v2/
+            echo "Current dir: $(pwd)"
+            echo "Looking for zip inside deploy-out/"
+            ls -lah deploy-out || true
+            ZIP_FILE=$(ls -1 deploy-out/*.zip 2>/dev/null | tail -n 1)
+            if [ -z "$ZIP_FILE" ]; then
+              echo "No zip file found in deploy-out/" && exit 1
+            fi
+            echo "Found zip: $ZIP_FILE"
+
+            # Backup existing api directory
+            if [ -d "api" ]; then
+              mv api api-backup-$(date +%Y%m%d-%H%M%S)
+            fi
+
+            # Extract into parent (v2) under api/
+            unzip -o "$ZIP_FILE" -d api/
+
+            # Optional permissions (shared hosting typical)
+            chmod -R 755 api/
+            chmod -R 775 api/storage api/bootstrap/cache || true
+
+            # Remove uploaded zip after extraction
+            rm -f "$ZIP_FILE"
+
       # Step 10: Post-deployment cleanup
       - name: Cleanup deployment files
         run: |
