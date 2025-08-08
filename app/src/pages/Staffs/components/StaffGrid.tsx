@@ -52,7 +52,7 @@ const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onChangeRole, onR
             {genderAvatar()}
             {/* Info */}
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-base truncate text-gray-900">
+              <div className="font-medium text-base truncate text-gray-900 uppercase">
                 {getFullName(staff)}
               </div>
               <div className="text-xs text-gray-500 mb-1">
@@ -76,7 +76,6 @@ const StaffGrid: React.FC<StaffGridProps> = ({ staffs, onEdit, onChangeRole, onR
                 <UserCog size={18} />
               </button>
               <button className={iconBtnClass} title="Reset Password" onClick={() => {
-                console.log('Reset password button clicked for staff:', staff);
                 onResetPassword(staff);
               }}>
                 <Key size={18} />

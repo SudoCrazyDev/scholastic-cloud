@@ -79,30 +79,59 @@ jobs:
           echo "<?php http_response_code(404); ?>" > deploy-temp/storage/app/index.php
           echo "<?php http_response_code(404); ?>" > deploy-temp/storage/framework/index.php
           echo "<?php http_response_code(404); ?>" > deploy-temp/storage/logs/index.php
+          
+          # Create deployment zip file
+          cd deploy-temp
+          zip -r ../api-deployment.zip .
+          cd ..
 
-      # Step 9: Deploy to FTP server
-      - name: Deploy to FTP server
+      # Step 9: Upload zip file to server
+      - name: Upload deployment zip
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.DEPLOYMENT_SERVER }}
           username: ${{ secrets.DEPLOYMENT_USERNAME }}
           password: ${{ secrets.DEPLOYMENT_PASSWORD }}
-          local-dir: deploy-temp/
-          server-dir: /public_html/v2/api/
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/vendor/**
-            **/.env.example
-            **/tests/**
-            **/phpunit.xml
-            **/Dockerfile
-            **/README.md
-            **/.DS_Store
-            **/Thumbs.db
+          local-dir: ./
+          server-dir: /public_html/v2/
+          include: api-deployment.zip
 
-      # Step 10: Post-deployment cleanup
+      # Step 10: Extract and deploy on server
+      - name: Extract and deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
+          username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
+          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
+          port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
+          script: |
+            cd /public_html/v2/
+            
+            # Backup existing api directory if it exists
+            if [ -d "api" ]; then
+              mv api api-backup-$(date +%Y%m%d-%H%M%S)
+            fi
+            
+            # Extract the new deployment
+            unzip -o api-deployment.zip -d api/
+            
+            # Set proper permissions
+            chmod -R 755 api/
+            chmod -R 777 api/storage/
+            chmod -R 777 api/bootstrap/cache/
+            
+            # Remove the zip file
+            rm api-deployment.zip
+            
+            # Clear Laravel caches
+            cd api
+            php artisan config:clear
+            php artisan route:clear
+            php artisan view:clear
+            php artisan cache:clear
+
+      # Step 11: Post-deployment cleanup
       - name: Cleanup deployment files
         run: |
           rm -rf deploy-temp
+          rm -f api-deployment.zip

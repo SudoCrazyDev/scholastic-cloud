@@ -277,7 +277,7 @@ class StaffController extends Controller
                 'last_name' => 'sometimes|required|string|max:255',
                 'ext_name' => 'nullable|string|max:255',
                 'gender' => 'nullable|string|in:male,female,other',
-                'birthdate' => 'sometimes|required|date',
+                'birthdate' => 'sometimes|nullable|date',
                 'email' => 'sometimes|required|email|unique:users,email,' . $id,
                 'password' => 'nullable|string|min:8',
                 'role_id' => 'sometimes|required|exists:roles,id',
