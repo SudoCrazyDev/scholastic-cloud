@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { Topic, ApiResponse, PaginatedResponse } from '../types'
+import type { Topic, ApiResponse } from '../types'
 
 export interface CreateTopicData {
   subject_id: string

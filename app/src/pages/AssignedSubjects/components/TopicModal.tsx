@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { Textarea } from '../../../components/textarea'
-import { Switch } from '../../../components/switch'
 import type { Topic } from '../../../types'
 import type { CreateTopicData, UpdateTopicData } from '../../../services/topicService'
 

@@ -96,7 +96,6 @@ export const useTopics = (subjectId: string) => {
 }
 
 export const useTopic = (id: string) => {
-  const queryClient = useQueryClient()
   const queryKey = ['topic', id]
 
   const {
