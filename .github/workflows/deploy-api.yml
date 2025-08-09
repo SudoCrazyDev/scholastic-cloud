@@ -124,6 +124,18 @@ jobs:
             chmod -R 755 api/
             chmod -R 775 api/storage api/bootstrap/cache || true
 
+            # Place web entry files into the public web root (v2)
+            # Copy .htaccess and index.php from Laravel's public/ to the web root
+            if [ -f api/public/.htaccess ]; then
+              cp -f api/public/.htaccess ./.htaccess
+            fi
+            if [ -f api/public/index.php ]; then
+              cp -f api/public/index.php ./index.php
+              # Rewrite index.php paths to point into api/
+              sed -i "s#__DIR__.'/../vendor/autoload.php'#__DIR__.'/api/vendor/autoload.php'#" ./index.php || true
+              sed -i "s#__DIR__.'/../bootstrap/app.php'#__DIR__.'/api/bootstrap/app.php'#" ./index.php || true
+            fi
+
             # Remove uploaded zip after extraction
             rm -f "$ZIP_FILE"
 
