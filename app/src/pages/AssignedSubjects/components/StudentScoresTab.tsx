@@ -26,6 +26,8 @@ import { StudentScoreInput } from './StudentScoreInput';
 interface StudentScoresTabProps {
   subjectId: string
   classSectionId: string
+  isLimited?: boolean
+  assignedStudentIds?: string[]
 }
 
 interface StudentScore {
@@ -313,9 +315,13 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   )
 }
 
-export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, classSectionId }) => {
+export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [] }) => {
   // Fetch students
   const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId })
+  // Filter students if limited
+  const filteredStudents = isLimited && assignedStudentIds.length > 0
+    ? students.filter(s => assignedStudentIds.includes(s.id))
+    : (isLimited ? [] : students)
   // Fetch all subject_ecr for this subject
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   // Extract all subject_ecr_id
@@ -393,13 +399,13 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   })
   
   // Calculate statistics
-  const totalStudents = students.length
+  const totalStudents = filteredStudents.length
   const totalItems = filteredItems.length
   const totalScores = studentScoresData?.data?.length || 0
   const completionRate = totalItems > 0 ? Math.round((totalScores / (totalStudents * totalItems)) * 100) : 0
 
   // Gender distribution
-  const genderDistribution = students.reduce((acc: any, student: any) => {
+  const genderDistribution = filteredStudents.reduce((acc: any, student: any) => {
     acc[student.gender] = (acc[student.gender] || 0) + 1
     return acc
   }, {})
@@ -426,7 +432,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-xl font-semibold text-gray-900">Student Scores</h3>
-          <p className="text-sm text-gray-500">Manage grades for {students.length} students</p>
+          <p className="text-sm text-gray-500">Manage grades for {filteredStudents.length} students</p>
         </div>
         <div className="flex items-center space-x-4">
           <button
@@ -581,7 +587,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
             <GradeItemSection
               key={item.id}
               item={item}
-              students={students}
+              students={filteredStudents}
               scores={studentScoresData?.data || []}
               onEditItem={handleEditGradeItem}
             />

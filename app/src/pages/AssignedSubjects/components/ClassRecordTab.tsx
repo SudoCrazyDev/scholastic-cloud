@@ -17,11 +17,17 @@ import { ErrorHandler } from '../../../utils/errorHandler'
 interface ClassRecordTabProps {
   subjectId: string
   classSectionId?: string
+  isLimited?: boolean
+  assignedStudentIds?: string[]
 }
 
-export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId }) => {
+export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [] }) => {
   // Fetch students
   const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId });
+  
+  const filteredStudents = isLimited && assignedStudentIds.length > 0
+    ? students.filter(s => assignedStudentIds.includes(s.id))
+    : (isLimited ? [] : students)
   
   // Fetch running grades for all students
   const { data: runningGradesData, isLoading: gradesLoading, error: gradesError } = useStudentRunningGrades({
@@ -63,13 +69,13 @@ console.log(students);
   }, {}) || {};
 
   // Calculate statistics
-  const totalStudents = students.length;
+  const totalStudents = filteredStudents.length;
   const totalGrades = runningGradesData?.data?.length || 0;
   const gradesWithFinalGrade = runningGradesData?.data?.filter((grade: any) => grade.final_grade !== null).length || 0;
   const completionRate = totalGrades > 0 ? Math.round((gradesWithFinalGrade / totalGrades) * 100) : 0;
 
   // Gender distribution
-  const genderDistribution = students.reduce((acc: any, student: any) => {
+  const genderDistribution = filteredStudents.reduce((acc: any, student: any) => {
     acc[student.gender] = (acc[student.gender] || 0) + 1;
     return acc;
   }, {});
@@ -141,7 +147,7 @@ console.log(students);
         />
         <div className="mt-3 p-2 bg-blue-50 rounded-lg">
           <p className="text-xs text-blue-700">
-            Showing Quarter {selectedQuarter} grades for {students.length} students
+            Showing Quarter {selectedQuarter} grades for {totalStudents} students
           </p>
         </div>
       </div>
@@ -245,17 +251,17 @@ console.log(students);
         </div>
         
         <div className="divide-y divide-gray-200">
-          {students.length === 0 ? (
+          {totalStudents === 0 ? (
             <div className="text-center py-12">
               <UserGroupIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Students Found</h3>
-              <p className="text-gray-500">No students are assigned to this class section.</p>
+              <p className="text-gray-500">{isLimited ? 'No students are assigned to this subject.' : 'No students are assigned to this class section.'}</p>
             </div>
           ) : (
             // Group students by gender and sort by last name
             (() => {
               // Sort students by last name first
-              const sortedStudents = [...students].sort((a, b) => 
+              const sortedStudents = [...filteredStudents].sort((a, b) => 
                 a.last_name.localeCompare(b.last_name)
               );
               
@@ -266,7 +272,7 @@ console.log(students);
                 }
                 acc[student.gender].push(student);
                 return acc;
-              }, {} as Record<string, typeof students>);
+              }, {} as Record<string, typeof filteredStudents>);
               
               // Define gender order for display
               const genderOrder: ('male' | 'female' | 'other')[] = ['male', 'female', 'other'];
