@@ -96,6 +96,10 @@ Route::middleware('auth.token')->group(function () {
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);
     Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
+
+    // StudentSubject routes
+    Route::apiResource('student-subjects', App\Http\Controllers\StudentSubjectController::class);
+    Route::post('student-subjects/bulk-assign', [App\Http\Controllers\StudentSubjectController::class, 'bulkAssign']);
     // Topic routes
     Route::get('topics', [App\Http\Controllers\TopicController::class, 'index']);
     Route::post('topics', [App\Http\Controllers\TopicController::class, 'store']);

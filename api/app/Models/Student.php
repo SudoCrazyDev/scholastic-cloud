@@ -50,6 +50,23 @@ class Student extends Model
     }
 
     /**
+     * Subjects the student is explicitly assigned to.
+     */
+    public function subjects()
+    {
+        return $this->belongsToMany(Subject::class, 'student_subjects', 'student_id', 'subject_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Pivot records for subject assignments.
+     */
+    public function studentSubjects()
+    {
+        return $this->hasMany(StudentSubject::class, 'student_id');
+    }
+
+    /**
      * Get the ECR item scores for the student.
      */
     public function ecrItemScores()
