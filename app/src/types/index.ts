@@ -341,17 +341,18 @@ export interface UpdateClassSectionSubjectData {
 // Student types
 export interface Student {
   id: string;
+  lrn?: string;
   first_name: string;
   middle_name?: string;
   last_name: string;
   ext_name?: string;
+  gender?: string;
+  religion?: string;
   birthdate: string;
-  gender: 'male' | 'female' | 'other';
-  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
-  lrn: string;
   profile_picture?: string;
-  created_at: string;
-  updated_at: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface CreateStudentData {
