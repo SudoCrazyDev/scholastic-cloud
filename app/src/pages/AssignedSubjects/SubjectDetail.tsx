@@ -12,6 +12,8 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline'
 import { useSubjectDetail } from '@hooks'
+import { useQuery } from '@tanstack/react-query'
+import { studentSubjectService } from '../../services/studentSubjectService'
 import { ClassRecordTab } from './components/ClassRecordTab'
 import { TopicsTab } from './components/TopicsTab'
 import { CalendarTab } from './components/CalendarTab'
@@ -36,6 +38,15 @@ const SubjectDetail: React.FC = () => {
 
   const subject = data?.data as SubjectWithClassSectionStudents;
   
+  // Fetch assigned student IDs if subject is limited
+  const { data: assignedRes } = useQuery({
+    queryKey: ['student-subjects', subject?.id],
+    queryFn: () => studentSubjectService.listBySubject(subject!.id),
+    enabled: !!subject?.id && !!subject?.is_limited_student,
+    staleTime: 30_000,
+  })
+  const assignedStudentIds = (assignedRes?.data || []).map((a: any) => a.student_id) as string[]
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -176,8 +187,24 @@ const SubjectDetail: React.FC = () => {
 
         {/* Tab Content */}
         <div className="p-6">
-          {activeTab === 'class-record' && <ClassRecordTab key={`${subject.id}-${subject.class_section_id}`} subjectId={subject.id} classSectionId={subject.class_section_id} />}
-          {activeTab === 'student-scores' && <StudentScoresTab key={`${subject.id}-${subject.class_section_id}`} subjectId={subject.id} classSectionId={subject.class_section_id} />}
+          {activeTab === 'class-record' && (
+            <ClassRecordTab
+              key={`${subject.id}-${subject.class_section_id}`}
+              subjectId={subject.id}
+              classSectionId={subject.class_section_id}
+              isLimited={!!subject.is_limited_student}
+              assignedStudentIds={assignedStudentIds}
+            />
+          )}
+          {activeTab === 'student-scores' && (
+            <StudentScoresTab
+              key={`${subject.id}-${subject.class_section_id}`}
+              subjectId={subject.id}
+              classSectionId={subject.class_section_id}
+              isLimited={!!subject.is_limited_student}
+              assignedStudentIds={assignedStudentIds}
+            />
+          )}
           {activeTab === 'summative-assessment' && <SummativeAssessmentTab subjectId={subject.id} />}
           {activeTab === 'topics' && <TopicsTab subjectId={subject.id} />}
           {activeTab === 'calendar' && <CalendarTab subjectId={subject.id} />}
