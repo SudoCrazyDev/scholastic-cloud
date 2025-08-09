@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Subject extends Model
 {
@@ -54,6 +55,23 @@ class Subject extends Model
     public function childSubjects(): HasMany
     {
         return $this->hasMany(Subject::class, 'parent_subject_id');
+    }
+
+    /**
+     * Students explicitly assigned to this subject when is_limited_student is true.
+     */
+    public function students(): BelongsToMany
+    {
+        return $this->belongsToMany(Student::class, 'student_subjects', 'subject_id', 'student_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Pivot records for student-subject assignments.
+     */
+    public function studentSubjects(): HasMany
+    {
+        return $this->hasMany(StudentSubject::class, 'subject_id');
     }
 
     /**
