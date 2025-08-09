@@ -234,12 +234,14 @@ const ClassSectionDetail: React.FC = () => {
 
   const handleSubjectSubmit = async (data: any) => {
     try {
+      let result: any
       if (editingSubject) {
-        await updateSubjectMutation.mutateAsync({ id: editingSubject.id, data })
+        result = await updateSubjectMutation.mutateAsync({ id: editingSubject.id, data })
       } else {
-        await createSubjectMutation.mutateAsync(data)
+        result = await createSubjectMutation.mutateAsync(data)
       }
       setShowSubjectModal(false)
+      return result
     } catch (error) {
       // Error is handled in mutation onError
     }

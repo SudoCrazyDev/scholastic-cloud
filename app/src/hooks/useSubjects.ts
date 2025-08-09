@@ -131,12 +131,14 @@ export const useSubjects = (options: UseSubjectsOptions = {}) => {
     setModalSuccess(null)
 
     try {
+      let result: any
       if (editingSubject) {
-        await updateMutation.mutateAsync({ id: editingSubject.id, data: data as UpdateSubjectData })
+        result = await updateMutation.mutateAsync({ id: editingSubject.id, data: data as UpdateSubjectData })
       } else {
-        await createMutation.mutateAsync(data as CreateSubjectData)
+        result = await createMutation.mutateAsync(data as CreateSubjectData)
       }
       setIsModalOpen(false)
+      return result
     } catch {
       // Error is handled in mutation onError
     } finally {

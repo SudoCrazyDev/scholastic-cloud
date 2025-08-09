@@ -8,12 +8,14 @@ import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
 import { Autocomplete } from '../../../components/autocomplete'
 import { useTeachers } from '../../../hooks/useTeachers'
-import type { Subject, CreateSubjectData, UpdateSubjectData } from '../../../types'
+import type { Subject, CreateSubjectData, UpdateSubjectData, Student } from '../../../types'
+import { studentService } from '../../../services/studentService'
+import { studentSubjectService } from '../../../services/studentSubjectService'
 
 interface ClassSectionSubjectModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: CreateSubjectData | UpdateSubjectData) => Promise<void>
+  onSubmit: (data: CreateSubjectData | UpdateSubjectData) => Promise<{ success: boolean; data: Subject; message?: string } | void>
   subject?: Subject | null
   classSectionId: string
   institutionId: string
@@ -97,6 +99,10 @@ export function ClassSectionSubjectModal({
 
   const isEditing = !!subject
 
+  const [sectionStudents, setSectionStudents] = useState<Student[]>([])
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
+  const [studentSearch, setStudentSearch] = useState('')
+
   const formik = useFormik({
     initialValues: {
       subject_type: 'child' as 'parent' | 'child',
@@ -124,7 +130,18 @@ export function ClassSectionSubjectModal({
           is_limited_student: values.is_limited_student,
         }
         
-        await onSubmit(submitData)
+        const result = await onSubmit(submitData)
+
+        // After creating/updating, assign students if limited
+        if (formik.values.is_limited_student && selectedStudentIds.size > 0) {
+          const subjectId = (result && (result as any).data?.id) || subject?.id
+          if (subjectId) {
+            await studentSubjectService.bulkAssign({
+              student_ids: Array.from(selectedStudentIds),
+              subject_id: subjectId,
+            })
+          }
+        }
         onClose()
       } catch (err) {
         // Error handling is done by the parent component
@@ -204,6 +221,41 @@ export function ClassSectionSubjectModal({
     }
     return []
   }, [formik.values.subject_type, parentSubjects])
+
+  useEffect(() => {
+    const loadStudents = async () => {
+      if (!classSectionId) return
+      try {
+        const res = await studentService.getStudentsByClassSection(classSectionId)
+        const students = (res?.data || []).map((ss: any) => ss.student) as Student[]
+        setSectionStudents(students.filter(Boolean))
+
+        // If editing and limited, load assigned student ids
+        if (subject && subject.is_limited_student) {
+          try {
+            const assigned = await studentSubjectService.listBySubject(subject.id)
+            const ids: string[] = (assigned?.data || []).map((a: any) => a.student_id)
+            setSelectedStudentIds(new Set(ids))
+          } catch {}
+        } else {
+          setSelectedStudentIds(new Set())
+        }
+      } catch {
+        setSectionStudents([])
+      }
+    }
+
+    if (isOpen && formik.values.is_limited_student) {
+      loadStudents()
+    }
+  }, [isOpen, classSectionId, subject?.id, formik.values.is_limited_student])
+
+  // Clear selected students if toggled off
+  useEffect(() => {
+    if (!formik.values.is_limited_student) {
+      setSelectedStudentIds(new Set())
+    }
+  }, [formik.values.is_limited_student])
 
   return (
     <AnimatePresence>
@@ -501,6 +553,72 @@ export function ClassSectionSubjectModal({
                     />
                     <span className="text-sm text-gray-700">Limited student capacity</span>
                   </label>
+
+                  {formik.values.is_limited_student && (
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Students</label>
+                        <input
+                          type="text"
+                          value={studentSearch}
+                          onChange={(e) => setStudentSearch(e.target.value)}
+                          placeholder="Search students in this section..."
+                          className="w-full border rounded-md px-3 py-2 text-sm"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Only students in this class section can be assigned.</p>
+                      </div>
+
+                      <div className="max-h-40 overflow-y-auto border rounded-md divide-y">
+                        {sectionStudents
+                          .filter((s) => {
+                            if (!studentSearch) return true
+                            const term = studentSearch.toLowerCase()
+                            const name = [s.first_name, s.middle_name, s.last_name, s.ext_name].filter(Boolean).join(' ').toLowerCase()
+                            return name.includes(term) || (s.lrn || '').toLowerCase().includes(term)
+                          })
+                          .map((s) => {
+                            const id = s.id
+                            const selected = selectedStudentIds.has(id)
+                            return (
+                              <label key={id} className="flex items-center px-3 py-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={(e) => {
+                                    const next = new Set(selectedStudentIds)
+                                    if (e.target.checked) next.add(id)
+                                    else next.delete(id)
+                                    setSelectedStudentIds(next)
+                                  }}
+                                  className="mr-2"
+                                />
+                                <span className="flex-1">
+                                  {[s.first_name, s.middle_name, s.last_name, s.ext_name].filter(Boolean).join(' ')}
+                                  {s.lrn ? <span className="text-gray-500 ml-2">({s.lrn})</span> : null}
+                                </span>
+                              </label>
+                            )
+                          })}
+                        {sectionStudents.length === 0 && (
+                          <div className="px-3 py-4 text-sm text-gray-500">No students found in this section.</div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-gray-600">
+                        <span>Selected: {selectedStudentIds.size}</span>
+                        <div className="space-x-2">
+                          <button type="button" className="underline" onClick={() => setSelectedStudentIds(new Set())}>Clear</button>
+                          <button
+                            type="button"
+                            className="underline"
+                            onClick={() => setSelectedStudentIds(new Set(sectionStudents.map(s => s.id)))}
+                          >
+                            Select all
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
