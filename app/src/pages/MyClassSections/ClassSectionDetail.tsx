@@ -96,8 +96,6 @@ const ClassSectionDetail: React.FC = () => {
   // Fetch institution details
   const {
     data: institution,
-    isLoading: institutionLoading,
-    error: institutionError,
   } = useQuery({
     queryKey: ['institution', effectiveInstitutionId],
     queryFn: () => institutionService.getInstitution(effectiveInstitutionId),
@@ -171,8 +169,7 @@ const ClassSectionDetail: React.FC = () => {
   // Fetch student grades for report card
   const {
     data: studentGrades,
-    isLoading: studentGradesLoading,
-    error: studentGradesError,
+    isLoading: studentGradesLoading
   } = useQuery({
     queryKey: ['student-running-grades', { student_id: selectedStudentForReport?.id }],
     queryFn: () => studentRunningGradeService.list({ student_id: selectedStudentForReport?.id }),

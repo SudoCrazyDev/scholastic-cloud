@@ -76,7 +76,8 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
 
   // Gender distribution
   const genderDistribution = filteredStudents.reduce((acc: any, student: any) => {
-    acc[student.gender] = (acc[student.gender] || 0) + 1;
+    const gender = student.gender || 'other';
+    acc[gender] = (acc[gender] || 0) + 1;
     return acc;
   }, {});
 
@@ -267,10 +268,11 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
               
               // Group by gender
               const groupedStudents = sortedStudents.reduce((acc, student) => {
-                if (!acc[student.gender]) {
-                  acc[student.gender] = [];
+                const gender = student.gender || 'other';
+                if (!acc[gender]) {
+                  acc[gender] = [];
                 }
-                acc[student.gender].push(student);
+                acc[gender].push(student);
                 return acc;
               }, {} as Record<string, typeof filteredStudents>);
               

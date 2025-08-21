@@ -188,11 +188,11 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                   {getFullName(student)}
                 </h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge color={getGenderColor(student.gender)}>
-                    {student.gender.charAt(0).toUpperCase() + student.gender.slice(1)}
+                  <Badge color={getGenderColor(student.gender || 'other')}>
+                    {(student.gender || 'other').charAt(0).toUpperCase() + (student.gender || 'other').slice(1)}
                   </Badge>
-                  <Badge color={getReligionColor(student.religion)}>
-                    {student.religion}
+                  <Badge color={getReligionColor(student.religion || 'Others')}>
+                    {student.religion || 'Others'}
                   </Badge>
                 </div>
               </div>

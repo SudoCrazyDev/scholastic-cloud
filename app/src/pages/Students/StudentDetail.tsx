@@ -275,13 +275,13 @@ export default function StudentDetail() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Gender</label>
-                <Badge color={getGenderColor(student.gender)}>
-                  {student.gender.charAt(0).toUpperCase() + student.gender.slice(1)}
+                <Badge color={getGenderColor(student.gender || 'other')}>
+                  {(student.gender || 'other').charAt(0).toUpperCase() + (student.gender || 'other').slice(1)}
                 </Badge>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Religion</label>
-                <Badge color={getReligionColor(student.religion)}>
+                <Badge color={getReligionColor(student.religion || 'Others')}>
                   {student.religion}
                 </Badge>
               </div>
@@ -327,11 +327,11 @@ export default function StudentDetail() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Created</label>
-            <p className="text-gray-900">{formatDate(student.created_at)}</p>
+            <p className="text-gray-900">{formatDate(student.created_at || '')}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Last Updated</label>
-            <p className="text-gray-900">{formatDate(student.updated_at)}</p>
+            <p className="text-gray-900">{formatDate(student.updated_at || '')}</p>
           </div>
         </div>
       </div>

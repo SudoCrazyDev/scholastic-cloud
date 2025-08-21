@@ -32,6 +32,18 @@ const GENDER_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 
+// Form values type
+type FormValues = {
+  first_name: string
+  middle_name: string
+  last_name: string
+  ext_name: string
+  birthdate: string
+  gender: 'male' | 'female' | 'other'
+  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others'
+  lrn: string
+}
+
 // Validation schema for quick edit (only essential fields)
 const validationSchema = Yup.object({
   first_name: Yup.string()
@@ -73,11 +85,11 @@ const validationSchema = Yup.object({
   
   gender: Yup.string()
     .required('Gender is required')
-    .oneOf(['male', 'female', 'other'], 'Please select a valid gender'),
+    .oneOf(['male', 'female', 'other'] as const, 'Please select a valid gender'),
   
   religion: Yup.string()
     .required('Religion is required')
-    .oneOf(['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'Others'], 'Please select a valid religion'),
+    .oneOf(['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'Others'] as const, 'Please select a valid religion'),
   
   lrn: Yup.string()
     .required('LRN is required')
@@ -165,7 +177,7 @@ export function StudentQuickEditModal({
     onClose()
   }
 
-  const handleSubmit = (values: typeof initialValues) => {
+  const handleSubmit = (values: FormValues) => {
     const updateData: UpdateStudentData = {
       ...values,
       profile_picture: profileImage || undefined,
@@ -175,14 +187,14 @@ export function StudentQuickEditModal({
 
   if (!student) return null
 
-  const initialValues = {
+  const initialValues: FormValues = {
     first_name: student.first_name || '',
     middle_name: student.middle_name || '',
     last_name: student.last_name || '',
     ext_name: student.ext_name || '',
     birthdate: student.birthdate ? new Date(student.birthdate).toISOString().split('T')[0] : '',
-    gender: student.gender || 'male',
-    religion: student.religion || 'Others',
+    gender: (student.gender as 'male' | 'female' | 'other') || 'male',
+    religion: (student.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others') || 'Others',
     lrn: student.lrn || '',
   }
 

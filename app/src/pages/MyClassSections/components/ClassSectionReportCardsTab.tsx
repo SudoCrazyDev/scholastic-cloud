@@ -29,7 +29,10 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
     };
     
     filteredStudents.forEach(student => {
-      groups[student.gender].push(student);
+      const gender = student.gender as keyof typeof groups;
+      if (gender && groups[gender]) {
+        groups[gender].push(student);
+      }
     });
     
     // Sort each group alphabetically by last name, then first name

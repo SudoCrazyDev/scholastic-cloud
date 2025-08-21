@@ -80,7 +80,7 @@ export default function PrintTempReportCard({
                             const quarter3Grade = roundGrade(studentGrade?.quarter3_grade) || '';
                             const quarter4Grade = roundGrade(studentGrade?.quarter4_grade) || '';
                             const finalGrade = roundGrade(studentGrade?.final_grade) || '';
-                            const remarks = studentGrade?.remarks || '';
+                            // const remarks = studentGrade?.remarks || '';
                             
                             return (
                               <View key={index} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>

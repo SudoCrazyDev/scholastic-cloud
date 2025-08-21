@@ -20,7 +20,8 @@ import { useStudentScores } from '../../../hooks/useStudentScores'
 import { toast } from 'react-hot-toast'
 import { ErrorHandler } from '../../../utils/errorHandler'
 import { Alert } from '../../../components/alert'
-import { StudentScoreInput } from './StudentScoreInput';
+import { StudentScoreInput } from './StudentScoreInput'
+import type { Student } from '../../../types'
 
 
 interface StudentScoresTabProps {
@@ -60,16 +61,7 @@ interface GradeItem {
 
 
 
-interface Student {
-  id: string
-  lrn: string
-  first_name: string
-  middle_name?: string
-  last_name: string
-  ext_name?: string
-  gender: 'male' | 'female' | 'other'
-  profile_picture?: string
-}
+
 interface StudentGroupProps {
   gender: 'male' | 'female' | 'other'
   students: Student[]
@@ -161,7 +153,7 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
                       <h4 className="text-sm font-medium text-gray-900 truncate">
                         {student.first_name} {student.last_name}
                       </h4>
-                      <p className="text-xs text-gray-500">LRN: {student.lrn}</p>
+                      <p className="text-xs text-gray-500">LRN: {student.lrn || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
@@ -206,7 +198,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
 
   // Group students by gender and sort alphabetically
   const groupedStudents = students.reduce((groups, student) => {
-    const gender = student.gender
+    const gender = student.gender || 'other'
     if (!groups[gender]) {
       groups[gender] = []
     }
@@ -406,7 +398,8 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
 
   // Gender distribution
   const genderDistribution = filteredStudents.reduce((acc: any, student: any) => {
-    acc[student.gender] = (acc[student.gender] || 0) + 1
+    const gender = student.gender || 'other'
+    acc[gender] = (acc[gender] || 0) + 1
     return acc
   }, {})
 

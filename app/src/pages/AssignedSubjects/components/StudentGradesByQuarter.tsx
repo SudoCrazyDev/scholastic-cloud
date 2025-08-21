@@ -1,17 +1,8 @@
 import React from 'react';
 import { FinalGradeInput } from './FinalGradeInput';
 import type { StudentRunningGrade } from '../../../services/studentRunningGradeService';
+import type { Student } from '../../../types';
 import { toNumber } from '../../../utils/gradeUtils';
-
-interface Student {
-  id: string;
-  lrn: string;
-  first_name: string;
-  middle_name?: string;
-  last_name: string;
-  ext_name?: string;
-  gender: 'male' | 'female' | 'other';
-}
 
 interface StudentGradesByQuarterProps {
   student: Student;
@@ -65,11 +56,11 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
           </h4>
           <div className="flex items-center space-x-4 mt-1">
             <p className="text-sm text-gray-600 font-medium">
-              LRN: <span className="text-gray-800">{student.lrn}</span>
+              LRN: <span className="text-gray-800">{student.lrn || 'N/A'}</span>
             </p>
             <div className="flex items-center space-x-1">
-              <div className={`w-2 h-2 rounded-full ${student.gender === 'male' ? 'bg-blue-400' : 'bg-pink-400'}`} />
-              <span className="text-xs text-gray-500 capitalize">{student.gender}</span>
+              <div className={`w-2 h-2 rounded-full ${student.gender === 'male' ? 'bg-blue-400' : student.gender === 'female' ? 'bg-pink-400' : 'bg-gray-400'}`} />
+              <span className="text-xs text-gray-500 capitalize">{student.gender || 'N/A'}</span>
             </div>
           </div>
           {selectedQuarter && (
