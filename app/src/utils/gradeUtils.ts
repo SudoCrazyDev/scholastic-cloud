@@ -19,6 +19,17 @@ export const formatGrade = (grade: number | string | null | undefined): string =
 };
 
 /**
+ * Rounds a grade to 2 decimal places consistently
+ * @param grade - The grade number or string to round
+ * @returns Rounded grade number or undefined if invalid
+ */
+export const roundGrade = (grade: any): number | undefined => {
+  if (!grade || isNaN(parseFloat(grade))) return undefined;
+  const numGrade = parseFloat(grade);
+  return Number(numGrade.toFixed(0));
+};
+
+/**
  * Gets the color class for a grade based on its value
  * @param grade - The grade number or string
  * @returns CSS color class

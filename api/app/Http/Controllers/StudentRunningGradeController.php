@@ -3,11 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\StudentRunningGrade;
+use App\Services\ParentSubjectGradeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class StudentRunningGradeController extends Controller
 {
+    protected $parentSubjectGradeService;
+
+    public function __construct(ParentSubjectGradeService $parentSubjectGradeService)
+    {
+        $this->parentSubjectGradeService = $parentSubjectGradeService;
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -62,6 +70,16 @@ class StudentRunningGradeController extends Controller
 
         $runningGrade = StudentRunningGrade::create($validated);
 
+        // If this is a final grade, calculate parent subject grades
+        if (isset($validated['final_grade'])) {
+            $this->parentSubjectGradeService->calculateParentSubjectGrades(
+                $validated['student_id'],
+                $validated['subject_id'],
+                $validated['quarter'],
+                $validated['academic_year']
+            );
+        }
+
         return response()->json([
             'success' => true,
             'data' => $runningGrade->load(['student', 'subject']),
@@ -95,6 +113,16 @@ class StudentRunningGradeController extends Controller
         ]);
 
         $studentRunningGrade->update($validated);
+
+        // If final grade was updated, calculate parent subject grades
+        if (isset($validated['final_grade'])) {
+            $this->parentSubjectGradeService->calculateParentSubjectGrades(
+                $studentRunningGrade->student_id,
+                $studentRunningGrade->subject_id,
+                $studentRunningGrade->quarter,
+                $studentRunningGrade->academic_year
+            );
+        }
 
         return response()->json([
             'success' => true,
@@ -146,6 +174,14 @@ class StudentRunningGradeController extends Controller
                 
                 $runningGrade = $existingGrade->fresh()->load(['student', 'subject']);
                 
+                // Calculate parent subject grades after updating final grade
+                $this->parentSubjectGradeService->calculateParentSubjectGrades(
+                    $validated['student_id'],
+                    $validated['subject_id'],
+                    $validated['quarter'],
+                    $validated['academic_year']
+                );
+                
                 return response()->json([
                     'success' => true,
                     'data' => $runningGrade,
@@ -162,6 +198,14 @@ class StudentRunningGradeController extends Controller
                     'academic_year' => $validated['academic_year'],
                 ]);
 
+                // Calculate parent subject grades after creating final grade
+                $this->parentSubjectGradeService->calculateParentSubjectGrades(
+                    $validated['student_id'],
+                    $validated['subject_id'],
+                    $validated['quarter'],
+                    $validated['academic_year']
+                );
+
                 return response()->json([
                     'success' => true,
                     'data' => $runningGrade->load(['student', 'subject']),
@@ -173,6 +217,37 @@ class StudentRunningGradeController extends Controller
                 'success' => false,
                 'message' => 'Failed to save final grade',
                 'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Manually recalculate all parent subject grades for a specific student, quarter, and academic year
+     */
+    public function recalculateParentSubjectGrades(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'student_id' => 'required|string|exists:students,id',
+            'quarter' => 'required|integer|between:1,4',
+            'academic_year' => 'required|string',
+        ]);
+
+        try {
+            $this->parentSubjectGradeService->recalculateAllParentSubjectGrades(
+                $validated['student_id'],
+                $validated['quarter'],
+                $validated['academic_year']
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Parent subject grades recalculated successfully',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to recalculate parent subject grades'
             ], 500);
         }
     }

@@ -89,4 +89,28 @@ class Subject extends Model
     {
         return $this->hasMany(Topic::class)->orderBy('order');
     }
+
+    /**
+     * Check if this subject has child subjects
+     */
+    public function hasChildSubjects(): bool
+    {
+        return $this->childSubjects()->exists();
+    }
+
+    /**
+     * Check if this subject is a child subject (has a parent)
+     */
+    public function isChildSubject(): bool
+    {
+        return !is_null($this->parent_subject_id);
+    }
+
+    /**
+     * Check if this subject is a parent subject (has children)
+     */
+    public function isParentSubject(): bool
+    {
+        return $this->hasChildSubjects();
+    }
 }

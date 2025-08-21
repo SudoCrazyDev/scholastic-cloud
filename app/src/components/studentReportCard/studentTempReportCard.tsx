@@ -1,17 +1,44 @@
 import { Page, Text, View, Document, PDFViewer } from '@react-pdf/renderer';
+import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../../types';
+import { roundGrade } from '@/utils/gradeUtils';
 
-export default function PrintTempReportCard() {
+interface PrintTempReportCardProps {
+  sectionSubjects?: SectionSubject[]
+  studentSubjectsGrade?: StudentSubjectGrade[]
+  institution?: Institution
+  classSection?: ClassSection | null
+  student?: Student | null
+}
+
+export default function PrintTempReportCard({ 
+  sectionSubjects = [], 
+  studentSubjectsGrade = [],
+  institution,
+  classSection,
+  student
+}: PrintTempReportCardProps) {
+
     return (
         <PDFViewer className='w-full' style={{height: '600px'}}>
             <Document>
                 <Page size="A5" orientation="landscape" style={{height: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'center', fontFamily: 'Helvetica', flexWrap: 'wrap'}}>
                     <View style={{ width: '95%', alignContent: "center", display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '10px' }}>
-                        <Text style={{ textTransform: 'uppercase', textAlign: 'center', fontSize: '13px' }}>SCHOOL NAME</Text>
-                        <Text style={{ fontSize: '10px', textAlign: 'center' }}>School Address</Text>
+                        <Text style={{ textTransform: 'uppercase', textAlign: 'center', fontSize: '13px' }}>
+                          {institution?.title || 'SCHOOL NAME'}
+                        </Text>
+                        <Text style={{ fontSize: '10px', textAlign: 'center' }}>
+                          {institution?.address || 'School Address'}
+                          {institution?.division && `, ${institution.division}`}
+                          {institution?.region && `, ${institution.region}`}
+                        </Text>
                     </View>
                     <View style={{ paddingHorizontal: '20px', width: '100%', display: 'flex', flexDirection: 'row', marginTop: '5px'}}>
-                        <Text style={{ textTransform: 'uppercase', fontFamily: 'Helvetica-Bold', fontSize: '12px'}}>STUDENT NAME</Text>
-                        <Text style={{ marginLeft: 'auto', fontFamily: 'Helvetica-Bold', fontSize: '12px' }}>LRN: 123456789012</Text>
+                        <Text style={{ textTransform: 'uppercase', fontFamily: 'Helvetica-Bold', fontSize: '12px'}}>
+                          {student ? `${student.last_name}, ${student.first_name} ${student.middle_name ? student.middle_name + ' ' : ''}${student.ext_name || ''}`.trim() : 'STUDENT NAME'}
+                        </Text>
+                        <Text style={{ marginLeft: 'auto', fontFamily: 'Helvetica-Bold', fontSize: '12px' }}>
+                          LRN: {student?.lrn || ""}
+                        </Text>
                     </View>
                     <View style={{width: '50%', paddingHorizontal: '20px', display: 'flex', flexDirection: 'column', marginTop: '5px'}}>
                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', marginBottom: '10px'}}>REPORT ON LEARNING PROGRESS AND ACHIEVEMENT</Text>
@@ -44,42 +71,80 @@ export default function PrintTempReportCard() {
                             </View>
                         </View>
 
-                        {/* Sample subject row */}
-                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{paddingLeft: '2px', paddingVertical: '2px', width: '30%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'flex-start', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica'}}>Mathematics</Text>
-                            </View>
-                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black', alignItems: 'center', justifyContent: 'center'}}>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>85</Text>
+                        {/* Dynamic subject rows */}
+                        {sectionSubjects && sectionSubjects.length > 0 ? (
+                          sectionSubjects.map((subject, index) => {
+                            const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
+                            const quarter1Grade = roundGrade(studentGrade?.quarter1_grade) || '';
+                            const quarter2Grade = roundGrade(studentGrade?.quarter2_grade) || '';
+                            const quarter3Grade = roundGrade(studentGrade?.quarter3_grade) || '';
+                            const quarter4Grade = roundGrade(studentGrade?.quarter4_grade) || '';
+                            const finalGrade = roundGrade(studentGrade?.final_grade) || '';
+                            const remarks = studentGrade?.remarks || '';
+                            
+                            return (
+                              <View key={index} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
+                                <View style={{paddingLeft: '2px', paddingVertical: '2px', width: '30%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'flex-start', borderRight: '1px solid black'}}>
+                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginLeft: `${subject.subject_type === 'parent' ? '0px' : '10px'}`}}>{subject.title ||  'Subject'} {subject.variant ? `- ${subject.variant}` : ''}</Text>
                                 </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>88</Text>
+                                <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black', alignItems: 'center', justifyContent: 'center'}}>
+                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                    <Text>{quarter1Grade}</Text>
+                                  </View>
+                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                    <Text>{quarter2Grade}</Text>
+                                  </View>
+                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                    <Text>{quarter3Grade}</Text>
+                                  </View>
+                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                    <Text>{quarter4Grade}</Text>
+                                  </View>
                                 </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>90</Text>
+                                <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{finalGrade}</Text>
                                 </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>92</Text>
+                                <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
+                                  {/* <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{remarks}</Text> */}
                                 </View>
+                              </View>
+                            );
+                          })
+                        ) : (
+                          <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
+                            <View style={{paddingLeft: '2px', paddingVertical: '2px', width: '100%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
+                              <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>No subjects available</Text>
                             </View>
-                            <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>89</Text>
-                            </View>
-                            <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Passed</Text>
-                            </View>
-                        </View>
+                          </View>
+                        )}
 
                         <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
                             <View style={{width: '70%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>GENERAL AVERAGE</Text>
                             </View>
                             <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>89</Text>
+                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>
+                                  {(() => {
+                                    const validGrades = studentSubjectsGrade
+                                      .filter(grade => grade.final_grade && !isNaN(Number(grade.final_grade)))
+                                      .map(grade => parseFloat(String(grade.final_grade)));
+                                    if (validGrades.length === 0) return '-';
+                                    const average = validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length;
+                                    return average.toFixed(2);
+                                  })()}
+                                </Text>
                             </View>
                             <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Passed</Text>
+                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>
+                                  {(() => {
+                                    const validGrades = studentSubjectsGrade
+                                      .filter(grade => grade.final_grade && !isNaN(Number(grade.final_grade)))
+                                      .map(grade => parseFloat(String(grade.final_grade)));
+                                    if (validGrades.length === 0) return '-';
+                                    const average = validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length;
+                                    return average >= 75 ? 'Passed' : 'Failed';
+                                  })()}
+                                </Text>
                             </View>
                         </View>
                             
@@ -150,8 +215,22 @@ export default function PrintTempReportCard() {
                             </View>
                         </View>
                         <View style={{ display: 'flex', flexDirection: 'column', marginTop: '10px', marginBottom: '5px'}}>
-                            <Text style={{ textTransform: 'uppercase', fontSize: '10px', fontFamily: 'Helvetica-Bold' }}>TEACHER NAME</Text>
+                            <Text style={{ textTransform: 'uppercase', fontSize: '10px', fontFamily: 'Helvetica-Bold' }}>
+                              {classSection?.adviser?.first_name && classSection?.adviser?.last_name 
+                                ? `${classSection.adviser.first_name} ${classSection.adviser.last_name}` 
+                                : 'TEACHER NAME'}
+                            </Text>
                             <Text style={{ fontSize: '8px'}}>ADVISER</Text>
+                            {classSection?.grade_level && (
+                              <Text style={{ fontSize: '8px', marginTop: '2px'}}>
+                                Grade Level: {classSection.grade_level}
+                              </Text>
+                            )}
+                            {classSection?.academic_year && (
+                              <Text style={{ fontSize: '8px', marginTop: '2px'}}>
+                                Academic Year: {classSection.academic_year}
+                              </Text>
+                            )}
                         </View>
                     </View>
                     
@@ -187,7 +266,7 @@ export default function PrintTempReportCard() {
                             <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Maka-Diyos</Text>
                             </View>
-                            <View style={{width: '42%', display: 'flex', flexDirection:'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '30px', borderBottom: '1px solid black'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
                                         Expresses one's spiritual beliefs while respecting the spiritual beliefs of others
@@ -203,48 +282,227 @@ export default function PrintTempReportCard() {
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            AO
+                                            
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            SO
+                                            
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            AO
+                                            
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            SO
+                                            
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            AO
+                                            
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            SO
+                                            
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            AO
+                                            
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            SO
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+                        
+                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
+                            <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Maka-Tao</Text>
+                            </View>
+                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                <View style={{height: '30px', borderBottom: '1px solid black'}}>
+                                    <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                        Is sensitive to individual, social, and cultural differences.
+                                    </Text>
+                                </View>
+                                <View>
+                                    <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                        Demonstrates contributions toward solidarity.
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+                        
+                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
+                            <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Makakalikasan</Text>
+                            </View>
+                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                <View style={{height: '30px'}}>
+                                    <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                        Cares for the environment and utilizes resources wisely, judiciously, and economically.
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+                        
+                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
+                            <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Makabansa</Text>
+                            </View>
+                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                <View style={{height: '30px', borderBottom: '1px solid black'}}>
+                                    <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                        Demonstrates pride being a Filipino; excercises the rights and responsibilities of a Filipino Citizen.
+                                    </Text>
+                                </View>
+                                <View>
+                                    <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                        Demonstrates appropriate behavior in carrying out activities in the school, community, and country.
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
+                                        </Text>
+                                    </View>
+                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                            
                                         </Text>
                                     </View>
                                 </View>

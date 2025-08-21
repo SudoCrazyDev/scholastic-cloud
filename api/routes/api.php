@@ -124,6 +124,7 @@ Route::middleware('auth.token')->group(function () {
     // StudentRunningGrade routes
     Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
+    Route::post('student-running-grades/recalculate-parent-subject-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'recalculateParentSubjectGrades']);
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
     // RealtimeAttendance GET route

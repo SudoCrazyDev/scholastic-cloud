@@ -137,14 +137,21 @@ class StudentSubjectController extends Controller
         }
 
         // Ensure student_institution exists
-        $hasInstitution = StudentInstitution::where('student_id', $request->student_id)
+        $studentInstitution = StudentInstitution::where('student_id', $request->student_id)
             ->where('institution_id', $institutionId)
-            ->where('academic_year', $academicYear)
-            ->exists();
-        if (!$hasInstitution) {
+            ->first();
+        
+        if (!$studentInstitution) {
+            // Create new student_institution record if it doesn't exist
             StudentInstitution::create([
                 'student_id' => $request->student_id,
                 'institution_id' => $institutionId,
+                'is_active' => true,
+                'academic_year' => $academicYear,
+            ]);
+        } else {
+            // Update existing record to ensure it's active and has the current academic year
+            $studentInstitution->update([
                 'is_active' => true,
                 'academic_year' => $academicYear,
             ]);
@@ -330,14 +337,21 @@ class StudentSubjectController extends Controller
         // Create missing student_institution and assignments
         $created = [];
         foreach ($studentIds as $studentId) {
-            $hasInstitution = StudentInstitution::where('student_id', $studentId)
+            $studentInstitution = StudentInstitution::where('student_id', $studentId)
                 ->where('institution_id', $institutionId)
-                ->where('academic_year', $academicYear)
-                ->exists();
-            if (!$hasInstitution) {
+                ->first();
+            
+            if (!$studentInstitution) {
+                // Create new student_institution record if it doesn't exist
                 StudentInstitution::create([
                     'student_id' => $studentId,
                     'institution_id' => $institutionId,
+                    'is_active' => true,
+                    'academic_year' => $academicYear,
+                ]);
+            } else {
+                // Update existing record to ensure it's active and has the current academic year
+                $studentInstitution->update([
                     'is_active' => true,
                     'academic_year' => $academicYear,
                 ]);

@@ -247,15 +247,22 @@ class StudentSectionController extends Controller
         // Create new assignments and ensure student_institution exists
         $assignments = [];
         foreach ($studentIds as $studentId) {
-            // Check if student_institution exists for this student, institution, and academic year
-            $hasInstitution = StudentInstitution::where('student_id', $studentId)
+            // Check if student_institution exists for this student and institution (regardless of academic year)
+            $studentInstitution = StudentInstitution::where('student_id', $studentId)
                 ->where('institution_id', $institutionId)
-                ->where('academic_year', $academicYear)
-                ->exists();
-            if (!$hasInstitution) {
+                ->first();
+            
+            if (!$studentInstitution) {
+                // Create new student_institution record if it doesn't exist
                 StudentInstitution::create([
                     'student_id' => $studentId,
                     'institution_id' => $institutionId,
+                    'is_active' => true,
+                    'academic_year' => $academicYear,
+                ]);
+            } else {
+                // Update existing record to ensure it's active and has the current academic year
+                $studentInstitution->update([
                     'is_active' => true,
                     'academic_year' => $academicYear,
                 ]);

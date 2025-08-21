@@ -2,18 +2,31 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Button } from './button'
 import PrintTempReportCard from './studentReportCard/studentTempReportCard.tsx'
+import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../types'
 
 interface ReportCardModalProps {
   isOpen: boolean
   onClose: () => void
   studentName?: string
   studentId?: string
+  sectionSubjects?: SectionSubject[]
+  studentSubjectsGrade?: StudentSubjectGrade[]
+  institution?: Institution
+  classSection?: ClassSection | null
+  student?: Student | null
+  loading?: boolean
 }
 
 export function ReportCardModal({
   isOpen,
   onClose,
   studentName,
+  sectionSubjects,
+  studentSubjectsGrade,
+  institution,
+  classSection,
+  student,
+  loading = false,
 }: ReportCardModalProps) {
   const handleClose = () => {
     onClose()
@@ -58,9 +71,34 @@ export function ReportCardModal({
 
               {/* Content */}
               <div className="p-6">
-                <div className="w-full h-[600px]">
-                  <PrintTempReportCard />
-                </div>
+                {loading || !institution || !classSection || !student ? (
+                  <div className="flex items-center justify-center h-[600px]">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600">
+                        {loading ? 'Loading report card data...' : 'Preparing report card...'}
+                      </p>
+                      {!loading && (!institution || !classSection || !student) && (
+                        <div className="mt-4 text-sm text-gray-500">
+                          <p>Missing data:</p>
+                          <p>Institution: {institution ? '✓' : '✗'}</p>
+                          <p>Class Section: {classSection ? '✓' : '✗'}</p>
+                          <p>Student: {student ? '✓' : '✗'}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full h-[600px]">
+                    <PrintTempReportCard 
+                      sectionSubjects={sectionSubjects}
+                      studentSubjectsGrade={studentSubjectsGrade}
+                      institution={institution}
+                      classSection={classSection}
+                      student={student}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

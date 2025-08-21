@@ -245,6 +245,33 @@ export interface UpdateTopicData {
   quarter?: string;
 }
 
+// Report Card types
+export interface SectionSubject {
+  id: string;
+  name?: string;
+  subject_name?: string;
+  variant?: string;
+  title: string;
+  order: number;
+  subject_type: 'parent' | 'child';
+  parent_subject_id?: string;
+}
+
+export interface StudentSubjectGrade {
+  id?: string;
+  subject_id: string;
+  student_id: string;
+  quarter1_grade?: number | string;
+  quarter2_grade?: number | string;
+  quarter3_grade?: number | string;
+  quarter4_grade?: number | string;
+  final_grade?: number | string;
+  remarks?: string;
+  academic_year?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ReorderTopicsData {
   subject_id: string;
   topic_orders: Array<{

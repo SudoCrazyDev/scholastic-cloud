@@ -1,10 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { classSectionService } from '../../services/classSectionService'
 import { subjectService } from '../../services/subjectService'
 import { studentService } from '../../services/studentService'
+import { studentRunningGradeService } from '../../services/studentRunningGradeService'
+import { institutionService } from '../../services/institutionService'
 import { Alert } from '../../components/alert'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { ReportCardModal } from '../../components/ReportCardModal'
@@ -24,7 +26,7 @@ import {
   BarChart3,
   Award
 } from 'lucide-react'
-import type { Student, Subject } from '../../types'
+import type { Student, Subject, StudentSubjectGrade } from '../../types'
 import ClassSectionHeader from './components/ClassSectionHeader';
 import ClassSectionStudentsTab from './components/ClassSectionStudentsTab';
 import ClassSectionRankingTab from './components/ClassSectionRankingTab';
@@ -33,6 +35,7 @@ import ClassSectionConsolidatedGradesTab from './components/ClassSectionConsolid
 import ClassSectionSubjectsTab from './components/ClassSectionSubjectsTab';
 import ClassSectionCoreValuesTab from './components/ClassSectionCoreValuesTab';
 import { Select } from '../../components/select';
+import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils';
 
 const ClassSectionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -83,6 +86,26 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!id,
   })
 
+  // Get institution ID from class section if user doesn't have it
+  const effectiveInstitutionId = useMemo(() => {
+    if (institutionId) return institutionId;
+    if (classSection?.data?.institution_id) return classSection.data.institution_id;
+    return '';
+  }, [institutionId, classSection?.data?.institution_id]);
+
+  // Fetch institution details
+  const {
+    data: institution,
+    isLoading: institutionLoading,
+    error: institutionError,
+  } = useQuery({
+    queryKey: ['institution', effectiveInstitutionId],
+    queryFn: () => institutionService.getInstitution(effectiveInstitutionId),
+    enabled: !!effectiveInstitutionId,
+  })
+
+
+
   // Fetch subjects for this class section
   const {
     data: subjectsResponse,
@@ -113,6 +136,96 @@ const ClassSectionDetail: React.FC = () => {
     assignmentId: item.id
   })) || []
   const classSectionData = classSection?.data
+
+  // Get the selected student object for report card
+  const selectedStudent = useMemo(() => {
+    if (!selectedStudentForReport?.id || !students.length) return null;
+    return students.find(student => student.id === selectedStudentForReport.id) || null;
+  }, [selectedStudentForReport?.id, students]);
+
+  // Create fallback institution data if the query fails
+  const fallbackInstitution = useMemo(() => ({
+    id: effectiveInstitutionId || 'unknown',
+    title: 'School Name',
+    abbr: 'SN',
+    address: 'School Address',
+    division: 'Division',
+    region: 'Region',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }), [effectiveInstitutionId]);
+
+  // Use actual institution data or fallback
+  const finalInstitution = institution?.data || fallbackInstitution;
+
+
+
+  // The backend now automatically includes the adviser relationship
+  const enhancedClassSectionData = useMemo(() => {
+    if (!classSectionData) return null;
+    return classSectionData;
+  }, [classSectionData]);
+
+
+
+  // Fetch student grades for report card
+  const {
+    data: studentGrades,
+    isLoading: studentGradesLoading,
+    error: studentGradesError,
+  } = useQuery({
+    queryKey: ['student-running-grades', { student_id: selectedStudentForReport?.id }],
+    queryFn: () => studentRunningGradeService.list({ student_id: selectedStudentForReport?.id }),
+    enabled: !!selectedStudentForReport?.id,
+  })
+
+
+
+  // Transform the grades data to match the expected format
+  const transformedGrades = useMemo((): StudentSubjectGrade[] => {
+    if (!studentGrades?.data || !selectedStudentForReport?.id) return [];
+
+    const gradesBySubject = studentGrades.data.reduce((acc: Record<string, StudentSubjectGrade>, grade: any) => {
+
+      if (!acc[grade.subject_id]) {
+        acc[grade.subject_id] = {
+          subject_id: grade.subject_id,
+          student_id: grade.student_id,
+          quarter1_grade: undefined,
+          quarter2_grade: undefined,
+          quarter3_grade: undefined,
+          quarter4_grade: undefined,
+          final_grade: undefined,
+          remarks: undefined,
+          academic_year: grade.academic_year,
+        };
+      }
+
+      const quarter = grade.quarter;
+      const roundedGrade = roundGrade(grade.final_grade);
+      
+      // Assign rounded quarterly grades
+      if (quarter === "1") {
+        acc[grade.subject_id].quarter1_grade = roundedGrade;
+      } else if (quarter === "2") {
+        acc[grade.subject_id].quarter2_grade = roundedGrade;
+      } else if (quarter === "3") {
+        acc[grade.subject_id].quarter3_grade = roundedGrade;
+      } else if (quarter === "4") {
+        acc[grade.subject_id].quarter4_grade = roundedGrade;
+      }
+
+      // Set final grade and remarks if grade exists
+      if (roundedGrade !== undefined) {
+        acc[grade.subject_id].final_grade = roundedGrade;
+        acc[grade.subject_id].remarks = getGradeRemarks(roundedGrade);
+      }
+
+      return acc;
+    }, {} as Record<string, StudentSubjectGrade>);
+
+    return Object.values(gradesBySubject);
+  }, [studentGrades?.data, selectedStudentForReport?.id]);
 
   // Subject mutations
   const createSubjectMutation = useMutation({
@@ -188,13 +301,13 @@ const ClassSectionDetail: React.FC = () => {
   const filteredStudents = students.filter(student => {
     if (!studentSearchTerm) return true
     const fullName = getFullName(student).toLowerCase()
-    const lrn = student.lrn.toLowerCase()
+    const lrn = student.lrn?.toLowerCase() || ''
     return fullName.includes(studentSearchTerm.toLowerCase()) || lrn.includes(studentSearchTerm.toLowerCase())
   })
 
   // Group students by gender and sort alphabetically
   const groupedStudents: Record<string, (Student & { assignmentId: string })[]> = students.reduce((acc, student) => {
-    const gender = student.gender;
+    const gender = student.gender || '';
     if (!acc[gender]) {
       acc[gender] = [];
     }
@@ -292,6 +405,16 @@ const ClassSectionDetail: React.FC = () => {
     }
   }
 
+  // Check if we have all the necessary data for the report card
+  const hasReportCardData = useMemo(() => {
+    return !!(
+      finalInstitution &&
+      enhancedClassSectionData &&
+      selectedStudent &&
+      subjects.length > 0
+    );
+  }, [finalInstitution, enhancedClassSectionData, selectedStudent, subjects]);
+
   // Report cards and consolidated grades handlers
   const handleViewTempReportCard = (studentId: string) => {
     const student = students.find(s => s.id === studentId)
@@ -300,7 +423,18 @@ const ClassSectionDetail: React.FC = () => {
         id: studentId,
         name: getFullName(student)
       })
-      setShowReportCardModal(true)
+      // Only open modal if we have the necessary data
+      if (hasReportCardData) {
+        setShowReportCardModal(true)
+      } else {
+        console.log('Cannot open report card modal - missing data:', {
+          institution: !!finalInstitution,
+          classSection: !!classSectionData,
+          student: !!selectedStudent,
+          subjects: subjects.length
+        });
+        // You could show an alert here to inform the user
+      }
     }
   }
 
@@ -311,7 +445,18 @@ const ClassSectionDetail: React.FC = () => {
         id: studentId,
         name: getFullName(student)
       })
-      setShowStudentReportCardModal(true)
+      // Only open modal if we have the necessary data
+      if (hasReportCardData) {
+        setShowStudentReportCardModal(true)
+      } else {
+        console.log('Cannot open student report card modal - missing data:', {
+          institution: !!finalInstitution,
+          classSection: !!classSectionData,
+          student: !!selectedStudent,
+          subjects: subjects.length
+        });
+        // You could show an alert here to inform the user
+      }
     }
   }
 
@@ -691,7 +836,7 @@ const ClassSectionDetail: React.FC = () => {
         loading={subjectDeleteConfirmation.loading}
       />
 
-      {/* Report Card Modal */}
+             {/* Report Card Modal */}
       <ReportCardModal
         isOpen={showReportCardModal}
         onClose={() => {
@@ -700,6 +845,12 @@ const ClassSectionDetail: React.FC = () => {
         }}
         studentName={selectedStudentForReport?.name}
         studentId={selectedStudentForReport?.id}
+        sectionSubjects={subjects}
+        studentSubjectsGrade={transformedGrades}
+        loading={studentGradesLoading}
+        institution={finalInstitution}
+        classSection={enhancedClassSectionData}
+        student={selectedStudent}
       />
 
       {/* Student Report Card Modal */}

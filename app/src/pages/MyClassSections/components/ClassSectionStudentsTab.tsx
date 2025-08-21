@@ -180,7 +180,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors uppercase">
+                          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors uppercase overflow-wrap max-w-[200px]">
                             {getFullName(student)}
                           </p>
                           <div className="flex items-center space-x-2 mt-1">
@@ -196,7 +196,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-1">
+                      <div className="flex flex-col items-center space-x-1">
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();

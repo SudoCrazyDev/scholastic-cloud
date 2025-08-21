@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\StudentEcrItemScore;
 use App\Models\Student;
 use App\Models\SubjectEcrItem;
+use App\Services\ParentSubjectGradeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,13 @@ use Illuminate\Validation\ValidationException;
 
 class StudentEcrItemScoreController extends Controller
 {
+    protected $parentSubjectGradeService;
+
+    public function __construct(ParentSubjectGradeService $parentSubjectGradeService)
+    {
+        $this->parentSubjectGradeService = $parentSubjectGradeService;
+    }
+
     /**
      * Display a listing of the student ECR item scores with pagination and search.
      */
@@ -512,5 +520,13 @@ class StudentEcrItemScoreController extends Controller
         ]);
         $runningGrade->grade = round($totalGrade, 2);
         $runningGrade->save();
+
+        // Calculate parent subject grades if this subject has a parent
+        $this->parentSubjectGradeService->calculateParentSubjectGrades(
+            $studentId,
+            $subjectId,
+            $quarter,
+            $academicYear ?? '2025-2026'
+        );
     }
 }

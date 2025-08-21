@@ -43,6 +43,7 @@ class ClassSectionService {
   }
 
   async getClassSection(id: string) {
+    // The backend API now automatically includes the adviser relationship
     const response = await api.get<{ data: ClassSection }>(`${this.baseUrl}/${id}`)
     return response.data
   }

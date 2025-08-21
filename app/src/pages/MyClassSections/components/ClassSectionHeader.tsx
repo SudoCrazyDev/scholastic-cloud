@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '../../../components/badge';
-import { Building2, UserCheck, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 interface ClassSectionHeaderProps {
   classSectionData: any;
@@ -8,7 +8,7 @@ interface ClassSectionHeaderProps {
   user: any;
 }
 
-const ClassSectionHeader: React.FC<ClassSectionHeaderProps> = ({ classSectionData, getFullName }) => {
+const ClassSectionHeader: React.FC<ClassSectionHeaderProps> = ({ classSectionData }) => {
   return (
     <div className="w-full max-w-5xl mx-auto">
       <div className="bg-gradient-to-br from-indigo-100 via-white to-purple-100 rounded-2xl shadow-xl border border-gray-200 p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 transition-all duration-300">
@@ -20,14 +20,6 @@ const ClassSectionHeader: React.FC<ClassSectionHeaderProps> = ({ classSectionDat
             <span className="inline-flex items-center text-sm text-gray-700 font-medium">
               <Calendar className="w-4 h-4 mr-1 text-indigo-500" />
               SY {classSectionData.academic_year}
-            </span>
-            <span className="inline-flex items-center text-sm text-gray-700 font-medium">
-              <UserCheck className="w-4 h-4 mr-1 text-green-500" />
-              Adviser: {getFullName(classSectionData.adviser) || 'N/A'}
-            </span>
-            <span className="inline-flex items-center text-sm text-gray-700 font-medium">
-              <Building2 className="w-4 h-4 mr-1 text-blue-500" />
-              {classSectionData.institution?.name || 'Institution'}
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-2">

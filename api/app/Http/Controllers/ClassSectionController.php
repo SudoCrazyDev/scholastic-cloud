@@ -78,7 +78,9 @@ class ClassSectionController extends Controller
     {
         $user = $request->user();
         $institutionId = $user->getDefaultInstitutionId();
-        $section = ClassSection::where('institution_id', $institutionId)->findOrFail($id);
+        $section = ClassSection::where('institution_id', $institutionId)
+            ->with('adviser')
+            ->findOrFail($id);
         return response()->json(['data' => $section]);
     }
 
