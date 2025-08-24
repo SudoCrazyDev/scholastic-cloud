@@ -18,8 +18,6 @@ type Paper = keyof typeof presets;
 
 type Orientation = 'portrait' | 'landscape';
 
-type ToolbarTab = 'design' | 'canvas';
-
 export default function CertificateBuilder() {
 	const [elements, setElements] = useState<CanvasElement[]>([]);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -30,7 +28,6 @@ export default function CertificateBuilder() {
 	const [paper, setPaper] = useState<Paper>('a4');
 	const [orientation, setOrientation] = useState<Orientation>('landscape');
 	const [zoom, setZoom] = useState<number>(1);
-	const [activeTab, setActiveTab] = useState<ToolbarTab>('design');
 	const canvasRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedElements = useMemo(() => elements.filter(e => selectedIds.includes(e.id)), [elements, selectedIds]);
@@ -50,92 +47,46 @@ export default function CertificateBuilder() {
 	function handleChangeEnd() {}
 
 	useEffect(() => {
-		function isTypingTarget(el: Element | null) {
-			if (!el) return false;
-			const tag = (el as HTMLElement).tagName.toLowerCase();
-			return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable;
-		}
-		function onKey(e: KeyboardEvent) {
-			const meta = e.ctrlKey || e.metaKey;
-			if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
-			if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); }
-			if ((e.key === 'Delete' || e.key === 'Backspace')) {
-				if (isTypingTarget(document.activeElement)) return;
-				if (selectedIds.length) { e.preventDefault(); handleDeleteSelected(); }
-			}
-		}
+		function isTypingTarget(el: Element | null) { if (!el) return false; const tag = (el as HTMLElement).tagName.toLowerCase(); return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable; }
+		function onKey(e: KeyboardEvent) { const meta = e.ctrlKey || e.metaKey; if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); } if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); } if ((e.key === 'Delete' || e.key === 'Backspace')) { if (isTypingTarget(document.activeElement)) return; if (selectedIds.length) { e.preventDefault(); handleDeleteSelected(); } } }
 		document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
 	}, [selectedIds, elements]);
 
 	async function handleExportPdf() { if (!canvasRef.current) return; const node = canvasRef.current; const canvas = await html2canvas(node, { background: '#ffffff', scale: 2 } as any); const imgData = canvas.toDataURL('image/png'); const pdf = new jsPDF({ orientation, unit: 'pt', format: canvasSize.pdf }); const pageWidth = pdf.internal.pageSize.getWidth(); const pageHeight = pdf.internal.pageSize.getHeight(); pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST'); pdf.save('certificate.pdf'); }
-
-	function alignSelected(axis: 'left' | 'centerX' | 'right' | 'top' | 'centerY' | 'bottom') {
-		if (selectedElements.length < 2) return; pushHistory(elements);
-		const xs = selectedElements.map(e => e.x); const ys = selectedElements.map(e => e.y); const rights = selectedElements.map(e => e.x + e.width); const bottoms = selectedElements.map(e => e.y + e.height);
-		const minX = Math.min(...xs); const maxRight = Math.max(...rights); const minY = Math.min(...ys); const maxBottom = Math.max(...bottoms); const centerX = (minX + maxRight) / 2; const centerY = (minY + maxBottom) / 2;
-		setElementsAndKeepOrder(prev => prev.map(e => { if (!selectedIds.includes(e.id)) return e; if (axis === 'left') return { ...e, x: minX }; if (axis === 'right') return { ...e, x: maxRight - e.width }; if (axis === 'top') return { ...e, y: minY }; if (axis === 'bottom') return { ...e, y: maxBottom - e.height }; if (axis === 'centerX') return { ...e, x: Math.round(centerX - e.width / 2) }; if (axis === 'centerY') return { ...e, y: Math.round(centerY - e.height / 2) }; return e; }));
-	}
-	function distributeSelected(direction: 'horizontal' | 'vertical') {
-		if (selectedElements.length < 3) return; pushHistory(elements);
-		const sorted = [...selectedElements].sort((a, b) => direction === 'horizontal' ? a.x - b.x : a.y - b.y);
-		if (direction === 'horizontal') { const left = sorted[0].x; const right = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width; const totalWidth = sorted.reduce((sum, e) => sum + e.width, 0); const gap = (right - left - totalWidth) / (sorted.length - 1); let cursor = left; setElementsAndKeepOrder(prev => prev.map(e => { const idx = sorted.findIndex(s => s.id === e.id); if (idx === -1) return e; if (idx === 0) { cursor = e.x + e.width + gap; return e; } if (idx === sorted.length - 1) return e; const newX = Math.round(cursor); cursor = cursor + e.width + gap; return { ...e, x: newX }; })); }
-		else { const top = sorted[0].y; const bottom = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height; const totalHeight = sorted.reduce((sum, e) => sum + e.height, 0); const gap = (bottom - top - totalHeight) / (sorted.length - 1); let cursor = top; setElementsAndKeepOrder(prev => prev.map(e => { const idx = sorted.findIndex(s => s.id === e.id); if (idx === -1) return e; if (idx === 0) { cursor = e.y + e.height + gap; return e; } if (idx === sorted.length - 1) return e; const newY = Math.round(cursor); cursor = cursor + e.height + gap; return { ...e, y: newY }; })); }
-	}
-
 
 	return (
 		<div className="flex h-full w-full overflow-hidden">
 			<div className="w-64 border-r bg-white overflow-auto">
 				<ElementsPanel onAddElement={handleAddElement} />
 				<div className="border-t" />
-				<LayersPanel elements={elements} selectedIds={selectedIds} onSelect={setSelectedIds} onToggleHide={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, hidden: !e.hidden } : e))} onToggleLock={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, locked: !e.locked } : e))} onReorder={(id, dir) => setElements(prev => { const list = [...prev]; const i = list.findIndex(e => e.id === id); if (i === -1) return prev; const t = dir === 'up' ? i + 1 : i - 1; if (t < 0 || t >= list.length) return prev; [list[i], list[t]] = [list[t], list[i]]; return snapshot(list); })} />
+				<LayersPanel elements={elements} selectedIds={selectedIds} onSelect={setSelectedIds} onToggleHide={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, hidden: !e.hidden } : e))} onToggleLock={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, locked: !e.locked } : e))} onReorder={(id, dir) => setElements(prev => { const list = [...prev]; const i = list.findIndex(e => e.id === id); if (i === -1) return prev; const t = dir === 'up' ? i + 1 : i - 1; if (t < 0 || t >= list.length) return prev; [list[i], list[t]] = [list[t], list[i]]; return snapshot(list); })} onDelete={(id) => { setSelectedIds(ids => ids.filter(x => x !== id)); setElements(prev => prev.filter(e => e.id !== id)); }} />
 			</div>
 
 			<div className="flex-1 flex flex-col bg-gray-50">
 				<div className="p-3 border-b bg-white">
 					<div className="flex items-center gap-2">
 						<Button onClick={handleExportPdf}>Export PDF</Button>
-						<div className="ml-2 inline-flex rounded bg-gray-100 p-1">
-							<button className={`px-3 py-1.5 rounded ${activeTab === 'design' ? 'bg-white shadow' : ''}`} onClick={() => setActiveTab('design')}>Design</button>
-							<button className={`px-3 py-1.5 rounded ${activeTab === 'canvas' ? 'bg-white shadow' : ''}`} onClick={() => setActiveTab('canvas')}>Canvas</button>
-						</div>
 						<div className="flex-1" />
 						<Button variant="secondary" onClick={undo} disabled={history.length === 0}>Undo</Button>
 						<Button variant="secondary" onClick={redo} disabled={future.length === 0}>Redo</Button>
 					</div>
-					{activeTab === 'design' ? (
-						<div className="mt-3 flex flex-wrap items-center gap-2">
-							<Button variant="secondary" onClick={() => alignSelected('left')} disabled={selectedElements.length < 2}>Align Left</Button>
-							<Button variant="secondary" onClick={() => alignSelected('centerX')} disabled={selectedElements.length < 2}>Align Center</Button>
-							<Button variant="secondary" onClick={() => alignSelected('right')} disabled={selectedElements.length < 2}>Align Right</Button>
-							<Button variant="secondary" onClick={() => alignSelected('top')} disabled={selectedElements.length < 2}>Align Top</Button>
-							<Button variant="secondary" onClick={() => alignSelected('centerY')} disabled={selectedElements.length < 2}>Align Middle</Button>
-							<Button variant="secondary" onClick={() => alignSelected('bottom')} disabled={selectedElements.length < 2}>Align Bottom</Button>
-							<div className="h-6 w-px bg-gray-200 mx-1" />
-							<Button variant="secondary" onClick={() => distributeSelected('horizontal')} disabled={selectedElements.length < 3}>Distribute H</Button>
-							<Button variant="secondary" onClick={() => distributeSelected('vertical')} disabled={selectedElements.length < 3}>Distribute V</Button>
-							<div className="h-6 w-px bg-gray-200 mx-1" />
-							<Button variant="secondary" onClick={handleDeleteSelected} disabled={!selectedIds.length}>Delete</Button>
-						</div>
-					) : (
-						<div className="mt-3 flex flex-wrap items-center gap-2">
-							<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={snapping} onChange={(e) => setSnapping(e.target.checked)} /> Snapping</label>
-							<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Grid</label>
-							<div className="h-6 w-px bg-gray-200 mx-1" />
-							<Select value={paper} onChange={(e) => setPaper(e.target.value as Paper)}>
-								<option value="a4">A4</option>
-								<option value="letter">Letter</option>
-								<option value="legal">Legal</option>
-							</Select>
-							<Select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
-								<option value="portrait">Portrait</option>
-								<option value="landscape">Landscape</option>
-							</Select>
-							<Select value={String(zoom)} onChange={(e) => setZoom(Number(e.target.value))}>
-								{[0.25,0.5,0.75,1,1.25,1.5].map(z => <option key={z} value={z}>{Math.round(z*100)}%</option>)}
-							</Select>
-						</div>
-					)}
+					<div className="mt-3 flex flex-wrap items-center gap-2">
+						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={snapping} onChange={(e) => setSnapping(e.target.checked)} /> Snapping</label>
+						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Grid</label>
+						<div className="h-6 w-px bg-gray-200 mx-1" />
+						<Select value={paper} onChange={(e) => setPaper(e.target.value as Paper)}>
+							<option value="a4">A4</option>
+							<option value="letter">Letter</option>
+							<option value="legal">Legal</option>
+						</Select>
+						<Select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+							<option value="portrait">Portrait</option>
+							<option value="landscape">Landscape</option>
+						</Select>
+						<Select value={String(zoom)} onChange={(e) => setZoom(Number(e.target.value))}>
+							{[0.25,0.5,0.75,1,1.25,1.5].map(z => <option key={z} value={z}>{Math.round(z*100)}%</option>)}
+						</Select>
+					</div>
 				</div>
 				<div className="flex-1 overflow-auto p-6">
 					<div className="mx-auto bg-white shadow relative rounded" style={{ width: canvasSize.w * zoom, height: canvasSize.h * zoom }}>
