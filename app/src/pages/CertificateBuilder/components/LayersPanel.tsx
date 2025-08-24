@@ -1,5 +1,6 @@
 import type { CanvasElement } from './CertificateCanvas';
 import Button from '@/components/ui/Button';
+import { Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 
 export default function LayersPanel({ elements, selectedIds, onSelect, onToggleHide, onToggleLock, onReorder, onDelete }:{
 	elements: CanvasElement[];
@@ -22,12 +23,22 @@ export default function LayersPanel({ elements, selectedIds, onSelect, onToggleH
 								{el.name || el.text || el.type}
 							</button>
 							<div className="flex items-center gap-1">
-								<Button variant="ghost" size="sm" onClick={() => onToggleHide(el.id)} title={el.hidden ? 'Show' : 'Hide'}>{el.hidden ? '👁️‍🗨️' : '👁️'}</Button>
-								<Button variant="ghost" size="sm" onClick={() => onToggleLock(el.id)} title={el.locked ? 'Unlock' : 'Lock'}>{el.locked ? '🔒' : '🔓'}</Button>
-								<Button variant="ghost" size="sm" onClick={() => onReorder(el.id, 'up')} disabled={idx === elements.length - 1} title="Move up">⬆️</Button>
-								<Button variant="ghost" size="sm" onClick={() => onReorder(el.id, 'down')} disabled={idx === 0} title="Move down">⬇️</Button>
+								<Button variant="ghost" size="sm" onClick={() => onToggleHide(el.id)} title={el.hidden ? 'Show' : 'Hide'}>
+									{el.hidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+								</Button>
+								<Button variant="ghost" size="sm" onClick={() => onToggleLock(el.id)} title={el.locked ? 'Unlock' : 'Lock'}>
+									{el.locked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+								</Button>
+								<Button variant="ghost" size="sm" onClick={() => onReorder(el.id, 'up')} disabled={idx === elements.length - 1} title="Move up">
+									<ArrowUp className="w-4 h-4" />
+								</Button>
+								<Button variant="ghost" size="sm" onClick={() => onReorder(el.id, 'down')} disabled={idx === 0} title="Move down">
+									<ArrowDown className="w-4 h-4" />
+								</Button>
 								{onDelete && (
-									<Button variant="ghost" size="sm" onClick={() => onDelete(el.id)} title="Delete">🗑️</Button>
+									<Button variant="ghost" size="sm" onClick={() => onDelete(el.id)} title="Delete">
+										<Trash2 className="w-4 h-4" />
+									</Button>
 								)}
 							</div>
 						</div>
