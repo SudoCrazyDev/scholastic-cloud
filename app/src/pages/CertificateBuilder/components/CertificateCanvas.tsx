@@ -43,10 +43,10 @@ export function CertificateCanvas({
 		function handleDeselect(e: MouseEvent) {
 			if (!containerRef.current) return;
 			if (!(e.target instanceof Node)) return;
-			if (!containerRef.current.contains(e.target)) return;
-			// If clicked on empty canvas area
 			const target = e.target as HTMLElement;
-			if (target.dataset.elId) return;
+			if (!containerRef.current.contains(target)) return;
+			// If clicked on empty canvas background (not on any element)
+			if (target.closest('[data-el-id]')) return;
 			onSelect(null);
 		}
 		document.addEventListener('mousedown', handleDeselect);
