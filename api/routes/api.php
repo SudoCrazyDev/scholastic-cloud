@@ -10,6 +10,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\SubjectTemplateController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentSectionController;
 use App\Http\Controllers\StudentEcrItemScoreController;
@@ -96,6 +97,10 @@ Route::middleware('auth.token')->group(function () {
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);
     Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
+
+    // Subject Template routes
+    Route::apiResource('subject-templates', SubjectTemplateController::class);
+    Route::post('subject-templates/{id}/apply', [SubjectTemplateController::class, 'applyToSection']);
 
     // StudentSubject routes
     Route::apiResource('student-subjects', App\Http\Controllers\StudentSubjectController::class);

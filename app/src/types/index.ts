@@ -173,6 +173,74 @@ export interface UpdateClassSectionData {
   academic_year?: string;
 }
 
+// Subject Template types
+export interface SubjectTemplate {
+  id: string;
+  institution_id: string;
+  name: string;
+  description?: string;
+  grade_level?: string;
+  created_by: string;
+  creator?: User;
+  items?: SubjectTemplateItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubjectTemplateItem {
+  id: string;
+  template_id: string;
+  subject_type: 'parent' | 'child';
+  parent_item_id?: string;
+  parent_item?: SubjectTemplateItem;
+  child_items?: SubjectTemplateItem[];
+  title: string;
+  variant?: string;
+  start_time?: string;
+  end_time?: string;
+  is_limited_student: boolean;
+  order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSubjectTemplateData {
+  name: string;
+  description?: string;
+  grade_level?: string;
+  items: CreateSubjectTemplateItemData[];
+}
+
+export interface CreateSubjectTemplateItemData {
+  subject_type: 'parent' | 'child';
+  parent_item_index?: number; // Index reference for parent item
+  title: string;
+  variant?: string;
+  start_time?: string;
+  end_time?: string;
+  is_limited_student?: boolean;
+  order?: number;
+}
+
+export interface UpdateSubjectTemplateData {
+  name?: string;
+  description?: string;
+  grade_level?: string;
+  items?: UpdateSubjectTemplateItemData[];
+}
+
+export interface UpdateSubjectTemplateItemData {
+  id?: string; // Existing item ID
+  subject_type: 'parent' | 'child';
+  parent_item_index?: number;
+  title: string;
+  variant?: string;
+  start_time?: string;
+  end_time?: string;
+  is_limited_student?: boolean;
+  order?: number;
+}
+
 // Subject types
 export interface Subject {
   id: string;

@@ -8,12 +8,14 @@ import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
 import { Autocomplete } from '../../../components/autocomplete'
 import { useTeachers } from '../../../hooks/useTeachers'
-import type { ClassSection, CreateClassSectionData } from '../../../types'
+import { useSubjectTemplates } from '../../../hooks/useSubjectTemplates'
+import { subjectTemplateService } from '../../../services/subjectTemplateService'
+import type { ClassSection, CreateClassSectionData, SubjectTemplate } from '../../../types'
 
 interface ClassSectionModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: CreateClassSectionData) => Promise<void>
+  onSubmit: (data: CreateClassSectionData, templateId?: string) => Promise<void>
   classSection?: ClassSection | null
   gradeLevels: string[]
   loading?: boolean
@@ -47,6 +49,8 @@ export function ClassSectionModal({
 }: ClassSectionModalProps) {
   const [selectedTeacher, setSelectedTeacher] = useState<{ id: string; label: string; description?: string } | null>(null)
   const [teacherSearchQuery, setTeacherSearchQuery] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState<SubjectTemplate | null>(null)
+  const [useTemplate, setUseTemplate] = useState(false)
   
   // Debounce the search query to avoid too many API calls
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
@@ -64,6 +68,9 @@ export function ClassSectionModal({
     search: debouncedSearchQuery,
     limit: 20
   })
+
+  // Fetch subject templates
+  const { templates, loading: templatesLoading } = useSubjectTemplates()
 
   const isEditing = !!classSection
 
@@ -84,7 +91,8 @@ export function ClassSectionModal({
           academic_year: values.academic_year || undefined,
         }
         
-        await onSubmit(submitData)
+        // Pass the template ID if a template is selected
+        await onSubmit(submitData, useTemplate && selectedTemplate ? selectedTemplate.id : undefined)
         onClose()
       } catch (err) {
         // Error handling is done by the parent component
@@ -124,11 +132,15 @@ export function ClassSectionModal({
       } else {
         formik.resetForm()
         setSelectedTeacher(null)
+        setSelectedTemplate(null)
+        setUseTemplate(false)
       }
     } else {
       // Clear search query when modal closes
       setTeacherSearchQuery('')
       setDebouncedSearchQuery('')
+      setSelectedTemplate(null)
+      setUseTemplate(false)
     }
   }, [isOpen, classSection, teachers])
 
@@ -292,6 +304,71 @@ export function ClassSectionModal({
                     <p className="mt-1 text-sm text-red-600">{formik.errors.academic_year}</p>
                   )}
                 </div>
+
+                {/* Subject Template Selection */}
+                {!isEditing && (
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="use-template"
+                        checked={useTemplate}
+                        onChange={(e) => {
+                          setUseTemplate(e.target.checked)
+                          if (!e.target.checked) {
+                            setSelectedTemplate(null)
+                          }
+                        }}
+                        className="mr-2"
+                      />
+                      <label htmlFor="use-template" className="text-sm font-medium text-gray-700">
+                        Use Subject Template
+                      </label>
+                    </div>
+                    
+                    {useTemplate && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Template
+                        </label>
+                        <Select
+                          value={selectedTemplate?.id || ''}
+                          onChange={(e) => {
+                            const template = templates.find(t => t.id === e.target.value)
+                            setSelectedTemplate(template || null)
+                          }}
+                          placeholder="Choose a subject template..."
+                          options={[
+                            { value: '', label: 'Select a template' },
+                            ...templates
+                              .filter(t => !formik.values.grade_level || !t.grade_level || t.grade_level === formik.values.grade_level)
+                              .map(template => ({
+                                value: template.id,
+                                label: template.name
+                              }))
+                          ]}
+                          disabled={templatesLoading}
+                        />
+                        {selectedTemplate && (
+                          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-sm font-medium text-blue-900">{selectedTemplate.name}</p>
+                            {selectedTemplate.description && (
+                              <p className="text-xs text-blue-700 mt-1">{selectedTemplate.description}</p>
+                            )}
+                            <p className="text-xs text-blue-600 mt-2">
+                              {selectedTemplate.items?.length || 0} subjects will be created
+                            </p>
+                          </div>
+                        )}
+                        {!useTemplate && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            You can add subjects manually after creating the section
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex items-center justify-end space-x-3 pt-4">
