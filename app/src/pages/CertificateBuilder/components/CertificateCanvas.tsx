@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type ElementType = 'text' | 'image' | 'shape';
 
@@ -25,19 +25,35 @@ export type CanvasElement = {
 	strokeWidth?: number;
 };
 
+type GuideLine = { orientation: 'v' | 'h'; pos: number };
+
 export function CertificateCanvas({
+	width,
+	height,
 	elements,
 	selectedElementId,
 	onSelect,
 	onChange,
+	onInteractionStart,
+	onChangeEnd,
+	showGrid = true,
+	snappingEnabled = true,
+	snapThreshold = 8,
 }:{
+	width: number;
+	height: number;
 	elements: CanvasElement[];
 	selectedElementId: string | null;
 	onSelect: (id: string | null) => void;
 	onChange: (el: CanvasElement) => void;
+	onInteractionStart?: () => void;
+	onChangeEnd?: () => void;
+	showGrid?: boolean;
+	snappingEnabled?: boolean;
+	snapThreshold?: number;
 }) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
-
+	const [guides, setGuides] = useState<GuideLine[]>([]);
 
 	useEffect(() => {
 		function handleDeselect(e: MouseEvent) {
@@ -53,9 +69,61 @@ export function CertificateCanvas({
 		return () => document.removeEventListener('mousedown', handleDeselect);
 	}, [onSelect]);
 
+	const collectSnapLines = useCallback((currentId: string) => {
+		const verticals: number[] = [0, width / 2, width];
+		const horizontals: number[] = [0, height / 2, height];
+		for (const el of elements) {
+			if (el.id === currentId) continue;
+			verticals.push(el.x, el.x + el.width / 2, el.x + el.width);
+			horizontals.push(el.y, el.y + el.height / 2, el.y + el.height);
+		}
+		return { verticals, horizontals };
+	}, [elements, width, height]);
+
+	function applySnap(x: number, y: number, w: number, h: number, id: string) {
+		if (!snappingEnabled) return { x, y, guides: [] as GuideLine[] };
+		const { verticals, horizontals } = collectSnapLines(id);
+		const g: GuideLine[] = [];
+
+		let snappedX = x;
+		let snappedY = y;
+
+		// Vertical snapping: left, center, right
+		const candidatesX = [x, x + w / 2, x + w];
+
+		for (let i = 0; i < candidatesX.length; i++) {
+			for (const v of verticals) {
+				if (Math.abs(candidatesX[i] - v) <= snapThreshold) {
+					const delta = v - candidatesX[i];
+					if (i === 0) snappedX = x + delta;
+					if (i === 1) snappedX = x + delta;
+					if (i === 2) snappedX = x + delta;
+					g.push({ orientation: 'v', pos: v });
+				}
+			}
+		}
+
+		// Horizontal snapping: top, middle, bottom
+		const candidatesY = [y, y + h / 2, y + h];
+		for (let i = 0; i < candidatesY.length; i++) {
+			for (const hLine of horizontals) {
+				if (Math.abs(candidatesY[i] - hLine) <= snapThreshold) {
+					const delta = hLine - candidatesY[i];
+					if (i === 0) snappedY = y + delta;
+					if (i === 1) snappedY = y + delta;
+					if (i === 2) snappedY = y + delta;
+					g.push({ orientation: 'h', pos: hLine });
+				}
+			}
+		}
+
+		return { x: snappedX, y: snappedY, guides: g };
+	}
+
 	const startDrag = useCallback((event: React.MouseEvent, el: CanvasElement) => {
 		event.stopPropagation();
 		onSelect(el.id);
+		onInteractionStart && onInteractionStart();
 		const startX = event.clientX;
 		const startY = event.clientY;
 		const originX = el.x;
@@ -64,18 +132,25 @@ export function CertificateCanvas({
 		function onMove(e: MouseEvent) {
 			const dx = e.clientX - startX;
 			const dy = e.clientY - startY;
-			onChange({ ...el, x: originX + dx, y: originY + dy });
+			const nextX = originX + dx;
+			const nextY = originY + dy;
+			const { x: sx, y: sy, guides: g } = applySnap(nextX, nextY, el.width, el.height, el.id);
+			setGuides(g);
+			onChange({ ...el, x: sx, y: sy });
 		}
 		function onUp() {
+			setGuides([]);
 			document.removeEventListener('mousemove', onMove);
 			document.removeEventListener('mouseup', onUp);
+			onChangeEnd && onChangeEnd();
 		}
 		document.addEventListener('mousemove', onMove);
 		document.addEventListener('mouseup', onUp);
-	}, [onChange, onSelect]);
+	}, [onChange, onSelect, onInteractionStart, onChangeEnd]);
 
 	const startResize = useCallback((event: React.MouseEvent, el: CanvasElement, corner: 'se' | 'e' | 's') => {
 		event.stopPropagation();
+		onInteractionStart && onInteractionStart();
 		const startX = event.clientX;
 		const startY = event.clientY;
 		const startW = el.width;
@@ -89,18 +164,26 @@ export function CertificateCanvas({
 			if (corner === 'se') { newW = startW + dx; newH = startH + dy; }
 			if (corner === 'e') { newW = startW + dx; }
 			if (corner === 's') { newH = startH + dy; }
-			onChange({ ...el, width: Math.max(10, newW), height: Math.max(10, newH) });
+			newW = Math.max(10, newW);
+			newH = Math.max(10, newH);
+			// Snap right/bottom edges when resizing from those directions
+			const { x: sx, y: sy, guides: g } = applySnap(el.x, el.y, newW, newH, el.id);
+			setGuides(g);
+			onChange({ ...el, width: newW, height: newH, x: sx, y: sy });
 		}
 		function onUp() {
+			setGuides([]);
 			document.removeEventListener('mousemove', onMove);
 			document.removeEventListener('mouseup', onUp);
+			onChangeEnd && onChangeEnd();
 		}
 		document.addEventListener('mousemove', onMove);
 		document.addEventListener('mouseup', onUp);
-	}, [onChange]);
+	}, [onChange, onChangeEnd, onInteractionStart]);
 
 	const startRotate = useCallback((event: React.MouseEvent, el: CanvasElement) => {
 		event.stopPropagation();
+		onInteractionStart && onInteractionStart();
 		const centerX = (el.x + el.width / 2);
 		const centerY = (el.y + el.height / 2);
 		function onMove(e: MouseEvent) {
@@ -112,13 +195,25 @@ export function CertificateCanvas({
 		function onUp() {
 			document.removeEventListener('mousemove', onMove);
 			document.removeEventListener('mouseup', onUp);
+			onChangeEnd && onChangeEnd();
 		}
 		document.addEventListener('mousemove', onMove);
 		document.addEventListener('mouseup', onUp);
-	}, [onChange]);
+	}, [onChange, onChangeEnd, onInteractionStart]);
+
+	const gridBackground = showGrid
+		? {
+			backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)`,
+			backgroundSize: '20px 20px',
+		}
+		: {} as React.CSSProperties;
 
 	return (
-		<div ref={containerRef} className="absolute inset-0">
+		<div ref={containerRef} className="absolute" style={{ width, height, ...gridBackground }}>
+			{/* Guides */}
+			{guides.map((g, idx) => (
+				<div key={idx} className="absolute bg-indigo-500" style={g.orientation === 'v' ? { left: g.pos, top: 0, bottom: 0, width: 1 } : { top: g.pos, left: 0, right: 0, height: 1 }} />
+			))}
 			{elements.map(el => {
 				const isSelected = el.id === selectedElementId;
 				return (
@@ -133,7 +228,7 @@ export function CertificateCanvas({
 							height: el.height,
 							transform: `rotate(${el.rotation}deg)`,
 							transformOrigin: 'center',
-							cursor: 'move'
+							cursor: 'move',
 						}}
 						onMouseDown={(e) => startDrag(e, el)}
 					>
@@ -145,7 +240,8 @@ export function CertificateCanvas({
 									fontWeight: el.fontWeight || 400,
 									color: el.color || '#111827',
 									width: '100%',
-									height: '100%'
+									height: '100%',
+									whiteSpace: 'pre-wrap'
 								}}
 							>
 								{el.text}
