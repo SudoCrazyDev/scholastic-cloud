@@ -56,6 +56,15 @@ export default function PropertiesPanel({ element, onChange }:{ element: CanvasE
 							<Label>Letter spacing</Label>
 							<Input type="number" value={element.letterSpacing ?? 0} onChange={(e) => update('letterSpacing', Number(e.target.value))} />
 						</div>
+						<div className="col-span-2">
+							<Label>Text decoration</Label>
+							<Select value={element.textDecoration || 'none'} onChange={(e) => update('textDecoration', e.target.value as CanvasElement['textDecoration'])}>
+								<option value="none">None</option>
+								<option value="underline">Underline</option>
+								<option value="line-through">Line through</option>
+								<option value="overline">Overline</option>
+							</Select>
+						</div>
 					</div>
 				</div>
 			)}
