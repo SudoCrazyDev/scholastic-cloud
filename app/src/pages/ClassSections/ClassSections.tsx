@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ClassSectionHeader, ClassSectionList, ClassSectionModal, ClassSectionSubjects, ClassSectionSubjectModal } from './components'
+import { ClassSectionHeader, ClassSectionList, ClassSectionModal, ClassSectionSubjects, ClassSectionSubjectModal, SubjectTemplatesModal } from './components'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { Alert } from '../../components/alert'
 import { useClassSections } from '../../hooks/useClassSections'
@@ -43,6 +43,9 @@ const ClassSections: React.FC = () => {
 
   // State management for selected class section
   const [selectedClassSection, setSelectedClassSection] = useState<ClassSection | null>(null)
+  
+  // State for templates modal
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
 
   // Wrapper handlers to update local state
   const handleSearchChange = (value: string) => {
@@ -182,7 +185,10 @@ const ClassSections: React.FC = () => {
       )}
 
       {/* Header */}
-      <ClassSectionHeader onCreate={handleCreate} />
+      <ClassSectionHeader 
+        onCreate={handleCreate} 
+        onManageTemplates={() => setIsTemplatesModalOpen(true)} 
+      />
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -268,6 +274,12 @@ const ClassSections: React.FC = () => {
         cancelText="Cancel"
         variant="danger"
         loading={subjectDeleteConfirmation.loading}
+      />
+
+      {/* Subject Templates Modal */}
+      <SubjectTemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onClose={() => setIsTemplatesModalOpen(false)}
       />
     </motion.div>
   )
