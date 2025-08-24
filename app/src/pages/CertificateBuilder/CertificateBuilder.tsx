@@ -28,6 +28,8 @@ export default function CertificateBuilder() {
 	const [paper, setPaper] = useState<Paper>('a4');
 	const [orientation, setOrientation] = useState<Orientation>('landscape');
 	const [zoom, setZoom] = useState<number>(1);
+	const [bgColor, setBgColor] = useState<string>('#ffffff');
+	const [bgImage, setBgImage] = useState<string | null>(null);
 	const canvasRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedElements = useMemo(() => elements.filter(e => selectedIds.includes(e.id)), [elements, selectedIds]);
@@ -53,6 +55,14 @@ export default function CertificateBuilder() {
 	}, [selectedIds, elements]);
 
 	async function handleExportPdf() { if (!canvasRef.current) return; const node = canvasRef.current; const canvas = await html2canvas(node, { background: '#ffffff', scale: 2 } as any); const imgData = canvas.toDataURL('image/png'); const pdf = new jsPDF({ orientation, unit: 'pt', format: canvasSize.pdf }); const pageWidth = pdf.internal.pageSize.getWidth(); const pageHeight = pdf.internal.pageSize.getHeight(); pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST'); pdf.save('certificate.pdf'); }
+
+	function onBgImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = () => setBgImage(reader.result as string);
+		reader.readAsDataURL(file);
+	}
 
 	return (
 		<div className="flex h-full w-full overflow-hidden">
@@ -95,11 +105,19 @@ export default function CertificateBuilder() {
 								{[0.25,0.5,0.75,1,1.25,1.5].map(z => <option key={z} value={z}>{Math.round(z*100)}%</option>)}
 							</Select>
 						</div>
+						<div className="flex items-center gap-2">
+							<span className="text-sm text-gray-700">Background</span>
+							<input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="h-10 w-10 p-0 border rounded" />
+							<input type="file" accept="image/*" onChange={onBgImageChange} title="Background image" />
+							{bgImage && (
+								<Button variant="secondary" size="sm" onClick={() => setBgImage(null)} title="Remove background image">Remove</Button>
+							)}
+						</div>
 					</div>
 				</div>
 				<div className="flex-1 overflow-auto p-6">
-					<div className="mx-auto bg-white shadow relative rounded" style={{ width: canvasSize.w * zoom, height: canvasSize.h * zoom }}>
-						<div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: canvasSize.w, height: canvasSize.h }} ref={canvasRef}>
+					<div className="mx-auto shadow relative rounded" style={{ width: canvasSize.w * zoom, height: canvasSize.h * zoom }}>
+						<div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: canvasSize.w, height: canvasSize.h, backgroundColor: bgColor, backgroundImage: bgImage ? `url(${bgImage})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }} ref={canvasRef}>
 							<CertificateCanvas width={canvasSize.w} height={canvasSize.h} scale={zoom} elements={elements} selectedElementIds={selectedIds} onSelect={setSelectedIds} onChange={handleUpdateElement} onInteractionStart={handleInteractionStart} onChangeEnd={handleChangeEnd} showGrid={showGrid} snappingEnabled={snapping} />
 						</div>
 					</div>

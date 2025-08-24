@@ -21,6 +21,7 @@ export type CanvasElement = {
 	fontWeight?: number;
 	color?: string;
 	textAlign?: 'left' | 'center' | 'right';
+	letterSpacing?: number; // px
 	// image
 	src?: string;
 	// shape
@@ -249,7 +250,8 @@ export function CertificateCanvas({
 									width: '100%',
 									height: '100%',
 									whiteSpace: 'pre-wrap',
-									textAlign: el.textAlign || 'left'
+									textAlign: el.textAlign || 'left',
+									letterSpacing: el.letterSpacing !== undefined ? `${el.letterSpacing}px` : undefined,
 								}}
 							>
 								{el.text}
