@@ -20,6 +20,7 @@ export type CanvasElement = {
 	fontSize?: number;
 	fontWeight?: number;
 	color?: string;
+	textAlign?: 'left' | 'center' | 'right';
 	// image
 	src?: string;
 	// shape
@@ -247,7 +248,8 @@ export function CertificateCanvas({
 									color: el.color || '#111827',
 									width: '100%',
 									height: '100%',
-									whiteSpace: 'pre-wrap'
+									whiteSpace: 'pre-wrap',
+									textAlign: el.textAlign || 'left'
 								}}
 							>
 								{el.text}

@@ -50,7 +50,20 @@ export default function CertificateBuilder() {
 	function handleChangeEnd() {}
 
 	useEffect(() => {
-		function onKey(e: KeyboardEvent) { const meta = e.ctrlKey || e.metaKey; if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); } if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); } if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length) { e.preventDefault(); handleDeleteSelected(); } }
+		function isTypingTarget(el: Element | null) {
+			if (!el) return false;
+			const tag = (el as HTMLElement).tagName.toLowerCase();
+			return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable;
+		}
+		function onKey(e: KeyboardEvent) {
+			const meta = e.ctrlKey || e.metaKey;
+			if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
+			if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); }
+			if ((e.key === 'Delete' || e.key === 'Backspace')) {
+				if (isTypingTarget(document.activeElement)) return;
+				if (selectedIds.length) { e.preventDefault(); handleDeleteSelected(); }
+			}
+		}
 		document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
 	}, [selectedIds, elements]);
 
