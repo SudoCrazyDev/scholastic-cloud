@@ -24,6 +24,7 @@ import ConsolidatedGrades from './pages/ConsolidatedGrades/ConsolidatedGrades';
 import SectionGrades from './pages/ConsolidatedGrades/SectionGrades';
 import SF9 from './pages/SF9';
 import SetNewPassword from './pages/SetNewPassword';
+import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
 
 
 function App() {
@@ -62,7 +63,7 @@ function App() {
               <Route path="consolidated-grades" element={<ConsolidatedGrades />} />
               <Route path="consolidated-grades/:sectionId/:quarter" element={<SectionGrades />} />
               <Route path="sf9" element={<SF9 />} />
-              {/* <Route path="certificate-builder" element={<CertificateBuilder />} /> */}
+              <Route path="certificate-builder" element={<CertificateBuilder />} />
 
             </Route>
 
