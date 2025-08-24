@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { CanvasElement } from './CertificateCanvas';
 import { useRef } from 'react';
+import Button from '@/components/ui/Button';
 
 export default function ElementsPanel({ onAddElement }:{ onAddElement: (el: CanvasElement) => void }) {
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -72,12 +73,12 @@ export default function ElementsPanel({ onAddElement }:{ onAddElement: (el: Canv
 
 	return (
 		<div className="p-3 space-y-2">
-			<h3 className="text-sm font-medium text-gray-700">Elements</h3>
-			<button className="w-full px-3 py-2 border rounded" onClick={addText}>Add Text</button>
-			<button className="w-full px-3 py-2 border rounded" onClick={triggerImage}>Add Image</button>
+			<h3 className="text-sm font-medium text-gray-700 mb-2">Elements</h3>
+			<Button variant="secondary" className="w-full" onClick={addText}>Add Text</Button>
+			<Button variant="secondary" className="w-full" onClick={triggerImage}>Add Image</Button>
 			<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
-			<button className="w-full px-3 py-2 border rounded" onClick={addRectangle}>Add Rectangle</button>
-			<button className="w-full px-3 py-2 border rounded" onClick={addEllipse}>Add Ellipse</button>
+			<Button variant="secondary" className="w-full" onClick={addRectangle}>Add Rectangle</Button>
+			<Button variant="secondary" className="w-full" onClick={addEllipse}>Add Ellipse</Button>
 		</div>
 	);
 }

@@ -2,9 +2,12 @@ import { Outlet } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Sidebar from '../sidebar/Sidebar';
 import Topbar from '../topbar/Topbar';
+import { useLocation } from 'react-router-dom';
 
 const DashboardLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const location = useLocation();
+  const isCertificateBuilder = location.pathname.startsWith('/certificate-builder');
 
   // Close mobile sidebar when screen size changes to desktop
   useEffect(() => {
@@ -39,11 +42,17 @@ const DashboardLayout = () => {
         <Topbar onMobileMenuClick={() => setIsMobileSidebarOpen(true)} />
         
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
+        {isCertificateBuilder ? (
+          <main className="flex-1 overflow-hidden p-0">
             <Outlet />
-          </div>
-        </main>
+          </main>
+        ) : (
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-7xl mx-auto">
+              <Outlet />
+            </div>
+          </main>
+        )}
       </div>
     </div>
   );

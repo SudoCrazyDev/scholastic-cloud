@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import ElementsPanel from './components/ElementsPanel';
 import PropertiesPanel from './components/PropertiesPanel';
 import { CertificateCanvas, type CanvasElement } from './components/CertificateCanvas';
+import Button from '@/components/ui/Button';
 
 export default function CertificateBuilder() {
 	const [elements, setElements] = useState<CanvasElement[]>([]);
@@ -49,11 +50,11 @@ export default function CertificateBuilder() {
 			{/* Center: Canvas */}
 			<div className="flex-1 flex flex-col bg-gray-50">
 				<div className="p-3 border-b bg-white flex items-center gap-2">
-					<button className="px-3 py-1.5 rounded bg-black text-white" onClick={handleExportPdf}>Export PDF</button>
-					<button className="px-3 py-1.5 rounded border" onClick={handleDeleteSelected} disabled={!selectedElementId}>Delete</button>
+					<Button onClick={handleExportPdf}>Export PDF</Button>
+					<Button variant="secondary" onClick={handleDeleteSelected} disabled={!selectedElementId}>Delete</Button>
 				</div>
 				<div className="flex-1 overflow-auto p-6">
-					<div className="mx-auto bg-white shadow relative" style={{ width: 1123, height: 794 }} ref={canvasRef}>
+					<div className="mx-auto bg-white shadow relative rounded" style={{ width: 1123, height: 794 }} ref={canvasRef}>
 						<CertificateCanvas
 							elements={elements}
 							selectedElementId={selectedElementId}
