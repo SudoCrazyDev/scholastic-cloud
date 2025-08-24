@@ -5,11 +5,15 @@ export type ElementType = 'text' | 'image' | 'shape';
 export type CanvasElement = {
 	id: string;
 	type: ElementType;
+	name?: string;
 	x: number;
 	y: number;
 	width: number;
 	height: number;
 	rotation: number; // degrees
+	zIndex?: number;
+	locked?: boolean;
+	hidden?: boolean;
 	// text
 	text?: string;
 	fontFamily?: string;
@@ -30,8 +34,9 @@ type GuideLine = { orientation: 'v' | 'h'; pos: number };
 export function CertificateCanvas({
 	width,
 	height,
+	scale = 1,
 	elements,
-	selectedElementId,
+	selectedElementIds,
 	onSelect,
 	onChange,
 	onInteractionStart,
@@ -42,9 +47,10 @@ export function CertificateCanvas({
 }:{
 	width: number;
 	height: number;
+	scale?: number;
 	elements: CanvasElement[];
-	selectedElementId: string | null;
-	onSelect: (id: string | null) => void;
+	selectedElementIds: string[];
+	onSelect: (ids: string[]) => void;
 	onChange: (el: CanvasElement) => void;
 	onInteractionStart?: () => void;
 	onChangeEnd?: () => void;
@@ -63,22 +69,26 @@ export function CertificateCanvas({
 			if (!containerRef.current.contains(target)) return;
 			// If clicked on empty canvas background (not on any element)
 			if (target.closest('[data-el-id]')) return;
-			onSelect(null);
+			onSelect([]);
 		}
 		document.addEventListener('mousedown', handleDeselect);
 		return () => document.removeEventListener('mousedown', handleDeselect);
 	}, [onSelect]);
 
+	const interactableElements = elements
+		.filter(el => !el.hidden)
+		.sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
 	const collectSnapLines = useCallback((currentId: string) => {
 		const verticals: number[] = [0, width / 2, width];
 		const horizontals: number[] = [0, height / 2, height];
-		for (const el of elements) {
+		for (const el of interactableElements) {
 			if (el.id === currentId) continue;
 			verticals.push(el.x, el.x + el.width / 2, el.x + el.width);
 			horizontals.push(el.y, el.y + el.height / 2, el.y + el.height);
 		}
 		return { verticals, horizontals };
-	}, [elements, width, height]);
+	}, [interactableElements, width, height]);
 
 	function applySnap(x: number, y: number, w: number, h: number, id: string) {
 		if (!snappingEnabled) return { x, y, guides: [] as GuideLine[] };
@@ -90,14 +100,11 @@ export function CertificateCanvas({
 
 		// Vertical snapping: left, center, right
 		const candidatesX = [x, x + w / 2, x + w];
-
 		for (let i = 0; i < candidatesX.length; i++) {
 			for (const v of verticals) {
 				if (Math.abs(candidatesX[i] - v) <= snapThreshold) {
 					const delta = v - candidatesX[i];
-					if (i === 0) snappedX = x + delta;
-					if (i === 1) snappedX = x + delta;
-					if (i === 2) snappedX = x + delta;
+					snappedX = x + delta;
 					g.push({ orientation: 'v', pos: v });
 				}
 			}
@@ -109,9 +116,7 @@ export function CertificateCanvas({
 			for (const hLine of horizontals) {
 				if (Math.abs(candidatesY[i] - hLine) <= snapThreshold) {
 					const delta = hLine - candidatesY[i];
-					if (i === 0) snappedY = y + delta;
-					if (i === 1) snappedY = y + delta;
-					if (i === 2) snappedY = y + delta;
+					snappedY = y + delta;
 					g.push({ orientation: 'h', pos: hLine });
 				}
 			}
@@ -122,16 +127,25 @@ export function CertificateCanvas({
 
 	const startDrag = useCallback((event: React.MouseEvent, el: CanvasElement) => {
 		event.stopPropagation();
-		onSelect(el.id);
+		if (el.locked) return;
+		if (event.shiftKey || event.metaKey || event.ctrlKey) {
+			// toggle in selection
+			const set = new Set(selectedElementIds);
+			if (set.has(el.id)) set.delete(el.id); else set.add(el.id);
+			onSelect(Array.from(set));
+		} else {
+			onSelect([el.id]);
+		}
 		onInteractionStart && onInteractionStart();
 		const startX = event.clientX;
 		const startY = event.clientY;
-		const originX = el.x;
-		const originY = el.y;
+		const origin = interactableElements.find(e => e.id === el.id)!;
+		const originX = origin.x;
+		const originY = origin.y;
 
 		function onMove(e: MouseEvent) {
-			const dx = e.clientX - startX;
-			const dy = e.clientY - startY;
+			const dx = (e.clientX - startX) / scale;
+			const dy = (e.clientY - startY) / scale;
 			const nextX = originX + dx;
 			const nextY = originY + dy;
 			const { x: sx, y: sy, guides: g } = applySnap(nextX, nextY, el.width, el.height, el.id);
@@ -146,10 +160,11 @@ export function CertificateCanvas({
 		}
 		document.addEventListener('mousemove', onMove);
 		document.addEventListener('mouseup', onUp);
-	}, [onChange, onSelect, onInteractionStart, onChangeEnd]);
+	}, [onChange, onSelect, onInteractionStart, onChangeEnd, selectedElementIds, scale, interactableElements]);
 
 	const startResize = useCallback((event: React.MouseEvent, el: CanvasElement, corner: 'se' | 'e' | 's') => {
 		event.stopPropagation();
+		if (el.locked) return;
 		onInteractionStart && onInteractionStart();
 		const startX = event.clientX;
 		const startY = event.clientY;
@@ -157,8 +172,8 @@ export function CertificateCanvas({
 		const startH = el.height;
 
 		function onMove(e: MouseEvent) {
-			const dx = e.clientX - startX;
-			const dy = e.clientY - startY;
+			const dx = (e.clientX - startX) / scale;
+			const dy = (e.clientY - startY) / scale;
 			let newW = startW;
 			let newH = startH;
 			if (corner === 'se') { newW = startW + dx; newH = startH + dy; }
@@ -166,7 +181,6 @@ export function CertificateCanvas({
 			if (corner === 's') { newH = startH + dy; }
 			newW = Math.max(10, newW);
 			newH = Math.max(10, newH);
-			// Snap right/bottom edges when resizing from those directions
 			const { x: sx, y: sy, guides: g } = applySnap(el.x, el.y, newW, newH, el.id);
 			setGuides(g);
 			onChange({ ...el, width: newW, height: newH, x: sx, y: sy });
@@ -179,16 +193,17 @@ export function CertificateCanvas({
 		}
 		document.addEventListener('mousemove', onMove);
 		document.addEventListener('mouseup', onUp);
-	}, [onChange, onChangeEnd, onInteractionStart]);
+	}, [onChange, onChangeEnd, onInteractionStart, scale]);
 
 	const startRotate = useCallback((event: React.MouseEvent, el: CanvasElement) => {
 		event.stopPropagation();
+		if (el.locked) return;
 		onInteractionStart && onInteractionStart();
 		const centerX = (el.x + el.width / 2);
 		const centerY = (el.y + el.height / 2);
 		function onMove(e: MouseEvent) {
-			const dx = e.clientX - (containerRef.current?.getBoundingClientRect().left || 0) - centerX;
-			const dy = e.clientY - (containerRef.current?.getBoundingClientRect().top || 0) - centerY;
+			const dx = (e.clientX - (containerRef.current?.getBoundingClientRect().left || 0)) / scale - centerX;
+			const dy = (e.clientY - (containerRef.current?.getBoundingClientRect().top || 0)) / scale - centerY;
 			const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 			onChange({ ...el, rotation: angle });
 		}
@@ -199,7 +214,7 @@ export function CertificateCanvas({
 		}
 		document.addEventListener('mousemove', onMove);
 		document.addEventListener('mouseup', onUp);
-	}, [onChange, onChangeEnd, onInteractionStart]);
+	}, [onChange, onChangeEnd, onInteractionStart, scale]);
 
 	const gridBackground = showGrid
 		? {
@@ -214,8 +229,8 @@ export function CertificateCanvas({
 			{guides.map((g, idx) => (
 				<div key={idx} className="absolute bg-indigo-500" style={g.orientation === 'v' ? { left: g.pos, top: 0, bottom: 0, width: 1 } : { top: g.pos, left: 0, right: 0, height: 1 }} />
 			))}
-			{elements.map(el => {
-				const isSelected = el.id === selectedElementId;
+			{interactableElements.map(el => {
+				const isSelected = selectedElementIds.includes(el.id);
 				return (
 					<div
 						key={el.id}
@@ -228,7 +243,7 @@ export function CertificateCanvas({
 							height: el.height,
 							transform: `rotate(${el.rotation}deg)`,
 							transformOrigin: 'center',
-							cursor: 'move',
+							cursor: el.locked ? 'not-allowed' : 'move',
 						}}
 						onMouseDown={(e) => startDrag(e, el)}
 					>
@@ -260,12 +275,15 @@ export function CertificateCanvas({
 						{isSelected && (
 							<>
 								<div className="absolute inset-0 border-2 border-sky-500 pointer-events-none" />
-								{/* Resize handles */}
-								<div className="absolute -right-2 -bottom-2 w-3 h-3 bg-sky-500 cursor-se-resize" onMouseDown={(e) => startResize(e, el, 'se')} />
-								<div className="absolute -right-2 top-1/2 -mt-1.5 w-3 h-3 bg-sky-500 cursor-e-resize" onMouseDown={(e) => startResize(e, el, 'e')} />
-								<div className="absolute left-1/2 -ml-1.5 -bottom-2 w-3 h-3 bg-sky-500 cursor-s-resize" onMouseDown={(e) => startResize(e, el, 's')} />
-								{/* Rotate handle */}
-								<div className="absolute left-1/2 -ml-2 -top-8 w-4 h-4 rounded-full bg-sky-500 cursor-crosshair" onMouseDown={(e) => startRotate(e, el)} />
+								{/* Resize handles only when single selected */}
+								{selectedElementIds.length === 1 && (
+									<>
+										<div className="absolute -right-2 -bottom-2 w-3 h-3 bg-sky-500 cursor-se-resize" onMouseDown={(e) => startResize(e, el, 'se')} />
+										<div className="absolute -right-2 top-1/2 -mt-1.5 w-3 h-3 bg-sky-500 cursor-e-resize" onMouseDown={(e) => startResize(e, el, 'e')} />
+										<div className="absolute left-1/2 -ml-1.5 -bottom-2 w-3 h-3 bg-sky-500 cursor-s-resize" onMouseDown={(e) => startResize(e, el, 's')} />
+										<div className="absolute left-1/2 -ml-2 -top-8 w-4 h-4 rounded-full bg-sky-500 cursor-crosshair" onMouseDown={(e) => startRotate(e, el)} />
+									</>
+								)}
 							</>
 						)}
 					</div>

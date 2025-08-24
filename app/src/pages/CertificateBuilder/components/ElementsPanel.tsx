@@ -10,6 +10,7 @@ export default function ElementsPanel({ onAddElement }:{ onAddElement: (el: Canv
 		onAddElement({
 			id: nanoid(),
 			type: 'text',
+			name: 'Text',
 			x: 100,
 			y: 100,
 			width: 300,
@@ -27,6 +28,7 @@ export default function ElementsPanel({ onAddElement }:{ onAddElement: (el: Canv
 		onAddElement({
 			id: nanoid(),
 			type: 'shape',
+			name: 'Rectangle',
 			x: 80,
 			y: 80,
 			width: 400,
@@ -43,6 +45,7 @@ export default function ElementsPanel({ onAddElement }:{ onAddElement: (el: Canv
 		onAddElement({
 			id: nanoid(),
 			type: 'shape',
+			name: 'Ellipse',
 			x: 200,
 			y: 200,
 			width: 200,
@@ -65,7 +68,7 @@ export default function ElementsPanel({ onAddElement }:{ onAddElement: (el: Canv
 		const reader = new FileReader();
 		reader.onload = () => {
 			const src = reader.result as string;
-			onAddElement({ id: nanoid(), type: 'image', x: 150, y: 120, width: 400, height: 300, rotation: 0, src });
+			onAddElement({ id: nanoid(), type: 'image', name: 'Image', x: 150, y: 120, width: 400, height: 300, rotation: 0, src });
 			if (fileInputRef.current) fileInputRef.current.value = '';
 		};
 		reader.readAsDataURL(file);
