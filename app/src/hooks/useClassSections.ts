@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { classSectionService } from '../services/classSectionService'
+import { subjectTemplateService } from '../services/subjectTemplateService'
 import type { ClassSection, CreateClassSectionData, UpdateClassSectionData } from '../types'
 
 interface DeleteConfirmation {
@@ -177,17 +178,36 @@ export const useClassSections = (options: UseClassSectionsOptions = {}) => {
     })
   }
 
-  const handleModalSubmit = async (data: CreateClassSectionData) => {
+  const handleModalSubmit = async (data: CreateClassSectionData, templateId?: string) => {
     setModalLoading(true)
     setModalError(null)
     setModalSuccess(null)
 
     try {
+      let classSectionId: string
+      
       if (editingClassSection) {
-        await updateMutation.mutateAsync({ id: editingClassSection.id, data })
+        const result = await updateMutation.mutateAsync({ id: editingClassSection.id, data })
+        classSectionId = editingClassSection.id
       } else {
-        await createMutation.mutateAsync(data)
+        const result = await createMutation.mutateAsync(data)
+        // Assuming the create mutation returns the created class section
+        classSectionId = (result as any)?.data?.id || ''
       }
+      
+      // Apply template if provided
+      if (templateId && classSectionId) {
+        try {
+          await subjectTemplateService.applyToSection(templateId, classSectionId)
+          // Refresh subjects for this class section
+          queryClient.invalidateQueries({ queryKey: ['subjects'] })
+        } catch (error) {
+          console.error('Failed to apply template:', error)
+          // Note: We don't throw here as the class section was created successfully
+          setModalError('Class section created but failed to apply template')
+        }
+      }
+      
       setIsModalOpen(false)
     } catch {
       // Error is handled in mutation onError
