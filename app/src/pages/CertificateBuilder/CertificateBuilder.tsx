@@ -4,24 +4,46 @@ import html2canvas from 'html2canvas';
 import ElementsPanel from './components/ElementsPanel';
 import PropertiesPanel from './components/PropertiesPanel';
 import { CertificateCanvas, type CanvasElement } from './components/CertificateCanvas';
+import LayersPanel from './components/LayersPanel';
 import Button from '@/components/ui/Button';
+import Select from '@/components/ui/Select';
+
+const presets = {
+	a4: { portrait: { w: 794, h: 1123, pdf: 'a4' as const }, landscape: { w: 1123, h: 794, pdf: 'a4' as const } },
+	letter: { portrait: { w: 816, h: 1056, pdf: 'letter' as const }, landscape: { w: 1056, h: 816, pdf: 'letter' as const } },
+	legal: { portrait: { w: 816, h: 1344, pdf: 'legal' as const }, landscape: { w: 1344, h: 816, pdf: 'legal' as const } },
+};
+
+type Paper = keyof typeof presets;
+
+type Orientation = 'portrait' | 'landscape';
 
 export default function CertificateBuilder() {
 	const [elements, setElements] = useState<CanvasElement[]>([]);
-	const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showGrid, setShowGrid] = useState(true);
 	const [snapping, setSnapping] = useState(true);
-
 	const [history, setHistory] = useState<CanvasElement[][]>([]);
 	const [future, setFuture] = useState<CanvasElement[][]>([]);
+	const [paper, setPaper] = useState<Paper>('a4');
+	const [orientation, setOrientation] = useState<Orientation>('landscape');
+	const [zoom, setZoom] = useState<number>(1);
 	const canvasRef = useRef<HTMLDivElement | null>(null);
 
-	const selectedElement = useMemo(() => elements.find(e => e.id === selectedElementId) || null, [elements, selectedElementId]);
+	const selectedElements = useMemo(() => elements.filter(e => selectedIds.includes(e.id)), [elements, selectedIds]);
+	const canvasSize = presets[paper][orientation];
 
 	// History helpers
+	function snapshot(state: CanvasElement[]): CanvasElement[] {
+		// ensure zIndex sequence
+		return state.map((e, idx) => ({ ...e, zIndex: idx }));
+	}
 	function pushHistory(state: CanvasElement[]) {
-		setHistory(prev => [...prev, state.map(e => ({ ...e }))]);
+		setHistory(prev => [...prev, snapshot(state)]);
 		setFuture([]);
+	}
+	function setElementsAndKeepOrder(next: CanvasElement[] | ((prev: CanvasElement[]) => CanvasElement[])) {
+		setElements(prev => snapshot(typeof next === 'function' ? (next as (prev: CanvasElement[]) => CanvasElement[])(prev) : next));
 	}
 
 	function undo() {
@@ -29,93 +51,157 @@ export default function CertificateBuilder() {
 			if (prev.length === 0) return prev;
 			const newHistory = prev.slice(0, -1);
 			const last = prev[prev.length - 1];
-			setFuture(f => [elements.map(e => ({ ...e })), ...f]);
-			setElements(last.map(e => ({ ...e })));
+			setFuture(f => [snapshot(elements), ...f]);
+			setElementsAndKeepOrder(last);
 			return newHistory;
 		});
 	}
-
 	function redo() {
 		setFuture(prev => {
 			if (prev.length === 0) return prev;
 			const [next, ...rest] = prev;
-			setHistory(h => [...h, elements.map(e => ({ ...e }))]);
-			setElements(next.map(e => ({ ...e })));
+			setHistory(h => [...h, snapshot(elements)]);
+			setElementsAndKeepOrder(next);
 			return rest;
 		});
 	}
 
 	function handleAddElement(newElement: CanvasElement) {
 		pushHistory(elements);
-		setElements(prev => [...prev, newElement]);
-		setSelectedElementId(newElement.id);
+		setElementsAndKeepOrder(prev => [...prev, { ...newElement, zIndex: prev.length } as any] as any);
+		setSelectedIds([newElement.id]);
 	}
-
 	function handleUpdateElement(updated: CanvasElement) {
 		setElements(prev => prev.map(e => e.id === updated.id ? updated : e));
 	}
-
 	function handleDeleteSelected() {
-		if (!selectedElementId) return;
+		if (selectedIds.length === 0) return;
 		pushHistory(elements);
-		setElements(prev => prev.filter(e => e.id !== selectedElementId));
-		setSelectedElementId(null);
+		setElementsAndKeepOrder(prev => prev.filter(e => !selectedIds.includes(e.id)));
+		setSelectedIds([]);
 	}
 
 	function handleInteractionStart() {
 		pushHistory(elements);
 	}
-
-	function handleChangeEnd() {
-		// no-op placeholder for now
-	}
+	function handleChangeEnd() {}
 
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
 			const meta = e.ctrlKey || e.metaKey;
-			if (meta && e.key.toLowerCase() === 'z') {
-				e.preventDefault();
-				if (e.shiftKey) {
-					redo();
-				} else {
-					undo();
-				}
-			}
-			if (meta && e.key.toLowerCase() === 'y') {
-				e.preventDefault();
-				redo();
-			}
-			if (e.key === 'Delete' || e.key === 'Backspace') {
-				if (selectedElementId) {
-					e.preventDefault();
-					handleDeleteSelected();
-				}
-			}
+			if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); }
+			if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); }
+			if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length) { e.preventDefault(); handleDeleteSelected(); }
 		}
 		document.addEventListener('keydown', onKey);
 		return () => document.removeEventListener('keydown', onKey);
-	}, [selectedElementId, elements]);
+	}, [selectedIds, elements]);
 
 	async function handleExportPdf() {
 		if (!canvasRef.current) return;
 		const node = canvasRef.current;
 		const canvas = await html2canvas(node, { background: '#ffffff', scale: 2 } as any);
 		const imgData = canvas.toDataURL('image/png');
-		const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+		const pdf = new jsPDF({ orientation, unit: 'pt', format: canvasSize.pdf });
 		const pageWidth = pdf.internal.pageSize.getWidth();
 		const pageHeight = pdf.internal.pageSize.getHeight();
 		pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
 		pdf.save('certificate.pdf');
 	}
 
-	const canvasWidth = 1123;
-	const canvasHeight = 794;
+	// Alignment and distribute utilities
+	function alignSelected(axis: 'left' | 'centerX' | 'right' | 'top' | 'centerY' | 'bottom') {
+		if (selectedElements.length < 2) return;
+		pushHistory(elements);
+		const xs = selectedElements.map(e => e.x);
+		const ys = selectedElements.map(e => e.y);
+		const rights = selectedElements.map(e => e.x + e.width);
+		const bottoms = selectedElements.map(e => e.y + e.height);
+		const minX = Math.min(...xs);
+		const maxRight = Math.max(...rights);
+		const minY = Math.min(...ys);
+		const maxBottom = Math.max(...bottoms);
+		const centerX = (minX + maxRight) / 2;
+		const centerY = (minY + maxBottom) / 2;
+		setElements(prev => prev.map(e => {
+			if (!selectedIds.includes(e.id)) return e;
+			if (axis === 'left') return { ...e, x: minX };
+			if (axis === 'right') return { ...e, x: maxRight - e.width };
+			if (axis === 'top') return { ...e, y: minY };
+			if (axis === 'bottom') return { ...e, y: maxBottom - e.height };
+			if (axis === 'centerX') return { ...e, x: Math.round(centerX - e.width / 2) };
+			if (axis === 'centerY') return { ...e, y: Math.round(centerY - e.height / 2) };
+			return e;
+		}));
+	}
+	function distributeSelected(direction: 'horizontal' | 'vertical') {
+		if (selectedElements.length < 3) return;
+		pushHistory(elements);
+		const sorted = [...selectedElements].sort((a, b) => direction === 'horizontal' ? a.x - b.x : a.y - b.y);
+		if (direction === 'horizontal') {
+			const left = sorted[0].x;
+			const right = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width;
+			const totalWidth = sorted.reduce((sum, e) => sum + e.width, 0);
+			const gap = (right - left - totalWidth) / (sorted.length - 1);
+			let cursor = left;
+			setElements(prev => prev.map(e => {
+				const idx = sorted.findIndex(s => s.id === e.id);
+				if (idx === -1) return e;
+				if (idx === 0) { cursor = e.x + e.width + gap; return e; }
+				if (idx === sorted.length - 1) return e;
+				const newX = Math.round(cursor);
+				cursor = cursor + e.width + gap;
+				return { ...e, x: newX };
+			}));
+		} else {
+			const top = sorted[0].y;
+			const bottom = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height;
+			const totalHeight = sorted.reduce((sum, e) => sum + e.height, 0);
+			const gap = (bottom - top - totalHeight) / (sorted.length - 1);
+			let cursor = top;
+			setElements(prev => prev.map(e => {
+				const idx = sorted.findIndex(s => s.id === e.id);
+				if (idx === -1) return e;
+				if (idx === 0) { cursor = e.y + e.height + gap; return e; }
+				if (idx === sorted.length - 1) return e;
+				const newY = Math.round(cursor);
+				cursor = cursor + e.height + gap;
+				return { ...e, y: newY };
+			}));
+		}
+	}
+
+	// Layers actions
+	function toggleHide(id: string) { setElements(prev => prev.map(e => e.id === id ? { ...e, hidden: !e.hidden } : e)); }
+	function toggleLock(id: string) { setElements(prev => prev.map(e => e.id === id ? { ...e, locked: !e.locked } : e)); }
+	function reorder(id: string, direction: 'up' | 'down') {
+		setElements(prev => {
+			const list = [...prev];
+			const index = list.findIndex(e => e.id === id);
+			if (index === -1) return prev;
+			const target = direction === 'up' ? index + 1 : index - 1;
+			if (target < 0 || target >= list.length) return prev;
+			[ list[index], list[target] ] = [ list[target], list[index] ];
+			return snapshot(list);
+		});
+	}
+
+	const zoomOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5];
 
 	return (
 		<div className="flex h-full w-full overflow-hidden">
-			{/* Left: Elements Panel */}
-			<div className="w-64 border-r bg-white">
+			{/* Left: Elements + Layers */}
+			<div className="w-64 border-r bg-white overflow-auto">
 				<ElementsPanel onAddElement={handleAddElement} />
+				<div className="border-t" />
+				<LayersPanel
+					elements={elements}
+					selectedIds={selectedIds}
+					onSelect={setSelectedIds}
+					onToggleHide={toggleHide}
+					onToggleLock={toggleLock}
+					onReorder={reorder}
+				/>
 			</div>
 
 			{/* Center: Canvas */}
@@ -124,37 +210,65 @@ export default function CertificateBuilder() {
 					<Button onClick={handleExportPdf}>Export PDF</Button>
 					<Button variant="secondary" onClick={undo} disabled={history.length === 0}>Undo</Button>
 					<Button variant="secondary" onClick={redo} disabled={future.length === 0}>Redo</Button>
-					<div className="flex items-center ml-auto gap-2">
-						<label className="inline-flex items-center gap-2 text-sm text-gray-700">
-							<input type="checkbox" checked={snapping} onChange={(e) => setSnapping(e.target.checked)} /> Snapping
-						</label>
-						<label className="inline-flex items-center gap-2 text-sm text-gray-700">
-							<input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Grid
-						</label>
-						<Button variant="secondary" onClick={handleDeleteSelected} disabled={!selectedElementId}>Delete</Button>
+					<div className="h-6 w-px bg-gray-200 mx-1" />
+					<Button variant="secondary" onClick={() => alignSelected('left')} disabled={selectedElements.length < 2}>Align Left</Button>
+					<Button variant="secondary" onClick={() => alignSelected('centerX')} disabled={selectedElements.length < 2}>Align Center</Button>
+					<Button variant="secondary" onClick={() => alignSelected('right')} disabled={selectedElements.length < 2}>Align Right</Button>
+					<Button variant="secondary" onClick={() => alignSelected('top')} disabled={selectedElements.length < 2}>Align Top</Button>
+					<Button variant="secondary" onClick={() => alignSelected('centerY')} disabled={selectedElements.length < 2}>Align Middle</Button>
+					<Button variant="secondary" onClick={() => alignSelected('bottom')} disabled={selectedElements.length < 2}>Align Bottom</Button>
+					<div className="h-6 w-px bg-gray-200 mx-1" />
+					<Button variant="secondary" onClick={() => distributeSelected('horizontal')} disabled={selectedElements.length < 3}>Distribute H</Button>
+					<Button variant="secondary" onClick={() => distributeSelected('vertical')} disabled={selectedElements.length < 3}>Distribute V</Button>
+					<div className="h-6 w-px bg-gray-200 mx-1" />
+					<label className="inline-flex items-center gap-2 text-sm text-gray-700">
+						<input type="checkbox" checked={snapping} onChange={(e) => setSnapping(e.target.checked)} /> Snapping
+					</label>
+					<label className="inline-flex items-center gap-2 text-sm text-gray-700">
+						<input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Grid
+					</label>
+					<div className="ml-auto flex items-center gap-2">
+						<Select value={paper} onChange={(e) => setPaper(e.target.value as Paper)}>
+							<option value="a4">A4</option>
+							<option value="letter">Letter</option>
+							<option value="legal">Legal</option>
+						</Select>
+						<Select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+							<option value="portrait">Portrait</option>
+							<option value="landscape">Landscape</option>
+						</Select>
+						<Select value={String(zoom)} onChange={(e) => setZoom(Number(e.target.value))}>
+							{zoomOptions.map(z => (
+								<option key={z} value={z}>{Math.round(z * 100)}%</option>
+							))}
+						</Select>
+						<Button variant="secondary" onClick={handleDeleteSelected} disabled={!selectedIds.length}>Delete</Button>
 					</div>
 				</div>
 				<div className="flex-1 overflow-auto p-6">
-					<div className="mx-auto bg-white shadow relative rounded" style={{ width: canvasWidth, height: canvasHeight }} ref={canvasRef}>
-						<CertificateCanvas
-							width={canvasWidth}
-							height={canvasHeight}
-							elements={elements}
-							selectedElementId={selectedElementId}
-							onSelect={setSelectedElementId}
-							onChange={handleUpdateElement}
-							onInteractionStart={handleInteractionStart}
-							onChangeEnd={handleChangeEnd}
-							showGrid={showGrid}
-							snappingEnabled={snapping}
-						/>
+					<div className="mx-auto bg-white shadow relative rounded" style={{ width: canvasSize.w * zoom, height: canvasSize.h * zoom }}>
+						<div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: canvasSize.w, height: canvasSize.h }} ref={canvasRef}>
+							<CertificateCanvas
+								width={canvasSize.w}
+								height={canvasSize.h}
+								scale={zoom}
+								elements={elements}
+								selectedElementIds={selectedIds}
+								onSelect={setSelectedIds}
+								onChange={handleUpdateElement}
+								onInteractionStart={handleInteractionStart}
+								onChangeEnd={handleChangeEnd}
+								showGrid={showGrid}
+								snappingEnabled={snapping}
+							/>
+						</div>
 					</div>
 				</div>
 			</div>
 
 			{/* Right: Properties Panel */}
 			<div className="w-72 border-l bg-white">
-				<PropertiesPanel element={selectedElement} onChange={(el) => { pushHistory(elements); handleUpdateElement(el); }} />
+				<PropertiesPanel element={selectedElements[0] || null} onChange={(el) => { pushHistory(elements); handleUpdateElement(el); }} />
 			</div>
 		</div>
 	);
