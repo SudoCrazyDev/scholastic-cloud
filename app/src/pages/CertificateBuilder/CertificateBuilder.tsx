@@ -107,6 +107,28 @@ export default function CertificateBuilder() {
 	}
 
 	useEffect(() => {
+		const params = new URLSearchParams(window.location.search);
+		const idParam = params.get('id');
+		if (idParam) {
+			const id = Number(idParam);
+			if (!Number.isNaN(id)) {
+				getCertificate(id).then(rec => {
+					setCertificateId(rec.id);
+					setTitle(rec.title);
+					const d = rec.design_json || {};
+					setElements(d.elements || []);
+					if (d.paper) setPaper(d.paper);
+					if (d.orientation) setOrientation(d.orientation);
+					if (d.zoom) setZoom(d.zoom);
+					if (d.bgColor) setBgColor(d.bgColor);
+					setBgImage(d.bgImage || null);
+				}).catch(() => {/* ignore */});
+			}
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	useEffect(() => {
 		function isTypingTarget(el: Element | null) { if (!el) return false; const tag = (el as HTMLElement).tagName.toLowerCase(); return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable; }
 		function onKey(e: KeyboardEvent) { const meta = e.ctrlKey || e.metaKey; if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); } if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); } if ((e.key === 'Delete' || e.key === 'Backspace')) { if (isTypingTarget(document.activeElement)) return; if (selectedIds.length) { e.preventDefault(); handleDeleteSelected(); } } }
 		document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
