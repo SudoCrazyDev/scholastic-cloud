@@ -52,6 +52,10 @@ export default function PropertiesPanel({ element, onChange }:{ element: CanvasE
 								<option value="right">Right</option>
 							</Select>
 						</div>
+						<div className="col-span-2">
+							<Label>Letter spacing</Label>
+							<Input type="number" value={element.letterSpacing ?? 0} onChange={(e) => update('letterSpacing', Number(e.target.value))} />
+						</div>
 					</div>
 				</div>
 			)}
