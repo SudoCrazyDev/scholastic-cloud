@@ -44,6 +44,14 @@ export default function PropertiesPanel({ element, onChange }:{ element: CanvasE
 							<Label>Color</Label>
 							<Input type="color" value={element.color || '#111827'} onChange={(e) => update('color', e.target.value)} />
 						</div>
+						<div className="col-span-2">
+							<Label>Text align</Label>
+							<Select value={element.textAlign || 'left'} onChange={(e) => update('textAlign', e.target.value as CanvasElement['textAlign'])}>
+								<option value="left">Left</option>
+								<option value="center">Center</option>
+								<option value="right">Right</option>
+							</Select>
+						</div>
 					</div>
 				</div>
 			)}
