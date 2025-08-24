@@ -135,6 +135,12 @@ export function ClassSectionModal({
   const handleTeacherSelect = (teacher: { id: string; label: string; description?: string } | null) => {
     setSelectedTeacher(teacher)
     formik.setFieldValue('adviser_id', teacher?.id || '')
+    
+    // Clear search query when clearing selection
+    if (!teacher) {
+      setTeacherSearchQuery('')
+      setDebouncedSearchQuery('')
+    }
   }
 
   const handleClose = () => {
@@ -233,20 +239,36 @@ export function ClassSectionModal({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Adviser
                   </label>
-                  <Autocomplete
-                    value={selectedTeacher}
-                    onChange={handleTeacherSelect}
-                    onQueryChange={setTeacherSearchQuery}
-                    options={teachers.map(teacher => ({
-                      id: teacher.id,
-                      label: getFullName(teacher),
-                      description: teacher.email
-                    }))}
-                    placeholder="Search for a teacher..."
-                    className={formik.touched.adviser_id && formik.errors.adviser_id ? 'border-red-500' : ''}
-                    disabled={teachersLoading}
-                    error={!!(formik.touched.adviser_id && formik.errors.adviser_id)}
-                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                                             <Autocomplete
+                         value={selectedTeacher}
+                         onChange={handleTeacherSelect}
+                         onQueryChange={setTeacherSearchQuery}
+                         options={teachers.map(teacher => ({
+                           id: teacher.id,
+                           label: getFullName(teacher),
+                           description: teacher.email
+                         }))}
+                         placeholder="Search for a teacher..."
+                         className={formik.touched.adviser_id && formik.errors.adviser_id ? 'border-red-500' : ''}
+                         disabled={teachersLoading}
+                         error={!!(formik.touched.adviser_id && formik.errors.adviser_id)}
+                       />
+
+                    </div>
+                    {selectedTeacher && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleTeacherSelect(null)}
+                        disabled={loading}
+                        className="px-3 py-2 text-sm"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                   {formik.touched.adviser_id && formik.errors.adviser_id && (
                     <p className="mt-1 text-sm text-red-600">{formik.errors.adviser_id}</p>
                   )}

@@ -119,10 +119,49 @@ jobs:
 
             # Extract into parent (v2) under api/
             unzip -o "$ZIP_FILE" -d api/
+            
+            # Ensure required Laravel directories exist
+            mkdir -p api/storage/logs
+            mkdir -p api/storage/framework/cache
+            mkdir -p api/storage/framework/sessions
+            mkdir -p api/storage/framework/views
+            mkdir -p api/bootstrap/cache
 
-            # Optional permissions (shared hosting typical)
-            chmod -R 755 api/
-            chmod -R 775 api/storage api/bootstrap/cache || true
+            # Set proper permissions for Laravel (shared hosting)
+            # Main directories - readable by web server
+            find api/ -type d -exec chmod 755 {} \;
+            find api/ -type f -exec chmod 644 {} \;
+            
+            # Storage and cache directories - writable by web server
+            chmod -R 775 api/storage
+            chmod -R 775 api/bootstrap/cache
+            
+            # Specific storage subdirectories
+            chmod -R 775 api/storage/logs
+            chmod -R 775 api/storage/framework
+            chmod -R 775 api/storage/app
+            chmod -R 775 api/storage/framework/cache
+            chmod -R 775 api/storage/framework/sessions
+            chmod -R 775 api/storage/framework/views
+            
+            # Ensure .env file has correct permissions (if it exists)
+            if [ -f api/.env ]; then
+              chmod 644 api/.env
+            fi
+            
+            # Set ownership if possible (may fail on shared hosting)
+            chown -R $USER:$USER api/ 2>/dev/null || true
+            
+            # Clear any existing cached files that might have wrong permissions
+            rm -rf api/bootstrap/cache/* 2>/dev/null || true
+            rm -rf api/storage/framework/cache/* 2>/dev/null || true
+            rm -rf api/storage/framework/views/* 2>/dev/null || true
+            rm -rf api/storage/framework/sessions/* 2>/dev/null || true
+            rm -rf api/storage/logs/* 2>/dev/null || true
+            
+            # Re-apply permissions after clearing cache
+            chmod -R 775 api/storage
+            chmod -R 775 api/bootstrap/cache
 
             # Place web entry files into the public web root (v2)
             # Copy .htaccess and index.php from Laravel's public/ to the web root
@@ -138,6 +177,28 @@ jobs:
 
             # Remove uploaded zip after extraction
             rm -f "$ZIP_FILE"
+            
+            # Verify permissions and show directory structure
+            echo "=== Final permission verification ==="
+            echo "API directory permissions:"
+            ls -la api/ | head -10
+            echo "Storage permissions:"
+            ls -la api/storage/ 2>/dev/null || echo "Storage directory not accessible"
+            echo "Bootstrap cache permissions:"
+            ls -la api/bootstrap/cache/ 2>/dev/null || echo "Bootstrap cache not accessible"
+            
+            # Test if key Laravel files are accessible
+            if [ -f api/vendor/autoload.php ]; then
+              echo "✓ Vendor autoload.php exists and accessible"
+            else
+              echo "✗ Vendor autoload.php missing or inaccessible"
+            fi
+            
+            if [ -f api/bootstrap/app.php ]; then
+              echo "✓ Bootstrap app.php exists and accessible"
+            else
+              echo "✗ Bootstrap app.php missing or inaccessible"
+            fi
 
       # Step 10: Post-deployment cleanup
       - name: Cleanup deployment files

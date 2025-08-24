@@ -6,6 +6,7 @@ use App\Models\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class SubjectController extends Controller
 {
@@ -73,7 +74,7 @@ class SubjectController extends Controller
 
             $validated = $request->validate([
                 'class_section_id' => 'required|exists:class_sections,id',
-                'adviser' => 'nullable|exists:users,id',
+                'adviser' => 'nullable|string',
                 'subject_type' => 'required|in:parent,child',
                 'parent_subject_id' => 'nullable|exists:subjects,id',
                 'title' => 'required|string|max:255',
@@ -83,6 +84,31 @@ class SubjectController extends Controller
                 'is_limited_student' => 'boolean',
                 'order' => 'nullable|integer|min:0',
             ]);
+
+            // Log the validated data after validation
+            Log::info('Subject store validated data:', $validated);
+
+            // Validate adviser exists in users table if provided
+            if (!empty($validated['adviser'])) {
+                if (!\App\Models\User::find($validated['adviser'])) {
+                    throw ValidationException::withMessages([
+                        'adviser' => 'The selected subject teacher does not exist.'
+                    ]);
+                }
+            }
+
+            // Handle adviser field - convert empty string to null or set to null if not provided
+            if (isset($validated['adviser'])) {
+                if ($validated['adviser'] === '') {
+                    $validated['adviser'] = null;
+                }
+            } else {
+                // If adviser field is not provided in the request, set it to null
+                $validated['adviser'] = null;
+            }
+
+            // Log the final validated data before creation
+            Log::info('Subject store final validated data:', $validated);
 
             // Add the institution_id from the user's default institution
             $validated['institution_id'] = $defaultInstitution->institution_id;
@@ -106,6 +132,13 @@ class SubjectController extends Controller
             if ($validated['subject_type'] === 'parent' && !empty($validated['parent_subject_id'])) {
                 throw ValidationException::withMessages([
                     'parent_subject_id' => 'Parent subject should not be set when subject type is parent.'
+                ]);
+            }
+
+            // Validate adviser is required for child subjects
+            if ($validated['subject_type'] === 'child' && empty($validated['adviser'])) {
+                throw ValidationException::withMessages([
+                    'adviser' => 'Subject teacher is required for child subjects.'
                 ]);
             }
 
@@ -201,7 +234,7 @@ class SubjectController extends Controller
 
             $validated = $request->validate([
                 'class_section_id' => 'sometimes|required|exists:class_sections,id',
-                'adviser' => 'nullable|exists:users,id',
+                'adviser' => 'nullable|string',
                 'subject_type' => 'sometimes|required|in:parent,child',
                 'parent_subject_id' => 'nullable|exists:subjects,id',
                 'title' => 'sometimes|required|string|max:255',
@@ -211,6 +244,28 @@ class SubjectController extends Controller
                 'is_limited_student' => 'boolean',
                 'order' => 'nullable|integer|min:0',
             ]);
+
+            // Log the validated data after validation
+            Log::info('Subject update validated data:', $validated);
+
+            // Validate adviser exists in users table if provided
+            if (!empty($validated['adviser'])) {
+                if (!\App\Models\User::find($validated['adviser'])) {
+                    throw ValidationException::withMessages([
+                        'adviser' => 'The selected subject teacher does not exist.'
+                    ]);
+                }
+            }
+
+            // Handle adviser field - convert empty string to null or set to null if not provided
+            if (isset($validated['adviser'])) {
+                if ($validated['adviser'] === '') {
+                    $validated['adviser'] = null;
+                }
+            } else {
+                // If adviser field is not provided in the request, set it to null to clear it
+                $validated['adviser'] = null;
+            }
 
             // Ensure the institution_id is always set to the user's default institution
             $validated['institution_id'] = $defaultInstitution->institution_id;
@@ -228,6 +283,16 @@ class SubjectController extends Controller
                     'parent_subject_id' => 'Parent subject should not be set when subject type is parent.'
                 ]);
             }
+
+            // Validate adviser is required for child subjects
+            if (isset($validated['subject_type']) && $validated['subject_type'] === 'child' && isset($validated['adviser']) && empty($validated['adviser'])) {
+                throw ValidationException::withMessages([
+                    'adviser' => 'Subject teacher is required for child subjects.'
+                ]);
+            }
+
+            // Log the final validated data before update
+            Log::info('Subject update final validated data:', $validated);
 
             $subject->update($validated);
 

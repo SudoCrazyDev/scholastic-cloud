@@ -73,7 +73,21 @@ export default function PrintTempReportCard({
 
                         {/* Dynamic subject rows */}
                         {sectionSubjects && sectionSubjects.length > 0 ? (
-                          sectionSubjects.map((subject, index) => {
+                          sectionSubjects
+                            .filter(subject => {
+                              // If it's a variant subject, only include it if student has grades
+                              if (subject.variant) {
+                                const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
+                                return studentGrade?.quarter1_grade || 
+                                       studentGrade?.quarter2_grade || 
+                                       studentGrade?.quarter3_grade || 
+                                       studentGrade?.quarter4_grade || 
+                                       studentGrade?.final_grade;
+                              }
+                              // Always include non-variant subjects
+                              return true;
+                            })
+                            .map((subject, index) => {
                             const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
                             const quarter1Grade = roundGrade(studentGrade?.quarter1_grade) || '';
                             const quarter2Grade = roundGrade(studentGrade?.quarter2_grade) || '';
@@ -85,7 +99,7 @@ export default function PrintTempReportCard({
                             return (
                               <View key={index} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
                                 <View style={{paddingLeft: '2px', paddingVertical: '2px', width: '30%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'flex-start', borderRight: '1px solid black'}}>
-                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginLeft: `${subject.subject_type === 'parent' ? '0px' : '10px'}`}}>{subject.title ||  'Subject'} {subject.variant ? `- ${subject.variant}` : ''}</Text>
+                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginLeft: `${subject.subject_type === 'parent' ? '0px' : '10px'}`}}>{subject.title ||  'Subject'}{subject.variant ? ` - ${subject.variant}` : ''}</Text>
                                 </View>
                                 <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black', alignItems: 'center', justifyContent: 'center'}}>
                                   <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>

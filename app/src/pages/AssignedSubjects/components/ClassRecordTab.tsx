@@ -5,14 +5,19 @@ import {
   UserGroupIcon,
   AcademicCapIcon,
   CalculatorIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  CheckIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
 import { Select } from '../../../components/select'
+import { Button } from '../../../components/button'
 import { useStudents } from '../../../hooks/useStudents'
 import { useStudentRunningGrades } from '../../../hooks/useStudentRunningGrades'
+import { useUpdateFinalGrade, useUpsertFinalGrade, useBulkUpsertFinalGrades } from '../../../hooks/useStudentRunningGrades'
 import { StudentGradesByQuarter } from './StudentGradesByQuarter'
 import { Alert } from '../../../components/alert'
 import { ErrorHandler } from '../../../utils/errorHandler'
+import { toast } from 'react-hot-toast'
 
 interface ClassRecordTabProps {
   subjectId: string
@@ -21,10 +26,24 @@ interface ClassRecordTabProps {
   assignedStudentIds?: string[]
 }
 
+// Type for batch grade changes
+interface BatchGradeChange {
+  studentId: string;
+  subjectId: string;
+  quarter: '1' | '2' | '3' | '4';
+  finalGrade: number;
+  gradeId?: string;
+  academicYear: string;
+  hasChanged: boolean;
+}
+
+// Type for submission strategy
+type SubmissionStrategy = 'bulk' | 'individual' | 'hybrid';
+
 export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [] }) => {
   // Fetch students
   const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId });
-  
+
   const filteredStudents = isLimited && assignedStudentIds.length > 0
     ? students.filter(s => assignedStudentIds.includes(s.id))
     : (isLimited ? [] : students)
@@ -34,11 +53,27 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
     subjectId,
     classSectionId,
   });
-
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  
+  console.log("RUNNING GRADES DATA: ", runningGradesData);
   // Quarter filter state for mobile/tablet
   const [selectedQuarter, setSelectedQuarter] = useState<string>('1');
+  
+  // Batch submission state
+  const [isBatchMode, setIsBatchMode] = useState(true); // Default to batch mode
+  const [batchChanges, setBatchChanges] = useState<BatchGradeChange[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStrategy, setSubmissionStrategy] = useState<SubmissionStrategy>('hybrid');
+  const [submissionProgress, setSubmissionProgress] = useState<{
+    total: number;
+    completed: number;
+    failed: number;
+    current: number;
+  }>({ total: 0, completed: 0, failed: 0, current: 0 });
+  
+  // Mutations for different submission strategies
+  const updateFinalGradeMutation = useUpdateFinalGrade();
+  const upsertFinalGradeMutation = useUpsertFinalGrade();
+  const bulkUpsertFinalGradesMutation = useBulkUpsertFinalGrades();
   
   // Quarter options for the filter
   const quarterOptions = [
@@ -81,6 +116,256 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
     return acc;
   }, {});
 
+  // Handle grade changes in batch mode
+  const handleGradeChange = (change: BatchGradeChange) => {
+    setBatchChanges(prev => {
+      // Remove existing change for this student/quarter combination
+      const filtered = prev.filter(c => 
+        !(c.studentId === change.studentId && c.quarter === change.quarter)
+      );
+      
+      // Add new change if it has actually changed
+      if (change.hasChanged) {
+        return [...filtered, change];
+      }
+      
+      return filtered;
+    });
+  };
+
+  // Smart submission strategy selection
+  const selectSubmissionStrategy = (changes: BatchGradeChange[]): SubmissionStrategy => {
+    if (changes.length === 0) return 'hybrid';
+    
+    // Always prefer bulk for batch mode - it's more efficient for slow connections
+    if (changes.length >= 1) return 'bulk';
+    
+    return 'hybrid';
+  };
+
+  // Individual submission with retry logic (only used as fallback)
+  const submitIndividualWithRetry = async (changes: BatchGradeChange[], maxRetries = 2) => {
+    const results = { success: 0, failed: 0, errors: [] as any[] };
+    
+    for (let i = 0; i < changes.length; i++) {
+      const change = changes[i];
+      setSubmissionProgress(prev => ({ ...prev, current: i + 1 }));
+      
+      let retries = 0;
+      let success = false;
+      
+      while (retries <= maxRetries && !success) {
+        try {
+          if (change.gradeId) {
+            // Update existing grade
+            await updateFinalGradeMutation.mutateAsync({
+              id: change.gradeId,
+              finalGrade: change.finalGrade,
+            });
+          } else {
+            // Create new grade
+            await upsertFinalGradeMutation.mutateAsync({
+              studentId: change.studentId,
+              subjectId: change.subjectId,
+              quarter: change.quarter,
+              finalGrade: change.finalGrade,
+              academicYear: change.academicYear,
+            });
+          }
+          
+          results.success++;
+          success = true;
+          
+        } catch (error) {
+          retries++;
+          if (retries > maxRetries) {
+            results.failed++;
+            results.errors.push({
+              change,
+              error: error,
+              retries
+            });
+          } else {
+            // Wait before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          }
+        }
+      }
+      
+      // Small delay between requests to avoid overwhelming the server
+      if (i < changes.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return results;
+  };
+
+  // Hybrid submission - try bulk first, fallback to individual only if bulk completely fails
+  const submitHybrid = async (changes: BatchGradeChange[]) => {
+    try {
+      // Always try bulk first - it's the most efficient for batch mode
+      setSubmissionStrategy('bulk');
+      await bulkUpsertFinalGradesMutation.mutateAsync(changes);
+      return { success: changes.length, failed: 0, errors: [] };
+    } catch (error) {
+      // Only fallback to individual if bulk completely fails
+      console.warn('Bulk operation failed, falling back to individual updates:', error);
+      
+      setSubmissionStrategy('individual');
+      toast.success('Bulk operation failed, falling back to individual updates...', {
+        duration: 3000,
+        icon: '🔄',
+        style: {
+          background: '#f59e0b',
+          color: 'white',
+          fontWeight: '600',
+        },
+      });
+      
+      return await submitIndividualWithRetry(changes);
+    }
+  };
+
+  // Submit all batch changes using smart strategy
+  const handleBatchSubmit = async () => {
+    if (batchChanges.length === 0) {
+      toast.success('No changes to submit', {
+        duration: 2000,
+        icon: 'ℹ️',
+        style: {
+          background: '#6b7280',
+          color: 'white',
+          fontWeight: '600',
+        },
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmissionProgress({
+      total: batchChanges.length,
+      completed: 0,
+      failed: 0,
+      current: 0
+    });
+    
+    // Show loading toast
+    const loadingToast = toast.loading(`Preparing to submit ${batchChanges.length} grade changes...`, {
+      icon: '⏳',
+      style: {
+        background: '#3b82f6',
+        color: 'white',
+        fontWeight: '600',
+      },
+    });
+
+    try {
+      let results;
+      const strategy = selectSubmissionStrategy(batchChanges);
+      
+      switch (strategy) {
+        case 'bulk':
+          setSubmissionStrategy('bulk');
+          // Always use bulk for batch mode - it's more efficient
+          results = await bulkUpsertFinalGradesMutation.mutateAsync(batchChanges);
+          results = { success: batchChanges.length, failed: 0, errors: [] };
+          break;
+          
+        case 'individual':
+          // This should rarely happen in batch mode, but handle it gracefully
+          setSubmissionStrategy('individual');
+          results = await submitIndividualWithRetry(batchChanges);
+          break;
+          
+        case 'hybrid':
+        default:
+          // Hybrid always tries bulk first
+          results = await submitHybrid(batchChanges);
+          break;
+      }
+      
+      // Clear batch changes
+      setBatchChanges([]);
+      
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      
+      // Show success/partial success message
+      if (results.failed === 0) {
+        toast.success(`✅ Successfully submitted all ${results.success} grade changes!`, {
+          duration: 4000,
+          icon: '✅',
+          style: {
+            background: '#10b981',
+            color: 'white',
+            fontWeight: '600',
+          },
+        });
+      } else {
+        toast.success(`⚠️ Partially successful: ${results.success} succeeded, ${results.failed} failed`, {
+          duration: 5000,
+          icon: '⚠️',
+          style: {
+            background: '#f59e0b',
+            color: 'white',
+            fontWeight: '600',
+          },
+        });
+        
+        // Log errors for debugging
+        console.error('Failed grade submissions:', results.errors);
+      }
+      
+    } catch (error) {
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      
+      // Show error toast
+      toast.error('Failed to submit grade changes. Please try again.', {
+        duration: 5000,
+        icon: '❌',
+        style: {
+          background: '#ef4444',
+          color: 'white',
+          fontWeight: '600',
+        },
+      });
+      
+      console.error('Batch submission error:', error);
+    } finally {
+      setIsSubmitting(false);
+      setSubmissionProgress({ total: 0, completed: 0, failed: 0, current: 0 });
+    }
+  };
+
+  // Clear all batch changes
+  const handleClearChanges = () => {
+    setBatchChanges([]);
+    toast.success('All pending changes cleared', {
+      duration: 2000,
+      icon: '🗑️',
+      style: {
+        background: '#6b7280',
+        color: 'white',
+        fontWeight: '600',
+      },
+    });
+  };
+
+  // Toggle between batch and immediate mode
+  const toggleBatchMode = () => {
+    if (isBatchMode && batchChanges.length > 0) {
+      // Warn user about unsaved changes
+      if (window.confirm('You have unsaved changes. Are you sure you want to switch to immediate mode? All pending changes will be lost.')) {
+        setBatchChanges([]);
+        setIsBatchMode(false);
+      }
+    } else {
+      setIsBatchMode(!isBatchMode);
+    }
+  };
+
   if (studentsLoading || gradesLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -111,6 +396,112 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
           <span className="hidden sm:inline">Click calculator icon to use calculated grade</span>
           <span className="sm:hidden">Use calculator for auto-grade</span>
         </div>
+      </div>
+
+      {/* Batch Mode Controls */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="batchMode"
+                checked={isBatchMode}
+                onChange={toggleBatchMode}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+              />
+              <label htmlFor="batchMode" className="text-sm font-medium text-gray-900">
+                Batch Submission Mode
+              </label>
+            </div>
+            <span className="text-xs text-gray-500">
+              {isBatchMode ? 'Make multiple changes and submit all at once' : 'Save changes immediately'}
+            </span>
+          </div>
+          
+          {isBatchMode && (
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <span>Pending changes:</span>
+                <span className="font-semibold text-blue-600">{batchChanges.length}</span>
+              </div>
+              
+              {batchChanges.length > 0 && (
+                <>
+                  <Button
+                    onClick={handleClearChanges}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-300 hover:bg-red-50"
+                  >
+                    <XMarkIcon className="w-4 h-4 mr-1" />
+                    Clear All
+                  </Button>
+                  
+                  <Button
+                    onClick={handleBatchSubmit}
+                    disabled={isSubmitting}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        {submissionStrategy === 'bulk' ? 'Submitting Bulk...' : 
+                         submissionStrategy === 'individual' ? 'Submitting Individual...' : 
+                         'Submitting...'}
+                      </>
+                    ) : (
+                      <>
+                        <CheckIcon className="w-4 h-4 mr-1" />
+                        Submit All Changes ({batchChanges.length})
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {isBatchMode && (
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-700">
+              💡 <strong>Smart Batch Mode:</strong> The system always uses bulk operations for maximum efficiency with slow internet connections. 
+              All your grade changes are sent in a single request, with automatic fallback to individual updates only if the bulk operation fails.
+            </p>
+          </div>
+        )}
+
+        {/* Submission Progress */}
+        {isSubmitting && submissionProgress.total > 0 && (
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-yellow-800">
+                {submissionStrategy === 'bulk' ? 'Bulk Processing...' : 
+                 submissionStrategy === 'individual' ? 'Individual Processing...' : 
+                 'Processing...'}
+              </span>
+              <span className="text-xs text-yellow-600">
+                {submissionProgress.current}/{submissionProgress.total}
+              </span>
+            </div>
+            
+            <div className="w-full bg-yellow-200 rounded-full h-2">
+              <div 
+                className="bg-yellow-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(submissionProgress.current / submissionProgress.total) * 100}%` }}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-4 mt-2 text-xs text-yellow-700">
+              <span>Strategy: {submissionStrategy}</span>
+              {submissionStrategy === 'individual' && (
+                <span>Progress: {submissionProgress.current}/{submissionProgress.total}</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Mobile Summary - Only visible on mobile and tablet */}
@@ -243,6 +634,14 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
             <span className="font-medium">Calculated Grade:</span> Click the calculator icon to use the system-calculated grade
           </div>
         </div>
+        {isBatchMode && (
+          <div className="mt-3 p-2 bg-blue-100 rounded border border-blue-300">
+            <p className="text-xs text-blue-800">
+              <strong>Batch Mode:</strong> Make all your changes first, then click "Submit All Changes" to save everything at once. 
+              Changed grades will show a blue indicator.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Student Grades List */}
@@ -307,6 +706,9 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
                           runningGrades={gradesByStudent[student.id] || []}
                           academicYear="2025-2026"
                           selectedQuarter={selectedQuarter}
+                          isBatchMode={isBatchMode}
+                          onGradeChange={handleGradeChange}
+                          isDisabled={isSubmitting}
                         />
                       ))}
                     </div>

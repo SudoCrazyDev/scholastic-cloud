@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '../../../components/input';
 import { CalculatorIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useUpdateFinalGrade, useUpsertFinalGrade, useDeleteStudentRunningGrade } from '../../../hooks/useStudentRunningGrades';
@@ -13,6 +13,18 @@ interface FinalGradeInputProps {
   calculatedGrade?: number;
   gradeId?: string;
   academicYear?: string;
+  // Batch submission props
+  isBatchMode?: boolean;
+  onGradeChange?: (data: {
+    studentId: string;
+    subjectId: string;
+    quarter: '1' | '2' | '3' | '4';
+    finalGrade: number;
+    gradeId?: string;
+    academicYear: string;
+    hasChanged: boolean;
+  }) => void;
+  isDisabled?: boolean;
 }
 
 export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
@@ -23,20 +35,50 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   calculatedGrade,
   gradeId,
   academicYear = '2025-2026',
+  isBatchMode = false,
+  onGradeChange,
+  isDisabled = false,
 }) => {
   const [finalGrade, setFinalGrade] = useState(toNumber(currentFinalGrade));
+  const [hasLocalChanges, setHasLocalChanges] = useState(false);
   const updateFinalGradeMutation = useUpdateFinalGrade();
   const upsertFinalGradeMutation = useUpsertFinalGrade();
   const deleteStudentRunningGradeMutation = useDeleteStudentRunningGrade();
+
+  // Update local state when currentFinalGrade prop changes
+  useEffect(() => {
+    setFinalGrade(toNumber(currentFinalGrade));
+    setHasLocalChanges(false);
+  }, [currentFinalGrade]);
 
   const handleFinalGradeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = Number(e.target.value);
     if (!isNaN(value) && value >= 0 && value <= 100) {
       setFinalGrade(value);
+      setHasLocalChanges(true);
+      
+      // Notify parent component about the change for batch mode
+      if (isBatchMode && onGradeChange) {
+        const originalGrade = toNumber(currentFinalGrade);
+        onGradeChange({
+          studentId,
+          subjectId,
+          quarter,
+          finalGrade: value,
+          gradeId,
+          academicYear,
+          hasChanged: value !== originalGrade,
+        });
+      }
     }
   };
 
   const handleSave = async () => {
+    // In batch mode, don't save immediately
+    if (isBatchMode) {
+      return;
+    }
+
     // Check if the value has actually changed
     const originalGrade = toNumber(currentFinalGrade);
     if (finalGrade === originalGrade) {
@@ -81,6 +123,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
       }
       // Dismiss loading toast (success toast will show from mutation)
       toast.dismiss(loadingToast);
+      setHasLocalChanges(false);
     } catch (error) {
       // Dismiss loading toast (error toast will show from mutation)
       toast.dismiss(loadingToast);
@@ -99,6 +142,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
     if (numCalculatedGrade === currentFinalGradeNum) {
       // No change, just update the local state and don't make API call
       setFinalGrade(numCalculatedGrade);
+      setHasLocalChanges(false);
       toast.success('Calculated grade is already applied', {
         duration: 2000,
         icon: 'ℹ️',
@@ -108,6 +152,25 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
           fontWeight: '600',
         },
       });
+      return;
+    }
+
+    // In batch mode, just update local state
+    if (isBatchMode) {
+      setFinalGrade(numCalculatedGrade);
+      setHasLocalChanges(true);
+      
+      if (onGradeChange) {
+        onGradeChange({
+          studentId,
+          subjectId,
+          quarter,
+          finalGrade: numCalculatedGrade,
+          gradeId,
+          academicYear,
+          hasChanged: true,
+        });
+      }
       return;
     }
 
@@ -139,6 +202,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
         });
       }
       setFinalGrade(numCalculatedGrade);
+      setHasLocalChanges(false);
       // Dismiss loading toast (success toast will show from mutation)
       toast.dismiss(loadingToast);
     } catch (error) {
@@ -146,6 +210,9 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
       toast.dismiss(loadingToast);
     }
   };
+
+  // Visual indicator for changes in batch mode
+  const hasChanges = isBatchMode ? hasLocalChanges : false;
 
   return (
     <div className="flex flex-col items-center space-y-2">
@@ -159,7 +226,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
         {calculatedGrade !== undefined && calculatedGrade !== null && !isNaN(calculatedGrade) && (
           <button
             onClick={handleUseCalculatedGrade}
-            disabled={updateFinalGradeMutation.isPending || upsertFinalGradeMutation.isPending}
+            disabled={isDisabled || updateFinalGradeMutation.isPending || upsertFinalGradeMutation.isPending}
             className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200 group relative"
             title={`Use calculated grade: ${formatGrade(calculatedGrade)}`}
           >
@@ -180,17 +247,25 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
           step="0.1"
           value={finalGrade}
           onChange={handleFinalGradeChange}
-          onBlur={handleSave}
+          onBlur={isBatchMode ? undefined : handleSave}
           onKeyPress={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !isBatchMode) {
               handleSave();
             }
           }}
           size="sm"
-          className="text-center w-16 h-10 text-sm font-medium"
+          className={`text-center w-16 h-10 text-sm font-medium ${
+            hasChanges ? 'ring-2 ring-blue-500 ring-opacity-50 bg-blue-50' : ''
+          }`}
           variant="outlined"
-          disabled={updateFinalGradeMutation.isPending || upsertFinalGradeMutation.isPending || deleteStudentRunningGradeMutation.status === 'pending'}
+          disabled={isDisabled || updateFinalGradeMutation.isPending || upsertFinalGradeMutation.isPending || deleteStudentRunningGradeMutation.status === 'pending'}
         />
+        
+        {/* Change indicator for batch mode */}
+        {hasChanges && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+        )}
+        
         {/* Delete button for existing running grade */}
         {gradeId && (
           <button
@@ -198,7 +273,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
             className="ml-1 p-1 rounded hover:bg-red-100"
             title="Delete running grade"
             onClick={() => deleteStudentRunningGradeMutation.mutate(gradeId)}
-            disabled={deleteStudentRunningGradeMutation.status === 'pending'}
+            disabled={isDisabled || deleteStudentRunningGradeMutation.status === 'pending'}
           >
             <TrashIcon className="w-4 h-4 text-red-500" />
           </button>

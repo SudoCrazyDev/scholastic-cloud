@@ -5,7 +5,6 @@ import {
   BookOpenIcon, 
   ClockIcon,
   UserGroupIcon,
-  AcademicCapIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline'
 import type { AssignedSubject } from '../../../types'
@@ -23,6 +22,40 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
   loading,
   error,
 }) => {
+  // Group subjects by class section
+  const groupedSubjects = assignedSubjects.reduce((groups, subject) => {
+    const sectionKey = subject.class_section?.id || 'no-section'
+    const sectionTitle = subject.class_section?.title || 'No Section'
+    const gradeLevel = subject.class_section?.grade_level || 'Unknown Grade'
+    
+    if (!groups[sectionKey]) {
+      groups[sectionKey] = {
+        sectionId: sectionKey,
+        sectionTitle,
+        gradeLevel,
+        subjects: []
+      }
+    }
+    
+    groups[sectionKey].subjects.push(subject)
+    return groups
+  }, {} as Record<string, {
+    sectionId: string
+    sectionTitle: string
+    gradeLevel: string
+    subjects: AssignedSubject[]
+  }>)
+
+  // Convert to array and sort by grade level and section title
+  const sortedGroups = Object.values(groupedSubjects).sort((a, b) => {
+    // First sort by grade level
+    const gradeA = parseInt(a.gradeLevel) || 0
+    const gradeB = parseInt(b.gradeLevel) || 0
+    if (gradeA !== gradeB) return gradeA - gradeB
+    
+    // Then sort by section title
+    return a.sectionTitle.localeCompare(b.sectionTitle)
+  })
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -66,77 +99,78 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {assignedSubjects.map((subject) => (
-          <motion.div
-            key={subject.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="group"
-          >
-            <Link
-              to={`/assigned-subjects/${subject.id}`}
-              className="block border rounded-lg p-4 transition-all duration-200 hover:shadow-md border-gray-200 bg-white hover:border-gray-300"
-            >
-              {/* Subject Icon */}
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-3">
-                <BookOpenIcon className="w-6 h-6 text-indigo-600" />
-              </div>
+      {/* Grouped Sections */}
+      <div className="space-y-8">
+        {sortedGroups.map((group) => (
+          <div key={group.sectionId} className="space-y-4">
+            {/* Section Header */}
+            <div className="border-b border-gray-200 pb-3">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {group.gradeLevel} - {group.sectionTitle}
+              </h2>
+              <p className="text-sm text-gray-600">
+                {group.subjects.length} subject{group.subjects.length !== 1 ? 's' : ''}
+              </p>
+            </div>
 
-              {/* Subject Info */}
-              <div className="space-y-2">
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm truncate" title={subject.title}>
-                    {subject.title}
-                  </h3>
-                  {subject.variant && (
-                    <p className="text-xs text-gray-500 font-medium">{subject.variant}</p>
-                  )}
-                </div>
+            {/* Subjects Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {group.subjects.map((subject) => (
+                <motion.div
+                  key={subject.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="group relative"
+                >
+                  <Link
+                    to={`/assigned-subjects/${subject.id}`}
+                    className="block border rounded-lg p-4 transition-all duration-200 hover:shadow-md border-gray-200 bg-white hover:border-gray-300"
+                  >
+                    {/* Subject Icon */}
+                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-3">
+                      <BookOpenIcon className="w-6 h-6 text-indigo-600" />
+                    </div>
 
-                {/* Class Section */}
-                <div className="flex items-center text-xs text-gray-600">
-                  <AcademicCapIcon className="w-3 h-3 mr-1 flex-shrink-0" />
-                  <span className="truncate" title={subject.class_section?.title}>
-                    {subject.class_section?.grade_level} - {subject.class_section?.title}
-                  </span>
-                </div>
+                    {/* Subject Info */}
+                    <div className="space-y-2">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-sm truncate" title={subject.title}>
+                          {subject.title}
+                        </h3>
+                        {subject.variant && (
+                          <p className="text-xs text-gray-500 font-medium">{subject.variant}</p>
+                        )}
+                      </div>
 
-                {/* Institution */}
-                {/* <div className="flex items-center text-xs text-gray-600">
-                  <BuildingOfficeIcon className="w-3 h-3 mr-1 flex-shrink-0" />
-                  <span className="truncate" title={subject.institution?.title}>
-                    {subject.institution?.abbr}
-                  </span>
-                </div> */}
+                      {/* Time */}
+                      {subject.start_time && subject.end_time && (
+                        <div className="flex items-center text-xs text-gray-600">
+                          <ClockIcon className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <span>
+                            {subject.start_time} - {subject.end_time}
+                          </span>
+                        </div>
+                      )}
 
-                {/* Time */}
-                {subject.start_time && subject.end_time && (
-                  <div className="flex items-center text-xs text-gray-600">
-                    <ClockIcon className="w-3 h-3 mr-1 flex-shrink-0" />
-                    <span>
-                      {subject.start_time} - {subject.end_time}
-                    </span>
-                  </div>
-                )}
+                      {/* Student Count */}
+                      <div className="flex items-center text-xs text-gray-600">
+                        <UserGroupIcon className="w-3 h-3 mr-1 flex-shrink-0" />
+                        <span>
+                          {subject.student_count || 0} / {subject.total_students || 0} students
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Student Count */}
-                <div className="flex items-center text-xs text-gray-600">
-                  <UserGroupIcon className="w-3 h-3 mr-1 flex-shrink-0" />
-                  <span>
-                    {subject.student_count || 0} / {subject.total_students || 0} students
-                  </span>
-                </div>
-              </div>
-
-              {/* Arrow indicator */}
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ChevronRightIcon className="w-4 h-4 text-gray-400" />
-              </div>
-            </Link>
-          </motion.div>
+                    {/* Arrow indicator */}
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronRightIcon className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>

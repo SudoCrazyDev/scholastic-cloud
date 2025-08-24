@@ -10,6 +10,18 @@ interface StudentGradesByQuarterProps {
   runningGrades: StudentRunningGrade[];
   academicYear?: string;
   selectedQuarter?: string;
+  // Batch submission props
+  isBatchMode?: boolean;
+  onGradeChange?: (data: {
+    studentId: string;
+    subjectId: string;
+    quarter: '1' | '2' | '3' | '4';
+    finalGrade: number;
+    gradeId?: string;
+    academicYear: string;
+    hasChanged: boolean;
+  }) => void;
+  isDisabled?: boolean;
 }
 
 export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
@@ -18,6 +30,9 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
   runningGrades,
   academicYear = '2025-2026',
   selectedQuarter,
+  isBatchMode = false,
+  onGradeChange,
+  isDisabled = false,
 }) => {
   // Group grades by quarter
   const gradesByQuarter = runningGrades.reduce((acc, grade) => {
@@ -90,6 +105,9 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
                       calculatedGrade={calculatedGrade}
                       gradeId={grade?.id}
                       academicYear={academicYear}
+                      isBatchMode={isBatchMode}
+                      onGradeChange={onGradeChange}
+                      isDisabled={isDisabled}
                     />
                   </div>
                 </div>
@@ -115,6 +133,9 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
                       calculatedGrade={calculatedGrade}
                       gradeId={grade?.id}
                       academicYear={academicYear}
+                      isBatchMode={isBatchMode}
+                      onGradeChange={onGradeChange}
+                      isDisabled={isDisabled}
                     />
                   </div>
                 </div>

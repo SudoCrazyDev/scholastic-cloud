@@ -60,7 +60,7 @@ const validationSchema = Yup.object().shape({
     .when('subject_type', {
       is: 'child',
       then: (schema) => schema.required('Subject teacher is required for child subjects'),
-      otherwise: (schema) => schema.nullable().optional(),
+      otherwise: (schema) => schema.optional(),
     }),
   is_limited_student: Yup.boolean()
     .optional(),
@@ -79,6 +79,7 @@ export function ClassSectionSubjectModal({
 }: ClassSectionSubjectModalProps) {
   const [selectedTeacher, setSelectedTeacher] = useState<{ id: string; label: string; description?: string } | null>(null)
   const [teacherSearchQuery, setTeacherSearchQuery] = useState('')
+  const [userClearedTeacher, setUserClearedTeacher] = useState(false)
   
   // Debounce the search query to avoid too many API calls
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
@@ -164,37 +165,42 @@ export function ClassSectionSubjectModal({
           is_limited_student: subject.is_limited_student || false,
         })
         
-        // Set the teacher if adviser is set
-        if (subject.adviser && subject.adviser_user) {
+        // Reset the user cleared flag when opening with a new subject
+        setUserClearedTeacher(false)
+        
+        // Set the teacher if adviser is set and user hasn't manually cleared it
+        if (subject.adviser && subject.adviser_user && !userClearedTeacher) {
           setSelectedTeacher({
             id: subject.adviser,
             label: getFullName(subject.adviser_user),
             description: subject.adviser_user.email
           })
-        } else {
+        } else if (!subject.adviser || userClearedTeacher) {
           setSelectedTeacher(null)
         }
       } else {
         formik.resetForm()
         setSelectedTeacher(null)
+        setUserClearedTeacher(false)
       }
     } else {
       // Clear search query when modal closes
       setTeacherSearchQuery('')
       setDebouncedSearchQuery('')
+      setUserClearedTeacher(false)
     }
   }, [isOpen, subject?.id])
 
   // Handle teacher selection when subject's adviser user data becomes available
   useEffect(() => {
-    if (isOpen && subject && subject.adviser && subject.adviser_user && !selectedTeacher) {
+    if (isOpen && subject && subject.adviser && subject.adviser_user && !selectedTeacher && formik.values.adviser && !userClearedTeacher) {
       setSelectedTeacher({
         id: subject.adviser,
         label: getFullName(subject.adviser_user),
         description: subject.adviser_user.email
       })
     }
-  }, [isOpen, subject?.adviser_user, selectedTeacher])
+  }, [isOpen, subject?.adviser_user, selectedTeacher, formik.values.adviser, userClearedTeacher])
 
   // Clear parent_subject_id when switching from child to parent subject type
   useEffect(() => {
@@ -206,6 +212,15 @@ export function ClassSectionSubjectModal({
   const handleTeacherSelect = (teacher: { id: string; label: string; description?: string } | null) => {
     setSelectedTeacher(teacher)
     formik.setFieldValue('adviser', teacher?.id || '')
+    
+    // Clear search query when clearing selection
+    if (!teacher) {
+      setTeacherSearchQuery('')
+      setDebouncedSearchQuery('')
+      setUserClearedTeacher(true)
+    } else {
+      setUserClearedTeacher(false)
+    }
   }
 
   const handleClose = () => {
@@ -277,7 +292,7 @@ export function ClassSectionSubjectModal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full max-w-md bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-lg bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
             >
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -514,9 +529,14 @@ export function ClassSectionSubjectModal({
 
                 {/* Subject Teacher */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Subject Teacher {formik.values.subject_type === 'child' && '*'}
-                  </label>
+                  <div className="flex row gap-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Subject Teacher {formik.values.subject_type === 'child' && '*'}
+                    </label>
+                    <label className="ml-auto block text-sm font-medium text-red-500 mb-2 cursor-pointer" onClick={() => handleTeacherSelect(null)}>
+                      Clear
+                    </label>
+                  </div>
                   <Autocomplete
                     value={selectedTeacher}
                     onChange={handleTeacherSelect}

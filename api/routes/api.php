@@ -122,9 +122,10 @@ Route::middleware('auth.token')->group(function () {
     Route::get('student-ecr-item-scores/by-student-subject', [StudentEcrItemScoreController::class, 'getByStudentAndSubject']);
     Route::apiResource('student-ecr-item-scores', StudentEcrItemScoreController::class);
     // StudentRunningGrade routes
-    Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
-    Route::post('student-running-grades/recalculate-parent-subject-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'recalculateParentSubjectGrades']);
+    Route::post('student-running-grades/bulk-upsert-final-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'bulkUpsertFinalGrades']);
+    Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
+    
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
     // RealtimeAttendance GET route

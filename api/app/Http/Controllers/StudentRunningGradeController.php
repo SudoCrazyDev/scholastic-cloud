@@ -6,6 +6,8 @@ use App\Models\StudentRunningGrade;
 use App\Services\ParentSubjectGradeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class StudentRunningGradeController extends Controller
 {
@@ -40,11 +42,11 @@ class StudentRunningGradeController extends Controller
         }
 
         // If class_section_id is provided, filter by students in that class section
-        if ($request->filled('class_section_id')) {
-            $query->whereHas('student.studentSections', function ($q) use ($request) {
-                $q->where('section_id', $request->class_section_id);
-            });
-        }
+        // if ($request->filled('class_section_id')) {
+        //     $query->whereHas('student.studentSections', function ($q) use ($request) {
+        //         $q->where('section_id', $request->class_section_id);
+        //     });
+        // }
 
         $runningGrades = $query->get();
 
@@ -217,6 +219,164 @@ class StudentRunningGradeController extends Controller
                 'success' => false,
                 'message' => 'Failed to save final grade',
                 'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk upsert final grades for multiple students
+     */
+    public function bulkUpsertFinalGrades(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'grades' => 'required|array|min:1|max:100',
+            'grades.*.student_id' => 'required|string|exists:students,id',
+            'grades.*.subject_id' => 'required|string|exists:subjects,id',
+            'grades.*.quarter' => 'required|integer|between:1,4',
+            'grades.*.final_grade' => 'required|numeric|between:0,100',
+            'grades.*.academic_year' => 'required|string',
+            'grades.*.grade_id' => 'sometimes|string|exists:student_running_grades,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $results = [];
+            $errors = [];
+            $updateCount = 0;
+            $createCount = 0;
+
+            foreach ($validated['grades'] as $index => $gradeData) {
+                try {
+                    $studentId = $gradeData['student_id'];
+                    $subjectId = $gradeData['subject_id'];
+                    $quarter = $gradeData['quarter'];
+                    $finalGrade = $gradeData['final_grade'];
+                    $academicYear = $gradeData['academic_year'];
+                    $gradeId = $gradeData['grade_id'] ?? null;
+
+                    // Check if a running grade already exists
+                    $existingGrade = null;
+                    if ($gradeId) {
+                        $existingGrade = StudentRunningGrade::find($gradeId);
+                        
+                        // Verify the grade belongs to the correct student/subject/quarter
+                        if ($existingGrade && 
+                            ($existingGrade->student_id !== $studentId || 
+                             $existingGrade->subject_id !== $subjectId || 
+                             $existingGrade->quarter !== $quarter || 
+                             $existingGrade->academic_year !== $academicYear)) {
+                            $existingGrade = null;
+                        }
+                    } else {
+                        $existingGrade = StudentRunningGrade::where([
+                            'student_id' => $studentId,
+                            'subject_id' => $subjectId,
+                            'quarter' => $quarter,
+                            'academic_year' => $academicYear,
+                        ])->first();
+                    }
+
+                    if ($existingGrade) {
+                        // Update existing grade
+                        $existingGrade->update(['final_grade' => $finalGrade]);
+                        $runningGrade = $existingGrade->fresh()->load(['student', 'subject']);
+                        $updateCount++;
+                        
+                        // Calculate parent subject grades
+                        $this->parentSubjectGradeService->calculateParentSubjectGrades(
+                            $studentId,
+                            $subjectId,
+                            $quarter,
+                            $academicYear
+                        );
+                        
+                        $results[] = [
+                            'index' => $index,
+                            'action' => 'updated',
+                            'data' => $runningGrade,
+                            'success' => true
+                        ];
+                    } else {
+                        // Create new grade
+                        $runningGrade = StudentRunningGrade::create([
+                            'student_id' => $studentId,
+                            'subject_id' => $subjectId,
+                            'quarter' => $quarter,
+                            'grade' => 0,
+                            'final_grade' => $finalGrade,
+                            'academic_year' => $academicYear,
+                        ]);
+                        
+                        $runningGrade->load(['student', 'subject']);
+                        $createCount++;
+                        
+                        // Calculate parent subject grades
+                        $this->parentSubjectGradeService->calculateParentSubjectGrades(
+                            $studentId,
+                            $subjectId,
+                            $quarter,
+                            $academicYear
+                        );
+                        
+                        $results[] = [
+                            'index' => $index,
+                            'action' => 'created',
+                            'data' => $runningGrade,
+                            'success' => true
+                        ];
+                    }
+                    
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'index' => $index,
+                        'error' => $e->getMessage(),
+                        'data' => $gradeData
+                    ];
+                    
+                    $results[] = [
+                        'index' => $index,
+                        'action' => 'failed',
+                        'error' => $e->getMessage(),
+                        'success' => false
+                    ];
+                }
+            }
+
+            if (!empty($errors)) {
+                DB::rollBack();
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some grades failed to update',
+                    'data' => [
+                        'total_requested' => count($validated['grades']),
+                        'successful' => count($validated['grades']) - count($errors),
+                        'failed' => count($errors),
+                        'results' => $results,
+                        'errors' => $errors
+                    ]
+                ], 422);
+            }
+
+            DB::commit();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Bulk grades updated successfully',
+                'data' => [
+                    'total_processed' => count($validated['grades']),
+                    'created' => $createCount,
+                    'updated' => $updateCount,
+                    'results' => $results
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to process bulk grades: ' . $e->getMessage()
             ], 500);
         }
     }

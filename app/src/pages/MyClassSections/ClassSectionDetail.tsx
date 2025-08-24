@@ -176,8 +176,6 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!selectedStudentForReport?.id,
   })
 
-
-
   // Transform the grades data to match the expected format
   const transformedGrades = useMemo((): StudentSubjectGrade[] => {
     if (!studentGrades?.data || !selectedStudentForReport?.id) return [];
@@ -223,7 +221,7 @@ const ClassSectionDetail: React.FC = () => {
 
     return Object.values(gradesBySubject);
   }, [studentGrades?.data, selectedStudentForReport?.id]);
-
+  
   // Subject mutations
   const createSubjectMutation = useMutation({
     mutationFn: (data: any) => subjectService.createSubject(data),

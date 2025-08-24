@@ -203,9 +203,70 @@ export const useUpsertFinalGrade = () => {
     },
     onError: (error: any) => {
       toast.error(
-        `❌ Failed to save grade: ${error?.response?.data?.message || 'Unknown error'}`,
+        `❌ Failed to update grade: ${error?.response?.data?.message || 'Unknown error'}`,
         {
           duration: 5000,
+          icon: '⚠️',
+          style: {
+            background: '#ef4444',
+            color: 'white',
+            fontWeight: '600',
+          },
+        }
+      );
+    },
+  });
+};
+
+export const useBulkUpsertFinalGrades = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (grades: Array<{
+      studentId: string;
+      subjectId: string;
+      quarter: '1' | '2' | '3' | '4';
+      finalGrade: number;
+      academicYear: string;
+      gradeId?: string;
+    }>) => {
+      const result = await studentRunningGradeService.bulkUpsertFinalGrades(grades);
+      return result;
+    },
+    onSuccess: (data, variables) => {
+      const totalProcessed = data?.data?.total_processed || variables.length;
+      const created = data?.data?.created || 0;
+      const updated = data?.data?.updated || 0;
+      
+      let message = `✅ Successfully processed ${totalProcessed} grades`;
+      if (created > 0 && updated > 0) {
+        message += ` (${created} created, ${updated} updated)`;
+      } else if (created > 0) {
+        message += ` (${created} created)`;
+      } else if (updated > 0) {
+        message += ` (${updated} updated)`;
+      }
+      
+      toast.success(message, {
+        duration: 5000,
+        icon: '📊',
+        style: {
+          background: '#10b981',
+          color: 'white',
+          fontWeight: '600',
+        },
+      });
+      
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['student-running-grades'] });
+      queryClient.invalidateQueries({ queryKey: ['student-running-grades-by-student'] });
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.message || 'Unknown error';
+      toast.error(
+        `❌ Bulk operation failed: ${errorMessage}`,
+        {
+          duration: 6000,
           icon: '⚠️',
           style: {
             background: '#ef4444',

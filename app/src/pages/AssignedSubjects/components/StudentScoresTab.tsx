@@ -551,21 +551,26 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         </div>
       </div>
 
-      {/* Grading System Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">Grading System</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-800">
-          <div>
-            <span className="font-medium">Written Works:</span> 30% of Quarter Grade
-          </div>
-          <div>
-            <span className="font-medium">Performance Tasks:</span> 50% of Quarter Grade
-          </div>
-          <div>
-            <span className="font-medium">Quarterly Assessment:</span> 20% of Quarter Grade
+      {/* Components of Summative Assessment Info */}
+      {subjectEcrsData?.data && subjectEcrsData.data.length > 0 ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Components of Summative Assessment</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-800">
+            {subjectEcrsData.data.map((component: any) => (
+              <div key={component.id}>
+                <span className="font-medium">{component.title}:</span> {component.percentage}% of Quarter Grade
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-yellow-900 mb-2">Components of Summative Assessment</h4>
+          <p className="text-sm text-yellow-800">
+            No components of summative assessment have been created yet. Please create the assessment components first.
+          </p>
+        </div>
+      )}
 
       {/* Grade Items */}
       <div className="space-y-4">

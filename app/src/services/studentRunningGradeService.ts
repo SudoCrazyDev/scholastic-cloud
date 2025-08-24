@@ -113,6 +113,27 @@ class StudentRunningGradeService {
     });
     return response.data;
   }
+
+  async bulkUpsertFinalGrades(grades: Array<{
+    studentId: string;
+    subjectId: string;
+    quarter: '1' | '2' | '3' | '4';
+    finalGrade: number;
+    academicYear: string;
+    gradeId?: string;
+  }>) {
+    const response = await api.post(`${this.baseUrl}/bulk-upsert-final-grades`, {
+      grades: grades.map(grade => ({
+        student_id: grade.studentId,
+        subject_id: grade.subjectId,
+        quarter: grade.quarter,
+        final_grade: grade.finalGrade,
+        academic_year: grade.academicYear,
+        grade_id: grade.gradeId,
+      })),
+    });
+    return response.data;
+  }
 }
 
 export const studentRunningGradeService = new StudentRunningGradeService(); 
