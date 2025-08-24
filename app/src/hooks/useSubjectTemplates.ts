@@ -6,6 +6,7 @@ export function useSubjectTemplates(params?: { grade_level?: string; search?: st
   const [templates, setTemplates] = useState<SubjectTemplate[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true)
@@ -23,18 +24,22 @@ export function useSubjectTemplates(params?: { grade_level?: string; search?: st
     } finally {
       setLoading(false)
     }
-  }, [params?.grade_level, params?.search])
+  }, [params?.grade_level, params?.search, refreshKey])
 
   useEffect(() => {
     fetchTemplates()
   }, [fetchTemplates])
+
+  const triggerRefresh = () => {
+    setRefreshKey(prev => prev + 1)
+  }
 
   const createTemplate = async (data: CreateSubjectTemplateData) => {
     setError(null)
     try {
       const response = await subjectTemplateService.create(data)
       if (response.success) {
-        await fetchTemplates() // Refresh the list
+        triggerRefresh() // Force refresh
         return response.data
       } else {
         setError(response.message || 'Failed to create template')
@@ -52,7 +57,7 @@ export function useSubjectTemplates(params?: { grade_level?: string; search?: st
     try {
       const response = await subjectTemplateService.update(id, data)
       if (response.success) {
-        await fetchTemplates() // Refresh the list
+        triggerRefresh() // Force refresh
         return response.data
       } else {
         setError(response.message || 'Failed to update template')
@@ -70,7 +75,7 @@ export function useSubjectTemplates(params?: { grade_level?: string; search?: st
     try {
       const response = await subjectTemplateService.delete(id)
       if (response.success) {
-        await fetchTemplates() // Refresh the list
+        triggerRefresh() // Force refresh
       } else {
         setError(response.message || 'Failed to delete template')
         throw new Error(response.message || 'Failed to delete template')

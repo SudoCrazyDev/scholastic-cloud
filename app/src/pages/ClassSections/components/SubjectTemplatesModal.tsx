@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon, PlusIcon, PencilIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline'
+import toast from 'react-hot-toast'
 import { useSubjectTemplates } from '../../../hooks/useSubjectTemplates'
 import { SubjectTemplateModal } from '../../SubjectTemplates/components/SubjectTemplateModal'
 import { Button } from '../../../components/button'
@@ -23,11 +24,26 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
     error, 
     createTemplate, 
     updateTemplate, 
-    deleteTemplate 
+    deleteTemplate,
+    fetchTemplates 
   } = useSubjectTemplates({ 
     search: searchQuery, 
     grade_level: selectedGradeLevel 
   })
+
+  // Refresh templates when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTemplates()
+    }
+  }, [isOpen, fetchTemplates])
+
+  // Show error if there's one from the hook
+  useEffect(() => {
+    if (error) {
+      toast.error(error)
+    }
+  }, [error])
 
   const handleCreate = () => {
     setSelectedTemplate(null)
@@ -41,10 +57,13 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
 
   const handleDelete = async (template: SubjectTemplate) => {
     if (window.confirm(`Are you sure you want to delete the template "${template.name}"?`)) {
+      const toastId = toast.loading('Deleting template...')
       try {
         await deleteTemplate(template.id)
+        toast.success(`Template "${template.name}" deleted successfully`, { id: toastId })
       } catch (err) {
         console.error('Failed to delete template:', err)
+        toast.error(`Failed to delete template: ${err instanceof Error ? err.message : 'Unknown error'}`, { id: toastId })
       }
     }
   }
@@ -55,15 +74,21 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
   }
 
   const handleModalSubmit = async (data: any) => {
+    const isEditing = !!selectedTemplate
+    const toastId = toast.loading(isEditing ? 'Updating template...' : 'Creating template...')
+    
     try {
-      if (selectedTemplate) {
+      if (isEditing) {
         await updateTemplate(selectedTemplate.id, data)
+        toast.success(`Template "${data.name}" updated successfully`, { id: toastId })
       } else {
         await createTemplate(data)
+        toast.success(`Template "${data.name}" created successfully`, { id: toastId })
       }
       handleModalClose()
     } catch (err) {
       console.error('Failed to save template:', err)
+      toast.error(`Failed to save template: ${err instanceof Error ? err.message : 'Unknown error'}`, { id: toastId })
       throw err
     }
   }
@@ -152,13 +177,6 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
                     </Button>
                   </div>
                 </div>
-
-                {/* Error Message */}
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
-                    <p className="text-red-600">{error}</p>
-                  </div>
-                )}
 
                 {/* Templates Grid */}
                 {loading ? (
