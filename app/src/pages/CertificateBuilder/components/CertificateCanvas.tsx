@@ -67,7 +67,6 @@ export function CertificateCanvas({
 			if (!(e.target instanceof Node)) return;
 			const target = e.target as HTMLElement;
 			if (!containerRef.current.contains(target)) return;
-			// If clicked on empty canvas background (not on any element)
 			if (target.closest('[data-el-id]')) return;
 			onSelect([]);
 		}
@@ -94,11 +93,8 @@ export function CertificateCanvas({
 		if (!snappingEnabled) return { x, y, guides: [] as GuideLine[] };
 		const { verticals, horizontals } = collectSnapLines(id);
 		const g: GuideLine[] = [];
-
 		let snappedX = x;
 		let snappedY = y;
-
-		// Vertical snapping: left, center, right
 		const candidatesX = [x, x + w / 2, x + w];
 		for (let i = 0; i < candidatesX.length; i++) {
 			for (const v of verticals) {
@@ -109,8 +105,6 @@ export function CertificateCanvas({
 				}
 			}
 		}
-
-		// Horizontal snapping: top, middle, bottom
 		const candidatesY = [y, y + h / 2, y + h];
 		for (let i = 0; i < candidatesY.length; i++) {
 			for (const hLine of horizontals) {
@@ -121,7 +115,6 @@ export function CertificateCanvas({
 				}
 			}
 		}
-
 		return { x: snappedX, y: snappedY, guides: g };
 	}
 
@@ -129,7 +122,6 @@ export function CertificateCanvas({
 		event.stopPropagation();
 		if (el.locked) return;
 		if (event.shiftKey || event.metaKey || event.ctrlKey) {
-			// toggle in selection
 			const set = new Set(selectedElementIds);
 			if (set.has(el.id)) set.delete(el.id); else set.add(el.id);
 			onSelect(Array.from(set));
@@ -162,28 +154,28 @@ export function CertificateCanvas({
 		document.addEventListener('mouseup', onUp);
 	}, [onChange, onSelect, onInteractionStart, onChangeEnd, selectedElementIds, scale, interactableElements]);
 
-	const startResize = useCallback((event: React.MouseEvent, el: CanvasElement, corner: 'se' | 'e' | 's') => {
+	const startResize = useCallback((event: React.MouseEvent, el: CanvasElement, handle: 'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w') => {
 		event.stopPropagation();
 		if (el.locked) return;
 		onInteractionStart && onInteractionStart();
 		const startX = event.clientX;
 		const startY = event.clientY;
-		const startW = el.width;
-		const startH = el.height;
+		const start = { x: el.x, y: el.y, w: el.width, h: el.height };
 
 		function onMove(e: MouseEvent) {
 			const dx = (e.clientX - startX) / scale;
 			const dy = (e.clientY - startY) / scale;
-			let newW = startW;
-			let newH = startH;
-			if (corner === 'se') { newW = startW + dx; newH = startH + dy; }
-			if (corner === 'e') { newW = startW + dx; }
-			if (corner === 's') { newH = startH + dy; }
-			newW = Math.max(10, newW);
-			newH = Math.max(10, newH);
-			const { x: sx, y: sy, guides: g } = applySnap(el.x, el.y, newW, newH, el.id);
+			let x = start.x;
+			let y = start.y;
+			let w = start.w;
+			let h = start.h;
+			if (handle.includes('e')) w = Math.max(10, start.w + dx);
+			if (handle.includes('s')) h = Math.max(10, start.h + dy);
+			if (handle.includes('w')) { w = Math.max(10, start.w - dx); x = start.x + dx; }
+			if (handle.includes('n')) { h = Math.max(10, start.h - dy); y = start.y + dy; }
+			const { x: sx, y: sy, guides: g } = applySnap(x, y, w, h, el.id);
 			setGuides(g);
-			onChange({ ...el, width: newW, height: newH, x: sx, y: sy });
+			onChange({ ...el, x: sx, y: sy, width: w, height: h });
 		}
 		function onUp() {
 			setGuides([]);
@@ -225,7 +217,6 @@ export function CertificateCanvas({
 
 	return (
 		<div ref={containerRef} className="absolute" style={{ width, height, ...gridBackground }}>
-			{/* Guides */}
 			{guides.map((g, idx) => (
 				<div key={idx} className="absolute bg-indigo-500" style={g.orientation === 'v' ? { left: g.pos, top: 0, bottom: 0, width: 1 } : { top: g.pos, left: 0, right: 0, height: 1 }} />
 			))}
@@ -275,13 +266,21 @@ export function CertificateCanvas({
 						{isSelected && (
 							<>
 								<div className="absolute inset-0 border-2 border-sky-500 pointer-events-none" />
-								{/* Resize handles only when single selected */}
 								{selectedElementIds.length === 1 && (
 									<>
-										<div className="absolute -right-2 -bottom-2 w-3 h-3 bg-sky-500 cursor-se-resize" onMouseDown={(e) => startResize(e, el, 'se')} />
+										{/* 8 Resize handles */}
+										<div className="absolute -left-2 -top-2 w-3 h-3 bg-sky-500 cursor-nw-resize" onMouseDown={(e) => startResize(e, el, 'nw')} />
+										<div className="absolute left-1/2 -ml-1.5 -top-2 w-3 h-3 bg-sky-500 cursor-n-resize" onMouseDown={(e) => startResize(e, el, 'n')} />
+										<div className="absolute -right-2 -top-2 w-3 h-3 bg-sky-500 cursor-ne-resize" onMouseDown={(e) => startResize(e, el, 'ne')} />
 										<div className="absolute -right-2 top-1/2 -mt-1.5 w-3 h-3 bg-sky-500 cursor-e-resize" onMouseDown={(e) => startResize(e, el, 'e')} />
+										<div className="absolute -right-2 -bottom-2 w-3 h-3 bg-sky-500 cursor-se-resize" onMouseDown={(e) => startResize(e, el, 'se')} />
 										<div className="absolute left-1/2 -ml-1.5 -bottom-2 w-3 h-3 bg-sky-500 cursor-s-resize" onMouseDown={(e) => startResize(e, el, 's')} />
-										<div className="absolute left-1/2 -ml-2 -top-8 w-4 h-4 rounded-full bg-sky-500 cursor-crosshair" onMouseDown={(e) => startRotate(e, el)} />
+										<div className="absolute -left-2 -bottom-2 w-3 h-3 bg-sky-500 cursor-sw-resize" onMouseDown={(e) => startResize(e, el, 'sw')} />
+										<div className="absolute -left-2 top-1/2 -mt-1.5 w-3 h-3 bg-sky-500 cursor-w-resize" onMouseDown={(e) => startResize(e, el, 'w')} />
+										{/* Rotation handle with icon */}
+										<div className="absolute left-1/2 -ml-3 -top-10 w-6 h-6 rounded-full bg-white border border-sky-500 text-sky-600 flex items-center justify-center cursor-crosshair shadow" onMouseDown={(e) => startRotate(e, el)} title="Rotate">
+											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 6V2l-4 4 4 4V6zm5.657 1.757a6 6 0 10.001 8.486l1.414 1.414a8 8 0 11-.001-11.314l-1.414 1.414z"/></svg>
+										</div>
 									</>
 								)}
 							</>
