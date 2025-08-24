@@ -70,22 +70,31 @@ export default function CertificateBuilder() {
 						<Button variant="secondary" onClick={undo} disabled={history.length === 0}>Undo</Button>
 						<Button variant="secondary" onClick={redo} disabled={future.length === 0}>Redo</Button>
 					</div>
-					<div className="mt-3 flex flex-wrap items-center gap-2">
-						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={snapping} onChange={(e) => setSnapping(e.target.checked)} /> Snapping</label>
-						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Grid</label>
+					<div className="mt-3 flex flex-wrap items-center gap-3">
+						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={snapping} onChange={(e) => setSnapping(e.target.checked)} /> <span>Snapping</span></label>
+						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> <span>Grid</span></label>
 						<div className="h-6 w-px bg-gray-200 mx-1" />
-						<Select value={paper} onChange={(e) => setPaper(e.target.value as Paper)}>
-							<option value="a4">A4</option>
-							<option value="letter">Letter</option>
-							<option value="legal">Legal</option>
-						</Select>
-						<Select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
-							<option value="portrait">Portrait</option>
-							<option value="landscape">Landscape</option>
-						</Select>
-						<Select value={String(zoom)} onChange={(e) => setZoom(Number(e.target.value))}>
-							{[0.25,0.5,0.75,1,1.25,1.5].map(z => <option key={z} value={z}>{Math.round(z*100)}%</option>)}
-						</Select>
+						<div className="flex items-center gap-2">
+							<span className="text-sm text-gray-700">Paper</span>
+							<Select value={paper} onChange={(e) => setPaper(e.target.value as Paper)}>
+								<option value="a4">A4</option>
+								<option value="letter">Letter</option>
+								<option value="legal">Legal</option>
+							</Select>
+						</div>
+						<div className="flex items-center gap-2">
+							<span className="text-sm text-gray-700">Orientation</span>
+							<Select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
+								<option value="portrait">Portrait</option>
+								<option value="landscape">Landscape</option>
+							</Select>
+						</div>
+						<div className="flex items-center gap-2">
+							<span className="text-sm text-gray-700">Zoom</span>
+							<Select value={String(zoom)} onChange={(e) => setZoom(Number(e.target.value))}>
+								{[0.25,0.5,0.75,1,1.25,1.5].map(z => <option key={z} value={z}>{Math.round(z*100)}%</option>)}
+							</Select>
+						</div>
 					</div>
 				</div>
 				<div className="flex-1 overflow-auto p-6">
