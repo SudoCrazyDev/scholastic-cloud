@@ -7,6 +7,7 @@ import { CertificateCanvas, type CanvasElement } from './components/CertificateC
 import LayersPanel from './components/LayersPanel';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
+import { createCertificate, updateCertificate, getCertificate } from '@/services/certificateService';
 
 const presets = {
 	a4: { portrait: { w: 794, h: 1123, pdf: 'a4' as const }, landscape: { w: 1123, h: 794, pdf: 'a4' as const } },
@@ -30,6 +31,8 @@ export default function CertificateBuilder() {
 	const [zoom, setZoom] = useState<number>(1);
 	const [bgColor, setBgColor] = useState<string>('#ffffff');
 	const [bgImage, setBgImage] = useState<string | null>(null);
+	const [certificateId, setCertificateId] = useState<number | null>(null);
+	const [title, setTitle] = useState<string>('Untitled Certificate');
 	const canvasRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedElements = useMemo(() => elements.filter(e => selectedIds.includes(e.id)), [elements, selectedIds]);
@@ -47,6 +50,61 @@ export default function CertificateBuilder() {
 	function handleDeleteSelected() { if (!selectedIds.length) return; pushHistory(elements); setElementsAndKeepOrder(prev => prev.filter(e => !selectedIds.includes(e.id))); setSelectedIds([]); }
 	function handleInteractionStart() { pushHistory(elements); }
 	function handleChangeEnd() {}
+
+	// Serialize current design
+	function buildDesignJson() {
+		return {
+			paper,
+			orientation,
+			zoom,
+			bgColor,
+			bgImage,
+			elements,
+		};
+	}
+
+	async function handleSave() {
+		try {
+			const currentTitle = title || prompt('Certificate title', title) || 'Untitled Certificate';
+			setTitle(currentTitle);
+			const design_json = buildDesignJson();
+			if (certificateId) {
+				const saved = await updateCertificate(certificateId, { title: currentTitle, design_json });
+				setCertificateId(saved.id);
+				alert('Certificate updated');
+			} else {
+				const saved = await createCertificate({ title: currentTitle, design_json });
+				setCertificateId(saved.id);
+				alert('Certificate saved');
+			}
+		} catch (e) {
+			alert('Failed to save certificate');
+		}
+	}
+
+	async function handleLoad() {
+		const idStr = prompt('Enter Certificate ID to load');
+		if (!idStr) return;
+		const id = Number(idStr);
+		if (Number.isNaN(id)) return alert('Invalid ID');
+		try {
+			const rec = await getCertificate(id);
+			setCertificateId(rec.id);
+			setTitle(rec.title);
+			const d = rec.design_json || {};
+			setElements(d.elements || []);
+			setSnapping(true);
+			setShowGrid(true);
+			if (d.paper) setPaper(d.paper);
+			if (d.orientation) setOrientation(d.orientation);
+			if (d.zoom) setZoom(d.zoom);
+			if (d.bgColor) setBgColor(d.bgColor);
+			setBgImage(d.bgImage || null);
+			alert('Certificate loaded');
+		} catch (e) {
+			alert('Failed to load certificate');
+		}
+	}
 
 	useEffect(() => {
 		function isTypingTarget(el: Element | null) { if (!el) return false; const tag = (el as HTMLElement).tagName.toLowerCase(); return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable; }
@@ -76,6 +134,8 @@ export default function CertificateBuilder() {
 				<div className="p-3 border-b bg-white">
 					<div className="flex items-center gap-2">
 						<Button onClick={handleExportPdf}>Export PDF</Button>
+						<Button variant="secondary" onClick={handleSave}>Save</Button>
+						<Button variant="secondary" onClick={handleLoad}>Load</Button>
 						<div className="flex-1" />
 						<Button variant="secondary" onClick={undo} disabled={history.length === 0}>Undo</Button>
 						<Button variant="secondary" onClick={redo} disabled={future.length === 0}>Redo</Button>

@@ -19,6 +19,7 @@ use App\Http\Controllers\UserAddressController;
 use App\Http\Controllers\UserWorkExperienceController;
 use App\Http\Controllers\CoreValueMarkingController;
 use App\Http\Controllers\SF9Controller;
+use App\Http\Controllers\CertificateController;
 
 /*
 |--------------------------------------------------------------------------
@@ -140,6 +141,9 @@ Route::middleware('auth.token')->group(function () {
     // SF9 routes
     Route::post('sf9/generate', [SF9Controller::class, 'generate']);
     Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears']);
+
+    // Certificate routes
+    Route::apiResource('certificates', CertificateController::class);
 });
 
 Route::get('/health', function () {
