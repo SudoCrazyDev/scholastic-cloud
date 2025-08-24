@@ -15,8 +15,6 @@ interface SubjectTemplatesModalProps {
 export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModalProps) {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<SubjectTemplate | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedGradeLevel, setSelectedGradeLevel] = useState<string>('')
   
   const { 
     templates, 
@@ -26,10 +24,7 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
     updateTemplate, 
     deleteTemplate,
     fetchTemplates 
-  } = useSubjectTemplates({ 
-    search: searchQuery, 
-    grade_level: selectedGradeLevel 
-  })
+  } = useSubjectTemplates()
 
   // Refresh templates when modal opens
   useEffect(() => {
@@ -93,13 +88,7 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
     }
   }
 
-  // Grade levels for filtering
-  const gradeLevels = [
-    'Kindergarten',
-    'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
-    'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10',
-    'Grade 11', 'Grade 12'
-  ]
+
 
   return (
     <AnimatePresence>
@@ -141,41 +130,15 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-6">
-                {/* Filters and Actions */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                    <div className="flex flex-col sm:flex-row gap-4 flex-1">
-                      {/* Search */}
-                      <input
-                        type="text"
-                        placeholder="Search templates..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                      
-                      {/* Grade Level Filter */}
-                      <select
-                        value={selectedGradeLevel}
-                        onChange={(e) => setSelectedGradeLevel(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      >
-                        <option value="">All Grade Levels</option>
-                        {gradeLevels.map(level => (
-                          <option key={level} value={level}>{level}</option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    {/* Create Button */}
-                    <Button
-                      onClick={handleCreate}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    >
-                      <PlusIcon className="w-5 h-5 mr-2" />
-                      Create Template
-                    </Button>
-                  </div>
+                {/* Actions */}
+                <div className="flex justify-end mb-6">
+                  <Button
+                    onClick={handleCreate}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <PlusIcon className="w-5 h-5 mr-2" />
+                    Create Template
+                  </Button>
                 </div>
 
                 {/* Templates Grid */}
@@ -186,21 +149,17 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
                 ) : templates.length === 0 ? (
                   <div className="bg-gray-50 rounded-lg p-12 text-center">
                     <DocumentDuplicateIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No templates found</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
                     <p className="text-gray-600 mb-4">
-                      {searchQuery || selectedGradeLevel 
-                        ? 'Try adjusting your filters'
-                        : 'Get started by creating your first subject template'}
+                      Get started by creating your first subject template
                     </p>
-                    {!searchQuery && !selectedGradeLevel && (
-                      <Button
-                        onClick={handleCreate}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                      >
-                        <PlusIcon className="w-5 h-5 mr-2" />
-                        Create Your First Template
-                      </Button>
-                    )}
+                    <Button
+                      onClick={handleCreate}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                      <PlusIcon className="w-5 h-5 mr-2" />
+                      Create Your First Template
+                    </Button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
