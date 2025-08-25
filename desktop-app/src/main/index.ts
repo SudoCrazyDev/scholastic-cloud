@@ -46,7 +46,7 @@ app.whenReady().then(async () => {
 
   // Initialize database system
   try {
-    const dbIPC = DatabaseIPC.initialize()
+    DatabaseIPC.initialize()
     console.log('Database IPC handlers initialized')
     
     // Initialize the database immediately

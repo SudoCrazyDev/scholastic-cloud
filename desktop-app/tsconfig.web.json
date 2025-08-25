@@ -2,8 +2,17 @@
   "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
   "include": [
     "src/renderer/src/env.d.ts",
-    "src/renderer/src/**/*",
-    "src/renderer/src/**/*.tsx",
+    "src/renderer/src/main.tsx",
+    "src/renderer/src/App.tsx",
+    "src/renderer/src/pages/**/*.tsx",
+    "src/renderer/src/components/layouts/DashboardLayout.tsx",
+    "src/renderer/src/components/topbar/Topbar.tsx",
+    "src/renderer/src/components/sidebar/Sidebar.tsx",
+    "src/renderer/src/components/alert.tsx",
+    "src/renderer/src/hooks/useAuth.ts",
+    "src/renderer/src/providers/AuthProvider.tsx",
+    "src/renderer/src/services/**/*.ts",
+    "src/renderer/src/lib/api.ts",
     "src/preload/*.d.ts"
   ],
   "compilerOptions": {

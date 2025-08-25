@@ -192,6 +192,18 @@ declare global {
         
         cleanupSessions(): Promise<{ success: boolean; message?: string; error?: string }>
       }
+      offline: {
+        isSeeded(teacherUserId: string): Promise<{ success: boolean; seeded?: boolean; error?: string }>
+        seed(payload: any): Promise<{ success: boolean; error?: string }>
+        getAssignedSubjects(teacherUserId: string): Promise<{ success: boolean; subjects?: any[]; error?: string }>
+        getStudentsBySection(sectionId: string): Promise<{ success: boolean; students?: any[]; error?: string }>
+        getEcrItemsBySubject(subjectId: string): Promise<{ success: boolean; items?: any[]; error?: string }>
+        upsertStudentScores(scores: Array<{ id?: string; student_id: string; subject_ecr_item_id: string; score: number; date_submitted?: string }>): Promise<{ success: boolean; error?: string }>
+        getOutboxCount(): Promise<{ success: boolean; count?: number; error?: string }>
+        getOutboxEntries(): Promise<{ success: boolean; entries?: Array<{ id: string; type: string; payload: any; created_at: string }>; error?: string }>
+        exportOutboxToFile(filePath: string, userId: string): Promise<{ success: boolean; filePath?: string; count?: number; error?: string }>
+        clearOutboxByIds(ids: string[]): Promise<{ success: boolean; error?: string }>
+      }
     }
   }
 }
