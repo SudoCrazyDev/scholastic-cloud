@@ -2,8 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { DatabaseIPC } from './database/DatabaseIPC'
-import { DatabaseManager } from './database/DatabaseManager'
+import { registerIpcHandlers } from './ipc/handlers'
 
 function createWindow(): void {
   // Create the browser window.
@@ -44,17 +43,12 @@ app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // Initialize database system
+  // Initialize database and IPC handlers
   try {
-    const dbIPC = DatabaseIPC.initialize()
-    console.log('Database IPC handlers initialized')
-    
-    // Initialize the database immediately
-    const dbManager = DatabaseManager.getInstance()
-    await dbManager.initialize()
-    console.log('Database initialized successfully')
+    registerIpcHandlers()
+    console.log('IPC handlers registered successfully')
   } catch (error) {
-    console.error('Failed to initialize database:', error)
+    console.error('Failed to initialize IPC handlers:', error)
   }
 
   // Default open or close DevTools by F12 in development
