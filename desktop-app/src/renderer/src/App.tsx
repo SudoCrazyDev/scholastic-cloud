@@ -6,8 +6,10 @@ import UnauthorizedRole from './pages/UnauthorizedRole';
 import { useAuth } from './hooks/useAuth';
 import { AuthProvider } from './providers/AuthProvider';
 import { authService } from './services/authService';
+import InitialSync from './pages/InitialSync';
+import OfflineGrades from './pages/OfflineGrades';
 
-type AppState = 'loading' | 'login' | 'dashboard' | 'unauthorized';
+type AppState = 'loading' | 'login' | 'initial-sync' | 'dashboard' | 'unauthorized';
 
 function AppContent(): React.JSX.Element {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -16,9 +18,8 @@ function AppContent(): React.JSX.Element {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated && user) {
-        // Check if user has subject-teacher role
         if (authService.isSubjectTeacher()) {
-          setAppState('dashboard');
+          setAppState('initial-sync');
         } else {
           setAppState('unauthorized');
         }
@@ -65,10 +66,18 @@ function AppContent(): React.JSX.Element {
     return <UnauthorizedRole onLogout={handleLogout} />;
   }
 
-  // Show dashboard for subject-teacher users
+  if (appState === 'initial-sync') {
+    return <InitialSync onDone={() => setAppState('dashboard')} />;
+  }
+
+  // Simple hash-based routing for two pages
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  const route = hash.replace('#', '') || '/dashboard';
+  const Page = route === '/offline-grades' ? <OfflineGrades /> : <Dashboard />;
+
   return (
     <DashboardLayout onLogout={handleLogout}>
-      <Dashboard />
+      {Page}
     </DashboardLayout>
   );
 }

@@ -202,6 +202,136 @@ export class DatabaseIPC {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to cleanup sessions' }
       }
     })
+
+    // Offline: check seeded status
+    ipcMain.handle('offline:isSeeded', async (_, teacherUserId: string) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        const seeded = db.isOfflineSeededForUser(teacherUserId)
+        return { success: true, seeded }
+      } catch (error) {
+        console.error('Offline isSeeded error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to check seed status' }
+      }
+    })
+
+    // Offline: bulk upserts for initial seed
+    ipcMain.handle('offline:seed', async (_, payload: {
+      teacherUserId: string
+      classSections: Array<{ id: string; title: string; grade_level?: string; institution_id?: string }>
+      subjects: Array<{ id: string; title: string; variant?: string; class_section_id: string; institution_id?: string }>
+      assignedSubjectIds: string[]
+      students: Array<{ id: string; lrn?: string; first_name: string; middle_name?: string; last_name: string; ext_name?: string; gender?: string }>
+      studentSections: Array<{ id: string; student_id: string; section_id: string; academic_year?: string }>
+      subjectEcr: Array<{ id: string; subject_id: string; title: string; percentage?: number }>
+      subjectEcrItems: Array<{ id: string; subject_ecr_id: string; title: string; description?: string; score?: number; category?: string; quarter?: string; academic_year?: string }>
+    }) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        db.upsertClassSections(payload.classSections)
+        db.upsertSubjects(payload.subjects)
+        db.upsertAssignedSubjects(payload.teacherUserId, payload.assignedSubjectIds)
+        db.upsertStudents(payload.students)
+        db.upsertStudentSections(payload.studentSections)
+        db.upsertSubjectEcr(payload.subjectEcr)
+        db.upsertSubjectEcrItems(payload.subjectEcrItems)
+        return { success: true }
+      } catch (error) {
+        console.error('Offline seed error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to seed offline data' }
+      }
+    })
+
+    // Offline: query helpers
+    ipcMain.handle('offline:getAssignedSubjects', async (_, teacherUserId: string) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        const subjects = db.getAssignedSubjectsForUser(teacherUserId)
+        return { success: true, subjects }
+      } catch (error) {
+        console.error('Offline getAssignedSubjects error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to get assigned subjects' }
+      }
+    })
+
+    ipcMain.handle('offline:getStudentsBySection', async (_, sectionId: string) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        const students = db.getStudentsBySection(sectionId)
+        return { success: true, students }
+      } catch (error) {
+        console.error('Offline getStudentsBySection error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to get students' }
+      }
+    })
+
+    ipcMain.handle('offline:getEcrItemsBySubject', async (_, subjectId: string) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        const items = db.getEcrItemsBySubject(subjectId)
+        return { success: true, items }
+      } catch (error) {
+        console.error('Offline getEcrItemsBySubject error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to get ecr items' }
+      }
+    })
+
+    // Offline: upsert score and add to outbox
+    ipcMain.handle('offline:upsertStudentScores', async (_, scores: Array<{ id?: string; student_id: string; subject_ecr_item_id: string; score: number; date_submitted?: string }>) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        db.upsertStudentScores(scores, true)
+        return { success: true }
+      } catch (error) {
+        console.error('Offline upsertStudentScores error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save scores' }
+      }
+    })
+
+    // Offline: outbox stats and export
+    ipcMain.handle('offline:getOutboxCount', async () => {
+      try {
+        const db = this.dbManager.getDatabase()
+        const count = db.getUnsyncedOutboxCount()
+        return { success: true, count }
+      } catch (error) {
+        console.error('Offline getOutboxCount error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to get outbox count' }
+      }
+    })
+
+    ipcMain.handle('offline:getOutboxEntries', async () => {
+      try {
+        const db = this.dbManager.getDatabase()
+        const entries = db.getOutboxEntries()
+        return { success: true, entries }
+      } catch (error) {
+        console.error('Offline getOutboxEntries error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to get outbox entries' }
+      }
+    })
+
+    ipcMain.handle('offline:exportOutboxToFile', async (_, filePath: string, userId: string) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        const res = db.exportOutboxToFile(filePath, userId)
+        return { success: true, ...res }
+      } catch (error) {
+        console.error('Offline exportOutboxToFile error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to export outbox' }
+      }
+    })
+
+    ipcMain.handle('offline:clearOutboxByIds', async (_, ids: string[]) => {
+      try {
+        const db = this.dbManager.getDatabase()
+        db.clearOutboxByIds(ids)
+        return { success: true }
+      } catch (error) {
+        console.error('Offline clearOutboxByIds error:', error)
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to clear outbox' }
+      }
+    })
   }
 
   public static initialize(): DatabaseIPC {

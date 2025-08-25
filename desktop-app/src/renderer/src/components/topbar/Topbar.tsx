@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu } from 'lucide-react';
 import { authService } from '../../services/authService';
+import { offlineSyncService } from '../../services/offlineSyncService';
 
 interface TopbarProps {
   onMobileMenuClick?: () => void;
@@ -12,6 +13,8 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick, onLogout }) => {
   const currentUser = authService.getCurrentUser();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [outboxCount, setOutboxCount] = useState<number>(0);
+  const [syncing, setSyncing] = useState<boolean>(false);
   
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -31,6 +34,38 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick, onLogout }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const res = await window.api.offline.getOutboxCount();
+        if (res.success) setOutboxCount(res.count || 0);
+      } catch {}
+    };
+    const id = setInterval(refresh, 5000);
+    refresh();
+    return () => clearInterval(id);
+  }, []);
+
+  const handleExport = async () => {
+    if (!currentUser) return;
+    try {
+      setSyncing(true);
+      const userId = currentUser.id || 'unknown';
+      const exportPath = `${process.env.HOME || process.env.USERPROFILE || ''}/Scholastic/sync_batches/batch_${Date.now()}.json`;
+      const res = await offlineSyncService.exportOutbox(exportPath, userId);
+      if (res.success) {
+        setOutboxCount(0);
+        alert(`Exported ${res.count} changes to ${res.filePath}`);
+      } else {
+        alert(`Failed to export: ${res.error}`);
+      }
+    } catch (e: any) {
+      alert(e?.message || 'Failed to export');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <motion.div
@@ -69,6 +104,17 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick, onLogout }) => {
 
         {/* Right Section - Actions */}
         <div className="flex items-center space-x-4">
+          {/* Offline Sync */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-gray-600 hidden md:block">Offline</span>
+            <button
+              disabled={syncing}
+              onClick={handleExport}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors duration-200 cursor-pointer ${syncing ? 'bg-gray-100 text-gray-400 border-gray-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}
+            >
+              {syncing ? 'Exporting...' : `Sync (${outboxCount})`}
+            </button>
+          </div>
           {/* Notifications */}
           <div className="relative" ref={notificationsRef}>
             <motion.button
@@ -162,7 +208,6 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick, onLogout }) => {
                       whileHover={{ backgroundColor: '#f3f4f6' }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => {
-                        // Handle profile settings
                         setIsProfileOpen(false);
                       }}
                       className="w-full flex items-center px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
@@ -198,4 +243,5 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick, onLogout }) => {
   );
 };
 
-export default Topbar; 
+export default Topbar;
+

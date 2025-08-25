@@ -45,7 +45,7 @@ export class SecureDatabase {
   private db: Database.Database | null = null
   private config: DatabaseConfig
   private isInitialized = false
-  private encryptionKey: Buffer
+  // encryptionKey retained in config; no instance property needed
 
   constructor(config: Partial<DatabaseConfig> = {}) {
     this.config = {
@@ -54,7 +54,7 @@ export class SecureDatabase {
       maxRetries: config.maxRetries || 3,
       timeout: config.timeout || 5000
     }
-    this.encryptionKey = Buffer.from(this.config.encryptionKey, 'hex')
+    // Buffer.from(this.config.encryptionKey, 'hex') // reserved for future crypto-at-rest
   }
 
   private generateEncryptionKey(): string {
@@ -235,6 +235,137 @@ export class SecureDatabase {
       CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
       CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
       CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+    `)
+
+    // Offline-first domain tables
+    // Class Sections
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS class_sections (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        grade_level TEXT,
+        institution_id TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    // Subjects
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS subjects (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        variant TEXT,
+        class_section_id TEXT NOT NULL,
+        institution_id TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (class_section_id) REFERENCES class_sections (id) ON DELETE CASCADE
+      )
+    `)
+
+    // Teacher assigned subjects
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS assigned_subjects (
+        subject_id TEXT PRIMARY KEY,
+        teacher_user_id TEXT NOT NULL,
+        assigned_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    `)
+
+    // Students
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS students (
+        id TEXT PRIMARY KEY,
+        lrn TEXT,
+        first_name TEXT NOT NULL,
+        middle_name TEXT,
+        last_name TEXT NOT NULL,
+        ext_name TEXT,
+        gender TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    // Student-Section membership
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS student_sections (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        section_id TEXT NOT NULL,
+        academic_year TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE,
+        FOREIGN KEY (section_id) REFERENCES class_sections (id) ON DELETE CASCADE
+      )
+    `)
+
+    // Subject ECR components
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS subject_ecr (
+        id TEXT PRIMARY KEY,
+        subject_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        percentage REAL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+      )
+    `)
+
+    // Subject ECR items
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS subject_ecr_items (
+        id TEXT PRIMARY KEY,
+        subject_ecr_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        score INTEGER,
+        category TEXT,
+        quarter TEXT,
+        academic_year TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_ecr_id) REFERENCES subject_ecr (id) ON DELETE CASCADE
+      )
+    `)
+
+    // Student scores
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS student_scores (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        subject_ecr_item_id TEXT NOT NULL,
+        score REAL NOT NULL,
+        date_submitted TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(student_id, subject_ecr_item_id),
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_ecr_item_id) REFERENCES subject_ecr_items (id) ON DELETE CASCADE
+      )
+    `)
+
+    // Outbox for offline sync
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS outbox (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    // Indexes for offline tables
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_subjects_class_section_id ON subjects(class_section_id);
+      CREATE INDEX IF NOT EXISTS idx_assigned_subjects_teacher ON assigned_subjects(teacher_user_id);
+      CREATE INDEX IF NOT EXISTS idx_student_sections_section_id ON student_sections(section_id);
+      CREATE INDEX IF NOT EXISTS idx_scores_student ON student_scores(student_id);
+      CREATE INDEX IF NOT EXISTS idx_scores_item ON student_scores(subject_ecr_item_id);
     `)
   }
 
@@ -644,5 +775,245 @@ export class SecureDatabase {
     `).run(newPasswordHash, newSalt, userId)
 
     return true
+  }
+
+  // ------------------------
+  // Offline helpers & CRUD
+  // ------------------------
+
+  public isOfflineSeededForUser(teacherUserId: string): boolean {
+    if (!this.db) throw new Error('Database not initialized')
+    const row = this.db.prepare('SELECT COUNT(*) as count FROM assigned_subjects WHERE teacher_user_id = ?').get(teacherUserId) as { count: number }
+    return (row?.count || 0) > 0
+  }
+
+  public upsertClassSections(sections: Array<{ id: string; title: string; grade_level?: string; institution_id?: string }>): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const insert = this.db.prepare(`
+      INSERT INTO class_sections (id, title, grade_level, institution_id)
+      VALUES (@id, @title, @grade_level, @institution_id)
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title,
+        grade_level = excluded.grade_level,
+        institution_id = excluded.institution_id,
+        updated_at = CURRENT_TIMESTAMP
+    `)
+    const tx = this.db.transaction((rows: any[]) => {
+      for (const row of rows) insert.run(row)
+    })
+    tx(sections)
+  }
+
+  public upsertSubjects(subjects: Array<{ id: string; title: string; variant?: string; class_section_id: string; institution_id?: string }>): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const insert = this.db.prepare(`
+      INSERT INTO subjects (id, title, variant, class_section_id, institution_id)
+      VALUES (@id, @title, @variant, @class_section_id, @institution_id)
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title,
+        variant = excluded.variant,
+        class_section_id = excluded.class_section_id,
+        institution_id = excluded.institution_id,
+        updated_at = CURRENT_TIMESTAMP
+    `)
+    const tx = this.db.transaction((rows: any[]) => {
+      for (const row of rows) insert.run(row)
+    })
+    tx(subjects)
+  }
+
+  public upsertAssignedSubjects(teacherUserId: string, subjectIds: string[]): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const insert = this.db.prepare(`
+      INSERT INTO assigned_subjects (subject_id, teacher_user_id)
+      VALUES (?, ?)
+      ON CONFLICT(subject_id) DO UPDATE SET
+        teacher_user_id = excluded.teacher_user_id,
+        assigned_at = CURRENT_TIMESTAMP
+    `)
+    const tx = this.db.transaction((ids: string[]) => {
+      for (const id of ids) insert.run(id, teacherUserId)
+    })
+    tx(subjectIds)
+  }
+
+  public upsertStudents(students: Array<{ id: string; lrn?: string; first_name: string; middle_name?: string; last_name: string; ext_name?: string; gender?: string }>): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const insert = this.db.prepare(`
+      INSERT INTO students (id, lrn, first_name, middle_name, last_name, ext_name, gender)
+      VALUES (@id, @lrn, @first_name, @middle_name, @last_name, @ext_name, @gender)
+      ON CONFLICT(id) DO UPDATE SET
+        lrn = excluded.lrn,
+        first_name = excluded.first_name,
+        middle_name = excluded.middle_name,
+        last_name = excluded.last_name,
+        ext_name = excluded.ext_name,
+        gender = excluded.gender,
+        updated_at = CURRENT_TIMESTAMP
+    `)
+    const tx = this.db.transaction((rows: any[]) => {
+      for (const row of rows) insert.run(row)
+    })
+    tx(students)
+  }
+
+  public upsertStudentSections(memberships: Array<{ id: string; student_id: string; section_id: string; academic_year?: string }>): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const insert = this.db.prepare(`
+      INSERT INTO student_sections (id, student_id, section_id, academic_year)
+      VALUES (@id, @student_id, @section_id, @academic_year)
+      ON CONFLICT(id) DO UPDATE SET
+        student_id = excluded.student_id,
+        section_id = excluded.section_id,
+        academic_year = excluded.academic_year,
+        updated_at = CURRENT_TIMESTAMP
+    `)
+    const tx = this.db.transaction((rows: any[]) => {
+      for (const row of rows) insert.run(row)
+    })
+    tx(memberships)
+  }
+
+  public upsertSubjectEcr(components: Array<{ id: string; subject_id: string; title: string; percentage?: number }>): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const insert = this.db.prepare(`
+      INSERT INTO subject_ecr (id, subject_id, title, percentage)
+      VALUES (@id, @subject_id, @title, @percentage)
+      ON CONFLICT(id) DO UPDATE SET
+        subject_id = excluded.subject_id,
+        title = excluded.title,
+        percentage = excluded.percentage,
+        updated_at = CURRENT_TIMESTAMP
+    `)
+    const tx = this.db.transaction((rows: any[]) => {
+      for (const row of rows) insert.run(row)
+    })
+    tx(components)
+  }
+
+  public upsertSubjectEcrItems(items: Array<{ id: string; subject_ecr_id: string; title: string; description?: string; score?: number; category?: string; quarter?: string; academic_year?: string }>): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const insert = this.db.prepare(`
+      INSERT INTO subject_ecr_items (id, subject_ecr_id, title, description, score, category, quarter, academic_year)
+      VALUES (@id, @subject_ecr_id, @title, @description, @score, @category, @quarter, @academic_year)
+      ON CONFLICT(id) DO UPDATE SET
+        subject_ecr_id = excluded.subject_ecr_id,
+        title = excluded.title,
+        description = excluded.description,
+        score = excluded.score,
+        category = excluded.category,
+        quarter = excluded.quarter,
+        academic_year = excluded.academic_year,
+        updated_at = CURRENT_TIMESTAMP
+    `)
+    const tx = this.db.transaction((rows: any[]) => {
+      for (const row of rows) insert.run(row)
+    })
+    tx(items)
+  }
+
+  public upsertStudentScores(scores: Array<{ id?: string; student_id: string; subject_ecr_item_id: string; score: number; date_submitted?: string }>, addToOutbox = false): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const upsert = this.db.prepare(`
+      INSERT INTO student_scores (id, student_id, subject_ecr_item_id, score, date_submitted)
+      VALUES (COALESCE(@id, lower(hex(randomblob(16)))), @student_id, @subject_ecr_item_id, @score, @date_submitted)
+      ON CONFLICT(student_id, subject_ecr_item_id) DO UPDATE SET
+        score = excluded.score,
+        date_submitted = excluded.date_submitted,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id
+    `)
+    const insertOutbox = this.db.prepare(`
+      INSERT INTO outbox (id, type, payload) VALUES (lower(hex(randomblob(16))), @type, @payload)
+    `)
+    const tx = this.db.transaction((rows: any[]) => {
+      for (const row of rows) {
+        const res = upsert.get(row) as any
+        if (addToOutbox) {
+          const payload = {
+            op: 'upsert_student_score',
+            id: res?.id,
+            student_id: row.student_id,
+            subject_ecr_item_id: row.subject_ecr_item_id,
+            score: row.score,
+            date_submitted: row.date_submitted || null
+          }
+          insertOutbox.run({ type: 'student_score_upsert', payload: JSON.stringify(payload) })
+        }
+      }
+    })
+    tx(scores)
+  }
+
+  public getAssignedSubjectsForUser(teacherUserId: string): any[] {
+    if (!this.db) throw new Error('Database not initialized')
+    const rows = this.db.prepare(`
+      SELECT s.*, cs.title as class_section_title, cs.grade_level, cs.institution_id
+      FROM assigned_subjects a
+      JOIN subjects s ON s.id = a.subject_id
+      JOIN class_sections cs ON cs.id = s.class_section_id
+      WHERE a.teacher_user_id = ?
+      ORDER BY cs.title, s.title
+    `).all(teacherUserId) as any[]
+    return rows
+  }
+
+  public getStudentsBySection(sectionId: string): any[] {
+    if (!this.db) throw new Error('Database not initialized')
+    const rows = this.db.prepare(`
+      SELECT st.* , ss.id as student_section_id, ss.academic_year
+      FROM student_sections ss
+      JOIN students st ON st.id = ss.student_id
+      WHERE ss.section_id = ?
+      ORDER BY st.last_name, st.first_name
+    `).all(sectionId) as any[]
+    return rows
+  }
+
+  public getEcrItemsBySubject(subjectId: string): any[] {
+    if (!this.db) throw new Error('Database not initialized')
+    const rows = this.db.prepare(`
+      SELECT i.*
+      FROM subject_ecr_items i
+      JOIN subject_ecr e ON e.id = i.subject_ecr_id
+      WHERE e.subject_id = ?
+      ORDER BY i.created_at DESC
+    `).all(subjectId) as any[]
+    return rows
+  }
+
+  public getUnsyncedOutboxCount(): number {
+    if (!this.db) throw new Error('Database not initialized')
+    const row = this.db.prepare('SELECT COUNT(*) as count FROM outbox').get() as { count: number }
+    return row?.count || 0
+  }
+
+  public getOutboxEntries(): Array<{ id: string; type: string; payload: any; created_at: string }> {
+    if (!this.db) throw new Error('Database not initialized')
+    const rows = this.db.prepare('SELECT id, type, payload, created_at FROM outbox ORDER BY created_at ASC').all() as any[]
+    return rows.map(r => ({ id: r.id, type: r.type, payload: JSON.parse(r.payload), created_at: r.created_at }))
+  }
+
+  public clearOutboxByIds(ids: string[]): void {
+    if (!this.db) throw new Error('Database not initialized')
+    const del = this.db.prepare('DELETE FROM outbox WHERE id = ?')
+    const tx = this.db.transaction((toDelete: string[]) => {
+      for (const id of toDelete) del.run(id)
+    })
+    tx(ids)
+  }
+
+  public exportOutboxToFile(filePath: string, userId: string): { filePath: string; count: number } {
+    if (!this.db) throw new Error('Database not initialized')
+    const entries = this.getOutboxEntries()
+    const batch = {
+      version: 1,
+      user_id: userId,
+      generated_at: new Date().toISOString(),
+      entries
+    }
+    fs.mkdirSync(path.dirname(filePath), { recursive: true })
+    fs.writeFileSync(filePath, JSON.stringify(batch, null, 2), 'utf8')
+    return { filePath, count: entries.length }
   }
 } 
