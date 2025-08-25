@@ -1,296 +1,220 @@
 import React, { useState } from 'react';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import PublicLayout from '../components/layouts/PublicLayout';
-import { authService } from '../services/authService';
+import { Formik, Form, Field } from 'formik';
+import * as Yup from 'yup';
+import { User, Lock, Wifi, WifiOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import type { LoginRequest } from '../../../../../shared/src/types/auth';
-import { Alert } from '../components/alert';
-import './Login.css';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
-const loginSchema = Yup.object().shape({
+const validationSchema = Yup.object({
   email: Yup.string()
     .email('Invalid email address')
     .required('Email is required'),
   password: Yup.string()
     .min(6, 'Password must be at least 6 characters')
     .required('Password is required'),
+  apiUrl: Yup.string()
+    .url('Invalid URL')
+    .required('API URL is required')
 });
 
-interface LoginProps {
-  onLogin: (user: any) => void;
-}
+export const Login: React.FC = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const isOnline = useOnlineStatus();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const { login: authLogin } = useAuth();
-  const [alert, setAlert] = useState<{
-    type: 'success' | 'error' | 'warning' | 'info';
-    title?: string;
-    message: string;
-    show: boolean;
-  } | null>(null);
-
-  const formik = useFormik({
-    initialValues: {
-      email: '',
-      password: '',
-    },
-    validationSchema: loginSchema,
-    onSubmit: async (values: LoginRequest) => {
-      setAlert(null);
-      try {
-        const response = await authService.login(values);
-        await authLogin(response);
-        setAlert({
-          type: 'success',
-          title: 'Login Successful',
-          message: 'Welcome back! Redirecting to dashboard...',
-          show: true,
-        });
-        setTimeout(() => {
-          onLogin(response);
-        }, 1500);
-
-      } catch (error: any) {
-        console.error('Login error:', error);
-        if (error.response?.data?.errors) {
-          const validationErrors = error.response.data.errors;
-          Object.keys(validationErrors).forEach((field) => {
-            formik.setFieldError(field, validationErrors[field][0]);
-          });
+  const handleSubmit = async (values: any) => {
+    setError(null);
+    setIsLoading(true);
+    
+    try {
+      const result = await window.api.auth.login(
+        values.email,
+        values.password,
+        values.apiUrl
+      );
+      
+      if (result.success) {
+        login(result.user, result.token);
+        
+        // If online and first login, fetch initial data
+        if (result.isOnline && !localStorage.getItem('initialDataFetched')) {
+          navigate('/loading');
         } else {
-          setAlert({
-            type: 'error',
-            title: 'Login Failed',
-            message: error.response?.data?.message || 'An error occurred during login',
-            show: true,
-          });
+          navigate('/dashboard');
         }
+      } else {
+        setError('Invalid credentials');
       }
-    },
-  });
-
-  const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.6,
-        ease: 'easeOut',
-        staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4, ease: 'easeOut' },
-    },
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <PublicLayout>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="max-w-md w-full space-y-8 login-container"
-        >
-          {/* Header */}
-          <motion.div variants={itemVariants} className="text-center">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-              className="mx-auto h-16 w-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg login-logo"
-            >
-              <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </motion.div>
-            <h2 className="mt-8 text-3xl font-extrabold text-gray-900 tracking-tight">
-              Welcome to Scholastic
-            </h2>
-            <p className="mt-3 text-sm text-gray-600">
-              Sign in to your desktop account to continue
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md"
+      >
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Scholastic Desktop
+          </h1>
+          <p className="text-gray-600">Sign in to continue</p>
+          
+          <div className="mt-4 flex items-center justify-center">
+            {isOnline ? (
+              <div className="flex items-center text-green-600">
+                <Wifi className="w-4 h-4 mr-2" />
+                <span className="text-sm">Online Mode</span>
+              </div>
+            ) : (
+              <div className="flex items-center text-orange-600">
+                <WifiOff className="w-4 h-4 mr-2" />
+                <span className="text-sm">Offline Mode</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center text-red-700"
+          >
+            <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span className="text-sm">{error}</span>
           </motion.div>
+        )}
 
-          {/* Alert */}
-          {alert && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <Alert
-                type={alert.type}
-                title={alert.title}
-                message={alert.message}
-                show={alert.show}
-                onClose={() => setAlert(null)}
-              />
-            </motion.div>
-          )}
-
-          {/* Login Form */}
-          <motion.div variants={itemVariants} className="mt-8 space-y-6">
-            <form onSubmit={formik.handleSubmit} className="space-y-6">
+        <Formik
+          initialValues={{
+            email: localStorage.getItem('lastEmail') || '',
+            password: '',
+            apiUrl: localStorage.getItem('apiUrl') || 'http://localhost:3000/api'
+          }}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+        >
+          {({ errors, touched }) => (
+            <Form className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email address
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
                 </label>
                 <div className="relative">
-                  <input
-                    id="email"
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Field
                     name="email"
                     type="email"
-                    autoComplete="email"
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    value={formik.values.email}
-                    className={`appearance-none relative block w-full px-4 py-3 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all duration-200 ${
-                      formik.errors.email && formik.touched.email
-                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                        : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                    className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.email && touched.email
+                        ? 'border-red-500'
+                        : 'border-gray-300'
                     }`}
-                    placeholder="Enter your email"
+                    placeholder="teacher@school.edu"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                    </svg>
-                  </div>
                 </div>
-                {formik.errors.email && formik.touched.email && (
-                  <div className="mt-2 text-sm text-red-600 flex items-center">
-                    <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {formik.errors.email}
-                  </div>
+                {errors.email && touched.email && (
+                  <p className="mt-1 text-xs text-red-500">{errors.email}</p>
                 )}
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Password
                 </label>
                 <div className="relative">
-                  <input
-                    id="password"
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Field
                     name="password"
                     type="password"
-                    autoComplete="current-password"
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    value={formik.values.password}
-                    className={`appearance-none relative block w-full px-4 py-3 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all duration-200 ${
-                      formik.errors.password && formik.touched.password
-                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                        : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                    className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.password && touched.password
+                        ? 'border-red-500'
+                        : 'border-gray-300'
                     }`}
-                    placeholder="Enter your password"
+                    placeholder="••••••••"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
                 </div>
-                {formik.errors.password && formik.touched.password && (
-                  <div className="mt-2 text-sm text-red-600 flex items-center">
-                    <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {formik.errors.password}
-                  </div>
+                {errors.password && touched.password && (
+                  <p className="mt-1 text-xs text-red-500">{errors.password}</p>
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded transition-colors duration-200"
-                  />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                    Remember me
-                  </label>
-                </div>
-
-                <div className="text-sm">
-                  <button
-                    type="button"
-                    className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-              </div>
-
               <div>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  disabled={formik.isSubmitting}
-                  className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  {formik.isSubmitting ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-                    />
-                  ) : (
-                    <>
-                      <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                        <svg
-                          className="h-5 w-5 text-indigo-500 group-hover:text-indigo-400 transition-colors duration-200"
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </span>
-                      Sign in
-                    </>
-                  )}
-                </motion.button>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  API Server URL
+                </label>
+                <Field
+                  name="apiUrl"
+                  type="url"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.apiUrl && touched.apiUrl
+                      ? 'border-red-500'
+                      : 'border-gray-300'
+                  }`}
+                  placeholder="https://api.school.edu"
+                />
+                {errors.apiUrl && touched.apiUrl && (
+                  <p className="mt-1 text-xs text-red-500">{errors.apiUrl}</p>
+                )}
               </div>
-            </form>
 
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
-                >
-                  Contact your administrator
-                </button>
-              </p>
-            </div>
-          </motion.div>
-        </motion.div>
-      </div>
-    </PublicLayout>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+            </Form>
+          )}
+        </Formik>
+
+        <div className="mt-6 text-center">
+          <p className="text-xs text-gray-500">
+            {isOnline 
+              ? 'Connected to server. Data will be synced automatically.'
+              : 'Working offline. Data will be synced when connection is restored.'}
+          </p>
+        </div>
+      </motion.div>
+    </div>
   );
 };
-
-export default Login; 
