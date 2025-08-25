@@ -177,7 +177,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 						value={title}
 						onChange={(e) => onTitleChange(e.target.value)}
 						placeholder="Enter certificate title..."
-						size="lg"
 						icon={<FileText className="w-4 h-4" />}
 					/>
 				</div>
@@ -216,7 +215,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 						<Select
 							value={paper}
 							onChange={(e) => onPaperChange(e.target.value)}
-							size="sm"
 							label="Paper"
 						>
 							<option value="a4">A4</option>
@@ -227,7 +225,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 						<Select
 							value={orientation}
 							onChange={(e) => onOrientationChange(e.target.value as 'portrait' | 'landscape')}
-							size="sm"
 							label="Orientation"
 						>
 							<option value="portrait">Portrait</option>
@@ -237,7 +234,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 						<Select
 							value={String(zoom)}
 							onChange={(e) => onZoomChange(Number(e.target.value))}
-							size="sm"
 							label="Zoom"
 						>
 							{[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2].map(z => (
@@ -277,7 +273,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 									variant="ghost"
 									size="sm"
 									onClick={() => onBgImageChange(null)}
-									title="Remove background image"
 								>
 									Remove
 								</Button>
@@ -316,7 +311,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 											   paper === 'letter' ? (orientation === 'portrait' ? 816 : 1056) : 
 											   (orientation === 'portrait' ? 816 : 1344)}
 										disabled
-										size="sm"
 									/>
 								</div>
 								<div>
@@ -329,7 +323,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 											   paper === 'letter' ? (orientation === 'portrait' ? 1056 : 816) : 
 											   (orientation === 'portrait' ? 1344 : 816)}
 										disabled
-										size="sm"
 									/>
 								</div>
 								<div>
@@ -343,7 +336,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 										step={0.1}
 										min={0.1}
 										max={3}
-										size="sm"
 									/>
 								</div>
 								<div>
@@ -353,7 +345,6 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 									<Input
 										value={currentInstitution?.name || 'No access'}
 										disabled
-										size="sm"
 									/>
 								</div>
 							</div>

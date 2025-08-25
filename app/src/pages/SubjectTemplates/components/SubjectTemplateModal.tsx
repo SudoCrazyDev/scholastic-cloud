@@ -113,7 +113,7 @@ export function SubjectTemplateModal({
         })
         
         // Convert template items to UI format
-        const templateItems: TemplateItem[] = template.items?.map((item, index) => {
+        const templateItems: TemplateItem[] = template.items?.map((item) => {
           // Find parent index if this is a child item
           let parentIndex: number | undefined
           if (item.parent_item_id) {
@@ -480,7 +480,7 @@ export function SubjectTemplateModal({
                   Cancel
                 </Button>
                 <Button
-                  onClick={formik.handleSubmit}
+                  onClick={() => formik.handleSubmit()}
                   disabled={loading || formik.isSubmitting}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
                 >

@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
 	Eye, 
 	EyeOff, 
@@ -7,7 +7,6 @@ import {
 	Unlock, 
 	Trash2, 
 	Copy,
-	Move,
 	Layers,
 	ChevronUp,
 	ChevronDown

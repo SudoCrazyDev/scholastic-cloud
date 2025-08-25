@@ -239,7 +239,7 @@ export default function CertificateList() {
 							className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
 						>
 							<AnimatePresence>
-								{items.map((item, index) => (
+								{items.map((item) => (
 									<motion.div
 										key={item.id}
 										variants={itemVariants}

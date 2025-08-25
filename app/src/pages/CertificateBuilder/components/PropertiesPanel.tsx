@@ -94,7 +94,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 					<Button
 						onClick={() => updateElement({ hidden: !element.hidden })}
 						variant="ghost"
-						size="sm"
+						
 						icon={element.hidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
 					>
 						{element.hidden ? 'Show' : 'Hide'}
@@ -102,7 +102,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 					<Button
 						onClick={() => updateElement({ locked: !element.locked })}
 						variant="ghost"
-						size="sm"
+						
 						icon={element.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
 					>
 						{element.locked ? 'Unlock' : 'Lock'}
@@ -111,7 +111,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 						<Button
 							onClick={() => onDuplicate(element)}
 							variant="ghost"
-							size="sm"
+							
 							icon={<Copy className="w-4 h-4" />}
 						>
 							Copy
@@ -121,7 +121,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 						<Button
 							onClick={() => onDelete(element.id)}
 							variant="danger"
-							size="sm"
+							
 							icon={<Trash2 className="w-4 h-4" />}
 						>
 							Delete
@@ -144,28 +144,25 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 							type="number"
 							value={element.x}
 							onChange={(e) => updateElement({ x: Number(e.target.value) })}
-							size="sm"
 						/>
 						<Input
 							label="Y"
 							type="number"
 							value={element.y}
 							onChange={(e) => updateElement({ y: Number(e.target.value) })}
-							size="sm"
 						/>
 						<Input
 							label="Width"
 							type="number"
 							value={element.width}
 							onChange={(e) => updateElement({ width: Number(e.target.value) })}
-							size="sm"
 						/>
 						<Input
 							label="Height"
 							type="number"
 							value={element.height}
 							onChange={(e) => updateElement({ height: Number(e.target.value) })}
-							size="sm"
+							
 						/>
 					</div>
 				</div>
@@ -182,7 +179,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 							type="number"
 							value={element.rotation || 0}
 							onChange={(e) => updateElement({ rotation: Number(e.target.value) })}
-							size="sm"
+							
 						/>
 						<Input
 							label="Opacity"
@@ -192,7 +189,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 							min={0}
 							max={1}
 							step={0.1}
-							size="sm"
+							
 						/>
 					</div>
 				</div>
@@ -212,13 +209,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									label="Content"
 									value={element.content || ''}
 									onChange={(e) => updateElement({ content: e.target.value })}
-									size="sm"
+									
 								/>
 								<Select
 									label="Font Family"
 									value={element.fontFamily || 'Arial'}
 									onChange={(e) => updateElement({ fontFamily: e.target.value })}
-									size="sm"
+									
 								>
 									<option value="Arial">Arial</option>
 									<option value="Helvetica">Helvetica</option>
@@ -233,21 +230,21 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 										type="number"
 										value={element.fontSize || 16}
 										onChange={(e) => updateElement({ fontSize: Number(e.target.value) })}
-										size="sm"
+										
 									/>
 									<Input
 										label="Color"
 										type="color"
 										value={element.color || '#000000'}
 										onChange={(e) => updateElement({ color: e.target.value })}
-										size="sm"
+										
 									/>
 								</div>
 								<Select
 									label="Font Weight"
 									value={element.fontWeight || 'normal'}
 									onChange={(e) => updateElement({ fontWeight: e.target.value })}
-									size="sm"
+									
 								>
 									<option value="normal">Normal</option>
 									<option value="bold">Bold</option>
@@ -265,7 +262,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									label="Text Align"
 									value={element.textAlign || 'left'}
 									onChange={(e) => updateElement({ textAlign: e.target.value })}
-									size="sm"
+									
 								>
 									<option value="left">Left</option>
 									<option value="center">Center</option>
@@ -289,19 +286,19 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									label="Source URL"
 									value={element.src || ''}
 									onChange={(e) => updateElement({ src: e.target.value })}
-									size="sm"
+									
 								/>
 								<Input
 									label="Alt Text"
 									value={element.alt || ''}
 									onChange={(e) => updateElement({ alt: e.target.value })}
-									size="sm"
+									
 								/>
 								<Select
 									label="Object Fit"
 									value={element.objectFit || 'cover'}
 									onChange={(e) => updateElement({ objectFit: e.target.value })}
-									size="sm"
+									
 								>
 									<option value="cover">Cover</option>
 									<option value="contain">Contain</option>
@@ -328,14 +325,14 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 										type="color"
 										value={element.fill || '#3B82F6'}
 										onChange={(e) => updateElement({ fill: e.target.value })}
-										size="sm"
+										
 									/>
 									<Input
 										label="Stroke Color"
 										type="color"
 										value={element.stroke || '#1E40AF'}
 										onChange={(e) => updateElement({ stroke: e.target.value })}
-										size="sm"
+										
 									/>
 								</div>
 								<Input
@@ -344,7 +341,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									value={element.strokeWidth || 1}
 									onChange={(e) => updateElement({ strokeWidth: Number(e.target.value) })}
 									min={0}
-									size="sm"
+									
 								/>
 								{element.type === 'rectangle' && (
 									<Input
@@ -353,7 +350,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 										value={element.cornerRadius || 0}
 										onChange={(e) => updateElement({ cornerRadius: Number(e.target.value) })}
 										min={0}
-										size="sm"
+										
 									/>
 								)}
 								{element.type === 'star' && (
@@ -364,7 +361,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 										onChange={(e) => updateElement({ points: Number(e.target.value) })}
 										min={3}
 										max={20}
-										size="sm"
+										
 									/>
 								)}
 							</div>

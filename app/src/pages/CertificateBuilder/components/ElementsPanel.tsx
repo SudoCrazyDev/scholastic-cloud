@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { Type, Image, Square, Circle, FileText } from 'lucide-react';
 import { type CanvasElement } from './CertificateCanvas';

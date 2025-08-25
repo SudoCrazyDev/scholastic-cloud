@@ -9,7 +9,6 @@ import { Select } from '../../../components/select'
 import { Autocomplete } from '../../../components/autocomplete'
 import { useTeachers } from '../../../hooks/useTeachers'
 import { useSubjectTemplates } from '../../../hooks/useSubjectTemplates'
-import { subjectTemplateService } from '../../../services/subjectTemplateService'
 import type { ClassSection, CreateClassSectionData, SubjectTemplate } from '../../../types'
 
 interface ClassSectionModalProps {

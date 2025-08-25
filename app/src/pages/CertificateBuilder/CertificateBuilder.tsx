@@ -1,11 +1,11 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { toast } from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useCertificate, useCreateCertificate, useUpdateCertificate } from '@/hooks/useCertificates';
+import { useCertificate } from '@/hooks/useCertificates';
 import { nanoid } from 'nanoid';
 
 // Components
@@ -20,14 +20,40 @@ import Button from '@/components/ui/Button';
 import Card, { CardBody } from '@/components/ui/Card';
 import { AlertTriangle, Building2 } from 'lucide-react';
 
-const presets = {
-	a4: { portrait: { w: 794, h: 1123, pdf: 'a4' as const }, landscape: { w: 1123, h: 794, pdf: 'a4' as const } },
-	letter: { portrait: { w: 816, h: 1056, pdf: 'letter' as const }, landscape: { w: 1056, h: 816, pdf: 'letter' as const } },
-	legal: { portrait: { w: 816, h: 1344, pdf: 'legal' as const }, landscape: { w: 1344, h: 816, pdf: 'legal' as const } },
-};
+const PAPER_PRESETS = {
+	a4: { 
+		portrait: { w: 794, h: 1123, pdf: 'a4' as const }, 
+		landscape: { w: 1123, h: 794, pdf: 'a4' as const } 
+	},
+	letter: { 
+		portrait: { w: 816, h: 1056, pdf: 'letter' as const }, 
+		landscape: { w: 1056, h: 816, pdf: 'letter' as const } 
+	},
+	legal: { 
+		portrait: { w: 816, h: 1344, pdf: 'legal' as const }, 
+		landscape: { w: 1344, h: 816, pdf: 'legal' as const } 
+	},
+} as const;
 
-type Paper = keyof typeof presets;
+type Paper = keyof typeof PAPER_PRESETS;
 type Orientation = 'portrait' | 'landscape';
+
+interface DesignData {
+	paper: Paper;
+	orientation: Orientation;
+	zoom: number;
+	bgColor: string;
+	bgImage: string | null;
+	elements: CanvasElement[];
+}
+
+interface UserInstitution {
+	is_default?: boolean;
+	is_main?: boolean;
+	institution: {
+		name: string;
+	};
+}
 
 export default function CertificateBuilder() {
 	const navigate = useNavigate();
@@ -47,7 +73,6 @@ export default function CertificateBuilder() {
 	const [bgColor, setBgColor] = useState<string>('#ffffff');
 	const [bgImage, setBgImage] = useState<string | null>(null);
 	const [title, setTitle] = useState<string>('Untitled Certificate');
-	const [isLoading, setIsLoading] = useState(false);
 	
 	// Refs
 	const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -57,79 +82,78 @@ export default function CertificateBuilder() {
 	
 	// TanStack Query hooks
 	const { data: certificate, isLoading: isLoadingCertificate } = useCertificate(certificateId);
-	const createCertificate = useCreateCertificate();
-	const updateCertificate = useUpdateCertificate();
 	
 	// Get user's default institution
-	const defaultInstitution = user?.user_institutions?.find((ui: any) => ui.is_default)?.institution;
-	const mainInstitution = user?.user_institutions?.find((ui: any) => ui.is_main)?.institution;
-	const currentInstitution = defaultInstitution || mainInstitution;
+	const currentInstitution = useMemo(() => {
+		const defaultInstitution = user?.user_institutions?.find((ui: UserInstitution) => ui.is_default)?.institution;
+		const mainInstitution = user?.user_institutions?.find((ui: UserInstitution) => ui.is_main)?.institution;
+		return defaultInstitution || mainInstitution;
+	}, [user?.user_institutions]);
 
 	// Computed values
-	const selectedElements = useMemo(() => elements.filter(e => selectedIds.includes(e.id)), [elements, selectedIds]);
-	const canvasSize = presets[paper][orientation];
+	const selectedElements = useMemo(() => 
+		elements.filter(e => selectedIds.includes(e.id)), 
+		[elements, selectedIds]
+	);
+	const canvasSize = PAPER_PRESETS[paper][orientation];
 	const canUndo = history.length > 0;
 	const canRedo = future.length > 0;
 
-	// Debug: Log canvas size changes
-	useEffect(() => {
-		console.log('Canvas dimensions changed:', { paper, orientation, width: canvasSize.w, height: canvasSize.h });
-	}, [paper, orientation, canvasSize.w, canvasSize.h]);
-
 	// History management
-	function snapshot(state: CanvasElement[]): CanvasElement[] { 
-		return state.map((e, idx) => ({ ...e, zIndex: idx })); 
-	}
+	const snapshot = useCallback((state: CanvasElement[]): CanvasElement[] => 
+		state.map((e, idx) => ({ ...e, zIndex: idx })), 
+		[]
+	);
 	
-	function pushHistory(state: CanvasElement[]) { 
-		setHistory(prev => [...prev, snapshot(state)]); 
-		setFuture([]); 
-	}
+	const pushHistory = useCallback((state: CanvasElement[]) => {
+		setHistory(prev => [...prev, snapshot(state)]);
+		setFuture([]);
+	}, [snapshot]);
 	
-	function setElementsAndKeepOrder(next: CanvasElement[] | ((prev: CanvasElement[]) => CanvasElement[])) { 
-		setElements(prev => snapshot(typeof next === 'function' ? (next as (prev: CanvasElement[]) => CanvasElement[])(prev) : next)); 
-	}
+	const setElementsAndKeepOrder = useCallback((next: CanvasElement[] | ((prev: CanvasElement[]) => CanvasElement[])) => {
+		setElements(prev => snapshot(typeof next === 'function' ? next(prev) : next));
+	}, [snapshot]);
 
-	function undo() { 
-		setHistory(prev => { 
-			if (prev.length === 0) return prev; 
-			const newHistory = prev.slice(0, -1); 
-			const last = prev[prev.length - 1]; 
-			setFuture(f => [snapshot(elements), ...f]); 
-			setElementsAndKeepOrder(last); 
-			return newHistory; 
-		}); 
-	}
+	const undo = useCallback(() => {
+		setHistory(prev => {
+			if (prev.length === 0) return prev;
+			const newHistory = prev.slice(0, -1);
+			const last = prev[prev.length - 1];
+			setFuture(f => [snapshot(elements), ...f]);
+			setElementsAndKeepOrder(last);
+			return newHistory;
+		});
+	}, [elements, snapshot, setElementsAndKeepOrder]);
 	
-	function redo() { 
-		setFuture(prev => { 
-			if (prev.length === 0) return prev; 
-			const [next, ...rest] = prev; 
-			setHistory(h => [...h, snapshot(elements)]); 
-			setElementsAndKeepOrder(next); 
-			return rest; 
-		}); 
-	}
+	const redo = useCallback(() => {
+		setFuture(prev => {
+			if (prev.length === 0) return prev;
+			const [next, ...rest] = prev;
+			setHistory(h => [...h, snapshot(elements)]);
+			setElementsAndKeepOrder(next);
+			return rest;
+		});
+	}, [elements, snapshot, setElementsAndKeepOrder]);
 
 	// Element management
-	function handleAddElement(newElement: CanvasElement) { 
-		pushHistory(elements); 
-		setElementsAndKeepOrder(prev => [...prev, { ...newElement, zIndex: prev.length } as any] as any); 
-		setSelectedIds([newElement.id]); 
-	}
+	const handleAddElement = useCallback((newElement: CanvasElement) => {
+		pushHistory(elements);
+		setElementsAndKeepOrder(prev => [...prev, { ...newElement, zIndex: prev.length }]);
+		setSelectedIds([newElement.id]);
+	}, [elements, pushHistory, setElementsAndKeepOrder]);
 	
-	function handleUpdateElement(updated: CanvasElement) { 
-		setElements(prev => prev.map(e => e.id === updated.id ? updated : e)); 
-	}
+	const handleUpdateElement = useCallback((updated: CanvasElement) => {
+		setElements(prev => prev.map(e => e.id === updated.id ? updated : e));
+	}, []);
 	
-	function handleDeleteSelected() { 
-		if (!selectedIds.length) return; 
-		pushHistory(elements); 
-		setElementsAndKeepOrder(prev => prev.filter(e => !selectedIds.includes(e.id))); 
-		setSelectedIds([]); 
-	}
+	const handleDeleteSelected = useCallback(() => {
+		if (!selectedIds.length) return;
+		pushHistory(elements);
+		setElementsAndKeepOrder(prev => prev.filter(e => !selectedIds.includes(e.id)));
+		setSelectedIds([]);
+	}, [selectedIds, elements, pushHistory, setElementsAndKeepOrder]);
 	
-	function handleDuplicateElement(element: CanvasElement) {
+	const handleDuplicateElement = useCallback((element: CanvasElement) => {
 		const duplicated = {
 			...element,
 			id: nanoid(),
@@ -141,25 +165,21 @@ export default function CertificateBuilder() {
 		setElementsAndKeepOrder(prev => [...prev, duplicated]);
 		setSelectedIds([duplicated.id]);
 		toast.success('Element duplicated');
-	}
+	}, [elements, pushHistory, setElementsAndKeepOrder]);
 	
-	function handleInteractionStart() { 
-		pushHistory(elements); 
-	}
-	
-	function handleChangeEnd() {}
+	const handleInteractionStart = useCallback(() => {
+		pushHistory(elements);
+	}, [elements, pushHistory]);
 
 	// Serialize current design
-	function buildDesignJson() {
-		return {
-			paper,
-			orientation,
-			zoom,
-			bgColor,
-			bgImage,
-			elements,
-		};
-	}
+	const buildDesignJson = useCallback((): DesignData => ({
+		paper,
+		orientation,
+		zoom,
+		bgColor,
+		bgImage,
+		elements,
+	}), [paper, orientation, zoom, bgColor, bgImage, elements]);
 
 	// Load certificate data
 	useEffect(() => {
@@ -178,7 +198,6 @@ export default function CertificateBuilder() {
 	// Load certificate from URL parameter
 	useEffect(() => {
 		if (certificateId && !certificate && !isLoadingCertificate) {
-			// Certificate not found, redirect to list
 			toast.error('Certificate not found');
 			navigate('/certificates');
 		}
@@ -186,57 +205,61 @@ export default function CertificateBuilder() {
 
 	// Keyboard shortcuts
 	useEffect(() => {
-		function isTypingTarget(el: Element | null) { 
-			if (!el) return false; 
-			const tag = (el as HTMLElement).tagName.toLowerCase(); 
-			return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable; 
-		}
+		const isTypingTarget = (el: Element | null): boolean => {
+			if (!el) return false;
+			const tag = (el as HTMLElement).tagName.toLowerCase();
+			return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable;
+		};
 		
-		function onKey(e: KeyboardEvent) { 
-			const meta = e.ctrlKey || e.metaKey; 
-			if (meta && e.key.toLowerCase() === 'z') { 
-				e.preventDefault(); 
-				return e.shiftKey ? redo() : undo(); 
-			} 
-			if (meta && e.key.toLowerCase() === 'y') { 
-				e.preventDefault(); 
-				return redo(); 
-			} 
-			if ((e.key === 'Delete' || e.key === 'Backspace')) { 
-				if (isTypingTarget(document.activeElement)) return; 
-				if (selectedIds.length) { 
-					e.preventDefault(); 
-					handleDeleteSelected(); 
-				} 
-			} 
-		}
+		const onKey = (e: KeyboardEvent) => {
+			const meta = e.ctrlKey || e.metaKey;
+			if (meta && e.key.toLowerCase() === 'z') {
+				e.preventDefault();
+				return e.shiftKey ? redo() : undo();
+			}
+			if (meta && e.key.toLowerCase() === 'y') {
+				e.preventDefault();
+				return redo();
+			}
+			if ((e.key === 'Delete' || e.key === 'Backspace')) {
+				if (isTypingTarget(document.activeElement)) return;
+				if (selectedIds.length) {
+					e.preventDefault();
+					handleDeleteSelected();
+				}
+			}
+		};
 		
-		document.addEventListener('keydown', onKey); 
+		document.addEventListener('keydown', onKey);
 		return () => document.removeEventListener('keydown', onKey);
-	}, [selectedIds, elements]);
+	}, [selectedIds, undo, redo, handleDeleteSelected]);
 
 	// Export PDF
-	async function handleExportPdf() { 
-		if (!canvasRef.current) return; 
+	const handleExportPdf = useCallback(async () => {
+		if (!canvasRef.current) return;
 		
-		setIsLoading(true);
 		try {
-			const node = canvasRef.current; 
-			const canvas = await html2canvas(node, { background: '#ffffff', scale: 2 } as any); 
-			const imgData = canvas.toDataURL('image/png'); 
-			const pdf = new jsPDF({ orientation, unit: 'pt', format: canvasSize.pdf }); 
-			const pageWidth = pdf.internal.pageSize.getWidth(); 
-			const pageHeight = pdf.internal.pageSize.getHeight(); 
-			pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST'); 
+			const node = canvasRef.current;
+			const canvas = await html2canvas(node, { 
+				background: '#ffffff', 
+				scale: 2 
+			} as Parameters<typeof html2canvas>[1]);
+			const imgData = canvas.toDataURL('image/png');
+			const pdf = new jsPDF({ 
+				orientation, 
+				unit: 'pt', 
+				format: canvasSize.pdf 
+			});
+			const pageWidth = pdf.internal.pageSize.getWidth();
+			const pageHeight = pdf.internal.pageSize.getHeight();
+			pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
 			pdf.save(`${title || 'certificate'}.pdf`);
 			toast.success('PDF exported successfully');
 		} catch (error) {
 			toast.error('Failed to export PDF');
 			console.error('PDF export error:', error);
-		} finally {
-			setIsLoading(false);
 		}
-	}
+	}, [orientation, canvasSize.pdf, title]);
 
 	// Show no institution access message
 	if (!currentInstitution) {
@@ -332,7 +355,7 @@ export default function CertificateBuilder() {
 						style={{
 							width: canvasSize.w,
 							height: canvasSize.h,
-							backgroundColor: '#f8fafc', // Light gray background for working area
+							backgroundColor: '#f8fafc',
 							zIndex: 1
 						}}
 					>
@@ -363,7 +386,7 @@ export default function CertificateBuilder() {
 								onSelect={setSelectedIds} 
 								onChange={handleUpdateElement} 
 								onInteractionStart={handleInteractionStart} 
-								onChangeEnd={handleChangeEnd} 
+								onChangeEnd={() => {}} 
 								showGrid={showGrid} 
 								snappingEnabled={snapping} 
 								key={`${canvasSize.w}-${canvasSize.h}`}

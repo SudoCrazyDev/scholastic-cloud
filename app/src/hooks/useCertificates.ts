@@ -7,7 +7,6 @@ import {
 	updateCertificate,
 	deleteCertificate,
 	duplicateCertificate,
-	type CertificatePayload,
 	type CertificateUpdatePayload,
 	type CertificateListParams,
 } from '@/services/certificateService';

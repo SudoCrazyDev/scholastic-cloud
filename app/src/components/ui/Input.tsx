@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes } from 'react';
-import { forwardRef, useState } from 'react';
+import { forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
@@ -27,7 +27,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input({
 	rightIcon,
 	...props 
 }, ref) {
-	const [isFocused, setIsFocused] = useState(false);
 	
 	return (
 		<div className="relative w-full">
@@ -53,9 +52,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input({
 						rightIcon ? 'pr-10' : '',
 						error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300',
 						className
-					)} 
-					onFocus={() => setIsFocused(true)}
-					onBlur={() => setIsFocused(false)}
+					)}
 					{...props} 
 				/>
 				{rightIcon && (

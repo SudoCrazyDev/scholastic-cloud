@@ -1,13 +1,18 @@
 import type { ButtonHTMLAttributes } from 'react';
 import { forwardRef } from 'react';
 import { motion } from 'framer-motion';
+import type { HTMLMotionProps } from 'framer-motion';
 import clsx from 'clsx';
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, keyof HTMLMotionProps<'button'> | 'onClick'> & {
 	variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 	size?: 'sm' | 'md' | 'lg';
 	loading?: boolean;
 	icon?: React.ReactNode;
+	className?: string;
+	children?: React.ReactNode;
+	disabled?: boolean;
+	onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
 const base = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95';
@@ -32,6 +37,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
 	icon,
 	children,
 	disabled,
+	onClick,
 	...props 
 }, ref) {
 	const isDisabled = disabled || loading;
@@ -43,6 +49,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
 			disabled={isDisabled}
 			whileHover={!isDisabled ? { scale: 1.02 } : {}}
 			whileTap={!isDisabled ? { scale: 0.98 } : {}}
+			onClick={onClick}
 			{...props}
 		>
 			{loading && (

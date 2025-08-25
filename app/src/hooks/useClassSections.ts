@@ -187,7 +187,6 @@ export const useClassSections = (options: UseClassSectionsOptions = {}) => {
       let classSectionId: string
       
       if (editingClassSection) {
-        const result = await updateMutation.mutateAsync({ id: editingClassSection.id, data })
         classSectionId = editingClassSection.id
       } else {
         const result = await createMutation.mutateAsync(data)
