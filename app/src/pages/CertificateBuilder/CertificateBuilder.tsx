@@ -1,13 +1,24 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { toast } from 'react-hot-toast';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useCertificate, useCreateCertificate, useUpdateCertificate } from '@/hooks/useCertificates';
+import { nanoid } from 'nanoid';
+
+// Components
 import ElementsPanel from './components/ElementsPanel';
 import PropertiesPanel from './components/PropertiesPanel';
-import { CertificateCanvas, type CanvasElement } from './components/CertificateCanvas';
+import CertificateCanvas, { type CanvasElement } from './components/CertificateCanvas';
 import LayersPanel from './components/LayersPanel';
+import CertificateToolbar from './components/CertificateToolbar';
+
+// UI Components
 import Button from '@/components/ui/Button';
-import Select from '@/components/ui/Select';
-import { createCertificate, updateCertificate, getCertificate } from '@/services/certificateService';
+import Card, { CardBody } from '@/components/ui/Card';
+import { AlertTriangle, Building2 } from 'lucide-react';
 
 const presets = {
 	a4: { portrait: { w: 794, h: 1123, pdf: 'a4' as const }, landscape: { w: 1123, h: 794, pdf: 'a4' as const } },
@@ -16,10 +27,14 @@ const presets = {
 };
 
 type Paper = keyof typeof presets;
-
 type Orientation = 'portrait' | 'landscape';
 
 export default function CertificateBuilder() {
+	const navigate = useNavigate();
+	const [searchParams] = useSearchParams();
+	const { user } = useAuth();
+	
+	// State
 	const [elements, setElements] = useState<CanvasElement[]>([]);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [showGrid, setShowGrid] = useState(true);
@@ -31,24 +46,107 @@ export default function CertificateBuilder() {
 	const [zoom, setZoom] = useState<number>(1);
 	const [bgColor, setBgColor] = useState<string>('#ffffff');
 	const [bgImage, setBgImage] = useState<string | null>(null);
-	const [certificateId, setCertificateId] = useState<number | null>(null);
 	const [title, setTitle] = useState<string>('Untitled Certificate');
+	const [isLoading, setIsLoading] = useState(false);
+	
+	// Refs
 	const canvasRef = useRef<HTMLDivElement | null>(null);
+	
+	// Get certificate ID from URL or state
+	const certificateId = searchParams.get('id') ? Number(searchParams.get('id')) : null;
+	
+	// TanStack Query hooks
+	const { data: certificate, isLoading: isLoadingCertificate } = useCertificate(certificateId);
+	const createCertificate = useCreateCertificate();
+	const updateCertificate = useUpdateCertificate();
+	
+	// Get user's default institution
+	const defaultInstitution = user?.user_institutions?.find((ui: any) => ui.is_default)?.institution;
+	const mainInstitution = user?.user_institutions?.find((ui: any) => ui.is_main)?.institution;
+	const currentInstitution = defaultInstitution || mainInstitution;
 
+	// Computed values
 	const selectedElements = useMemo(() => elements.filter(e => selectedIds.includes(e.id)), [elements, selectedIds]);
 	const canvasSize = presets[paper][orientation];
+	const canUndo = history.length > 0;
+	const canRedo = future.length > 0;
 
-	function snapshot(state: CanvasElement[]): CanvasElement[] { return state.map((e, idx) => ({ ...e, zIndex: idx })); }
-	function pushHistory(state: CanvasElement[]) { setHistory(prev => [...prev, snapshot(state)]); setFuture([]); }
-	function setElementsAndKeepOrder(next: CanvasElement[] | ((prev: CanvasElement[]) => CanvasElement[])) { setElements(prev => snapshot(typeof next === 'function' ? (next as (prev: CanvasElement[]) => CanvasElement[])(prev) : next)); }
+	// Debug: Log canvas size changes
+	useEffect(() => {
+		console.log('Canvas dimensions changed:', { paper, orientation, width: canvasSize.w, height: canvasSize.h });
+	}, [paper, orientation, canvasSize.w, canvasSize.h]);
 
-	function undo() { setHistory(prev => { if (prev.length === 0) return prev; const newHistory = prev.slice(0, -1); const last = prev[prev.length - 1]; setFuture(f => [snapshot(elements), ...f]); setElementsAndKeepOrder(last); return newHistory; }); }
-	function redo() { setFuture(prev => { if (prev.length === 0) return prev; const [next, ...rest] = prev; setHistory(h => [...h, snapshot(elements)]); setElementsAndKeepOrder(next); return rest; }); }
+	// History management
+	function snapshot(state: CanvasElement[]): CanvasElement[] { 
+		return state.map((e, idx) => ({ ...e, zIndex: idx })); 
+	}
+	
+	function pushHistory(state: CanvasElement[]) { 
+		setHistory(prev => [...prev, snapshot(state)]); 
+		setFuture([]); 
+	}
+	
+	function setElementsAndKeepOrder(next: CanvasElement[] | ((prev: CanvasElement[]) => CanvasElement[])) { 
+		setElements(prev => snapshot(typeof next === 'function' ? (next as (prev: CanvasElement[]) => CanvasElement[])(prev) : next)); 
+	}
 
-	function handleAddElement(newElement: CanvasElement) { pushHistory(elements); setElementsAndKeepOrder(prev => [...prev, { ...newElement, zIndex: prev.length } as any] as any); setSelectedIds([newElement.id]); }
-	function handleUpdateElement(updated: CanvasElement) { setElements(prev => prev.map(e => e.id === updated.id ? updated : e)); }
-	function handleDeleteSelected() { if (!selectedIds.length) return; pushHistory(elements); setElementsAndKeepOrder(prev => prev.filter(e => !selectedIds.includes(e.id))); setSelectedIds([]); }
-	function handleInteractionStart() { pushHistory(elements); }
+	function undo() { 
+		setHistory(prev => { 
+			if (prev.length === 0) return prev; 
+			const newHistory = prev.slice(0, -1); 
+			const last = prev[prev.length - 1]; 
+			setFuture(f => [snapshot(elements), ...f]); 
+			setElementsAndKeepOrder(last); 
+			return newHistory; 
+		}); 
+	}
+	
+	function redo() { 
+		setFuture(prev => { 
+			if (prev.length === 0) return prev; 
+			const [next, ...rest] = prev; 
+			setHistory(h => [...h, snapshot(elements)]); 
+			setElementsAndKeepOrder(next); 
+			return rest; 
+		}); 
+	}
+
+	// Element management
+	function handleAddElement(newElement: CanvasElement) { 
+		pushHistory(elements); 
+		setElementsAndKeepOrder(prev => [...prev, { ...newElement, zIndex: prev.length } as any] as any); 
+		setSelectedIds([newElement.id]); 
+	}
+	
+	function handleUpdateElement(updated: CanvasElement) { 
+		setElements(prev => prev.map(e => e.id === updated.id ? updated : e)); 
+	}
+	
+	function handleDeleteSelected() { 
+		if (!selectedIds.length) return; 
+		pushHistory(elements); 
+		setElementsAndKeepOrder(prev => prev.filter(e => !selectedIds.includes(e.id))); 
+		setSelectedIds([]); 
+	}
+	
+	function handleDuplicateElement(element: CanvasElement) {
+		const duplicated = {
+			...element,
+			id: nanoid(),
+			x: element.x + 20,
+			y: element.y + 20,
+			zIndex: elements.length,
+		};
+		pushHistory(elements);
+		setElementsAndKeepOrder(prev => [...prev, duplicated]);
+		setSelectedIds([duplicated.id]);
+		toast.success('Element duplicated');
+	}
+	
+	function handleInteractionStart() { 
+		pushHistory(elements); 
+	}
+	
 	function handleChangeEnd() {}
 
 	// Serialize current design
@@ -63,152 +161,275 @@ export default function CertificateBuilder() {
 		};
 	}
 
-	async function handleSave() {
-		try {
-			const currentTitle = title || prompt('Certificate title', title) || 'Untitled Certificate';
-			setTitle(currentTitle);
-			const design_json = buildDesignJson();
-			if (certificateId) {
-				const saved = await updateCertificate(certificateId, { title: currentTitle, design_json });
-				setCertificateId(saved.id);
-				alert('Certificate updated');
-			} else {
-				const saved = await createCertificate({ title: currentTitle, design_json });
-				setCertificateId(saved.id);
-				alert('Certificate saved');
-			}
-		} catch (e) {
-			alert('Failed to save certificate');
-		}
-	}
-
-	async function handleLoad() {
-		const idStr = prompt('Enter Certificate ID to load');
-		if (!idStr) return;
-		const id = Number(idStr);
-		if (Number.isNaN(id)) return alert('Invalid ID');
-		try {
-			const rec = await getCertificate(id);
-			setCertificateId(rec.id);
-			setTitle(rec.title);
-			const d = rec.design_json || {};
-			setElements(d.elements || []);
-			setSnapping(true);
-			setShowGrid(true);
-			if (d.paper) setPaper(d.paper);
-			if (d.orientation) setOrientation(d.orientation);
-			if (d.zoom) setZoom(d.zoom);
-			if (d.bgColor) setBgColor(d.bgColor);
-			setBgImage(d.bgImage || null);
-			alert('Certificate loaded');
-		} catch (e) {
-			alert('Failed to load certificate');
-		}
-	}
-
+	// Load certificate data
 	useEffect(() => {
-		const params = new URLSearchParams(window.location.search);
-		const idParam = params.get('id');
-		if (idParam) {
-			const id = Number(idParam);
-			if (!Number.isNaN(id)) {
-				getCertificate(id).then(rec => {
-					setCertificateId(rec.id);
-					setTitle(rec.title);
-					const d = rec.design_json || {};
-					setElements(d.elements || []);
-					if (d.paper) setPaper(d.paper);
-					if (d.orientation) setOrientation(d.orientation);
-					if (d.zoom) setZoom(d.zoom);
-					if (d.bgColor) setBgColor(d.bgColor);
-					setBgImage(d.bgImage || null);
-				}).catch(() => {/* ignore */});
-			}
+		if (certificate && !isLoadingCertificate) {
+			setTitle(certificate.title);
+			const design = certificate.design_json || {};
+			setElements(design.elements || []);
+			if (design.paper) setPaper(design.paper);
+			if (design.orientation) setOrientation(design.orientation);
+			if (design.zoom) setZoom(design.zoom);
+			if (design.bgColor) setBgColor(design.bgColor);
+			setBgImage(design.bgImage || null);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+	}, [certificate, isLoadingCertificate]);
 
+	// Load certificate from URL parameter
 	useEffect(() => {
-		function isTypingTarget(el: Element | null) { if (!el) return false; const tag = (el as HTMLElement).tagName.toLowerCase(); return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable; }
-		function onKey(e: KeyboardEvent) { const meta = e.ctrlKey || e.metaKey; if (meta && e.key.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? redo() : undo(); } if (meta && e.key.toLowerCase() === 'y') { e.preventDefault(); return redo(); } if ((e.key === 'Delete' || e.key === 'Backspace')) { if (isTypingTarget(document.activeElement)) return; if (selectedIds.length) { e.preventDefault(); handleDeleteSelected(); } } }
-		document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
+		if (certificateId && !certificate && !isLoadingCertificate) {
+			// Certificate not found, redirect to list
+			toast.error('Certificate not found');
+			navigate('/certificates');
+		}
+	}, [certificateId, certificate, isLoadingCertificate, navigate]);
+
+	// Keyboard shortcuts
+	useEffect(() => {
+		function isTypingTarget(el: Element | null) { 
+			if (!el) return false; 
+			const tag = (el as HTMLElement).tagName.toLowerCase(); 
+			return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable; 
+		}
+		
+		function onKey(e: KeyboardEvent) { 
+			const meta = e.ctrlKey || e.metaKey; 
+			if (meta && e.key.toLowerCase() === 'z') { 
+				e.preventDefault(); 
+				return e.shiftKey ? redo() : undo(); 
+			} 
+			if (meta && e.key.toLowerCase() === 'y') { 
+				e.preventDefault(); 
+				return redo(); 
+			} 
+			if ((e.key === 'Delete' || e.key === 'Backspace')) { 
+				if (isTypingTarget(document.activeElement)) return; 
+				if (selectedIds.length) { 
+					e.preventDefault(); 
+					handleDeleteSelected(); 
+				} 
+			} 
+		}
+		
+		document.addEventListener('keydown', onKey); 
+		return () => document.removeEventListener('keydown', onKey);
 	}, [selectedIds, elements]);
 
-	async function handleExportPdf() { if (!canvasRef.current) return; const node = canvasRef.current; const canvas = await html2canvas(node, { background: '#ffffff', scale: 2 } as any); const imgData = canvas.toDataURL('image/png'); const pdf = new jsPDF({ orientation, unit: 'pt', format: canvasSize.pdf }); const pageWidth = pdf.internal.pageSize.getWidth(); const pageHeight = pdf.internal.pageSize.getHeight(); pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST'); pdf.save('certificate.pdf'); }
+	// Export PDF
+	async function handleExportPdf() { 
+		if (!canvasRef.current) return; 
+		
+		setIsLoading(true);
+		try {
+			const node = canvasRef.current; 
+			const canvas = await html2canvas(node, { background: '#ffffff', scale: 2 } as any); 
+			const imgData = canvas.toDataURL('image/png'); 
+			const pdf = new jsPDF({ orientation, unit: 'pt', format: canvasSize.pdf }); 
+			const pageWidth = pdf.internal.pageSize.getWidth(); 
+			const pageHeight = pdf.internal.pageSize.getHeight(); 
+			pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST'); 
+			pdf.save(`${title || 'certificate'}.pdf`);
+			toast.success('PDF exported successfully');
+		} catch (error) {
+			toast.error('Failed to export PDF');
+			console.error('PDF export error:', error);
+		} finally {
+			setIsLoading(false);
+		}
+	}
 
-	function onBgImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-		const file = e.target.files?.[0];
-		if (!file) return;
-		const reader = new FileReader();
-		reader.onload = () => setBgImage(reader.result as string);
-		reader.readAsDataURL(file);
+	// Show no institution access message
+	if (!currentInstitution) {
+		return (
+			<motion.div
+				initial={{ opacity: 0, scale: 0.95 }}
+				animate={{ opacity: 1, scale: 1 }}
+				className="flex items-center justify-center h-full bg-gray-50"
+			>
+				<Card className="max-w-md mx-auto text-center">
+					<CardBody>
+						<div className="w-24 h-24 bg-gradient-to-br from-red-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-6">
+							<AlertTriangle className="w-12 h-12 text-red-600" />
+						</div>
+						<h3 className="text-xl font-semibold text-gray-900 mb-2">No Institution Access</h3>
+						<p className="text-gray-600 mb-8">
+							You don't have access to any institution. Please contact your administrator to set up your institution access.
+						</p>
+						<Button onClick={() => navigate('/dashboard')} variant="primary">
+							Go to Dashboard
+						</Button>
+					</CardBody>
+				</Card>
+			</motion.div>
+		);
+	}
+
+	// Loading state
+	if (isLoadingCertificate) {
+		return (
+			<motion.div
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				className="flex items-center justify-center h-full"
+			>
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+					<p className="text-gray-600">Loading certificate...</p>
+				</div>
+			</motion.div>
+		);
 	}
 
 	return (
-		<div className="flex h-full w-full overflow-hidden">
-			<div className="w-64 border-r bg-white overflow-auto">
+		<motion.div
+			initial={{ opacity: 0 }}
+			animate={{ opacity: 1 }}
+			className="flex h-full w-full overflow-hidden bg-gray-50"
+		>
+			{/* Left Sidebar - Elements Only */}
+			<motion.div
+				initial={{ x: -300 }}
+				animate={{ x: 0 }}
+				transition={{ type: "spring", stiffness: 300, damping: 30 }}
+				className="w-64 bg-white border-r border-gray-200"
+			>
 				<ElementsPanel onAddElement={handleAddElement} />
-				<div className="border-t" />
-				<LayersPanel elements={elements} selectedIds={selectedIds} onSelect={setSelectedIds} onToggleHide={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, hidden: !e.hidden } : e))} onToggleLock={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, locked: !e.locked } : e))} onReorder={(id, dir) => setElements(prev => { const list = [...prev]; const i = list.findIndex(e => e.id === id); if (i === -1) return prev; const t = dir === 'up' ? i + 1 : i - 1; if (t < 0 || t >= list.length) return prev; [list[i], list[t]] = [list[t], list[i]]; return snapshot(list); })} onDelete={(id) => { setSelectedIds(ids => ids.filter(x => x !== id)); setElements(prev => prev.filter(e => e.id !== id)); }} />
-			</div>
+			</motion.div>
 
-			<div className="flex-1 flex flex-col bg-gray-50">
-				<div className="p-3 border-b bg-white">
-					<div className="flex items-center gap-2">
-						<Button onClick={handleExportPdf}>Export PDF</Button>
-						<Button variant="secondary" onClick={handleSave}>Save</Button>
-						<Button variant="secondary" onClick={handleLoad}>Load</Button>
-						<div className="flex-1" />
-						<Button variant="secondary" onClick={undo} disabled={history.length === 0}>Undo</Button>
-						<Button variant="secondary" onClick={redo} disabled={future.length === 0}>Redo</Button>
-					</div>
-					<div className="mt-3 flex flex-wrap items-center gap-3">
-						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={snapping} onChange={(e) => setSnapping(e.target.checked)} /> <span>Snapping</span></label>
-						<label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> <span>Grid</span></label>
-						<div className="h-6 w-px bg-gray-200 mx-1" />
-						<div className="flex items-center gap-2">
-							<span className="text-sm text-gray-700">Paper</span>
-							<Select value={paper} onChange={(e) => setPaper(e.target.value as Paper)}>
-								<option value="a4">A4</option>
-								<option value="letter">Letter</option>
-								<option value="legal">Legal</option>
-							</Select>
-						</div>
-						<div className="flex items-center gap-2">
-							<span className="text-sm text-gray-700">Orientation</span>
-							<Select value={orientation} onChange={(e) => setOrientation(e.target.value as Orientation)}>
-								<option value="portrait">Portrait</option>
-								<option value="landscape">Landscape</option>
-							</Select>
-						</div>
-						<div className="flex items-center gap-2">
-							<span className="text-sm text-gray-700">Zoom</span>
-							<Select value={String(zoom)} onChange={(e) => setZoom(Number(e.target.value))}>
-								{[0.25,0.5,0.75,1,1.25,1.5].map(z => <option key={z} value={z}>{Math.round(z*100)}%</option>)}
-							</Select>
-						</div>
-						<div className="flex items-center gap-2">
-							<span className="text-sm text-gray-700">Background</span>
-							<input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="h-10 w-10 p-0 border rounded" />
-							<input type="file" accept="image/*" onChange={onBgImageChange} title="Background image" />
-							{bgImage && (
-								<Button variant="secondary" size="sm" onClick={() => setBgImage(null)} title="Remove background image">Remove</Button>
-							)}
-						</div>
-					</div>
-				</div>
+			{/* Main Content */}
+			<div className="flex-1 flex flex-col">
+				{/* Toolbar */}
+				<CertificateToolbar
+					paper={paper}
+					orientation={orientation}
+					zoom={zoom}
+					bgColor={bgColor}
+					bgImage={bgImage}
+					title={title}
+					certificateId={certificateId}
+					onPaperChange={(paper: string) => setPaper(paper as Paper)}
+					onOrientationChange={setOrientation}
+					onZoomChange={setZoom}
+					onBgColorChange={setBgColor}
+					onBgImageChange={setBgImage}
+					onTitleChange={setTitle}
+					onExportPdf={handleExportPdf}
+					onUndo={undo}
+					onRedo={redo}
+					onToggleGrid={() => setShowGrid(!showGrid)}
+					onToggleSnapping={() => setSnapping(!snapping)}
+					showGrid={showGrid}
+					snapping={snapping}
+					canUndo={canUndo}
+					canRedo={canRedo}
+					designData={buildDesignJson()}
+				/>
+
+				{/* Canvas Area */}
 				<div className="flex-1 overflow-auto p-6">
-					<div className="mx-auto shadow relative rounded" style={{ width: canvasSize.w * zoom, height: canvasSize.h * zoom }}>
-						<div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: canvasSize.w, height: canvasSize.h, backgroundColor: bgColor, backgroundImage: bgImage ? `url(${bgImage})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }} ref={canvasRef}>
-							<CertificateCanvas width={canvasSize.w} height={canvasSize.h} scale={zoom} elements={elements} selectedElementIds={selectedIds} onSelect={setSelectedIds} onChange={handleUpdateElement} onInteractionStart={handleInteractionStart} onChangeEnd={handleChangeEnd} showGrid={showGrid} snappingEnabled={snapping} />
+					<div 
+						className="mx-auto shadow-2xl relative rounded-lg"
+						style={{
+							width: canvasSize.w,
+							height: canvasSize.h,
+							backgroundColor: '#f8fafc', // Light gray background for working area
+							zIndex: 1
+						}}
+					>
+						<div 
+							key={`canvas-${canvasSize.w}-${canvasSize.h}`}
+							style={{ 
+								transform: `scale(${zoom})`, 
+								transformOrigin: 'top left', 
+								width: canvasSize.w, 
+								height: canvasSize.h, 
+								backgroundColor: bgColor, 
+								backgroundImage: bgImage ? `url(${bgImage})` : undefined, 
+								backgroundSize: 'cover', 
+								backgroundPosition: 'center',
+								position: 'absolute',
+								top: 0,
+								left: 0,
+								zIndex: 3
+							}} 
+							ref={canvasRef}
+						>
+							<CertificateCanvas 
+								width={canvasSize.w} 
+								height={canvasSize.h} 
+								scale={zoom} 
+								elements={elements} 
+								selectedElementIds={selectedIds} 
+								onSelect={setSelectedIds} 
+								onChange={handleUpdateElement} 
+								onInteractionStart={handleInteractionStart} 
+								onChangeEnd={handleChangeEnd} 
+								showGrid={showGrid} 
+								snappingEnabled={snapping} 
+								key={`${canvasSize.w}-${canvasSize.h}`}
+							/>
 						</div>
 					</div>
 				</div>
+
+				{/* Institution Info */}
+				<motion.div
+					initial={{ opacity: 0, y: 20 }}
+					animate={{ opacity: 1, y: 0 }}
+					className="px-6 py-3 bg-white border-t border-gray-200"
+				>
+					<div className="flex items-center gap-2 text-sm text-gray-600">
+						<Building2 className="w-4 h-4 text-gray-400" />
+						<span>Creating certificate for: <strong className="text-gray-900">{currentInstitution.name}</strong></span>
+					</div>
+				</motion.div>
 			</div>
 
-			<div className="w-72 border-l bg-white">
-				<PropertiesPanel element={selectedElements[0] || null} onChange={(el) => { pushHistory(elements); handleUpdateElement(el); }} />
-			</div>
-		</div>
+			{/* Right Sidebar - Properties & Layers */}
+			<motion.div
+				initial={{ x: 300 }}
+				animate={{ x: 0 }}
+				transition={{ type: "spring", stiffness: 300, damping: 30 }}
+				className="w-80 border-l border-gray-200 bg-white flex flex-col"
+			>
+				{/* Properties Panel */}
+				<div className="flex-1 overflow-hidden">
+					<PropertiesPanel 
+						element={selectedElements[0] || null} 
+						onChange={(el) => { 
+							pushHistory(elements); 
+							handleUpdateElement(el); 
+						}} 
+						onDelete={handleDeleteSelected}
+						onDuplicate={handleDuplicateElement}
+					/>
+				</div>
+				
+				{/* Divider */}
+				<div className="border-t border-gray-200" />
+				
+				{/* Layers Panel */}
+				<div className="flex-1 overflow-hidden">
+					<LayersPanel 
+						elements={elements} 
+						selectedIds={selectedIds} 
+						onSelect={setSelectedIds} 
+						onToggleHide={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, hidden: !e.hidden } : e))} 
+						onToggleLock={(id) => setElements(prev => prev.map(e => e.id === id ? { ...e, locked: !e.locked } : e))} 
+						onReorder={(id, dir) => setElements(prev => { 
+							const list = [...prev]; 
+							const i = list.findIndex(e => e.id === id); 
+							if (i === -1) return prev; 
+							const t = dir === 'up' ? i + 1 : i - 1; 
+							if (t < 0 || t >= list.length) return prev; 
+							[list[i], list[t]] = [list[t], list[i]]; 
+							return snapshot(list); 
+						})} 
+						onDelete={handleDeleteSelected} 
+						onDuplicate={handleDuplicateElement}
+					/>
+				</div>
+			</motion.div>
+		</motion.div>
 	);
 }

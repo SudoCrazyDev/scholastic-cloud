@@ -1,299 +1,589 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+	Move, 
+	RotateCw
+} from 'lucide-react';
 
-export type ElementType = 'text' | 'image' | 'shape';
-
-export type CanvasElement = {
+export interface CanvasElement {
 	id: string;
-	type: ElementType;
-	name?: string;
+	type: string;
 	x: number;
 	y: number;
 	width: number;
 	height: number;
-	rotation: number; // degrees
-	zIndex?: number;
-	locked?: boolean;
-	hidden?: boolean;
-	// text
-	text?: string;
-	fontFamily?: string;
+	rotation: number;
+	opacity: number;
+	hidden: boolean;
+	locked: boolean;
+	zIndex: number;
+	
+	// Text properties
+	content?: string;
 	fontSize?: number;
-	fontWeight?: number;
+	fontFamily?: string;
+	fontWeight?: string;
+	fontStyle?: string;
 	color?: string;
-	textAlign?: 'left' | 'center' | 'right';
-	letterSpacing?: number; // px
-	textDecoration?: 'none' | 'underline' | 'line-through' | 'overline';
-	// image
+	textAlign?: string;
+	
+	// Image properties
 	src?: string;
-	// shape
-	shape?: 'rect' | 'ellipse';
+	alt?: string;
+	objectFit?: string;
+	
+	// Shape properties
 	fill?: string;
 	stroke?: string;
 	strokeWidth?: number;
-};
+	cornerRadius?: number;
+	points?: number;
+}
 
-type GuideLine = { orientation: 'v' | 'h'; pos: number };
+interface CertificateCanvasProps {
+	width: number;
+	height: number;
+	scale: number;
+	elements: CanvasElement[];
+	selectedElementIds: string[];
+	onSelect: (ids: string[]) => void;
+	onChange: (element: CanvasElement) => void;
+	onInteractionStart: () => void;
+	onChangeEnd: () => void;
+	showGrid: boolean;
+	snappingEnabled: boolean;
+}
 
-export function CertificateCanvas({
+const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 	width,
 	height,
-	scale = 1,
+	scale,
 	elements,
 	selectedElementIds,
 	onSelect,
 	onChange,
 	onInteractionStart,
 	onChangeEnd,
-	showGrid = true,
-	snappingEnabled = true,
-	snapThreshold = 8,
-}:{
-	width: number;
-	height: number;
-	scale?: number;
-	elements: CanvasElement[];
-	selectedElementIds: string[];
-	onSelect: (ids: string[]) => void;
-	onChange: (el: CanvasElement) => void;
-	onInteractionStart?: () => void;
-	onChangeEnd?: () => void;
-	showGrid?: boolean;
-	snappingEnabled?: boolean;
-	snapThreshold?: number;
-}) {
-	const containerRef = useRef<HTMLDivElement | null>(null);
-	const [guides, setGuides] = useState<GuideLine[]>([]);
+	showGrid,
+	snappingEnabled
+}) => {
+	const canvasRef = useRef<HTMLDivElement>(null);
+	const [draggedElement, setDraggedElement] = useState<string | null>(null);
+	const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+	const [rotateHandle, setRotateHandle] = useState<string | null>(null);
+	const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+	const [snapGrid] = useState(20);
 
-	useEffect(() => {
-		function handleDeselect(e: MouseEvent) {
-			if (!containerRef.current) return;
-			if (!(e.target instanceof Node)) return;
-			const target = e.target as HTMLElement;
-			if (!containerRef.current.contains(target)) return;
-			if (target.closest('[data-el-id]')) return;
-			onSelect([]);
+	const getSnapPosition = (value: number) => {
+		if (!snappingEnabled) return value;
+		return Math.round(value / snapGrid) * snapGrid;
+	};
+
+	const handleMouseDown = (e: React.MouseEvent, elementId: string, action: 'move' | 'resize' | 'rotate') => {
+		e.preventDefault();
+		e.stopPropagation();
+		
+		console.log('Mouse down event:', { action, elementId, clientX: e.clientX, clientY: e.clientY });
+		
+		const rect = canvasRef.current?.getBoundingClientRect();
+		if (!rect) return;
+		
+		const x = (e.clientX - rect.left) / scale;
+		const y = (e.clientY - rect.top) / scale;
+		
+		setDragStart({ x, y });
+		
+		switch (action) {
+			case 'move':
+				setDraggedElement(elementId);
+				console.log('Setting dragged element:', elementId);
+				break;
+			case 'resize':
+				setResizeHandle(elementId);
+				console.log('Setting resize handle:', elementId);
+				break;
+			case 'rotate':
+				setRotateHandle(elementId);
+				console.log('Setting rotate handle:', elementId);
+				break;
 		}
-		document.addEventListener('mousedown', handleDeselect);
-		return () => document.removeEventListener('mousedown', handleDeselect);
-	}, [onSelect]);
+		
+		onInteractionStart();
+	};
 
-	const interactableElements = elements
-		.filter(el => !el.hidden)
-		.sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
-
-	const collectSnapLines = useCallback((currentId: string) => {
-		const verticals: number[] = [0, width / 2, width];
-		const horizontals: number[] = [0, height / 2, height];
-		for (const el of interactableElements) {
-			if (el.id === currentId) continue;
-			verticals.push(el.x, el.x + el.width / 2, el.x + el.width);
-			horizontals.push(el.y, el.y + el.height / 2, el.y + el.height);
+	const handleMouseMove = (e: React.MouseEvent) => {
+		if (!draggedElement && !resizeHandle && !rotateHandle) return;
+		
+		const rect = canvasRef.current?.getBoundingClientRect();
+		if (!rect) return;
+		
+		const x = (e.clientX - rect.left) / scale;
+		const y = (e.clientY - rect.top) / scale;
+		
+		const deltaX = x - dragStart.x;
+		const deltaY = y - dragStart.y;
+		
+		// Add movement threshold to prevent jittery movement
+		const movementThreshold = 5;
+		if (Math.abs(deltaX) < movementThreshold && Math.abs(deltaY) < movementThreshold) {
+			return;
 		}
-		return { verticals, horizontals };
-	}, [interactableElements, width, height]);
-
-	function applySnap(x: number, y: number, w: number, h: number, id: string) {
-		if (!snappingEnabled) return { x, y, guides: [] as GuideLine[] };
-		const { verticals, horizontals } = collectSnapLines(id);
-		const g: GuideLine[] = [];
-		let snappedX = x;
-		let snappedY = y;
-		const candidatesX = [x, x + w / 2, x + w];
-		for (let i = 0; i < candidatesX.length; i++) {
-			for (const v of verticals) {
-				if (Math.abs(candidatesX[i] - v) <= snapThreshold) {
-					const delta = v - candidatesX[i];
-					snappedX = x + delta;
-					g.push({ orientation: 'v', pos: v });
-				}
+		
+		if (draggedElement) {
+			const element = elements.find(el => el.id === draggedElement);
+			if (element && !element.locked) {
+				// No dampening - direct 1:1 movement for natural feel
+				const newX = getSnapPosition(element.x + deltaX);
+				const newY = getSnapPosition(element.y + deltaY);
+				console.log('Moving element:', { oldX: element.x, oldY: element.y, newX, newY });
+				onChange({ ...element, x: newX, y: newY });
+				
+				// Update dragStart to current position for next frame
+				setDragStart({ x, y });
 			}
 		}
-		const candidatesY = [y, y + h / 2, y + h];
-		for (let i = 0; i < candidatesY.length; i++) {
-			for (const hLine of horizontals) {
-				if (Math.abs(candidatesY[i] - hLine) <= snapThreshold) {
-					const delta = hLine - candidatesY[i];
-					snappedY = y + delta;
-					g.push({ orientation: 'h', pos: hLine });
-				}
+		
+		if (resizeHandle) {
+			const element = elements.find(el => el.id === resizeHandle);
+			if (element && !element.locked) {
+				// No dampening - direct 1:1 resizing for natural feel
+				const newWidth = Math.max(20, getSnapPosition(element.width + deltaX));
+				const newHeight = Math.max(20, getSnapPosition(element.height + deltaY));
+				console.log('Resizing element:', { oldWidth: element.width, oldHeight: element.height, newWidth, newHeight });
+				onChange({ ...element, width: newWidth, height: newHeight });
+				
+				// Update dragStart to current position for next frame
+				setDragStart({ x, y });
 			}
 		}
-		return { x: snappedX, y: snappedY, guides: g };
-	}
+		
+		if (rotateHandle) {
+			const element = elements.find(el => el.id === rotateHandle);
+			if (element && !element.locked) {
+				const centerX = element.x + element.width / 2;
+				const centerY = element.y + element.height / 2;
+				const angle = Math.atan2(y - centerY, x - centerX) * (180 / Math.PI);
+				onChange({ ...element, rotation: angle });
+			}
+		}
+	};
 
-	const startDrag = useCallback((event: React.MouseEvent, el: CanvasElement) => {
-		event.stopPropagation();
-		if (el.locked) return;
-		if (event.shiftKey || event.metaKey || event.ctrlKey) {
-			const set = new Set(selectedElementIds);
-			if (set.has(el.id)) set.delete(el.id); else set.add(el.id);
-			onSelect(Array.from(set));
+	const handleMouseUp = () => {
+		setDraggedElement(null);
+		setResizeHandle(null);
+		setRotateHandle(null);
+		onChangeEnd();
+	};
+
+	const handleElementClick = (e: React.MouseEvent, elementId: string) => {
+		e.stopPropagation();
+		
+		if (e.shiftKey) {
+			// Multi-select
+			if (selectedElementIds.includes(elementId)) {
+				onSelect(selectedElementIds.filter(id => id !== elementId));
+			} else {
+				onSelect([...selectedElementIds, elementId]);
+			}
 		} else {
-			onSelect([el.id]);
+			// Single select
+			onSelect([elementId]);
 		}
-		onInteractionStart && onInteractionStart();
-		const startX = event.clientX;
-		const startY = event.clientY;
-		const origin = interactableElements.find(e => e.id === el.id)!;
-		const originX = origin.x;
-		const originY = origin.y;
+	};
 
-		function onMove(e: MouseEvent) {
-			const dx = (e.clientX - startX) / scale;
-			const dy = (e.clientY - startY) / scale;
-			const nextX = originX + dx;
-			const nextY = originY + dy;
-			const { x: sx, y: sy, guides: g } = applySnap(nextX, nextY, el.width, el.height, el.id);
-			setGuides(g);
-			onChange({ ...el, x: sx, y: sy });
-		}
-		function onUp() {
-			setGuides([]);
-			document.removeEventListener('mousemove', onMove);
-			document.removeEventListener('mouseup', onUp);
-			onChangeEnd && onChangeEnd();
-		}
-		document.addEventListener('mousemove', onMove);
-		document.addEventListener('mouseup', onUp);
-	}, [onChange, onSelect, onInteractionStart, onChangeEnd, selectedElementIds, scale, interactableElements]);
+	const handleCanvasClick = () => {
+		onSelect([]);
+	};
 
-	const startResize = useCallback((event: React.MouseEvent, el: CanvasElement, handle: 'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w') => {
-		event.stopPropagation();
-		if (el.locked) return;
-		onInteractionStart && onInteractionStart();
-		const startX = event.clientX;
-		const startY = event.clientY;
-		const start = { x: el.x, y: el.y, w: el.width, h: el.height };
-
-		function onMove(e: MouseEvent) {
-			const dx = (e.clientX - startX) / scale;
-			const dy = (e.clientY - startY) / scale;
-			let x = start.x;
-			let y = start.y;
-			let w = start.w;
-			let h = start.h;
-			if (handle.includes('e')) w = Math.max(10, start.w + dx);
-			if (handle.includes('s')) h = Math.max(10, start.h + dy);
-			if (handle.includes('w')) { w = Math.max(10, start.w - dx); x = start.x + dx; }
-			if (handle.includes('n')) { h = Math.max(10, start.h - dy); y = start.y + dy; }
-			const { x: sx, y: sy, guides: g } = applySnap(x, y, w, h, el.id);
-			setGuides(g);
-			onChange({ ...el, x: sx, y: sy, width: w, height: h });
-		}
-		function onUp() {
-			setGuides([]);
-			document.removeEventListener('mousemove', onMove);
-			document.removeEventListener('mouseup', onUp);
-			onChangeEnd && onChangeEnd();
-		}
-		document.addEventListener('mousemove', onMove);
-		document.addEventListener('mouseup', onUp);
-	}, [onChange, onChangeEnd, onInteractionStart, scale]);
-
-	const startRotate = useCallback((event: React.MouseEvent, el: CanvasElement) => {
-		event.stopPropagation();
-		if (el.locked) return;
-		onInteractionStart && onInteractionStart();
-		const centerX = (el.x + el.width / 2);
-		const centerY = (el.y + el.height / 2);
-		function onMove(e: MouseEvent) {
-			const dx = (e.clientX - (containerRef.current?.getBoundingClientRect().left || 0)) / scale - centerX;
-			const dy = (e.clientY - (containerRef.current?.getBoundingClientRect().top || 0)) / scale - centerY;
-			const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-			onChange({ ...el, rotation: angle });
-		}
-		function onUp() {
-			document.removeEventListener('mousemove', onMove);
-			document.removeEventListener('mouseup', onUp);
-			onChangeEnd && onChangeEnd();
-		}
-		document.addEventListener('mousemove', onMove);
-		document.addEventListener('mouseup', onUp);
-	}, [onChange, onChangeEnd, onInteractionStart, scale]);
-
-	const gridBackground = showGrid
-		? {
-			backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px)`,
-			backgroundSize: '20px 20px',
-		}
-		: {} as React.CSSProperties;
-
-	return (
-		<div ref={containerRef} className="absolute" style={{ width, height, ...gridBackground }}>
-			{guides.map((g, idx) => (
-				<div key={idx} className="absolute bg-indigo-500" style={g.orientation === 'v' ? { left: g.pos, top: 0, bottom: 0, width: 1 } : { top: g.pos, left: 0, right: 0, height: 1 }} />
-			))}
-			{interactableElements.map(el => {
-				const isSelected = selectedElementIds.includes(el.id);
-				return (
+	const renderElement = (element: CanvasElement) => {
+		if (element.hidden) return null;
+		
+		const isSelected = selectedElementIds.includes(element.id);
+		const isDragging = draggedElement === element.id;
+		const isResizing = resizeHandle === element.id;
+		const isRotating = rotateHandle === element.id;
+		
+		const elementStyle = {
+			position: 'absolute' as const,
+			left: 0, // Position relative to wrapper, not canvas
+			top: 0,  // Position relative to wrapper, not canvas
+			width: element.width,
+			height: element.height,
+			minWidth: element.width,
+			minHeight: element.height,
+			transform: `rotate(${element.rotation || 0}deg)`,
+			opacity: element.opacity || 1,
+			zIndex: element.zIndex,
+			cursor: element.locked ? 'not-allowed' : (isDragging ? 'grabbing' : 'grab'),
+			boxSizing: 'border-box' as const,
+			// Add visual feedback when dragging
+			...(isDragging && {
+				opacity: 0.8,
+				boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+				transform: `rotate(${element.rotation || 0}deg) scale(1.02)`,
+			}),
+		};
+		
+		let elementContent: React.ReactNode;
+		
+		switch (element.type) {
+			case 'text':
+				elementContent = (
 					<div
-						key={el.id}
-						data-el-id={el.id}
-						className="absolute"
 						style={{
-							left: el.x,
-							top: el.y,
-							width: el.width,
-							height: el.height,
-							transform: `rotate(${el.rotation}deg)`,
-							transformOrigin: 'center',
-							cursor: el.locked ? 'not-allowed' : 'move',
+							...elementStyle,
+							fontFamily: element.fontFamily || 'Arial',
+							fontSize: element.fontSize || 16,
+							fontWeight: element.fontWeight || 'normal',
+							color: element.color || '#000000',
+							textAlign: (element.textAlign as 'left' | 'center' | 'right' | 'justify') || 'left',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: element.textAlign === 'center' ? 'center' : 'flex-start',
+							padding: '4px',
+							userSelect: 'none',
 						}}
-						onMouseDown={(e) => startDrag(e, el)}
 					>
-						{el.type === 'text' && (
-							<div
-								style={{
-									fontFamily: el.fontFamily || 'serif',
-									fontSize: el.fontSize || 24,
-									fontWeight: el.fontWeight || 400,
-									color: el.color || '#111827',
-									width: '100%',
-									height: '100%',
-									whiteSpace: 'pre-wrap',
-									textAlign: el.textAlign || 'left',
-									letterSpacing: el.letterSpacing !== undefined ? `${el.letterSpacing}px` : undefined,
-									textDecoration: el.textDecoration || 'none',
-								}}
-							>
-								{el.text}
-							</div>
-						)}
-						{el.type === 'image' && el.src && (
-							<img src={el.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
-						)}
-						{el.type === 'shape' && el.shape === 'rect' && (
-							<div style={{ width: '100%', height: '100%', background: el.fill || '#e5e7eb', border: `${el.strokeWidth || 0}px solid ${el.stroke || 'transparent'}` }} />
-						)}
-						{el.type === 'shape' && el.shape === 'ellipse' && (
-							<div style={{ width: '100%', height: '100%', background: el.fill || '#e5e7eb', borderRadius: '9999px', border: `${el.strokeWidth || 0}px solid ${el.stroke || 'transparent'}` }} />
-						)}
-
-						{isSelected && (
-							<>
-								<div className="absolute inset-0 border-2 border-sky-500 pointer-events-none" />
-								{selectedElementIds.length === 1 && (
-									<>
-										{/* 8 Resize handles */}
-										<div className="absolute -left-2 -top-2 w-3 h-3 bg-sky-500 cursor-nw-resize" onMouseDown={(e) => startResize(e, el, 'nw')} />
-										<div className="absolute left-1/2 -ml-1.5 -top-2 w-3 h-3 bg-sky-500 cursor-n-resize" onMouseDown={(e) => startResize(e, el, 'n')} />
-										<div className="absolute -right-2 -top-2 w-3 h-3 bg-sky-500 cursor-ne-resize" onMouseDown={(e) => startResize(e, el, 'ne')} />
-										<div className="absolute -right-2 top-1/2 -mt-1.5 w-3 h-3 bg-sky-500 cursor-e-resize" onMouseDown={(e) => startResize(e, el, 'e')} />
-										<div className="absolute -right-2 -bottom-2 w-3 h-3 bg-sky-500 cursor-se-resize" onMouseDown={(e) => startResize(e, el, 'se')} />
-										<div className="absolute left-1/2 -ml-1.5 -bottom-2 w-3 h-3 bg-sky-500 cursor-s-resize" onMouseDown={(e) => startResize(e, el, 's')} />
-										<div className="absolute -left-2 -bottom-2 w-3 h-3 bg-sky-500 cursor-sw-resize" onMouseDown={(e) => startResize(e, el, 'sw')} />
-										<div className="absolute -left-2 top-1/2 -mt-1.5 w-3 h-3 bg-sky-500 cursor-w-resize" onMouseDown={(e) => startResize(e, el, 'w')} />
-										{/* Rotation handle with icon */}
-										<div className="absolute left-1/2 -ml-3 -top-10 w-6 h-6 rounded-full bg-white border border-sky-500 text-sky-600 flex items-center justify-center cursor-crosshair shadow" onMouseDown={(e) => startRotate(e, el)} title="Rotate">
-											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 6V2l-4 4 4 4V6zm5.657 1.757a6 6 0 10.001 8.486l1.414 1.414a8 8 0 11-.001-11.314l-1.414 1.414z"/></svg>
-										</div>
-									</>
-								)}
-							</>
-						)}
+						{element.content || 'Sample Text'}
 					</div>
 				);
-			})}
+				break;
+				
+			case 'paragraph':
+				elementContent = (
+					<div
+						style={{
+							...elementStyle,
+							fontFamily: element.fontFamily || 'Arial',
+							fontSize: element.fontSize || 14,
+							fontWeight: element.fontWeight || 'normal',
+							color: element.color || '#000000',
+							textAlign: (element.textAlign as 'left' | 'center' | 'right' | 'justify') || 'left',
+							lineHeight: '1.4',
+							padding: '8px',
+							userSelect: 'none',
+							wordWrap: 'break-word',
+							overflowWrap: 'break-word',
+						}}
+					>
+						{element.content || 'This is a sample paragraph with rich text content. You can edit this text with formatting options.'}
+					</div>
+				);
+				break;
+				
+			case 'image':
+				elementContent = (
+					<img
+						src={element.src || 'https://via.placeholder.com/200x100'}
+						alt={element.alt || ''}
+						style={{
+							...elementStyle,
+							objectFit: (element.objectFit as 'cover' | 'contain' | 'fill' | 'none' | 'scale-down') || 'cover',
+							userSelect: 'none',
+						}}
+					/>
+				);
+				break;
+				
+			case 'rectangle':
+				elementContent = (
+					<div
+						style={{
+							...elementStyle,
+							backgroundColor: element.fill || '#3B82F6',
+							border: `${element.strokeWidth || 0}px solid ${element.stroke || 'transparent'}`,
+							borderRadius: element.cornerRadius || 0,
+							userSelect: 'none',
+						}}
+					/>
+				);
+				break;
+				
+			case 'circle':
+				elementContent = (
+					<div
+						style={{
+							...elementStyle,
+							backgroundColor: element.fill || '#10B981',
+							border: `${element.strokeWidth || 0}px solid ${element.stroke || 'transparent'}`,
+							borderRadius: '50%',
+							userSelect: 'none',
+						}}
+					/>
+				);
+				break;
+				
+			default:
+				elementContent = (
+					<div
+						style={{
+							...elementStyle,
+							backgroundColor: element.fill || '#6B7280',
+							border: `${element.strokeWidth || 0}px solid ${element.stroke || 'transparent'}`,
+							userSelect: 'none',
+						}}
+					/>
+				);
+		}
+		
+		return (
+			<motion.div
+				key={element.id}
+				layout
+				initial={{ opacity: 0, scale: 0.8 }}
+				animate={{ 
+					opacity: 1, 
+					scale: 1,
+				}}
+				exit={{ opacity: 0, scale: 0.8 }}
+				transition={{ duration: 0.2 }}
+				className={`
+					relative group
+					${isDragging ? 'z-50' : ''}
+					${isResizing ? 'z-50' : ''}
+					${isRotating ? 'z-50' : ''}
+				`}
+				onClick={(e) => handleElementClick(e, element.id)}
+				onMouseDown={(e) => handleMouseDown(e, element.id, 'move')}
+				style={{
+					position: 'absolute',
+					left: element.x,
+					top: element.y,
+					width: element.width,
+					height: element.height,
+				}}
+			>
+				{/* Selection border - positioned absolutely on canvas */}
+				{isSelected && !element.locked && (
+					<motion.div
+						initial={{ opacity: 0, scale: 0.95 }}
+						animate={{ opacity: 1, scale: 1 }}
+						transition={{ duration: 0.15 }}
+						style={{
+							position: 'absolute',
+							top: -4,
+							left: -4,
+							width: `calc(100% + 8px)`,
+							height: `calc(100% + 8px)`,
+							border: '2px solid #3b82f6',
+							pointerEvents: 'none',
+							zIndex: 10,
+							backgroundColor: 'rgba(59, 130, 246, 0.1)',
+						}}
+					/>
+				)}
+				
+				{/* Element content */}
+				{React.cloneElement(elementContent as React.ReactElement, {
+					onMouseDown: (e: React.MouseEvent) => {
+						e.preventDefault();
+						e.stopPropagation();
+						handleMouseDown(e, element.id, 'move');
+					}
+				} as any)}
+				
+				{/* Selection handles */}
+				{isSelected && !element.locked && (
+					<>
+						{/* Corner resize handles */}
+						{/* Top-left */}
+						<div
+							className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-nw-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								handleMouseDown(e, element.id, 'resize');
+							}}
+							title="Resize"
+						/>
+						
+						{/* Top-right */}
+						<div
+							className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-ne-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								handleMouseDown(e, element.id, 'resize');
+							}}
+							title="Resize"
+						/>
+						
+						{/* Bottom-left */}
+						<div
+							className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-sw-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								handleMouseDown(e, element.id, 'resize');
+							}}
+							title="Resize"
+						/>
+						
+						{/* Bottom-right */}
+						<div
+							className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-se-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								handleMouseDown(e, element.id, 'resize');
+							}}
+							title="Resize"
+						/>
+						
+						{/* Rotate handle */}
+						<div
+							className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-grab hover:bg-blue-600 hover:scale-110 transition-all duration-150"
+							onMouseDown={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								handleMouseDown(e, element.id, 'rotate');
+							}}
+							title="Rotate"
+						>
+							<RotateCw className="w-2.5 h-2.5 text-white" />
+						</div>
+						
+						{/* Move indicator */}
+						<div className="absolute -top-3 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-blue-500 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity">
+							<Move className="w-3 h-3 inline mr-1" />
+							Move
+						</div>
+					</>
+				)}
+			</motion.div>
+		);
+	};
+
+	// Global mouse event handlers
+	useEffect(() => {
+		const handleGlobalMouseMove = (e: MouseEvent) => {
+			if (!draggedElement && !resizeHandle && !rotateHandle) return;
+			
+			console.log('Global mouse move:', { draggedElement, resizeHandle, rotateHandle, clientX: e.clientX, clientY: e.clientY });
+			
+			const rect = canvasRef.current?.getBoundingClientRect();
+			if (!rect) return;
+			
+			const x = (e.clientX - rect.left) / scale;
+			const y = (e.clientY - rect.top) / scale;
+			
+			const deltaX = x - dragStart.x;
+			const deltaY = y - dragStart.y;
+			
+			console.log('Mouse move deltas:', { deltaX, deltaY, threshold: 5 });
+			
+			// Add movement threshold to prevent jittery movement
+			const movementThreshold = 5;
+			if (Math.abs(deltaX) < movementThreshold && Math.abs(deltaY) < movementThreshold) {
+				console.log('Movement below threshold, skipping');
+				return;
+			}
+			
+			if (draggedElement) {
+				const element = elements.find(el => el.id === draggedElement);
+				if (element && !element.locked) {
+					// No dampening - direct 1:1 movement for natural feel
+					const newX = getSnapPosition(element.x + deltaX);
+					const newY = getSnapPosition(element.y + deltaY);
+					console.log('Moving element:', { oldX: element.x, oldY: element.y, newX, newY });
+					onChange({ ...element, x: newX, y: newY });
+					
+					// Update dragStart to current position for next frame
+					setDragStart({ x, y });
+				}
+			}
+			
+			if (resizeHandle) {
+				const element = elements.find(el => el.id === resizeHandle);
+				if (element && !element.locked) {
+					// No dampening - direct 1:1 resizing for natural feel
+					const newWidth = Math.max(20, getSnapPosition(element.width + deltaX));
+					const newHeight = Math.max(20, getSnapPosition(element.height + deltaY));
+					console.log('Resizing element:', { oldWidth: element.width, oldHeight: element.height, newWidth, newHeight });
+					onChange({ ...element, width: newWidth, height: newHeight });
+					
+					// Update dragStart to current position for next frame
+					setDragStart({ x, y });
+				}
+			}
+			
+			if (rotateHandle) {
+				const element = elements.find(el => el.id === rotateHandle);
+				if (element && !element.locked) {
+					const centerX = element.x + element.width / 2;
+					const centerY = element.y + element.height / 2;
+					const angle = Math.atan2(y - centerY, x - centerX) * (180 / Math.PI);
+					console.log('Rotating element:', { oldRotation: element.rotation, newRotation: angle });
+					onChange({ ...element, rotation: angle });
+				}
+			}
+		};
+		
+		const handleGlobalMouseUp = () => {
+			setDraggedElement(null);
+			setResizeHandle(null);
+			setRotateHandle(null);
+			onChangeEnd();
+		};
+		
+		document.addEventListener('mousemove', handleGlobalMouseMove);
+		document.addEventListener('mouseup', handleGlobalMouseUp);
+		
+		return () => {
+			document.removeEventListener('mousemove', handleGlobalMouseMove);
+			document.removeEventListener('mouseup', handleGlobalMouseUp);
+		};
+	}, [draggedElement, resizeHandle, rotateHandle, dragStart, elements, onChange, onChangeEnd, scale, snapGrid, snappingEnabled]);
+
+	return (
+		<div
+			ref={canvasRef}
+			className="relative overflow-hidden"
+			style={{ 
+				width: `${width}px`, 
+				height: `${height}px`,
+				margin: 0,
+				padding: 0,
+				boxSizing: 'border-box',
+				position: 'relative'
+			}}
+			onClick={handleCanvasClick}
+		>
+			{/* Grid */}
+			{showGrid && (
+				<div 
+					className="absolute inset-0 pointer-events-none"
+					style={{
+						backgroundImage: `
+							linear-gradient(to right, #9CA3AF 1px, transparent 1px),
+							linear-gradient(to bottom, #9CA3AF 1px, transparent 1px)
+						`,
+						backgroundSize: `${snapGrid}px ${snapGrid}px`,
+						backgroundPosition: '0 0',
+						width: '100%',
+						height: '100%',
+						opacity: 0.4,
+						zIndex: 1,
+						// Ensure grid covers the entire canvas area
+						left: 0,
+						top: 0,
+						right: 0,
+						bottom: 0,
+						// Add a small buffer to ensure grid covers edges
+						margin: '1px'
+					}}
+				/>
+			)}
+			
+			{/* Elements */}
+			<AnimatePresence>
+				{elements
+					.filter(el => !el.hidden)
+					.sort((a, b) => a.zIndex - b.zIndex)
+					.map(renderElement)}
+			</AnimatePresence>
 		</div>
 	);
-}
+};
+
+export default CertificateCanvas;

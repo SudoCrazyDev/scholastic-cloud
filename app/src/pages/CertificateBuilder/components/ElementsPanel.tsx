@@ -1,157 +1,144 @@
-import { nanoid } from 'nanoid';
-import type { CanvasElement } from './CertificateCanvas';
-import { useRef } from 'react';
-import Button from '@/components/ui/Button';
-import { Type as TypeIcon, Image as ImageIcon, Square as SquareIcon, Circle as CircleIcon, Building2, MapPin, Braces } from 'lucide-react';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Type, Image, Square, Circle, FileText } from 'lucide-react';
+import { type CanvasElement } from './CertificateCanvas';
 
-export default function ElementsPanel({ onAddElement }:{ onAddElement: (el: CanvasElement) => void }) {
-	const fileInputRef = useRef<HTMLInputElement | null>(null);
+interface ElementsPanelProps {
+	onAddElement: (element: CanvasElement) => void;
+}
 
-	function addText() {
-		onAddElement({
-			id: nanoid(),
-			type: 'text',
-			name: 'Text',
+const elementTypes = [
+	{ id: 'text', name: 'Text', icon: Type, description: 'Add text elements with customizable fonts and colors', category: 'Basic' },
+	{ id: 'paragraph', name: 'Paragraph', icon: FileText, description: 'Add rich text paragraphs with WYSIWYG editing', category: 'Basic' },
+	{ id: 'image', name: 'Image', icon: Image, description: 'Insert and manipulate images', category: 'Basic' },
+	{ id: 'rectangle', name: 'Rectangle', icon: Square, description: 'Add rectangular shapes for backgrounds and borders', category: 'Shapes' },
+	{ id: 'circle', name: 'Circle', icon: Circle, description: 'Add circular shapes for logos and decorative elements', category: 'Shapes' }
+];
+
+export default function ElementsPanel({ onAddElement }: ElementsPanelProps) {
+	const createElement = (type: string) => {
+		const baseElement = {
+			id: crypto.randomUUID(),
+			type,
 			x: 100,
 			y: 100,
-			width: 300,
-			height: 60,
-			rotation: 0,
-			text: 'Certificate Title',
-			fontFamily: 'serif',
-			fontSize: 36,
-			fontWeight: 700,
-			color: '#111827'
-		});
-	}
-
-	function addRectangle() {
-		onAddElement({
-			id: nanoid(),
-			type: 'shape',
-			name: 'Rectangle',
-			x: 80,
-			y: 80,
-			width: 400,
-			height: 200,
-			rotation: 0,
-			shape: 'rect',
-			fill: '#f3f4f6',
-			stroke: '#d1d5db',
-			strokeWidth: 1
-		});
-	}
-
-	function addEllipse() {
-		onAddElement({
-			id: nanoid(),
-			type: 'shape',
-			name: 'Ellipse',
-			x: 200,
-			y: 200,
 			width: 200,
-			height: 200,
+			height: 100,
 			rotation: 0,
-			shape: 'ellipse',
-			fill: '#eef2ff',
-			stroke: '#c7d2fe',
-			strokeWidth: 1
-		});
-	}
-
-	function triggerImage() {
-		fileInputRef.current?.click();
-	}
-
-	function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-		const file = e.target.files?.[0];
-		if (!file) return;
-		const reader = new FileReader();
-		reader.onload = () => {
-			const src = reader.result as string;
-			onAddElement({ id: nanoid(), type: 'image', name: 'Image', x: 150, y: 120, width: 400, height: 300, rotation: 0, src });
-			if (fileInputRef.current) fileInputRef.current.value = '';
+			opacity: 1,
+			hidden: false,
+			locked: false,
+			zIndex: 0,
 		};
-		reader.readAsDataURL(file);
-	}
 
-	function addInstitutionTitleVar() {
-		onAddElement({
-			id: nanoid(),
-			type: 'text',
-			name: 'Var: {institution_title}',
-			x: 120,
-			y: 120,
-			width: 480,
-			height: 50,
-			rotation: 0,
-			text: '{institution_title}',
-			fontFamily: 'serif',
-			fontSize: 28,
-			fontWeight: 600,
-			color: '#111827'
-		});
-	}
-
-	function addInstitutionAddressVar() {
-		onAddElement({
-			id: nanoid(),
-			type: 'text',
-			name: 'Var: {institution_address}',
-			x: 120,
-			y: 180,
-			width: 520,
-			height: 50,
-			rotation: 0,
-			text: '{institution_address}',
-			fontFamily: 'serif',
-			fontSize: 18,
-			fontWeight: 400,
-			color: '#374151'
-		});
-	}
-
-	function addLogoVar() {
-		const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='200'><rect width='100%' height='100%' fill='%23e5e7eb' stroke='%23d1d5db'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-family='sans-serif' font-size='24'>Logo</text></svg>`;
-		const src = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-		onAddElement({ id: nanoid(), type: 'image', name: 'Var: {logo}', x: 140, y: 220, width: 300, height: 200, rotation: 0, src });
-	}
+		switch (type) {
+			case 'text':
+				onAddElement({
+					...baseElement,
+					content: 'Sample Text',
+					fontSize: 16,
+					fontFamily: 'Arial',
+					fontWeight: 'normal',
+					fontStyle: 'normal',
+					color: '#000000',
+					textAlign: 'left',
+				} as CanvasElement);
+				break;
+			case 'paragraph':
+				onAddElement({
+					...baseElement,
+					content: 'This is a sample paragraph with rich text content. You can edit this text with formatting options.',
+					fontSize: 14,
+					fontFamily: 'Arial',
+					fontWeight: 'normal',
+					fontStyle: 'normal',
+					color: '#000000',
+					textAlign: 'left',
+					width: 300,
+					height: 120,
+				} as CanvasElement);
+				break;
+			case 'image':
+				onAddElement({
+					...baseElement,
+					src: 'https://via.placeholder.com/200x100',
+					alt: 'Sample Image',
+					objectFit: 'cover',
+				} as CanvasElement);
+				break;
+			case 'rectangle':
+				onAddElement({
+					...baseElement,
+					fill: '#3B82F6',
+					stroke: 'transparent',
+					strokeWidth: 0,
+					cornerRadius: 0,
+				} as CanvasElement);
+				break;
+			case 'circle':
+				onAddElement({
+					...baseElement,
+					fill: '#10B981',
+					stroke: 'transparent',
+					strokeWidth: 0,
+				} as CanvasElement);
+				break;
+		}
+	};
 
 	return (
-		<div className="p-3 space-y-4">
-			<div className="space-y-3">
-				<h3 className="text-sm font-medium text-gray-700">Elements</h3>
-				<div className="flex items-center gap-2 flex-wrap">
-					<Button variant="secondary" size="sm" className="p-2" onClick={addText} title="Add Text">
-						<TypeIcon className="w-4 h-4" />
-					</Button>
-					<Button variant="secondary" size="sm" className="p-2" onClick={triggerImage} title="Add Image">
-						<ImageIcon className="w-4 h-4" />
-					</Button>
-					<input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
-					<Button variant="secondary" size="sm" className="p-2" onClick={addRectangle} title="Add Rectangle">
-						<SquareIcon className="w-4 h-4" />
-					</Button>
-					<Button variant="secondary" size="sm" className="p-2" onClick={addEllipse} title="Add Ellipse">
-						<CircleIcon className="w-4 h-4" />
-					</Button>
+		<motion.div
+			initial={{ opacity: 0, y: 20 }}
+			animate={{ opacity: 1, y: 0 }}
+			className="p-4"
+		>
+			{/* Header */}
+			<div className="mb-6">
+				<h3 className="text-lg font-semibold text-gray-900 mb-2">Elements</h3>
+				<p className="text-sm text-gray-600">Click elements to add them to the canvas</p>
+			</div>
+
+			{/* Basic Elements */}
+			<div className="mb-6">
+				<h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">Basic</h4>
+				<div className="grid grid-cols-4 gap-2">
+					{elementTypes
+						.filter(element => element.category === 'Basic')
+						.map(element => (
+							<motion.button
+								key={element.id}
+								whileHover={{ scale: 1.05 }}
+								whileTap={{ scale: 0.95 }}
+								onClick={() => createElement(element.id)}
+								className="p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors group"
+								title={element.description}
+							>
+								<element.icon className="w-5 h-5 text-gray-600 mx-auto" />
+							</motion.button>
+						))}
 				</div>
 			</div>
 
-			<div className="space-y-3">
-				<h3 className="text-sm font-medium text-gray-700">Variables</h3>
-				<div className="flex items-center gap-2 flex-wrap">
-					<Button variant="secondary" size="sm" className="p-2" onClick={addInstitutionTitleVar} title="{institution_title}">
-						<Building2 className="w-4 h-4" />
-					</Button>
-					<Button variant="secondary" size="sm" className="p-2" onClick={addInstitutionAddressVar} title="{institution_address}">
-						<MapPin className="w-4 h-4" />
-					</Button>
-					<Button variant="secondary" size="sm" className="p-2" onClick={addLogoVar} title="{logo}">
-						<Braces className="w-4 h-4" />
-					</Button>
+			{/* Shapes */}
+			<div className="mb-6">
+				<h4 className="text-sm font-medium text-gray-700 mb-3 uppercase tracking-wide">Shapes</h4>
+				<div className="grid grid-cols-4 gap-2">
+					{elementTypes
+						.filter(element => element.category === 'Shapes')
+						.map(element => (
+							<motion.button
+								key={element.id}
+								whileHover={{ scale: 1.05 }}
+								whileTap={{ scale: 0.95 }}
+								onClick={() => createElement(element.id)}
+								className="p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors group"
+								title={element.description}
+							>
+								<element.icon className="w-5 h-5 text-gray-600 mx-auto" />
+							</motion.button>
+						))}
 				</div>
 			</div>
-		</div>
+		</motion.div>
 	);
 }

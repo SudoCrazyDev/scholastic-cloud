@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->uuid('id')->primary();
             $table->string('title');
             $table->json('design_json');
-            $table->foreignUuid('institution_id')->constrained('institutions')->cascadeOnDelete();
+            $table->foreignUuid('institution_id')->nullable()->constrained('institutions')->nullOnDelete();
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignUuid('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

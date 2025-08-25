@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Institution extends Model
 {
@@ -41,6 +42,14 @@ class Institution extends Model
     public function subscription(): BelongsTo
     {
         return $this->belongsTo(Subscription::class);
+    }
+
+    /**
+     * Get the certificates for the institution.
+     */
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(Certificate::class);
     }
 
     /**
