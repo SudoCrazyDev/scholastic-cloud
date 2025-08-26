@@ -76,12 +76,20 @@ export function useStudents(options?: { class_section_id?: string }) {
         // For class section queries, create a simple pagination object
         currentPage: 1,
         totalPages: 1,
-        totalItems: students.length
+        totalItems: students.length,
+        onPageChange: (page: number) => {
+          // This would need to be implemented with a separate query for pagination
+          console.log('Navigate to page:', page)
+        },
       }
     : studentsData?.type === 'paginated' ? {
         currentPage: studentsData.data.pagination.current_page,
         totalPages: studentsData.data.pagination.last_page,
-        totalItems: studentsData.data.pagination.total
+        totalItems: studentsData.data.pagination.total,
+        onPageChange: (page: number) => {
+          // This would need to be implemented with a separate query for pagination
+          console.log('Navigate to page:', page)
+        },
       } : null
 
   // Create student mutation
