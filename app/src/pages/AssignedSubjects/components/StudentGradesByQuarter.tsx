@@ -66,7 +66,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
       <div className="relative flex items-center justify-between p-4">
         {/* Student Info Section */}
         <div className="flex-1 min-w-0">
-          <h4 className="text-lg font-semibold text-gray-900 truncate leading-tight">
+          <h4 className="text-lg font-semibold text-gray-900 truncate leading-tight uppercase">
             {formatStudentName()}
           </h4>
           <div className="flex items-center space-x-4 mt-1">

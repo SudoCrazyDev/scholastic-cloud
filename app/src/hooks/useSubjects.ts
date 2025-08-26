@@ -214,7 +214,7 @@ export const useSubjectDetail = (id?: string) => {
       return subjectService.getSubject(id)
     },
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0, // Changed from 5 minutes to 0 to ensure immediate refetching
     retry: 1,
   })
 } 

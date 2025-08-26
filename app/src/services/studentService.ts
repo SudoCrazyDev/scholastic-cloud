@@ -21,8 +21,10 @@ class StudentService {
     if (params?.middle_name) queryParams.append('middle_name', params.middle_name)
     if (params?.last_name) queryParams.append('last_name', params.last_name)
     if (params?.lrn) queryParams.append('lrn', params.lrn)
+    if (params?.class_section_id) queryParams.append('class_section_id', params.class_section_id)
 
     const url = `${this.baseUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    
     const response = await api.get<PaginatedResponse<Student>>(url)
     
     return response.data
@@ -67,7 +69,7 @@ class StudentService {
     section_id: string
     academic_year: string
   }) {
-    const response = await api.post<{ success: boolean; message: string; data: any[] }>('/student-sections/bulk-assign', data)
+    const response = await api.post<{ success: boolean; message: string; data: any[] }>("/student-sections/bulk-assign", data)
     return response.data
   }
 

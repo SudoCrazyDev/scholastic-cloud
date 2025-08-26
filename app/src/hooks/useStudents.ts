@@ -2,7 +2,12 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { studentService } from '../services/studentService'
-import type { Student, CreateStudentData, UpdateStudentData } from '../types'
+import type { Student, CreateStudentData, UpdateStudentData, PaginatedResponse } from '../types'
+
+// Define response types for different query methods
+type StudentsQueryResponse = 
+  | { type: 'class_section'; data: { success: boolean; data: Student[] } }
+  | { type: 'paginated'; data: PaginatedResponse<Student> }
 
 export function useStudents(options?: { class_section_id?: string }) {
   const queryClient = useQueryClient()
@@ -31,32 +36,53 @@ export function useStudents(options?: { class_section_id?: string }) {
 
   const searchParams = parseSearchValue(searchValue)
 
+  // Debug logging for hook parameters
+
   // Query for fetching students
   const {
     data: studentsData,
     isLoading: loading,
     error,
-  } = useQuery({
+    refetch,
+  } = useQuery<StudentsQueryResponse>({
     queryKey: ['students', { ...searchParams, ...options }],
-    queryFn: () => studentService.getStudents({
-      ...searchParams,
-      ...options,
-      per_page: 70,
-    }),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryFn: async () => {
+      // If class_section_id is provided, use getStudentsByClassSection
+      if (options?.class_section_id) {
+        const response = await studentService.getStudentsByClassSection(options.class_section_id);
+        return { type: 'class_section', data: response };
+      }
+      // Otherwise, use the general getStudents method
+      const response = await studentService.getStudents({
+        ...searchParams,
+        per_page: 70,
+      });
+      return { type: 'paginated', data: response };
+    },
+    enabled: true, // Always enabled, but logic is in queryFn
+    staleTime: 0, // Changed from 5 minutes to 0 to ensure immediate refetching
     gcTime: 10 * 60 * 1000, // 10 minutes
   })
 
-  const students = studentsData?.data || []
-  const pagination = studentsData?.pagination ? {
-    currentPage: studentsData.pagination.current_page,
-    totalPages: studentsData.pagination.last_page,
-    totalItems: studentsData.pagination.total,
-    onPageChange: (page: number) => {
-      // This would need to be implemented with a separate query for pagination
-      console.log('Navigate to page:', page)
-    },
-  } : null
+  const students = studentsData?.type === 'class_section' 
+    ? studentsData.data.data 
+    : studentsData?.type === 'paginated' 
+      ? studentsData.data.data 
+      : []
+      
+  // Handle pagination for both response types
+  const pagination = studentsData?.type === 'class_section'
+    ? {
+        // For class section queries, create a simple pagination object
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: students.length
+      }
+    : studentsData?.type === 'paginated' ? {
+        currentPage: studentsData.data.pagination.current_page,
+        totalPages: studentsData.data.pagination.last_page,
+        totalItems: studentsData.data.pagination.total
+      } : null
 
   // Create student mutation
   const createMutation = useMutation({
@@ -214,5 +240,6 @@ export function useStudents(options?: { class_section_id?: string }) {
     setSelectedRows,
     checkExists: checkExistsMutation.mutate,
     checkExistsLoading: checkExistsMutation.isPending,
+    refetch,
   }
 } 
