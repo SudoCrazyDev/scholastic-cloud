@@ -127,14 +127,14 @@ const ClassSectionDetail: React.FC = () => {
     queryFn: () => studentService.getStudentsByClassSection(id!),
     enabled: !!id,
   })
-
+  console.log(studentsResponse)
   const subjects = subjectsResponse?.data || []
-  const students = studentsResponse?.data?.map((item: { student: Student; id: string }) => ({
-    ...item.student,
+  const students = studentsResponse?.data?.map((item: Student) => ({
+    ...item,
     assignmentId: item.id
   })) || []
   const classSectionData = classSection?.data
-
+  console.log(students)
   // Get the selected student object for report card
   const selectedStudent = useMemo(() => {
     if (!selectedStudentForReport?.id || !students.length) return null;
