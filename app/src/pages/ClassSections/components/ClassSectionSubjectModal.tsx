@@ -124,10 +124,10 @@ export function ClassSectionSubjectModal({
           subject_type: values.subject_type,
           parent_subject_id: values.subject_type === 'child' ? values.parent_subject_id : undefined,
           title: values.title,
-          variant: values.variant || undefined,
-          start_time: values.start_time || undefined,
-          end_time: values.end_time || undefined,
-          adviser: values.adviser || undefined,
+          variant: isEditing ? values.variant : (values.variant === '' ? '' : values.variant || undefined),
+          start_time: isEditing ? values.start_time : (values.start_time === '' ? '' : values.start_time || undefined),
+          end_time: isEditing ? values.end_time : (values.end_time === '' ? '' : values.end_time || undefined),
+          adviser: isEditing ? values.adviser : (values.adviser === '' ? '' : values.adviser || undefined),
           is_limited_student: values.is_limited_student,
         }
         

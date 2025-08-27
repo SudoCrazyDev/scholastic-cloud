@@ -78,10 +78,10 @@ export default function PrintTempReportCard({
                               // If it's a variant subject, only include it if student has grades
                               if (subject.variant) {
                                 const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
-                                return studentGrade?.quarter1_grade || 
-                                       studentGrade?.quarter2_grade || 
-                                       studentGrade?.quarter3_grade || 
-                                       studentGrade?.quarter4_grade || 
+                                return studentGrade?.quarter1_grade ||
+                                       studentGrade?.quarter2_grade ||
+                                       studentGrade?.quarter3_grade ||
+                                       studentGrade?.quarter4_grade ||
                                        studentGrade?.final_grade;
                               }
                               // Always include non-variant subjects
@@ -95,7 +95,7 @@ export default function PrintTempReportCard({
                             const quarter4Grade = roundGrade(studentGrade?.quarter4_grade) || '';
                             const finalGrade = roundGrade(studentGrade?.final_grade) || '';
                             // const remarks = studentGrade?.remarks || '';
-                            
+
                             return (
                               <View key={index} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
                                 <View style={{paddingLeft: '2px', paddingVertical: '2px', width: '30%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'flex-start', borderRight: '1px solid black'}}>
