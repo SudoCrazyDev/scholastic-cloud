@@ -448,6 +448,7 @@ export interface Student {
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+  student_section_id: string;
 }
 
 export interface CreateStudentData {

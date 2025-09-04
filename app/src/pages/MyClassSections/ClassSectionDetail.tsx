@@ -131,7 +131,7 @@ const ClassSectionDetail: React.FC = () => {
   const subjects = subjectsResponse?.data || []
   const students = studentsResponse?.data?.map((item: Student) => ({
     ...item,
-    assignmentId: item.id
+    assignmentId: item.student_section_id
   })) || []
   const classSectionData = classSection?.data
 

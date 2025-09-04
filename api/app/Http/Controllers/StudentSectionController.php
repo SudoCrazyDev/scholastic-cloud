@@ -33,12 +33,24 @@ class StudentSectionController extends Controller
 
         $sectionId = $request->section_id;
         
-        // Get students directly from the section relationship
-        $students = Student::whereHas('studentSections', function($query) use ($sectionId) {
-            $query->where('section_id', $sectionId);
-        })
-        ->select('id', 'lrn', 'first_name', 'middle_name', 'last_name', 'ext_name', 'gender', 'religion', 'birthdate', 'profile_picture', 'is_active')
-        ->get();
+        // Get students with their studentSection id using join
+        $students = Student::join('student_sections', 'students.id', '=', 'student_sections.student_id')
+            ->where('student_sections.section_id', $sectionId)
+            ->select(
+                'students.id', 
+                'students.lrn', 
+                'students.first_name', 
+                'students.middle_name', 
+                'students.last_name', 
+                'students.ext_name', 
+                'students.gender', 
+                'students.religion', 
+                'students.birthdate', 
+                'students.profile_picture', 
+                'students.is_active',
+                'student_sections.id as student_section_id'
+            )
+            ->get();
         return response()->json([
             'success' => true,
             'data' => $students
