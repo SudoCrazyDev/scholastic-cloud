@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'react-hot-toast'
 import { classSectionService } from '../../services/classSectionService'
 import { subjectService } from '../../services/subjectService'
 import { studentService } from '../../services/studentService'
@@ -263,14 +264,27 @@ const ClassSectionDetail: React.FC = () => {
   })
 
   const reorderSubjectsMutation = useMutation({
-    mutationFn: (subjectOrders: Array<{ id: string; order: number }>) => 
-      subjectService.reorderSubjects(id!, subjectOrders),
+    mutationFn: (subjectOrders: Array<{ id: string; order: number }>) => {
+      console.log('reorderSubjectsMutation called with:', subjectOrders)
+      return subjectService.reorderSubjects(id!, subjectOrders)
+    },
     onSuccess: () => {
+      toast.success('Subjects reordered successfully!', {
+        duration: 3000,
+        position: 'top-right',
+        style: {
+          background: '#10B981',
+          color: '#fff',
+        },
+      })
       queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
       refetchSubjects()
     },
     onError: (error: any) => {
-      console.error('Failed to reorder subjects:', error)
+      toast.error('Failed to reorder subjects. Please try again.', {
+        duration: 4000,
+        position: 'top-right',
+      })
     }
   })
 

@@ -46,30 +46,6 @@ interface SubjectListProps {
   onRefetch?: () => void
 }
 
-// Build hierarchical structure - moved outside component to prevent recreation
-const buildSubjectHierarchy = (subjects: Subject[]) => {
-  const subjectMap = new Map<string, Subject>()
-  const rootSubjects: Subject[] = []
-
-  // First pass: create map and identify root subjects
-  subjects.forEach(subject => {
-    subjectMap.set(subject.id, { ...subject, child_subjects: [] })
-    if (!subject.parent_subject_id) {
-      rootSubjects.push(subjectMap.get(subject.id)!)
-    }
-  })
-
-  // Second pass: build hierarchy
-  subjects.forEach(subject => {
-    if (subject.parent_subject_id && subjectMap.has(subject.parent_subject_id)) {
-      const parent = subjectMap.get(subject.parent_subject_id)!
-      if (!parent.child_subjects) parent.child_subjects = []
-      parent.child_subjects.push(subjectMap.get(subject.id)!)
-    }
-  })
-
-  return rootSubjects
-}
 
 // Regular Subject Item Component - moved outside to prevent hook ordering issues
 const SubjectItem = ({ 
@@ -181,19 +157,23 @@ export const SubjectList: React.FC<SubjectListProps> = ({
   onRefetch,
 }) => {
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set())
-  const [orderedSubjects, setOrderedSubjects] = useState<Subject[]>(subjects)
+  const [orderedParentSubjects, setOrderedParentSubjects] = useState<Subject[]>(() => 
+    subjects.filter(s => !s.parent_subject_id)
+  )
   const subjectsRef = useRef<Subject[]>(subjects)
   const reorderTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [moveAnimationKey, setMoveAnimationKey] = useState(0)
 
-  // Update ordered subjects when props change - use ref to avoid dependency issues
+  // Update ordered parent subjects when props change - use ref to avoid dependency issues
   React.useEffect(() => {
     const subjectsIds = subjects.map(s => s.id).join(',')
     const currentIds = subjectsRef.current.map(s => s.id).join(',')
     
     if (subjectsIds !== currentIds) {
       subjectsRef.current = subjects
-      setOrderedSubjects(subjects)
+      // Filter only parent subjects for reordering
+      const parentSubjects = subjects.filter(s => !s.parent_subject_id)
+      setOrderedParentSubjects(parentSubjects)
     }
   }, [subjects])
 
@@ -220,21 +200,46 @@ export const SubjectList: React.FC<SubjectListProps> = ({
 
   const isParentExpanded = useCallback((parentId: string) => expandedParents.has(parentId), [expandedParents])
 
-  const hierarchicalSubjects = useMemo(() => buildSubjectHierarchy(orderedSubjects), [orderedSubjects])
+  const hierarchicalSubjects = useMemo(() => {
+    // Build hierarchy using ordered parent subjects but include all subjects for child relationships
+    const subjectMap = new Map<string, Subject>()
+    const rootSubjects: Subject[] = []
+
+    // First pass: create map and identify root subjects from ordered parent subjects
+    orderedParentSubjects.forEach(subject => {
+      subjectMap.set(subject.id, { ...subject, child_subjects: [] })
+      rootSubjects.push(subjectMap.get(subject.id)!)
+    })
+
+    // Second pass: add child subjects from all subjects
+    subjects.forEach(subject => {
+      if (subject.parent_subject_id && subjectMap.has(subject.parent_subject_id)) {
+        const parent = subjectMap.get(subject.parent_subject_id)!
+        if (!parent.child_subjects) parent.child_subjects = []
+        parent.child_subjects.push({ ...subject, child_subjects: [] })
+      }
+    })
+
+    return rootSubjects
+  }, [orderedParentSubjects, subjects])
 
   // Helper to move parent subject up/down
   const moveParentSubject = (fromIdx: number, toIdx: number) => {
-    if (toIdx < 0 || toIdx >= orderedSubjects.length) return
-    const newOrder = [...orderedSubjects]
+    if (toIdx < 0 || toIdx >= orderedParentSubjects.length) return
+    
+    // Immediately update the UI for instant feedback
+    const newOrder = [...orderedParentSubjects]
     const [moved] = newOrder.splice(fromIdx, 1)
     newOrder.splice(toIdx, 0, moved)
-    setOrderedSubjects(newOrder)
+    setOrderedParentSubjects(newOrder)
     setMoveAnimationKey(prev => prev + 1)
+    
     // Debounce API call
     if (onReorderSubjects) {
       if (reorderTimeoutRef.current) clearTimeout(reorderTimeoutRef.current)
       reorderTimeoutRef.current = setTimeout(() => {
         const subjectOrders = newOrder.map((subject, idx) => ({ id: subject.id, order: idx + 1 }))
+        console.log('Calling onReorderSubjects with:', subjectOrders)
         onReorderSubjects(subjectOrders)
       }, 500)
     }
@@ -269,9 +274,9 @@ export const SubjectList: React.FC<SubjectListProps> = ({
           <p className="text-sm text-gray-600">
             Manage subjects and their teachers for this class section
             {reordering && (
-              <span className="ml-2 inline-flex items-center text-blue-600">
+              <span className="ml-2 inline-flex items-center text-green-600 font-medium">
                 <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                Saving order...
+                Saving changes...
               </span>
             )}
           </p>
@@ -318,7 +323,13 @@ export const SubjectList: React.FC<SubjectListProps> = ({
           </Button>
         </div>
       ) : (
-        <motion.div key={moveAnimationKey} layout className="space-y-3">
+        <motion.div 
+          key={moveAnimationKey} 
+          layout 
+          className={`space-y-3 transition-all duration-300 ${
+            reordering ? 'opacity-95' : 'opacity-100'
+          }`}
+        >
           {hierarchicalSubjects.map((subject, index) => (
             <div key={subject.id} className="space-y-2">
               {/* Parent Subject */}
@@ -327,7 +338,11 @@ export const SubjectList: React.FC<SubjectListProps> = ({
                   {/* Up/Down arrows for parent subjects only */}
                   <div className="flex flex-col mr-2">
                     <button
-                      className={`p-1 ${index === 0 || reordering ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                      className={`p-1 rounded transition-all duration-200 ${
+                        index === 0 || reordering 
+                          ? 'opacity-30 cursor-not-allowed' 
+                          : 'hover:bg-gray-100 hover:scale-110 active:scale-95'
+                      }`}
                       onClick={() => moveParentSubject(index, index - 1)}
                       disabled={index === 0 || reordering}
                       aria-label="Move up"
@@ -335,7 +350,11 @@ export const SubjectList: React.FC<SubjectListProps> = ({
                       <ArrowUp className="w-4 h-4" />
                     </button>
                     <button
-                      className={`p-1 ${index === hierarchicalSubjects.length - 1 || reordering ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                      className={`p-1 rounded transition-all duration-200 ${
+                        index === hierarchicalSubjects.length - 1 || reordering 
+                          ? 'opacity-30 cursor-not-allowed' 
+                          : 'hover:bg-gray-100 hover:scale-110 active:scale-95'
+                      }`}
                       onClick={() => moveParentSubject(index, index + 1)}
                       disabled={index === hierarchicalSubjects.length - 1 || reordering}
                       aria-label="Move down"
