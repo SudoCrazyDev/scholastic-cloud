@@ -30,8 +30,18 @@ class SectionConsolidatedGradesController extends Controller
         // Get all students in this section
         $students = $section->students;
 
-        // Get all subjects for this section
-        $subjects = $section->subjects;
+        // Get all subjects for this section, ordered hierarchically
+        $subjects = $section->subjects->sortBy(function($subject) {
+            if ($subject->subject_type === 'parent') {
+                // Parent subjects: use their order * 1000 to leave room for children
+                return $subject->order * 1000;
+            } else {
+                // Child subjects: use parent's order * 1000 + child's order
+                $parentOrder = $subject->parentSubject ? $subject->parentSubject->order : 999;
+                $childOrder = $subject->order;
+                return ($parentOrder * 1000) + $childOrder;
+            }
+        });
 
         // Get grades for all students in this section for the specified quarter
         $grades = StudentRunningGrade::whereIn('student_id', $students->pluck('id'))

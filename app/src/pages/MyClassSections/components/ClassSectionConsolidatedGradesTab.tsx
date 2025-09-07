@@ -1,11 +1,14 @@
 import React from 'react';
 import { useConsolidatedGrades } from '../../../hooks/useConsolidatedGrades';
 import { useAuth } from '../../../hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+import { subjectService } from '../../../services/subjectService';
 import { Loader2, X, FileText, User, GraduationCap, Users } from 'lucide-react';
 import { Badge } from '../../../components/badge';
 import { Button } from '../../../components/button';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { ConsolidatedGradesPDF } from '../../ConsolidatedGrades/components/ConsolidatedGradesPDF';
+import type { Subject } from '../../../types';
 
 interface ClassSectionConsolidatedGradesTabProps {
   sectionId: string;
@@ -70,9 +73,6 @@ const getRemarksColor = (finalGrade: number | null) => {
   return 'text-red-600';
 };
 
-const getBaseTitle = (title: string) => {
-  return title.split(/[-(]/)[0].trim();
-};
 
 const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGradesTabProps> = ({
   sectionId,
@@ -80,24 +80,104 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
 }) => {
   const { user } = useAuth();
   const { data, isLoading, error } = useConsolidatedGrades(sectionId, selectedQuarter);
+  
+  // Fetch subjects with hierarchical data like the report card
+  const {
+    data: subjectsResponse,
+    isLoading: subjectsLoading,
+    error: subjectsError,
+  } = useQuery({
+    queryKey: ['subjects', { class_section_id: sectionId }],
+    queryFn: () => subjectService.getSubjects({ class_section_id: sectionId }),
+    enabled: !!sectionId,
+  });
 
-  // Group subjects by base title for table columns
+  // Helper function to get base title (without variant)
+  const getBaseTitle = (title: string) => {
+    return title.split(/[-(]/)[0].trim();
+  };
+
+  // Use subjects with hierarchical sorting and group variants by base title
   const baseSubjects = React.useMemo(() => {
-    if (!data || !data.students.length) return [];
-    const subjectMap: Record<string, { subject_id: string; subject_title: string }[]> = {};
-    data.students[0].subjects.forEach((subject: any) => {
-      const base = getBaseTitle(subject.subject_title);
-      if (!subjectMap[base]) subjectMap[base] = [];
-      subjectMap[base].push(subject);
+    if (!subjectsResponse?.data || !data || !data.students.length) return [];
+    
+    const subjects = subjectsResponse.data as Subject[];
+    
+    // Apply the same sorting logic as the report card
+    const sortedSubjects = subjects
+      .sort((a, b) => {
+        // If both are parent subjects, sort by order
+        if (a.subject_type === 'parent' && b.subject_type === 'parent') {
+          return a.order - b.order;
+        }
+        
+        // If both are child subjects, group by parent and then by order
+        if (a.subject_type === 'child' && b.subject_type === 'child') {
+          // First sort by parent order, then by child order
+          const aParentOrder = subjects.find(s => s.id === a.parent_subject_id)?.order || 0;
+          const bParentOrder = subjects.find(s => s.id === b.parent_subject_id)?.order || 0;
+          
+          if (aParentOrder !== bParentOrder) {
+            return aParentOrder - bParentOrder;
+          }
+          // Then by order within the same parent
+          return a.order - b.order;
+        }
+        
+        // If one is parent and one is child
+        if (a.subject_type === 'parent' && b.subject_type === 'child') {
+          // If the child belongs to this parent, child comes after parent
+          if (b.parent_subject_id === a.id) {
+            return -1;
+          }
+          // If the child belongs to a different parent, sort by parent order
+          const aOrder = a.order;
+          const bParentOrder = subjects.find(s => s.id === b.parent_subject_id)?.order || 0;
+          return aOrder - bParentOrder;
+        }
+        
+        if (a.subject_type === 'child' && b.subject_type === 'parent') {
+          // If the child belongs to this parent, child comes after parent
+          if (a.parent_subject_id === b.id) {
+            return 1;
+          }
+          // If the child belongs to a different parent, sort by parent order
+          const aParentOrder = subjects.find(s => s.id === a.parent_subject_id)?.order || 0;
+          const bOrder = b.order;
+          return aParentOrder - bOrder;
+        }
+        
+        return a.order - b.order;
+      });
+    
+    // Group subjects by base title (without variant)
+    const groupedSubjects: Record<string, Subject[]> = {};
+    sortedSubjects.forEach(subject => {
+      const baseTitle = getBaseTitle(subject.title);
+      if (!groupedSubjects[baseTitle]) {
+        groupedSubjects[baseTitle] = [];
+      }
+      groupedSubjects[baseTitle].push(subject);
     });
-    return Object.keys(subjectMap).map(base => ({
-      base,
-      subject_ids: subjectMap[base].map(s => s.subject_id),
-      subject_title: base,
+    
+    console.log('Grouped subjects:', Object.keys(groupedSubjects).map(baseTitle => ({
+      baseTitle,
+      subjects: groupedSubjects[baseTitle].map(s => ({
+        title: s.title,
+        type: s.subject_type,
+        order: s.order,
+        parent_id: s.parent_subject_id,
+      }))
+    })));
+    
+    // Return grouped subjects with all subject IDs for each base title
+    return Object.keys(groupedSubjects).map(baseTitle => ({
+      base: baseTitle,
+      subject_ids: groupedSubjects[baseTitle].map(s => s.id),
+      subject_title: baseTitle,
     }));
-  }, [data]);
-
-  // For each student, group grades by base subject
+  }, [subjectsResponse, data]);
+  // For each student, group grades by base subject title
   const studentsWithGroupedSubjects = React.useMemo(() => {
     if (!data) return [];
     return data.students.map((student: any) => {
@@ -107,6 +187,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
         if (!grouped[base]) grouped[base] = { grades: [] };
         grouped[base].grades.push(subject.grade);
       });
+      
       // For each base, average grades (or use single if only one)
       const groupedSubjects = Object.keys(grouped).map(base => {
         const grades = grouped[base].grades
@@ -121,6 +202,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
           grade: avg,
         };
       });
+      
       return {
         ...student,
         groupedSubjects,
@@ -128,7 +210,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
     });
   }, [data]);
 
-  if (isLoading) {
+  if (isLoading || subjectsLoading) {
     return (
       <div className="min-h-[300px] flex items-center justify-center">
         <div className="text-center">
@@ -139,7 +221,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
     );
   }
 
-  if (error) {
+  if (error || subjectsError) {
     return (
       <div className="min-h-[300px] flex items-center justify-center">
         <div className="text-center">
