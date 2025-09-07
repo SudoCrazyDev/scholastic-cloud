@@ -26,9 +26,9 @@ const getQuarterLabel = (quarter: number) => {
 };
 
 const formatGrade = (grade: number | string | null) => {
-  if (grade === null || grade === undefined) return 'N/A';
+  if (grade === null || grade === undefined) return '';
   const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
-  if (isNaN(numGrade)) return 'N/A';
+  if (isNaN(numGrade)) return '';
   return Math.round(numGrade).toString();
 };
 
