@@ -63,12 +63,12 @@ export default function PrintTempReportCard({
                                     </View>
                                 </View>
                             </View>
-                            <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                            {/* <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Final Grade</Text>
-                            </View>
-                            <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
+                            </View> */}
+                            {/* <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Remarks</Text>
-                            </View>
+                            </View> */}
                         </View>
 
                         {/* Dynamic subject rows */}
@@ -87,13 +87,54 @@ export default function PrintTempReportCard({
                               // Always include non-variant subjects
                               return true;
                             })
+                            .sort((a, b) => {
+                              // If both are parent subjects, sort by order
+                              if (a.subject_type === 'parent' && b.subject_type === 'parent') {
+                                return a.order - b.order;
+                              }
+                              
+                              // If both are child subjects, group by parent and then by order
+                              if (a.subject_type === 'child' && b.subject_type === 'child') {
+                                // First sort by parent_subject_id
+                                if (a.parent_subject_id !== b.parent_subject_id) {
+                                  return (a.parent_subject_id || '').localeCompare(b.parent_subject_id || '');
+                                }
+                                // Then by order within the same parent
+                                return a.order - b.order;
+                              }
+                              
+                              // If one is parent and one is child
+                              if (a.subject_type === 'parent' && b.subject_type === 'child') {
+                                // If the child belongs to this parent, child comes after parent
+                                if (b.parent_subject_id === a.id) {
+                                  return -1;
+                                }
+                                // If the child belongs to a different parent, sort by parent order
+                                const aOrder = a.order;
+                                const bParentOrder = sectionSubjects.find(s => s.id === b.parent_subject_id)?.order || 0;
+                                return aOrder - bParentOrder;
+                              }
+                              
+                              if (a.subject_type === 'child' && b.subject_type === 'parent') {
+                                // If the child belongs to this parent, child comes after parent
+                                if (a.parent_subject_id === b.id) {
+                                  return 1;
+                                }
+                                // If the child belongs to a different parent, sort by parent order
+                                const aParentOrder = sectionSubjects.find(s => s.id === a.parent_subject_id)?.order || 0;
+                                const bOrder = b.order;
+                                return aParentOrder - bOrder;
+                              }
+                              
+                              return a.order - b.order;
+                            })
                             .map((subject, index) => {
                             const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
                             const quarter1Grade = roundGrade(studentGrade?.quarter1_grade) || '';
                             const quarter2Grade = roundGrade(studentGrade?.quarter2_grade) || '';
                             const quarter3Grade = roundGrade(studentGrade?.quarter3_grade) || '';
                             const quarter4Grade = roundGrade(studentGrade?.quarter4_grade) || '';
-                            const finalGrade = roundGrade(studentGrade?.final_grade) || '';
+                            // const finalGrade = roundGrade(studentGrade?.final_grade) || '';
                             // const remarks = studentGrade?.remarks || '';
 
                             return (
@@ -115,12 +156,12 @@ export default function PrintTempReportCard({
                                     <Text>{quarter4Grade}</Text>
                                   </View>
                                 </View>
-                                <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                {/* <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{finalGrade}</Text>
                                 </View>
                                 <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
-                                  {/* <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{remarks}</Text> */}
-                                </View>
+                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{remarks}</Text>
+                                </View> */}
                               </View>
                             );
                           })
@@ -132,7 +173,7 @@ export default function PrintTempReportCard({
                           </View>
                         )}
 
-                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
+                        {/* <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
                             <View style={{width: '70%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>GENERAL AVERAGE</Text>
                             </View>
@@ -160,7 +201,7 @@ export default function PrintTempReportCard({
                                   })()}
                                 </Text>
                             </View>
-                        </View>
+                        </View> */}
                             
                         <View style={{marginTop: '0', display: 'flex', flexDirection: 'row', flexWrap: 'wrap'}}>
                             <View style={{width: '40%'}}>
