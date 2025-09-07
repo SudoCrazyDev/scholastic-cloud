@@ -280,7 +280,7 @@ const ClassSectionDetail: React.FC = () => {
       queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
       refetchSubjects()
     },
-    onError: (error: any) => {
+    onError: () => {
       toast.error('Failed to reorder subjects. Please try again.', {
         duration: 4000,
         position: 'top-right',
