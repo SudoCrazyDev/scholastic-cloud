@@ -98,6 +98,7 @@ Route::middleware('auth.token')->group(function () {
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);
     Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
+    Route::post('subjects/reorder-children', [SubjectController::class, 'reorderChildren']);
 
     // Subject Template routes
     Route::apiResource('subject-templates', SubjectTemplateController::class);

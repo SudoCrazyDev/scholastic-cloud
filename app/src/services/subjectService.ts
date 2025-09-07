@@ -48,6 +48,15 @@ class SubjectService {
     const response = await api.post('/subjects/reorder', data)
     return response.data
   }
+
+  async reorderChildSubjects(parentSubjectId: string, childOrders: Array<{ id: string; order: number }>): Promise<ApiResponse<void>> {
+    const data = {
+      parent_subject_id: parentSubjectId,
+      child_orders: childOrders
+    }
+    const response = await api.post('/subjects/reorder-children', data)
+    return response.data
+  }
 }
 
 export const subjectService = new SubjectService() 

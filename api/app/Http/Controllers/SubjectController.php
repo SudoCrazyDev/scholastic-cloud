@@ -421,4 +421,83 @@ class SubjectController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Reorder child subjects within a parent subject.
+     */
+    public function reorderChildren(Request $request): JsonResponse
+    {
+        try {
+            $authenticatedUser = $request->user();
+
+            // Get the authenticated user's default institution
+            $defaultInstitution = $authenticatedUser->userInstitutions()
+                ->where('is_default', true)
+                ->first();
+
+            if (!$defaultInstitution) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No default institution found for authenticated user'
+                ], 403);
+            }
+
+            $validated = $request->validate([
+                'parent_subject_id' => 'required|exists:subjects,id',
+                'child_orders' => 'required|array',
+                'child_orders.*.id' => 'required|exists:subjects,id',
+                'child_orders.*.order' => 'required|integer|min:0',
+            ]);
+
+            // Verify the parent subject belongs to the user's institution
+            $parentSubject = Subject::where('institution_id', $defaultInstitution->institution_id)
+                ->where('id', $validated['parent_subject_id'])
+                ->where('subject_type', 'parent')
+                ->first();
+
+            if (!$parentSubject) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Parent subject not found or access denied'
+                ], 404);
+            }
+
+            // Verify all child subjects belong to the parent and user's institution
+            $childSubjectIds = collect($validated['child_orders'])->pluck('id');
+            $childSubjects = Subject::where('institution_id', $defaultInstitution->institution_id)
+                ->where('parent_subject_id', $validated['parent_subject_id'])
+                ->whereIn('id', $childSubjectIds)
+                ->get();
+
+            if ($childSubjects->count() !== $childSubjectIds->count()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some child subjects not found or access denied'
+                ], 404);
+            }
+
+            // Update the order for each child subject
+            foreach ($validated['child_orders'] as $childOrder) {
+                Subject::where('id', $childOrder['id'])->update(['order' => $childOrder['order']]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Child subjects reordered successfully'
+            ]);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to reorder child subjects',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

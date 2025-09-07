@@ -10,6 +10,7 @@ interface ClassSectionSubjectsTabProps {
   onEditSubject: (subject: Subject) => void;
   onDeleteSubject: (subject: Subject) => void;
   onReorderSubjects: (subjectOrders: Array<{ id: string; order: number }>) => void;
+  onReorderChildSubjects?: (parentId: string, childOrders: Array<{ id: string; order: number }>) => void;
   reordering: boolean;
   onRefetch: () => void;
 }
@@ -22,6 +23,7 @@ const ClassSectionSubjectsTab: React.FC<ClassSectionSubjectsTabProps> = ({
   onEditSubject,
   onDeleteSubject,
   onReorderSubjects,
+  onReorderChildSubjects,
   reordering,
   onRefetch,
 }) => {
@@ -34,6 +36,7 @@ const ClassSectionSubjectsTab: React.FC<ClassSectionSubjectsTabProps> = ({
       onEditSubject={onEditSubject}
       onDeleteSubject={onDeleteSubject}
       onReorderSubjects={onReorderSubjects}
+      onReorderChildSubjects={onReorderChildSubjects}
       reordering={reordering}
       onRefetch={onRefetch}
     />

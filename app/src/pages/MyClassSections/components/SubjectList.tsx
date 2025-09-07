@@ -42,6 +42,7 @@ interface SubjectListProps {
   onEditSubject: (subject: Subject) => void
   onDeleteSubject: (subject: Subject) => void
   onReorderSubjects?: (subjectOrders: Array<{ id: string; order: number }>) => void
+  onReorderChildSubjects?: (parentId: string, childOrders: Array<{ id: string; order: number }>) => void
   reordering?: boolean
   onRefetch?: () => void
 }
@@ -57,6 +58,11 @@ const SubjectItem = ({
   isParent = false,
   expanded = false,
   onToggleExpand,
+  onMoveChildUp,
+  onMoveChildDown,
+  canMoveUp = false,
+  canMoveDown = false,
+  reordering = false,
 }: { 
   subject: Subject; 
   index?: number; 
@@ -66,6 +72,11 @@ const SubjectItem = ({
   isParent?: boolean;
   expanded?: boolean;
   onToggleExpand?: () => void;
+  onMoveChildUp?: () => void;
+  onMoveChildDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  reordering?: boolean;
 }) => {
   const hasNoAdviser = !subject.adviser_user
 
@@ -97,6 +108,37 @@ const SubjectItem = ({
               />
             </button>
           )}
+          
+          {/* Reorder buttons for child subjects */}
+          {isChild && (
+            <div className="flex flex-col mr-2">
+              <button
+                className={`p-1 rounded transition-all duration-200 ${
+                  !canMoveUp || reordering
+                    ? 'opacity-30 cursor-not-allowed' 
+                    : 'hover:bg-gray-100 hover:scale-110 active:scale-95'
+                }`}
+                onClick={onMoveChildUp}
+                disabled={!canMoveUp || reordering}
+                aria-label="Move up"
+              >
+                <ArrowUp className="w-4 h-4" />
+              </button>
+              <button
+                className={`p-1 rounded transition-all duration-200 ${
+                  !canMoveDown || reordering
+                    ? 'opacity-30 cursor-not-allowed' 
+                    : 'hover:bg-gray-100 hover:scale-110 active:scale-95'
+                }`}
+                onClick={onMoveChildDown}
+                disabled={!canMoveDown || reordering}
+                aria-label="Move down"
+              >
+                <ArrowDown className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          
           <BookOpen className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-indigo-600' : 'text-green-600'} mr-2`} />
           <div className="flex-1 min-w-0">
             <h3 className={`font-semibold truncate ${hasNoAdviser ? 'text-red-700' : 'text-gray-900'}`}
@@ -153,6 +195,7 @@ export const SubjectList: React.FC<SubjectListProps> = ({
   onEditSubject,
   onDeleteSubject,
   onReorderSubjects,
+  onReorderChildSubjects,
   reordering = false,
   onRefetch,
 }) => {
@@ -160,11 +203,13 @@ export const SubjectList: React.FC<SubjectListProps> = ({
   const [orderedParentSubjects, setOrderedParentSubjects] = useState<Subject[]>(() => 
     subjects.filter(s => !s.parent_subject_id)
   )
+  const [orderedChildSubjects, setOrderedChildSubjects] = useState<Map<string, Subject[]>>(new Map())
   const subjectsRef = useRef<Subject[]>(subjects)
   const reorderTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const childReorderTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
   const [moveAnimationKey, setMoveAnimationKey] = useState(0)
 
-  // Update ordered parent subjects when props change - use ref to avoid dependency issues
+  // Update ordered parent subjects and child subjects when props change - use ref to avoid dependency issues
   React.useEffect(() => {
     const subjectsIds = subjects.map(s => s.id).join(',')
     const currentIds = subjectsRef.current.map(s => s.id).join(',')
@@ -174,6 +219,14 @@ export const SubjectList: React.FC<SubjectListProps> = ({
       // Filter only parent subjects for reordering
       const parentSubjects = subjects.filter(s => !s.parent_subject_id)
       setOrderedParentSubjects(parentSubjects)
+      
+      // Initialize ordered child subjects for each parent
+      const childSubjectsMap = new Map<string, Subject[]>()
+      parentSubjects.forEach(parent => {
+        const children = subjects.filter(s => s.parent_subject_id === parent.id)
+        childSubjectsMap.set(parent.id, children)
+      })
+      setOrderedChildSubjects(childSubjectsMap)
     }
   }, [subjects])
 
@@ -183,6 +236,10 @@ export const SubjectList: React.FC<SubjectListProps> = ({
       if (reorderTimeoutRef.current) {
         clearTimeout(reorderTimeoutRef.current)
       }
+      // Clear all child reorder timeouts
+      childReorderTimeoutRef.current.forEach(timeout => {
+        if (timeout) clearTimeout(timeout)
+      })
     }
   }, [])
 
@@ -201,7 +258,7 @@ export const SubjectList: React.FC<SubjectListProps> = ({
   const isParentExpanded = useCallback((parentId: string) => expandedParents.has(parentId), [expandedParents])
 
   const hierarchicalSubjects = useMemo(() => {
-    // Build hierarchy using ordered parent subjects but include all subjects for child relationships
+    // Build hierarchy using ordered parent subjects and ordered child subjects
     const subjectMap = new Map<string, Subject>()
     const rootSubjects: Subject[] = []
 
@@ -211,17 +268,29 @@ export const SubjectList: React.FC<SubjectListProps> = ({
       rootSubjects.push(subjectMap.get(subject.id)!)
     })
 
-    // Second pass: add child subjects from all subjects
-    subjects.forEach(subject => {
-      if (subject.parent_subject_id && subjectMap.has(subject.parent_subject_id)) {
-        const parent = subjectMap.get(subject.parent_subject_id)!
-        if (!parent.child_subjects) parent.child_subjects = []
-        parent.child_subjects.push({ ...subject, child_subjects: [] })
+    // Second pass: add child subjects for each parent
+    orderedParentSubjects.forEach(parent => {
+      const parentSubject = subjectMap.get(parent.id)!
+      if (!parentSubject.child_subjects) parentSubject.child_subjects = []
+      
+      // Use ordered child subjects if available, otherwise fall back to original subjects
+      const orderedChildren = orderedChildSubjects.get(parent.id)
+      if (orderedChildren && orderedChildren.length > 0) {
+        // Use ordered child subjects
+        orderedChildren.forEach(child => {
+          parentSubject.child_subjects!.push({ ...child, child_subjects: [] })
+        })
+      } else {
+        // Fall back to original subjects data
+        const children = subjects.filter(s => s.parent_subject_id === parent.id)
+        children.forEach(child => {
+          parentSubject.child_subjects!.push({ ...child, child_subjects: [] })
+        })
       }
     })
 
     return rootSubjects
-  }, [orderedParentSubjects, subjects])
+  }, [orderedParentSubjects, orderedChildSubjects, subjects])
 
   // Helper to move parent subject up/down
   const moveParentSubject = (fromIdx: number, toIdx: number) => {
@@ -242,6 +311,45 @@ export const SubjectList: React.FC<SubjectListProps> = ({
         console.log('Calling onReorderSubjects with:', subjectOrders)
         onReorderSubjects(subjectOrders)
       }, 500)
+    }
+  }
+
+  // Helper to move child subject up/down within parent
+  const moveChildSubject = (parentId: string, fromIdx: number, toIdx: number) => {
+    // Get current children from either ordered map or fall back to original subjects
+    let currentChildren = orderedChildSubjects.get(parentId)
+    if (!currentChildren || currentChildren.length === 0) {
+      // Fall back to original subjects if no ordered children exist
+      currentChildren = subjects.filter(s => s.parent_subject_id === parentId)
+    }
+    
+    if (toIdx < 0 || toIdx >= currentChildren.length) return
+    
+    // Immediately update the UI for instant feedback
+    const newOrder = [...currentChildren]
+    const [moved] = newOrder.splice(fromIdx, 1)
+    newOrder.splice(toIdx, 0, moved)
+    
+    setOrderedChildSubjects(prev => {
+      const newMap = new Map(prev)
+      newMap.set(parentId, newOrder)
+      return newMap
+    })
+    setMoveAnimationKey(prev => prev + 1)
+    
+    // Debounce API call
+    if (onReorderChildSubjects) {
+      const existingTimeout = childReorderTimeoutRef.current.get(parentId)
+      if (existingTimeout) clearTimeout(existingTimeout)
+      
+      const timeout = setTimeout(() => {
+        const childOrders = newOrder.map((child, idx) => ({ id: child.id, order: idx + 1 }))
+        console.log('Calling onReorderChildSubjects with:', parentId, childOrders)
+        onReorderChildSubjects(parentId, childOrders)
+        childReorderTimeoutRef.current.delete(parentId)
+      }, 500)
+      
+      childReorderTimeoutRef.current.set(parentId, timeout)
     }
   }
 
@@ -378,16 +486,29 @@ export const SubjectList: React.FC<SubjectListProps> = ({
               {/* Child Subjects */}
               {subject.child_subjects && subject.child_subjects.length > 0 && isParentExpanded(subject.id) && (
                 <div className="ml-6 space-y-2">
-                  {subject.child_subjects.map((child: Subject, childIndex: number) => (
-                    <SubjectItem 
-                      key={child.id} 
-                      subject={child} 
-                      index={childIndex} 
-                      isChild={true} 
-                      onEditSubject={onEditSubject}
-                      onDeleteSubject={onDeleteSubject}
-                    />
-                  ))}
+                  {subject.child_subjects.map((child: Subject, childIndex: number) => {
+                    const canMoveUp = childIndex > 0
+                    const canMoveDown = childIndex < subject.child_subjects!.length - 1
+                    
+                    return (
+                      <div key={child.id} className="flex items-center w-full">
+                        <div className="flex-1 min-w-0">
+                          <SubjectItem 
+                            subject={child} 
+                            index={childIndex} 
+                            isChild={true} 
+                            onEditSubject={onEditSubject}
+                            onDeleteSubject={onDeleteSubject}
+                            onMoveChildUp={() => moveChildSubject(subject.id, childIndex, childIndex - 1)}
+                            onMoveChildDown={() => moveChildSubject(subject.id, childIndex, childIndex + 1)}
+                            canMoveUp={canMoveUp}
+                            canMoveDown={canMoveDown}
+                            reordering={reordering}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

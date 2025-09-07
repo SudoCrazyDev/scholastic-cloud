@@ -288,6 +288,31 @@ const ClassSectionDetail: React.FC = () => {
     }
   })
 
+  const reorderChildSubjectsMutation = useMutation({
+    mutationFn: ({ parentId, childOrders }: { parentId: string; childOrders: Array<{ id: string; order: number }> }) => {
+      console.log('reorderChildSubjectsMutation called with:', parentId, childOrders)
+      return subjectService.reorderChildSubjects(parentId, childOrders)
+    },
+    onSuccess: () => {
+      toast.success('Child subjects reordered successfully!', {
+        duration: 3000,
+        position: 'top-right',
+        style: {
+          background: '#10B981',
+          color: '#fff',
+        },
+      })
+      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
+      refetchSubjects()
+    },
+    onError: () => {
+      toast.error('Failed to reorder child subjects. Please try again.', {
+        duration: 4000,
+        position: 'top-right',
+      })
+    }
+  })
+
   // Remove student mutation
   const removeStudentMutation = useMutation({
     mutationFn: (assignmentId: string) => studentService.removeStudentFromSection(assignmentId),
@@ -377,6 +402,10 @@ const ClassSectionDetail: React.FC = () => {
 
   const handleReorderSubjects = async (subjectOrders: Array<{ id: string; order: number }>) => {
     await reorderSubjectsMutation.mutateAsync(subjectOrders)
+  }
+
+  const handleReorderChildSubjects = async (parentId: string, childOrders: Array<{ id: string; order: number }>) => {
+    await reorderChildSubjectsMutation.mutateAsync({ parentId, childOrders })
   }
 
   const handleAssignmentSuccess = () => {
@@ -673,7 +702,8 @@ const ClassSectionDetail: React.FC = () => {
                     onEditSubject={handleEditSubject}
                     onDeleteSubject={handleDeleteSubject}
                     onReorderSubjects={handleReorderSubjects}
-                    reordering={reorderSubjectsMutation.isPending}
+                    onReorderChildSubjects={handleReorderChildSubjects}
+                    reordering={reorderSubjectsMutation.isPending || reorderChildSubjectsMutation.isPending}
                     onRefetch={refetchSubjects}
                   />
                 </motion.div>
