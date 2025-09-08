@@ -290,10 +290,10 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
                     grouped[base][subject.subject_title] = subject.grade;
                   });
                   // For each base, average grades for final grade (excluding child subjects)
-                  const allGrades = Object.values(grouped)
-                    .flatMap(variants => Object.values(variants)
-                      .map(g => typeof g === 'string' ? parseFloat(g) : g)
-                      .filter((g): g is number => g !== null && !isNaN(g)));
+                  // const allGrades = Object.values(grouped)
+                  //   .flatMap(variants => Object.values(variants)
+                  //     .map(g => typeof g === 'string' ? parseFloat(g) : g)
+                  //     .filter((g): g is number => g !== null && !isNaN(g)));
                   
                   // Filter out child subjects from final grade calculation
                   const parentAndRegularGrades = student.subjects
