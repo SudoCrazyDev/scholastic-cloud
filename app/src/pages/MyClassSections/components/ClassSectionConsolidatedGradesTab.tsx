@@ -43,8 +43,13 @@ const getGradeColor = (grade: number | string | null) => {
   return 'text-red-600 font-semibold';
 };
 
-const calculateFinalGrade = (subjects: Array<{ grade: number | string | null }>) => {
-  const validGrades = subjects
+const calculateFinalGrade = (subjects: Array<{ grade: number | string | null; subject_type?: string; parent_subject_id?: string | null }>) => {
+  // Filter out child subjects - only include parent subjects and regular subjects
+  const parentAndRegularSubjects = subjects.filter(subject => 
+    subject.subject_type !== 'child'
+  );
+  
+  const validGrades = parentAndRegularSubjects
     .map(subject => {
       const grade = typeof subject.grade === 'string' ? parseFloat(subject.grade) : subject.grade;
       return isNaN(grade as number) ? null : grade;
@@ -80,7 +85,6 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
 }) => {
   const { user } = useAuth();
   const { data, isLoading, error } = useConsolidatedGrades(sectionId, selectedQuarter);
-  
   // Fetch subjects with hierarchical data like the report card
   const {
     data: subjectsResponse,
@@ -181,11 +185,12 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
   const studentsWithGroupedSubjects = React.useMemo(() => {
     if (!data) return [];
     return data.students.map((student: any) => {
-      const grouped: Record<string, { grades: (number | string | null)[] }> = {};
+      const grouped: Record<string, { grades: (number | string | null)[], subjects: any[] }> = {};
       student.subjects.forEach((subject: any) => {
         const base = getBaseTitle(subject.subject_title);
-        if (!grouped[base]) grouped[base] = { grades: [] };
+        if (!grouped[base]) grouped[base] = { grades: [], subjects: [] };
         grouped[base].grades.push(subject.grade);
+        grouped[base].subjects.push(subject);
       });
       
       // For each base, average grades (or use single if only one)
@@ -197,9 +202,20 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
         if (grades.length > 0) {
           avg = Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
         }
+        
+        // Get the subject type from the first subject in the group
+        // If all subjects in the group are child subjects, mark as child
+        // Otherwise, mark as parent or regular
+        const subjects = grouped[base].subjects;
+        const isChildGroup = subjects.every((s: any) => s.subject_type === 'child');
+        const subjectType = isChildGroup ? 'child' : (subjects[0]?.subject_type || 'regular');
+        const parentSubjectId = subjects[0]?.parent_subject_id || null;
+        
         return {
           subject_title: base,
           grade: avg,
+          subject_type: subjectType,
+          parent_subject_id: parentSubjectId,
         };
       });
       
@@ -209,7 +225,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
       };
     });
   }, [data]);
-
+  console.log('data', data);
   if (isLoading || subjectsLoading) {
     return (
       <div className="min-h-[300px] flex items-center justify-center">

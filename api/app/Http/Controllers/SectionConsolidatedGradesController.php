@@ -84,6 +84,8 @@ class SectionConsolidatedGradesController extends Controller
                             'subject_id' => $subject->id,
                             'subject_title' => $subject->title,
                             'subject_variant' => $subject->variant,
+                            'subject_type' => $subject->subject_type,
+                            'parent_subject_id' => $subject->parent_subject_id,
                             'grade' => $avg !== null ? (int)$avg : null,
                             'final_grade' => $avg !== null ? (int)$avg : null,
                             'calculated_grade' => $avg !== null ? (int)$avg : null,
@@ -100,6 +102,8 @@ class SectionConsolidatedGradesController extends Controller
                             'subject_id' => $subject->id,
                             'subject_title' => $subject->title,
                             'subject_variant' => $subject->variant,
+                            'subject_type' => $subject->subject_type,
+                            'parent_subject_id' => $subject->parent_subject_id,
                             'grade' => $val !== null ? (int)$val : null,
                             'final_grade' => $grade ? $grade->final_grade : null,
                             'calculated_grade' => $grade ? $grade->grade : null,
@@ -129,6 +133,8 @@ class SectionConsolidatedGradesController extends Controller
                             'subject_id' => $subject->id,
                             'subject_title' => $subject->title,
                             'subject_variant' => $subject->variant,
+                            'subject_type' => $subject->subject_type,
+                            'parent_subject_id' => $subject->parent_subject_id,
                             'grade' => $val !== null ? (int)$val : null,
                             'final_grade' => $grade ? $grade->final_grade : null,
                             'calculated_grade' => $grade ? $grade->grade : null,
@@ -161,15 +167,22 @@ class SectionConsolidatedGradesController extends Controller
                     'subject_id' => $groupedSubjects[0]->id, // Use first subject's ID
                     'subject_title' => $baseTitle,
                     'subject_variant' => null,
+                    'subject_type' => $groupedSubjects[0]->subject_type,
+                    'parent_subject_id' => $groupedSubjects[0]->parent_subject_id,
                     'grade' => $avg !== null ? (int)$avg : null,
                     'final_grade' => $avg !== null ? (int)$avg : null,
                     'calculated_grade' => $avg !== null ? (int)$avg : null,
                 ];
             }
 
+            // Format student name as: LAST_NAME, FIRST_NAME MIDDLE_INITIAL EXT_NAME
+            $middleInitial = !empty($student->middle_name) ? substr($student->middle_name, 0, 1) . '.' : '';
+            $extName = !empty($student->ext_name) ? ' ' . $student->ext_name : '';
+            $formattedName = strtoupper(trim($student->last_name . ', ' . $student->first_name . ' ' . $middleInitial . $extName));
+
             $consolidatedGrades[] = [
                 'student_id' => $student->id,
-                'student_name' => trim($student->first_name . ' ' . $student->middle_name . ' ' . $student->last_name . ' ' . $student->ext_name),
+                'student_name' => $formattedName,
                 'lrn' => $student->lrn,
                 'gender' => $student->gender,
                 'subjects' => $studentGrades,

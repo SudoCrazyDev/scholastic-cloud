@@ -18,6 +18,8 @@ export interface ConsolidatedGradesResponse {
         subject_id: string
         subject_title: string
         subject_variant: string
+        subject_type: string
+        parent_subject_id: string | null
         grade: number | string | null
         final_grade: number | string | null
         calculated_grade: number | string | null

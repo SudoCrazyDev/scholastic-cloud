@@ -149,6 +149,8 @@ interface ConsolidatedGradesPDFProps {
         subject_id: string;
         subject_title: string;
         subject_variant: string;
+        subject_type: string;
+        parent_subject_id: string | null;
         grade: number | string | null;
         final_grade: number | string | null;
         calculated_grade: number | string | null;
@@ -287,12 +289,22 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
                     if (!grouped[base]) grouped[base] = {};
                     grouped[base][subject.subject_title] = subject.grade;
                   });
-                  // For each base, average grades for final grade
+                  // For each base, average grades for final grade (excluding child subjects)
                   const allGrades = Object.values(grouped)
                     .flatMap(variants => Object.values(variants)
                       .map(g => typeof g === 'string' ? parseFloat(g) : g)
                       .filter((g): g is number => g !== null && !isNaN(g)));
-                  const finalGrade = allGrades.length > 0 ? Math.round(allGrades.reduce((a, b) => a + b, 0) / allGrades.length) : null;
+                  
+                  // Filter out child subjects from final grade calculation
+                  const parentAndRegularGrades = student.subjects
+                    .filter(subject => subject.subject_type !== 'child')
+                    .map(subject => {
+                      const grade = typeof subject.grade === 'string' ? parseFloat(subject.grade) : subject.grade;
+                      return grade !== null && !isNaN(grade) ? grade : null;
+                    })
+                    .filter((grade): grade is number => grade !== null);
+                  
+                  const finalGrade = parentAndRegularGrades.length > 0 ? Math.round(parentAndRegularGrades.reduce((a, b) => a + b, 0) / parentAndRegularGrades.length) : null;
                   return (
                     <View key={student.student_id} style={styles.tableRow}>
                       <View style={styles.tableColStudent}>
