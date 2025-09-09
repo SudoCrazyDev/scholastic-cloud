@@ -27,8 +27,8 @@ class SectionConsolidatedGradesController extends Controller
         // Get the section with its students and subjects (eager load childSubjects)
         $section = ClassSection::with(['students', 'subjects.childSubjects'])->findOrFail($sectionId);
 
-        // Get all students in this section
-        $students = $section->students;
+        // Get all students in this section and sort by last name alphabetically
+        $students = $section->students->sortBy('last_name');
 
         // Get all subjects for this section, ordered hierarchically
         $subjects = $section->subjects->sortBy(function($subject) {
@@ -67,6 +67,7 @@ class SectionConsolidatedGradesController extends Controller
             // 1. Handle parent subjects (average their children)
             foreach ($subjects as $subject) {
                 if ($subject->subject_type === 'parent') {
+                    
                     $childSubjects = $subject->childSubjects;
                     if ($childSubjects->count() > 0) {
                         // Average grades of all child subjects for this student
@@ -101,11 +102,11 @@ class SectionConsolidatedGradesController extends Controller
                         $studentGrades[] = [
                             'subject_id' => $subject->id,
                             'subject_title' => $subject->title,
-                            'subject_variant' => $subject->variant,
+                            'subswedsject_variant' => $subject->variant,
                             'subject_type' => $subject->subject_type,
                             'parent_subject_id' => $subject->parent_subject_id,
-                            'grade' => $val !== null ? (int)$val : null,
-                            'final_grade' => $grade ? $grade->final_grade : null,
+                            'grade' => $val !== null ? (float)$val : null,
+                            'final_grade' => $val !== null ? (float)$val : null,
                             'calculated_grade' => $grade ? $grade->grade : null,
                         ];
                         $handledParentIds[] = $subject->id;
@@ -136,22 +137,33 @@ class SectionConsolidatedGradesController extends Controller
                             'subject_type' => $subject->subject_type,
                             'parent_subject_id' => $subject->parent_subject_id,
                             'grade' => $val !== null ? (int)$val : null,
-                            'final_grade' => $grade ? $grade->final_grade : null,
+                            'final_grade' => $val !== null ? (int)$val : null,
                             'calculated_grade' => $grade ? $grade->grade : null,
                         ];
                     }
                 }
             }
 
-            // 2. Handle subjects with variants (group by base title, average grades)
+            // 2. Handle subjects with variants (group by base title only if variant is not empty/null)
             $variantGroups = [];
+            $regularSubjects = [];
+            
             foreach ($subjects as $subject) {
                 // Only consider subjects not already handled (not parent or child)
                 if ($subject->subject_type !== 'parent' && $subject->subject_type !== 'child' && !in_array($subject->id, $handledParentIds)) {
-                    $baseTitle = $getBaseTitle($subject->title);
-                    $variantGroups[$baseTitle][] = $subject;
+                    // Check if subject has a variant (not empty and not null)
+                    if (!empty($subject->variant) && $subject->variant !== null) {
+                        // Group by base title for subjects with variants
+                        $baseTitle = $getBaseTitle($subject->title);
+                        $variantGroups[$baseTitle][] = $subject;
+                    } else {
+                        // Treat as individual subject if no variant
+                        $regularSubjects[] = $subject;
+                    }
                 }
             }
+            
+            // Process grouped subjects with variants
             foreach ($variantGroups as $baseTitle => $groupedSubjects) {
                 $gradesArr = [];
                 foreach ($groupedSubjects as $subject) {
@@ -172,6 +184,24 @@ class SectionConsolidatedGradesController extends Controller
                     'grade' => $avg !== null ? (int)$avg : null,
                     'final_grade' => $avg !== null ? (int)$avg : null,
                     'calculated_grade' => $avg !== null ? (int)$avg : null,
+                ];
+            }
+            
+            // Process regular subjects (without variants) individually
+            foreach ($regularSubjects as $subject) {
+                $grade = $grades->where('student_id', $student->id)
+                    ->where('subject_id', $subject->id)
+                    ->first();
+                $val = $grade ? ($grade->final_grade ?? $grade->grade) : null;
+                $studentGrades[] = [
+                    'subject_id' => $subject->id,
+                    'subject_title' => $subject->title,
+                    'subject_variant' => $subject->variant,
+                    'subject_type' => $subject->subject_type,
+                    'parent_subject_id' => $subject->parent_subject_id,
+                    'grade' => $val !== null ? (int)$val : null,
+                    'final_grade' => $val !== null ? (int)$val : null,
+                    'calculated_grade' => $grade ? $grade->grade : null,
                 ];
             }
 

@@ -3,11 +3,12 @@ import { useConsolidatedGrades } from '../../../hooks/useConsolidatedGrades';
 import { useAuth } from '../../../hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { subjectService } from '../../../services/subjectService';
-import { Loader2, X, FileText, User, GraduationCap, Users } from 'lucide-react';
+import { Loader2, X, FileText, User, GraduationCap, Users, FileSpreadsheet } from 'lucide-react';
 import { Badge } from '../../../components/badge';
 import { Button } from '../../../components/button';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { ConsolidatedGradesPDF } from '../../ConsolidatedGrades/components/ConsolidatedGradesPDF';
+import { exportConsolidatedGradesToExcel } from '../../../utils/excelExport';
 import type { Subject } from '../../../types';
 
 interface ClassSectionConsolidatedGradesTabProps {
@@ -154,14 +155,23 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
         return a.order - b.order;
       });
     
-    // Group subjects by base title (without variant)
+    // Group subjects by base title only if they have variants
     const groupedSubjects: Record<string, Subject[]> = {};
+    const individualSubjects: Subject[] = [];
+    
     sortedSubjects.forEach(subject => {
-      const baseTitle = getBaseTitle(subject.title);
-      if (!groupedSubjects[baseTitle]) {
-        groupedSubjects[baseTitle] = [];
+      // Check if subject has a variant (not empty and not null)
+      if (subject.variant && subject.variant.trim() !== '') {
+        // Group by base title for subjects with variants
+        const baseTitle = getBaseTitle(subject.title);
+        if (!groupedSubjects[baseTitle]) {
+          groupedSubjects[baseTitle] = [];
+        }
+        groupedSubjects[baseTitle].push(subject);
+      } else {
+        // Treat as individual subject if no variant
+        individualSubjects.push(subject);
       }
-      groupedSubjects[baseTitle].push(subject);
     });
     
     console.log('Grouped subjects:', Object.keys(groupedSubjects).map(baseTitle => ({
@@ -174,27 +184,44 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
       }))
     })));
     
-    // Return grouped subjects with all subject IDs for each base title
-    return Object.keys(groupedSubjects).map(baseTitle => ({
+    // Return grouped subjects with all subject IDs for each base title, plus individual subjects
+    const groupedSubjectsList = Object.keys(groupedSubjects).map(baseTitle => ({
       base: baseTitle,
       subject_ids: groupedSubjects[baseTitle].map(s => s.id),
       subject_title: baseTitle,
     }));
+    
+    const individualSubjectsList = individualSubjects.map(subject => ({
+      base: subject.title,
+      subject_ids: [subject.id],
+      subject_title: subject.title,
+    }));
+    
+    return [...groupedSubjectsList, ...individualSubjectsList];
   }, [subjectsResponse, data]);
-  // For each student, group grades by base subject title
+  // For each student, group grades by base subject title only for subjects with variants
   const studentsWithGroupedSubjects = React.useMemo(() => {
     if (!data) return [];
     return data.students.map((student: any) => {
       const grouped: Record<string, { grades: (number | string | null)[], subjects: any[] }> = {};
+      const individualSubjects: any[] = [];
+      
       student.subjects.forEach((subject: any) => {
-        const base = getBaseTitle(subject.subject_title);
-        if (!grouped[base]) grouped[base] = { grades: [], subjects: [] };
-        grouped[base].grades.push(subject.grade);
-        grouped[base].subjects.push(subject);
+        // Check if subject has a variant (not empty and not null)
+        if (subject.subject_variant && subject.subject_variant.trim() !== '') {
+          // Group by base title for subjects with variants
+          const base = getBaseTitle(subject.subject_title);
+          if (!grouped[base]) grouped[base] = { grades: [], subjects: [] };
+          grouped[base].grades.push(subject.grade);
+          grouped[base].subjects.push(subject);
+        } else {
+          // Treat as individual subject if no variant
+          individualSubjects.push(subject);
+        }
       });
       
-      // For each base, average grades (or use single if only one)
-      const groupedSubjects = Object.keys(grouped).map(base => {
+      // Process grouped subjects with variants
+      const groupedSubjectsList = Object.keys(grouped).map(base => {
         const grades = grouped[base].grades
           .map(g => (g === null || g === undefined ? null : typeof g === 'string' ? parseFloat(g) : g))
           .filter(g => g !== null && !isNaN(g as number)) as number[];
@@ -219,13 +246,21 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
         };
       });
       
+      // Process individual subjects (without variants)
+      const individualSubjectsList = individualSubjects.map(subject => ({
+        subject_title: subject.subject_title,
+        grade: subject.grade,
+        subject_type: subject.subject_type,
+        parent_subject_id: subject.parent_subject_id,
+      }));
+      
       return {
         ...student,
-        groupedSubjects,
+        groupedSubjects: [...groupedSubjectsList, ...individualSubjectsList],
       };
     });
   }, [data]);
-  console.log('data', data);
+
   if (isLoading || subjectsLoading) {
     return (
       <div className="min-h-[300px] flex items-center justify-center">
@@ -260,13 +295,22 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
   type ConsolidatedStudent = typeof students[number] & { gender?: string };
   const studentsWithGender = students as ConsolidatedStudent[];
 
-  // Group students by gender
+  // Group students by gender and sort each group by last name
   const groupedStudents: Record<string, ConsolidatedStudent[]> = studentsWithGender.reduce((acc, student) => {
     const gender = student.gender ? student.gender.toLowerCase() : 'other';
     if (!acc[gender]) acc[gender] = [];
     acc[gender].push(student);
     return acc;
   }, {} as Record<string, ConsolidatedStudent[]>);
+
+  // Sort each gender group by last name alphabetically
+  Object.keys(groupedStudents).forEach(gender => {
+    groupedStudents[gender].sort((a, b) => {
+      const lastNameA = a.student_name.split(',')[0]?.trim() || '';
+      const lastNameB = b.student_name.split(',')[0]?.trim() || '';
+      return lastNameA.localeCompare(lastNameB);
+    });
+  });
 
   const genderLabels: Record<string, string> = {
     male: 'Male',
@@ -278,6 +322,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
   const defaultInstitution = user?.user_institutions?.find((ui: any) => ui.is_default)?.institution;
   const institutionName = defaultInstitution?.name || 'School Institution';
 
+  console.log("data", data);
   return (
     <div className="">
       {/* Header */}
@@ -298,26 +343,42 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
           </div>
           <div className="flex items-center gap-3">
             {data && (
-              <PDFDownloadLink
-                document={
-                  <ConsolidatedGradesPDF 
-                    data={data} 
-                    institutionName={institutionName}
-                  />
-                }
-                fileName={`consolidated-grades-${section.title}-q${selectedQuarter}-${section.academic_year}.pdf`}
-              >
-                {({loading }) => (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    disabled={loading}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    {loading ? 'Generating PDF...' : 'Export PDF'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
+              <>
+                <PDFDownloadLink
+                  document={
+                    <ConsolidatedGradesPDF 
+                      data={data} 
+                      institutionName={institutionName}
+                    />
+                  }
+                  fileName={`consolidated-grades-${section.title}-q${selectedQuarter}-${section.academic_year}.pdf`}
+                >
+                  {({loading }) => (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      disabled={loading}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      {loading ? 'Generating PDF...' : 'Export PDF'}
+                    </Button>
+                  )}
+                </PDFDownloadLink>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => exportConsolidatedGradesToExcel(
+                    data, 
+                    baseSubjects, 
+                    studentsWithGroupedSubjects, 
+                    institutionName, 
+                    selectedQuarter
+                  )}
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export Excel
+                </Button>
+              </>
             )}
           </div>
         </div>

@@ -17,7 +17,7 @@ export default function PrintTempReportCard({
   classSection,
   student
 }: PrintTempReportCardProps) {
-
+    console.log('studentSubjectsGrade', studentSubjectsGrade);
     return (
         <PDFViewer className='w-full' style={{height: '600px'}}>
             <Document>
