@@ -6,8 +6,6 @@ use App\Models\ClassSection;
 use App\Models\StudentRunningGrade;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class SectionConsolidatedGradesController extends Controller
 {
@@ -102,7 +100,7 @@ class SectionConsolidatedGradesController extends Controller
                         $studentGrades[] = [
                             'subject_id' => $subject->id,
                             'subject_title' => $subject->title,
-                            'subswedsject_variant' => $subject->variant,
+                            'subject_variant' => $subject->variant,
                             'subject_type' => $subject->subject_type,
                             'parent_subject_id' => $subject->parent_subject_id,
                             'grade' => $val !== null ? (float)$val : null,
@@ -166,15 +164,18 @@ class SectionConsolidatedGradesController extends Controller
             // Process grouped subjects with variants
             foreach ($variantGroups as $baseTitle => $groupedSubjects) {
                 $gradesArr = [];
+                $finalGradesArr = [];
                 foreach ($groupedSubjects as $subject) {
                     $grade = $grades->where('student_id', $student->id)
                         ->where('subject_id', $subject->id)
                         ->first();
                     if ($grade) {
-                        $gradesArr[] = $grade->final_grade ?? $grade->grade;
+                        $gradesArr[] = $grade->grade;
+                        $finalGradesArr[] = $grade->final_grade ?? $grade->grade;
                     }
                 }
                 $avg = count($gradesArr) > 0 ? round(array_sum($gradesArr) / count($gradesArr)) : null;
+                $finalAvg = count($finalGradesArr) > 0 ? round(array_sum($finalGradesArr) / count($finalGradesArr)) : null;
                 $studentGrades[] = [
                     'subject_id' => $groupedSubjects[0]->id, // Use first subject's ID
                     'subject_title' => $baseTitle,
@@ -182,7 +183,7 @@ class SectionConsolidatedGradesController extends Controller
                     'subject_type' => $groupedSubjects[0]->subject_type,
                     'parent_subject_id' => $groupedSubjects[0]->parent_subject_id,
                     'grade' => $avg !== null ? (int)$avg : null,
-                    'final_grade' => $avg !== null ? (int)$avg : null,
+                    'final_grade' => $finalAvg !== null ? (int)$finalAvg : null,
                     'calculated_grade' => $avg !== null ? (int)$avg : null,
                 ];
             }

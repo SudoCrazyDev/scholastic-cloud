@@ -174,30 +174,29 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
       }
     });
     
-    console.log('Grouped subjects:', Object.keys(groupedSubjects).map(baseTitle => ({
-      baseTitle,
-      subjects: groupedSubjects[baseTitle].map(s => ({
-        title: s.title,
-        type: s.subject_type,
-        order: s.order,
-        parent_id: s.parent_subject_id,
-      }))
-    })));
-    
-    // Return grouped subjects with all subject IDs for each base title, plus individual subjects
-    const groupedSubjectsList = Object.keys(groupedSubjects).map(baseTitle => ({
-      base: baseTitle,
-      subject_ids: groupedSubjects[baseTitle].map(s => s.id),
-      subject_title: baseTitle,
-    }));
+    // Create combined list with order information for proper sorting
+    const groupedSubjectsList = Object.keys(groupedSubjects).map(baseTitle => {
+      const subjects = groupedSubjects[baseTitle];
+      // Use the minimum order from the grouped subjects to maintain proper sorting
+      const minOrder = Math.min(...subjects.map(s => s.order));
+      return {
+        base: baseTitle,
+        subject_ids: subjects.map(s => s.id),
+        subject_title: baseTitle,
+        order: minOrder,
+      };
+    });
     
     const individualSubjectsList = individualSubjects.map(subject => ({
       base: subject.title,
       subject_ids: [subject.id],
       subject_title: subject.title,
+      order: subject.order,
     }));
     
-    return [...groupedSubjectsList, ...individualSubjectsList];
+    // Combine and sort by order to maintain proper subject sequence
+    const combinedSubjects = [...groupedSubjectsList, ...individualSubjectsList];
+    return combinedSubjects.sort((a, b) => a.order - b.order);
   }, [subjectsResponse, data]);
   // For each student, group grades by base subject title only for subjects with variants
   const studentsWithGroupedSubjects = React.useMemo(() => {
@@ -322,7 +321,6 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
   const defaultInstitution = user?.user_institutions?.find((ui: any) => ui.is_default)?.institution;
   const institutionName = defaultInstitution?.name || 'School Institution';
 
-  console.log("data", data);
   return (
     <div className="">
       {/* Header */}
