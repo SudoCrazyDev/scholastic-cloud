@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import PublicLayout from '../components/layouts/PublicLayout';
 import { authService } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
@@ -71,25 +71,25 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     },
   });
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
         duration: 0.6,
-        ease: 'easeOut',
+        ease: ['easeOut'],
         staggerChildren: 0.1,
       },
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.4, ease: 'easeOut' },
+      transition: { duration: 0.4, ease: ['easeOut'] },
     },
   };
 

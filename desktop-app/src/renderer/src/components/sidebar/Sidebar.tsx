@@ -4,7 +4,8 @@ import {
   LayoutDashboard, 
   Menu,
   Lock,
-  X
+  X,
+  PencilLine
 } from 'lucide-react';
 
 interface MenuItem {
@@ -24,6 +25,12 @@ const menuItems: MenuItem[] = [
     label: 'Dashboard',
     icon: <LayoutDashboard className="w-5 h-5" />,
     path: '/dashboard',
+  },
+  {
+    id: 'offline-grades',
+    label: 'Offline Grades',
+    icon: <PencilLine className="w-5 h-5" />,
+    path: '/offline-grades',
   },
 ];
 
@@ -81,8 +88,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
             key={item.id}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={onMobileClose} // Close mobile sidebar when clicking a link
-            className="flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer group w-full text-left bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600"
+            onClick={() => {
+              onMobileClose?.();
+              // naive navigation by setting location hash (simple since no router is set up)
+              window.location.hash = item.path;
+            }}
+            className="flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer group w-full text-left hover:bg-gray-50"
           >
             <motion.div
               whileHover={{ scale: 1.1 }}
