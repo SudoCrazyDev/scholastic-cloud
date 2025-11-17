@@ -61,6 +61,21 @@ class ClassSectionService {
   async deleteClassSection(id: string) {
     await api.delete(`${this.baseUrl}/${id}`)
   }
+
+  async dissolveSection(id: string, data: {
+    student_assignments: Array<{
+      student_id: string
+      target_section_id: string
+    }>
+    subject_mappings: Array<{
+      source_subject_id: string
+      target_subject_id: string
+      target_section_id: string
+    }>
+  }) {
+    const response = await api.post<{ success: boolean; message: string; data: any }>(`${this.baseUrl}/${id}/dissolve`, data)
+    return response.data
+  }
 }
 
 export const classSectionService = new ClassSectionService() 

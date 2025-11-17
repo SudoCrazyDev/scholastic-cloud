@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ClassSectionHeader, ClassSectionList, ClassSectionModal, ClassSectionSubjects, ClassSectionSubjectModal, SubjectTemplatesModal } from './components'
+import { ClassSectionHeader, ClassSectionList, ClassSectionModal, ClassSectionSubjects, ClassSectionSubjectModal, SubjectTemplatesModal, DissolveSectionModal } from './components'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { Alert } from '../../components/alert'
 import { useClassSections } from '../../hooks/useClassSections'
 import { useSubjects } from '../../hooks/useSubjects'
+import { useStudents } from '../../hooks/useStudents'
 import { useAuth } from '../../hooks/useAuth'
 import type { ClassSection, Subject } from '../../types'
 
@@ -46,6 +47,18 @@ const ClassSections: React.FC = () => {
   
   // State for templates modal
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
+  
+  // State for dissolve section modal
+  const [isDissolveModalOpen, setIsDissolveModalOpen] = useState(false)
+  
+  // Fetch students for selected class section
+  const {
+    students: sectionStudents,
+    loading: studentsLoading,
+    error: studentsError,
+  } = useStudents({
+    class_section_id: selectedClassSection?.id,
+  })
 
   // Wrapper handlers to update local state
   const handleSearchChange = (value: string) => {
@@ -111,6 +124,11 @@ const ClassSections: React.FC = () => {
   const filteredSubjects = selectedClassSection 
     ? buildSubjectHierarchy(subjects)
     : []
+
+  // Available sections for transfer (exclude current section)
+  const availableSections = classSections.filter(
+    section => section.id !== selectedClassSection?.id
+  )
 
   const handleReorderSubjects = async (classSectionId: string, subjectOrders: Array<{ id: string; order: number }>) => {
     try {
@@ -218,6 +236,7 @@ const ClassSections: React.FC = () => {
             onEditSubject={handleEditSubject}
             onDeleteSubject={handleDeleteSubject}
             onReorderSubjects={handleReorderSubjects}
+            onDissolveSection={selectedClassSection ? () => setIsDissolveModalOpen(true) : undefined}
             loading={subjectsLoading}
           />
         </div>
@@ -280,6 +299,21 @@ const ClassSections: React.FC = () => {
       <SubjectTemplatesModal
         isOpen={isTemplatesModalOpen}
         onClose={() => setIsTemplatesModalOpen(false)}
+      />
+
+      {/* Dissolve Section Modal */}
+      <DissolveSectionModal
+        isOpen={isDissolveModalOpen}
+        onClose={() => setIsDissolveModalOpen(false)}
+        students={sectionStudents || []}
+        sectionTitle={selectedClassSection?.title}
+        sectionId={selectedClassSection?.id}
+        availableSections={availableSections}
+        currentSubjects={subjects.filter(s => 
+          selectedClassSection && s.class_section_id === selectedClassSection.id
+        )}
+        loading={studentsLoading}
+        studentsError={studentsError}
       />
     </motion.div>
   )

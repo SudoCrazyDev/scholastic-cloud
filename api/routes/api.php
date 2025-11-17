@@ -94,6 +94,7 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('staffs', StaffController::class);
     // ClassSection routes
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
+    Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);
     Route::apiResource('class-sections', ClassSectionController::class);
     // Subject routes
     Route::apiResource('subjects', SubjectController::class);

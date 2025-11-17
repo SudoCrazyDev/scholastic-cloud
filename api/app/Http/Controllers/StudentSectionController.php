@@ -34,8 +34,10 @@ class StudentSectionController extends Controller
         $sectionId = $request->section_id;
         
         // Get students with their studentSection id using join
+        // Only get students where is_active = 1 (active students)
         $students = Student::join('student_sections', 'students.id', '=', 'student_sections.student_id')
             ->where('student_sections.section_id', $sectionId)
+            ->where('student_sections.is_active', true)
             ->select(
                 'students.id', 
                 'students.lrn', 

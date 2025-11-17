@@ -22,6 +22,7 @@ interface ClassSectionSubjectsProps {
   onEditSubject: (subject: Subject) => void
   onDeleteSubject: (subject: Subject) => void
   onReorderSubjects: (classSectionId: string, subjectOrders: Array<{ id: string; order: number }>) => Promise<void>
+  onDissolveSection?: () => void
   loading?: boolean
 }
 
@@ -32,6 +33,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
   onEditSubject,
   onDeleteSubject,
   onReorderSubjects,
+  onDissolveSection,
   loading = false,
 }) => {
   const [isDragging, setIsDragging] = useState(false)
@@ -341,13 +343,27 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
             {selectedClassSection.title} - {selectedClassSection.grade_level}
           </p>
         </div>
-        <Button
-          onClick={onCreateSubject}
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          <PlusIcon className="w-4 h-4 mr-2" />
-          Add Subject
-        </Button>
+        <div className="flex items-center space-x-3">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onCreateSubject}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
+          >
+            <PlusIcon className="w-4 h-4" />
+            <span>Add Subject</span>
+          </motion.button>
+          {onDissolveSection && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onDissolveSection}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
+            >
+                    <span>Student Transfer</span>
+            </motion.button>
+          )}
+        </div>
       </div>
 
       {/* Pending Changes Indicator */}
@@ -373,14 +389,15 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
           <div className="text-center py-8">
             <AcademicCapIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 mb-4">No subjects assigned to this class section</p>
-            <Button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={onCreateSubject}
-              variant="outline"
-              className="border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
             >
-              <PlusIcon className="w-4 h-4 mr-2" />
-              Add First Subject
-            </Button>
+              <PlusIcon className="w-4 h-4" />
+              <span>Add First Subject</span>
+            </motion.button>
           </div>
         ) : (
           <div className="space-y-3">

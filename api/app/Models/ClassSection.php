@@ -16,6 +16,8 @@ class ClassSection extends Model
         'title',
         'adviser',
         'academic_year',
+        'status',
+        'deleted_at',
     ];
 
     /**

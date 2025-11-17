@@ -17,6 +17,8 @@ class StudentRunningGrade extends Model
         'grade',
         'final_grade',
         'academic_year',
+        'note',
+        'deleted_at',
     ];
 
     protected $casts = [

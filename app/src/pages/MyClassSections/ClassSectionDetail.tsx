@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'react-hot-toast'
+import { useQuery } from '@tanstack/react-query'
 import { classSectionService } from '../../services/classSectionService'
 import { subjectService } from '../../services/subjectService'
 import { studentService } from '../../services/studentService'
@@ -17,6 +16,7 @@ import { CreateStudentModal } from './components/CreateStudentModal'
 import { StudentModal } from '../Students/components/StudentModal'
 import { ClassSectionSubjectModal } from '../ClassSections/components/ClassSectionSubjectModal'
 import { useAuth } from '../../hooks/useAuth'
+import { useClassSectionDetailMutations } from '../../hooks/useClassSectionDetailMutations'
 import {
   ArrowLeft,
   Users,
@@ -28,20 +28,29 @@ import {
   Award
 } from 'lucide-react'
 import type { Student, Subject, StudentSubjectGrade } from '../../types'
-import ClassSectionHeader from './components/ClassSectionHeader';
-import ClassSectionStudentsTab from './components/ClassSectionStudentsTab';
-import ClassSectionRankingTab from './components/ClassSectionRankingTab';
-import ClassSectionReportCardsTab from './components/ClassSectionReportCardsTab';
-import ClassSectionConsolidatedGradesTab from './components/ClassSectionConsolidatedGradesTab';
-import ClassSectionSubjectsTab from './components/ClassSectionSubjectsTab';
-import ClassSectionCoreValuesTab from './components/ClassSectionCoreValuesTab';
-import { Select } from '../../components/select';
-import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils';
+import ClassSectionHeader from './components/ClassSectionHeader'
+import ClassSectionStudentsTab from './components/ClassSectionStudentsTab'
+import ClassSectionRankingTab from './components/ClassSectionRankingTab'
+import ClassSectionReportCardsTab from './components/ClassSectionReportCardsTab'
+import ClassSectionConsolidatedGradesTab from './components/ClassSectionConsolidatedGradesTab'
+import ClassSectionSubjectsTab from './components/ClassSectionSubjectsTab'
+import ClassSectionCoreValuesTab from './components/ClassSectionCoreValuesTab'
+import { Select } from '../../components/select'
+import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils'
+
+const QUARTER_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '1', label: 'First Quarter' },
+  { value: '2', label: 'Second Quarter' },
+  { value: '3', label: 'Third Quarter' },
+  { value: '4', label: 'Fourth Quarter' },
+]
+
+const ERROR_TIMEOUT = 5000
+const SUCCESS_TIMEOUT = 3000
 
 const ClassSectionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
@@ -76,7 +85,6 @@ const ClassSectionDetail: React.FC = () => {
 
   const institutionId = user?.user_institutions?.[0]?.institution_id || ''
 
-  // Fetch class section details
   const {
     data: classSection,
     isLoading: classSectionLoading,
@@ -87,14 +95,10 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!id,
   })
 
-  // Get institution ID from class section if user doesn't have it
   const effectiveInstitutionId = useMemo(() => {
-    if (institutionId) return institutionId;
-    if (classSection?.data?.institution_id) return classSection.data.institution_id;
-    return '';
-  }, [institutionId, classSection?.data?.institution_id]);
+    return institutionId || classSection?.data?.institution_id || ''
+  }, [institutionId, classSection?.data?.institution_id])
 
-  // Fetch institution details
   const {
     data: institution,
   } = useQuery({
@@ -105,7 +109,6 @@ const ClassSectionDetail: React.FC = () => {
 
 
 
-  // Fetch subjects for this class section
   const {
     data: subjectsResponse,
     isLoading: subjectsLoading,
@@ -117,7 +120,6 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!id,
   })
 
-  // Fetch students for this class section
   const {
     data: studentsResponse,
     isLoading: studentsLoading,
@@ -129,20 +131,23 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!id,
   })
 
-  const subjects = subjectsResponse?.data || []
-  const students = studentsResponse?.data?.map((item: Student) => ({
-    ...item,
-    assignmentId: item.student_section_id
-  })) || []
+  const subjects = useMemo(() => subjectsResponse?.data || [], [subjectsResponse?.data])
+  
+  const students = useMemo(() => 
+    studentsResponse?.data?.map((item: Student) => ({
+      ...item,
+      assignmentId: item.student_section_id
+    })) || [], 
+    [studentsResponse?.data]
+  )
+  
   const classSectionData = classSection?.data
 
-  // Get the selected student object for report card
   const selectedStudent = useMemo(() => {
-    if (!selectedStudentForReport?.id || !students.length) return null;
-    return students.find(student => student.id === selectedStudentForReport.id) || null;
-  }, [selectedStudentForReport?.id, students]);
+    if (!selectedStudentForReport?.id || !students.length) return null
+    return students.find(student => student.id === selectedStudentForReport.id) || null
+  }, [selectedStudentForReport?.id, students])
 
-  // Create fallback institution data if the query fails
   const fallbackInstitution = useMemo(() => ({
     id: effectiveInstitutionId || 'unknown',
     title: 'School Name',
@@ -152,22 +157,13 @@ const ClassSectionDetail: React.FC = () => {
     region: 'Region',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
-  }), [effectiveInstitutionId]);
+  }), [effectiveInstitutionId])
 
-  // Use actual institution data or fallback
-  const finalInstitution = institution?.data || fallbackInstitution;
-
-
-
-  // The backend now automatically includes the adviser relationship
-  const enhancedClassSectionData = useMemo(() => {
-    if (!classSectionData) return null;
-    return classSectionData;
-  }, [classSectionData]);
+  const finalInstitution = institution?.data || fallbackInstitution
+  const enhancedClassSectionData = classSectionData
 
 
 
-  // Fetch student grades for report card
   const {
     data: studentGrades,
     isLoading: studentGradesLoading
@@ -177,12 +173,10 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!selectedStudentForReport?.id,
   })
 
-  // Transform the grades data to match the expected format
   const transformedGrades = useMemo((): StudentSubjectGrade[] => {
-    if (!studentGrades?.data || !selectedStudentForReport?.id) return [];
+    if (!studentGrades?.data || !selectedStudentForReport?.id) return []
 
     const gradesBySubject = studentGrades.data.reduce((acc: Record<string, StudentSubjectGrade>, grade: any) => {
-
       if (!acc[grade.subject_id]) {
         acc[grade.subject_id] = {
           subject_id: grade.subject_id,
@@ -194,309 +188,232 @@ const ClassSectionDetail: React.FC = () => {
           final_grade: undefined,
           remarks: undefined,
           academic_year: grade.academic_year,
-        };
+        }
       }
 
-      const quarter = grade.quarter;
-      const roundedGrade = roundGrade(grade.final_grade);
+      const quarter = grade.quarter
+      const roundedGrade = roundGrade(grade.final_grade)
       
-      // Assign rounded quarterly grades
-      if (quarter === "1") {
-        acc[grade.subject_id].quarter1_grade = roundedGrade;
-      } else if (quarter === "2") {
-        acc[grade.subject_id].quarter2_grade = roundedGrade;
-      } else if (quarter === "3") {
-        acc[grade.subject_id].quarter3_grade = roundedGrade;
-      } else if (quarter === "4") {
-        acc[grade.subject_id].quarter4_grade = roundedGrade;
+      const quarterMap: Record<string, 'quarter1_grade' | 'quarter2_grade' | 'quarter3_grade' | 'quarter4_grade'> = {
+        '1': 'quarter1_grade',
+        '2': 'quarter2_grade',
+        '3': 'quarter3_grade',
+        '4': 'quarter4_grade',
       }
 
-      // Set final grade and remarks if grade exists
+      const quarterKey = quarterMap[quarter]
+      if (quarterKey && roundedGrade !== undefined) {
+        acc[grade.subject_id][quarterKey] = roundedGrade as number | string
+      }
+
       if (roundedGrade !== undefined) {
-        acc[grade.subject_id].final_grade = roundedGrade;
-        acc[grade.subject_id].remarks = getGradeRemarks(roundedGrade);
+        acc[grade.subject_id].final_grade = roundedGrade
+        acc[grade.subject_id].remarks = getGradeRemarks(roundedGrade)
       }
 
-      return acc;
-    }, {} as Record<string, StudentSubjectGrade>);
+      return acc
+    }, {} as Record<string, StudentSubjectGrade>)
 
-    return Object.values(gradesBySubject);
-  }, [studentGrades?.data, selectedStudentForReport?.id]);
+    return Object.values(gradesBySubject)
+  }, [studentGrades?.data, selectedStudentForReport?.id])
   
-  // Subject mutations
-  const createSubjectMutation = useMutation({
-    mutationFn: (data: any) => subjectService.createSubject(data),
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
-      refetchSubjects()
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to create subject'
-      setSubjectModalError(message)
-      setTimeout(() => setSubjectModalError(null), 5000)
-    }
-  })
-
-  const updateSubjectMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => subjectService.updateSubject(id, data),
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
-      refetchSubjects()
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to update subject'
-      setSubjectModalError(message)
-      setTimeout(() => setSubjectModalError(null), 5000)
-    }
-  })
-
-  const deleteSubjectMutation = useMutation({
-    mutationFn: (id: string) => subjectService.deleteSubject(id),
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
+  const {
+    createSubjectMutation,
+    updateSubjectMutation,
+    deleteSubjectMutation,
+    reorderSubjectsMutation,
+    reorderChildSubjectsMutation,
+    removeStudentMutation,
+  } = useClassSectionDetailMutations({
+    classSectionId: id!,
+    onSubjectCreateSuccess: refetchSubjects,
+    onSubjectUpdateSuccess: refetchSubjects,
+    onSubjectDeleteSuccess: () => {
       refetchSubjects()
       setSubjectDeleteConfirmation({ isOpen: false, subject: null, loading: false })
     },
-    onError: (error: any) => {
-      console.error('Failed to delete subject:', error)
+    onSubjectError: (error: string) => {
+      setSubjectModalError(error)
+      setTimeout(() => setSubjectModalError(null), ERROR_TIMEOUT)
+    },
+    onSubjectDeleteError: () => {
       setSubjectDeleteConfirmation(prev => ({ ...prev, loading: false }))
-    }
-  })
-
-  const reorderSubjectsMutation = useMutation({
-    mutationFn: (subjectOrders: Array<{ id: string; order: number }>) => {
-      console.log('reorderSubjectsMutation called with:', subjectOrders)
-      return subjectService.reorderSubjects(id!, subjectOrders)
     },
-    onSuccess: () => {
-      toast.success('Subjects reordered successfully!', {
-        duration: 3000,
-        position: 'top-right',
-        style: {
-          background: '#10B981',
-          color: '#fff',
-        },
-      })
-      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
-      refetchSubjects()
-    },
-    onError: () => {
-      toast.error('Failed to reorder subjects. Please try again.', {
-        duration: 4000,
-        position: 'top-right',
-      })
-    }
-  })
-
-  const reorderChildSubjectsMutation = useMutation({
-    mutationFn: ({ parentId, childOrders }: { parentId: string; childOrders: Array<{ id: string; order: number }> }) => {
-      console.log('reorderChildSubjectsMutation called with:', parentId, childOrders)
-      return subjectService.reorderChildSubjects(parentId, childOrders)
-    },
-    onSuccess: () => {
-      toast.success('Child subjects reordered successfully!', {
-        duration: 3000,
-        position: 'top-right',
-        style: {
-          background: '#10B981',
-          color: '#fff',
-        },
-      })
-      queryClient.removeQueries({ queryKey: ['subjects', { class_section_id: id }] })
-      refetchSubjects()
-    },
-    onError: () => {
-      toast.error('Failed to reorder child subjects. Please try again.', {
-        duration: 4000,
-        position: 'top-right',
-      })
-    }
-  })
-
-  // Remove student mutation
-  const removeStudentMutation = useMutation({
-    mutationFn: (assignmentId: string) => studentService.removeStudentFromSection(assignmentId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students-by-section', id] })
+    onReorderSubjectsSuccess: refetchSubjects,
+    onReorderChildSubjectsSuccess: refetchSubjects,
+    onRemoveStudentSuccess: () => {
       setShowRemoveModal(false)
       setStudentToRemove(null)
     },
-    onError: (error: unknown) => {
-      console.error('Failed to remove student:', error)
-    }
   })
 
-  const getFullName = (user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => {
-    const parts = [`${user?.last_name},`, user?.first_name, `${user?.middle_name ? user?.middle_name.charAt(0) + "." : ""}`,  user?.ext_name]
+  const getFullName = useCallback((user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => {
+    const parts = [
+      user?.last_name ? `${user.last_name},` : '',
+      user?.first_name || '',
+      user?.middle_name ? `${user.middle_name.charAt(0)}.` : '',
+      user?.ext_name || ''
+    ]
     return parts.filter(Boolean).join(' ')
-  }
+  }, [])
 
-  // Filter students by search term
-  const filteredStudents = students.filter(student => {
-    if (!studentSearchTerm) return true
-    const fullName = getFullName(student).toLowerCase()
-    const lrn = student.lrn?.toLowerCase() || ''
-    return fullName.includes(studentSearchTerm.toLowerCase()) || lrn.includes(studentSearchTerm.toLowerCase())
-  })
+  const filteredStudents = useMemo(() => {
+    if (!studentSearchTerm) return students
+    const searchLower = studentSearchTerm.toLowerCase()
+    return students.filter(student => {
+      const fullName = getFullName(student).toLowerCase()
+      const lrn = student.lrn?.toLowerCase() || ''
+      return fullName.includes(searchLower) || lrn.includes(searchLower)
+    })
+  }, [students, studentSearchTerm, getFullName])
 
-  // Group students by gender and sort alphabetically
-  const groupedStudents: Record<string, (Student & { assignmentId: string })[]> = students.reduce((acc, student) => {
-    const gender = student.gender || '';
-    if (!acc[gender]) {
-      acc[gender] = [];
-    }
-    acc[gender].push(student);
-    return acc;
-  }, {} as Record<string, (Student & { assignmentId: string })[]>);
+  const groupedStudents = useMemo(() => {
+    const grouped: Record<string, (Student & { assignmentId: string })[]> = {}
+    
+    students.forEach(student => {
+      const gender = student.gender || 'other'
+      if (!grouped[gender]) {
+        grouped[gender] = []
+      }
+      grouped[gender].push(student)
+    })
 
-  // Sort students alphabetically within each gender group
-  Object.keys(groupedStudents).forEach(gender => {
-    groupedStudents[gender].sort((a, b) => {
-      const nameA = `${a.last_name} ${a.first_name} ${a.middle_name || ''}`.toLowerCase();
-      const nameB = `${b.last_name} ${b.first_name} ${b.middle_name || ''}`.toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-  });
+    Object.keys(grouped).forEach(gender => {
+      grouped[gender].sort((a, b) => {
+        const nameA = `${a.last_name} ${a.first_name} ${a.middle_name || ''}`.toLowerCase()
+        const nameB = `${b.last_name} ${b.first_name} ${b.middle_name || ''}`.toLowerCase()
+        return nameA.localeCompare(nameB)
+      })
+    })
 
-  // Subject handlers
-  const handleCreateSubject = () => {
+    return grouped
+  }, [students])
+
+  const handleCreateSubject = useCallback(() => {
     setEditingSubject(null)
     setSubjectModalError(null)
     setShowSubjectModal(true)
-  }
+  }, [])
 
-  const handleEditSubject = (subject: Subject) => {
+  const handleEditSubject = useCallback((subject: Subject) => {
     setEditingSubject(subject)
     setSubjectModalError(null)
     setShowSubjectModal(true)
-  }
+  }, [])
 
-  const handleDeleteSubject = (subject: Subject) => {
+  const handleDeleteSubject = useCallback((subject: Subject) => {
     setSubjectDeleteConfirmation({
       isOpen: true,
       subject,
       loading: false
     })
-  }
+  }, [])
 
-  const handleSubjectSubmit = async (data: any) => {
+  const handleSubjectSubmit = useCallback(async (data: any) => {
     try {
-      let result: any
       if (editingSubject) {
-        result = await updateSubjectMutation.mutateAsync({ id: editingSubject.id, data })
+        await updateSubjectMutation.mutateAsync({ id: editingSubject.id, data })
       } else {
-        result = await createSubjectMutation.mutateAsync(data)
+        await createSubjectMutation.mutateAsync(data)
       }
       setShowSubjectModal(false)
-      return result
     } catch (error) {
       // Error is handled in mutation onError
     }
-  }
+  }, [editingSubject, updateSubjectMutation, createSubjectMutation])
 
-  const handleSubjectModalClose = () => {
+  const handleSubjectModalClose = useCallback(() => {
     setShowSubjectModal(false)
     setEditingSubject(null)
     setSubjectModalError(null)
-  }
+  }, [])
 
-  const handleReorderSubjects = async (subjectOrders: Array<{ id: string; order: number }>) => {
+  const handleReorderSubjects = useCallback(async (subjectOrders: Array<{ id: string; order: number }>) => {
     await reorderSubjectsMutation.mutateAsync(subjectOrders)
-  }
+  }, [reorderSubjectsMutation])
 
-  const handleReorderChildSubjects = async (parentId: string, childOrders: Array<{ id: string; order: number }>) => {
+  const handleReorderChildSubjects = useCallback(async (parentId: string, childOrders: Array<{ id: string; order: number }>) => {
     await reorderChildSubjectsMutation.mutateAsync({ parentId, childOrders })
-  }
+  }, [reorderChildSubjectsMutation])
 
-  const handleAssignmentSuccess = () => {
+  const handleAssignmentSuccess = useCallback(() => {
     refetchStudents()
-  }
+  }, [refetchStudents])
 
-  const handleEditStudent = (student: Student) => {
+  const handleEditStudent = useCallback((student: Student) => {
     setStudentToEdit(student)
     setShowEditModal(true)
-  }
+  }, [])
 
-  const handleEditSuccess = () => {
+  const handleEditSuccess = useCallback(() => {
     refetchStudents()
     setEditModalSuccess('Student updated successfully!')
-    setTimeout(() => setEditModalSuccess(null), 3000)
-  }
+    setTimeout(() => setEditModalSuccess(null), SUCCESS_TIMEOUT)
+  }, [refetchStudents])
 
-  const handleEditError = (error: string) => {
+  const handleEditError = useCallback((error: string) => {
     setEditModalError(error)
-    setTimeout(() => setEditModalError(null), 5000)
-  }
+    setTimeout(() => setEditModalError(null), ERROR_TIMEOUT)
+  }, [])
 
-  const handleRemoveStudent = (student: Student & { assignmentId: string }) => {
+  const handleRemoveStudent = useCallback((student: Student & { assignmentId: string }) => {
     setStudentToRemove({
       id: student.id,
       name: getFullName(student),
       assignmentId: student.assignmentId
     })
     setShowRemoveModal(true)
-  }
+  }, [getFullName])
 
-  const handleConfirmRemove = () => {
+  const handleConfirmRemove = useCallback(() => {
     if (studentToRemove) {
       removeStudentMutation.mutate(studentToRemove.assignmentId)
     }
-  }
+  }, [studentToRemove, removeStudentMutation])
 
-  // Check if we have all the necessary data for the report card
   const hasReportCardData = useMemo(() => {
-    return !!(
-      finalInstitution &&
-      enhancedClassSectionData &&
-      selectedStudent &&
-      subjects.length > 0
-    );
-  }, [finalInstitution, enhancedClassSectionData, selectedStudent, subjects]);
+    return !!(finalInstitution && enhancedClassSectionData && selectedStudent && subjects.length > 0)
+  }, [finalInstitution, enhancedClassSectionData, selectedStudent, subjects])
 
-  // Report cards and consolidated grades handlers
-  const handleViewTempReportCard = (studentId: string) => {
+  const handleViewTempReportCard = useCallback((studentId: string) => {
     const student = students.find(s => s.id === studentId)
     if (student) {
       setSelectedStudentForReport({
         id: studentId,
         name: getFullName(student)
       })
-      // Only open modal if we have the necessary data
       if (hasReportCardData) {
         setShowReportCardModal(true)
-      } else {
-        console.log('Cannot open report card modal - missing data:', {
-          institution: !!finalInstitution,
-          classSection: !!classSectionData,
-          student: !!selectedStudent,
-          subjects: subjects.length
-        });
-        // You could show an alert here to inform the user
       }
     }
-  }
+  }, [students, getFullName, hasReportCardData])
 
-  const handleViewReportCard = (studentId: string) => {
+  const handleViewReportCard = useCallback((studentId: string) => {
     const student = students.find(s => s.id === studentId)
     if (student) {
       setSelectedStudentForReport({
         id: studentId,
         name: getFullName(student)
       })
-      // Only open modal if we have the necessary data
       if (hasReportCardData) {
         setShowStudentReportCardModal(true)
-      } else {
-        console.log('Cannot open student report card modal - missing data:', {
-          institution: !!finalInstitution,
-          classSection: !!classSectionData,
-          student: !!selectedStudent,
-          subjects: subjects.length
-        });
-        // You could show an alert here to inform the user
       }
     }
-  }
+  }, [students, getFullName, hasReportCardData])
+
+  const handleStudentSubmit = useCallback(async (data: any) => {
+    if (!studentToEdit) return
+    try {
+      await studentService.updateStudent(studentToEdit.id, data)
+      handleEditSuccess()
+    } catch (error: unknown) {
+      const errorMessage = error && typeof error === 'object' && 'response' in error 
+        ? ((error.response as { data?: { message?: string } })?.data?.message) || 'Failed to update student'
+        : 'Failed to update student'
+      handleEditError(errorMessage)
+      throw error
+    }
+  }, [studentToEdit, handleEditSuccess, handleEditError])
 
   if (classSectionLoading) {
     return (
@@ -647,12 +564,7 @@ const ClassSectionDetail: React.FC = () => {
               <span className="text-sm text-gray-700 font-medium">Quarter:</span>
               <div className="min-w-[140px]">
                 <Select
-                  options={[
-                    { value: '1', label: 'First Quarter' },
-                    { value: '2', label: 'Second Quarter' },
-                    { value: '3', label: 'Third Quarter' },
-                    { value: '4', label: 'Fourth Quarter' },
-                  ]}
+                  options={QUARTER_OPTIONS}
                   value={selectedQuarter}
                   onChange={e => setSelectedQuarter(e.target.value)}
                 />
@@ -809,20 +721,7 @@ const ClassSectionDetail: React.FC = () => {
           setEditModalSuccess(null)
         }}
         student={studentToEdit}
-        onSubmit={async (data) => {
-          try {
-            if (studentToEdit) {
-              await studentService.updateStudent(studentToEdit.id, data)
-              handleEditSuccess()
-            }
-          } catch (error: unknown) {
-            const errorMessage = error && typeof error === 'object' && 'response' in error 
-              ? ((error.response as { data?: { message?: string } })?.data?.message) || 'Failed to update student'
-              : 'Failed to update student'
-            handleEditError(errorMessage)
-            throw error
-          }
-        }}
+        onSubmit={handleStudentSubmit}
         loading={false}
         error={editModalError}
         success={editModalSuccess}
@@ -836,7 +735,7 @@ const ClassSectionDetail: React.FC = () => {
         subject={editingSubject}
         classSectionId={id!}
         institutionId={institutionId}
-        parentSubjects={subjects.filter(s => s.subject_type === 'parent')}
+        parentSubjects={subjects.filter((s: Subject) => s.subject_type === 'parent')}
         loading={createSubjectMutation.isPending || updateSubjectMutation.isPending}
         error={subjectModalError}
       />
@@ -875,7 +774,7 @@ const ClassSectionDetail: React.FC = () => {
         loading={subjectDeleteConfirmation.loading}
       />
 
-             {/* Report Card Modal */}
+      {/* Report Card Modal */}
       <ReportCardModal
         isOpen={showReportCardModal}
         onClose={() => {
