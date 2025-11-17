@@ -11,7 +11,6 @@ import {
   ChevronDownIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline'
-import { Button } from '../../../components/button'
 import { Alert } from '../../../components/alert'
 import type { ClassSection, Subject } from '../../../types'
 
