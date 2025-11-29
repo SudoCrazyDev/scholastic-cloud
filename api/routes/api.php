@@ -20,6 +20,8 @@ use App\Http\Controllers\UserWorkExperienceController;
 use App\Http\Controllers\CoreValueMarkingController;
 use App\Http\Controllers\SF9Controller;
 use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\StudentAttendanceController;
+use App\Http\Controllers\SchoolDayController;
 
 /*
 |--------------------------------------------------------------------------
@@ -133,6 +135,12 @@ Route::middleware('auth.token')->group(function () {
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
     Route::post('student-running-grades/bulk-upsert-final-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'bulkUpsertFinalGrades']);
     Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
+    // StudentAttendance routes
+    Route::post('student-attendances/bulk-upsert', [StudentAttendanceController::class, 'bulkUpsert']);
+    Route::apiResource('student-attendances', StudentAttendanceController::class);
+    // SchoolDays routes
+    Route::post('school-days/bulk-upsert', [SchoolDayController::class, 'bulkUpsert']);
+    Route::apiResource('school-days', SchoolDayController::class);
     
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
