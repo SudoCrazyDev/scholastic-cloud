@@ -475,6 +475,49 @@ export interface UpdateStudentData {
   profile_picture?: string;
 }
 
+// Student Attendance types
+export interface StudentAttendance {
+  id: string;
+  student_id: string;
+  class_section_id: string;
+  academic_year: string;
+  month: number; // 1-12
+  year: number; // e.g., 2025
+  days_present: number;
+  days_absent: number;
+  created_at: string;
+  updated_at: string;
+  student?: Student;
+  class_section?: ClassSection;
+}
+
+export interface CreateStudentAttendanceData {
+  student_id: string;
+  class_section_id: string;
+  academic_year: string;
+  month: number; // 1-12
+  year: number; // e.g., 2025
+  days_present: number;
+  days_absent: number;
+}
+
+export interface UpdateStudentAttendanceData {
+  days_present?: number;
+  days_absent?: number;
+}
+
+export interface BulkUpsertStudentAttendanceData {
+  class_section_id: string;
+  academic_year: string;
+  month: number;
+  year: number;
+  attendances: Array<{
+    student_id: string;
+    days_present: number;
+    days_absent: number;
+  }>;
+}
+
 // Staff types
 export interface CreateStaffData {
   first_name: string;
@@ -575,4 +618,39 @@ export interface TeacherAttendanceSummary {
   break_out_time?: string;
   break_in_time?: string;
   total_hours?: number;
+}
+
+// School Days types
+export interface SchoolDay {
+  id: string;
+  institution_id: string;
+  academic_year: string;
+  month: number; // 1-12
+  year: number; // e.g., 2025
+  total_days: number;
+  created_at: string;
+  updated_at: string;
+  institution?: Institution;
+}
+
+export interface CreateSchoolDayData {
+  institution_id: string;
+  academic_year: string;
+  month: number; // 1-12
+  year: number; // e.g., 2025
+  total_days: number;
+}
+
+export interface UpdateSchoolDayData {
+  total_days?: number;
+}
+
+export interface BulkUpsertSchoolDayData {
+  institution_id: string;
+  academic_year: string;
+  year: number;
+  school_days: Array<{
+    month: number;
+    total_days: number;
+  }>;
 } 

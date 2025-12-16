@@ -187,15 +187,29 @@ export const useClassSections = (options: UseClassSectionsOptions = {}) => {
       let classSectionId: string
       
       if (editingClassSection) {
+        // Update existing class section
+        const updateData: UpdateClassSectionData = {
+          grade_level: data.grade_level,
+          title: data.title,
+          adviser: data.adviser,
+          academic_year: data.academic_year,
+        }
+        const result = await updateMutation.mutateAsync({
+          id: editingClassSection.id,
+          data: updateData
+        })
         classSectionId = editingClassSection.id
+        // Refresh the class sections list
+        refetch()
       } else {
+        // Create new class section
         const result = await createMutation.mutateAsync(data)
         // Assuming the create mutation returns the created class section
         classSectionId = (result as any)?.data?.id || ''
       }
       
-      // Apply template if provided
-      if (templateId && classSectionId) {
+      // Apply template if provided (only for new sections)
+      if (templateId && classSectionId && !editingClassSection) {
         try {
           await subjectTemplateService.applyToSection(templateId, classSectionId)
           // Refresh subjects for this class section

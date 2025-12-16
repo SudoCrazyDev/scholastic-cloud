@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { useFormik } from 'formik'
@@ -51,20 +52,13 @@ export function ClassSectionModal({
   const [selectedTemplate, setSelectedTemplate] = useState<SubjectTemplate | null>(null)
   const [useTemplate, setUseTemplate] = useState(false)
   
-  // Debounce the search query to avoid too many API calls
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
-  
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setDebouncedSearchQuery(teacherSearchQuery)
-    }, 300)
-    
-    return () => clearTimeout(timeoutId)
-  }, [teacherSearchQuery])
+  // Track if we've initialized the form for the current classSection to prevent infinite loops
+  const initializedClassSectionId = useRef<string | null>(null)
   
   // Fetch teachers for autocomplete with search parameter
+  // The Autocomplete component now handles debouncing internally
   const { teachers, loading: teachersLoading, getFullName } = useTeachers({
-    search: debouncedSearchQuery,
+    search: teacherSearchQuery || undefined,
     limit: 20
   })
 
@@ -101,47 +95,70 @@ export function ClassSectionModal({
 
   // Reset form when modal opens/closes or classSection changes
   useEffect(() => {
-    if (isOpen) {
-      if (classSection) {
+    if (!isOpen) {
+      // Clear everything when modal closes
+      initializedClassSectionId.current = null
+      setTeacherSearchQuery('')
+      setSelectedTemplate(null)
+      setUseTemplate(false)
+      return
+    }
+
+    // Handle form initialization when modal opens
+    if (classSection) {
+      // Only initialize if this is a different classSection
+      if (initializedClassSectionId.current !== classSection.id) {
+        initializedClassSectionId.current = classSection.id
+        
         formik.setValues({
           grade_level: classSection.grade_level,
           title: classSection.title,
-          adviser_id: '', // We'll set this after finding the teacher
+          adviser_id: '',
           academic_year: classSection.academic_year || '',
         })
         
-        // Find the teacher if adviser is set
+        // Set adviser if available
         if (classSection.adviser) {
+          // First try to find in the teachers array
           const teacher = teachers.find(t => t.id === classSection.adviser?.id)
           if (teacher) {
+            const teacherName = getFullName(teacher)
             setSelectedTeacher({
               id: teacher.id,
-              label: getFullName(teacher),
+              label: teacherName,
               description: teacher.email
             })
             formik.setFieldValue('adviser_id', teacher.id)
           } else {
-            setSelectedTeacher(null)
-            formik.setFieldValue('adviser_id', '')
+            // If teacher not found in array, use adviser data directly
+            const adviser = classSection.adviser
+            const adviserName = [adviser.first_name, adviser.middle_name, adviser.last_name, adviser.ext_name]
+              .filter(Boolean)
+              .join(' ')
+            setSelectedTeacher({
+              id: adviser.id,
+              label: adviserName,
+              description: adviser.email
+            })
+            formik.setFieldValue('adviser_id', adviser.id)
           }
         } else {
           setSelectedTeacher(null)
           formik.setFieldValue('adviser_id', '')
         }
-      } else {
-        formik.resetForm()
-        setSelectedTeacher(null)
-        setSelectedTemplate(null)
-        setUseTemplate(false)
       }
     } else {
-      // Clear search query when modal closes
-      setTeacherSearchQuery('')
-      setDebouncedSearchQuery('')
+      // Create mode - reset form
+      initializedClassSectionId.current = null
+      formik.resetForm()
+      setSelectedTeacher(null)
       setSelectedTemplate(null)
       setUseTemplate(false)
     }
-  }, [isOpen, classSection, teachers])
+    // Note: getFullName is a pure function, so we don't need it in dependencies
+    // We only want to run this when isOpen or classSection.id changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, classSection?.id])
 
   const handleTeacherSelect = (teacher: { id: string; label: string; description?: string } | null) => {
     setSelectedTeacher(teacher)
@@ -153,6 +170,34 @@ export function ClassSectionModal({
       setDebouncedSearchQuery('')
     }
   }
+
+  // Build teacher options, ensuring the current adviser is included even if not in teachers array
+  const teacherOptions = React.useMemo(() => {
+    const options = teachers.map(teacher => ({
+      id: teacher.id,
+      label: getFullName(teacher),
+      description: teacher.email
+    }))
+    
+    // If editing and adviser exists but not in teachers array, add it
+    if (classSection?.adviser) {
+      const adviserInOptions = options.some(opt => opt.id === classSection.adviser?.id)
+      if (!adviserInOptions) {
+        const adviser = classSection.adviser
+        options.unshift({
+          id: adviser.id,
+          label: [adviser.first_name, adviser.middle_name, adviser.last_name, adviser.ext_name]
+            .filter(Boolean)
+            .join(' '),
+          description: adviser.email
+        })
+      }
+    }
+    
+    return options
+    // Note: getFullName is a pure function, so we don't need it in dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teachers, classSection?.adviser?.id])
 
   const handleClose = () => {
     if (!loading) {
@@ -180,7 +225,8 @@ export function ClassSectionModal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full max-w-md bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-md bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto overflow-x-hidden"
+              style={{ isolation: 'isolate' }}
             >
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -245,46 +291,6 @@ export function ClassSectionModal({
                   )}
                 </div>
 
-                {/* Adviser */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Adviser
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                                             <Autocomplete
-                         value={selectedTeacher}
-                         onChange={handleTeacherSelect}
-                         onQueryChange={setTeacherSearchQuery}
-                         options={teachers.map(teacher => ({
-                           id: teacher.id,
-                           label: getFullName(teacher),
-                           description: teacher.email
-                         }))}
-                         placeholder="Search for a teacher..."
-                         className={formik.touched.adviser_id && formik.errors.adviser_id ? 'border-red-500' : ''}
-                         disabled={teachersLoading}
-                         error={!!(formik.touched.adviser_id && formik.errors.adviser_id)}
-                       />
-
-                    </div>
-                    {selectedTeacher && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleTeacherSelect(null)}
-                        disabled={loading}
-                        className="px-3 py-2 text-sm"
-                      >
-                        Clear
-                      </Button>
-                    )}
-                  </div>
-                  {formik.touched.adviser_id && formik.errors.adviser_id && (
-                    <p className="mt-1 text-sm text-red-600">{formik.errors.adviser_id}</p>
-                  )}
-                </div>
-
                 {/* Academic Year */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -301,6 +307,42 @@ export function ClassSectionModal({
                   />
                   {formik.touched.academic_year && formik.errors.academic_year && (
                     <p className="mt-1 text-sm text-red-600">{formik.errors.academic_year}</p>
+                  )}
+                </div>
+
+                {/* Adviser */}
+                <div className="relative z-0">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Adviser
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative z-0">
+                      <Autocomplete
+                        value={selectedTeacher}
+                        onChange={handleTeacherSelect}
+                        onQueryChange={setTeacherSearchQuery}
+                        options={teacherOptions}
+                        placeholder="Search for a teacher..."
+                        className={formik.touched.adviser_id && formik.errors.adviser_id ? 'border-red-500' : ''}
+                        disabled={teachersLoading}
+                        loading={teachersLoading}
+                        error={!!(formik.touched.adviser_id && formik.errors.adviser_id)}
+                      />
+                    </div>
+                    {selectedTeacher && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleTeacherSelect(null)}
+                        disabled={loading}
+                        className="px-3 py-2 text-sm"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  {formik.touched.adviser_id && formik.errors.adviser_id && (
+                    <p className="mt-1 text-sm text-red-600">{formik.errors.adviser_id}</p>
                   )}
                 </div>
 

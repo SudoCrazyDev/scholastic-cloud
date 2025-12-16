@@ -26,6 +26,7 @@ import SF9 from './pages/SF9';
 import SetNewPassword from './pages/SetNewPassword';
 import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
 import CertificateList from './pages/CertificateBuilder/CertificateList';
+import SchoolDays from './pages/SchoolDays';
 
 
 function App() {
@@ -66,6 +67,7 @@ function App() {
               <Route path="sf9" element={<SF9 />} />
               <Route path="certificate-builder" element={<CertificateBuilder />} />
               <Route path="certificates" element={<CertificateList />} />
+              <Route path="school-days" element={<SchoolDays />} />
 
             </Route>
 

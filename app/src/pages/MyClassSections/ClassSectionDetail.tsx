@@ -25,7 +25,8 @@ import {
   Trophy,
   FileText,
   BarChart3,
-  Award
+  Award,
+  Calendar
 } from 'lucide-react'
 import type { Student, Subject, StudentSubjectGrade } from '../../types'
 import ClassSectionHeader from './components/ClassSectionHeader'
@@ -35,6 +36,7 @@ import ClassSectionReportCardsTab from './components/ClassSectionReportCardsTab'
 import ClassSectionConsolidatedGradesTab from './components/ClassSectionConsolidatedGradesTab'
 import ClassSectionSubjectsTab from './components/ClassSectionSubjectsTab'
 import ClassSectionCoreValuesTab from './components/ClassSectionCoreValuesTab'
+import ClassSectionAttendanceTab from './components/ClassSectionAttendanceTab'
 import { Select } from '../../components/select'
 import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils'
 
@@ -52,7 +54,7 @@ const ClassSectionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values'>('students')
+  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values' | 'attendance'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
   const [showRemoveModal, setShowRemoveModal] = useState(false)
@@ -553,6 +555,19 @@ const ClassSectionDetail: React.FC = () => {
                 <span>Core Values</span>
               </div>
             </button>
+            <button
+              onClick={() => setActiveTab('attendance')}
+              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                activeTab === 'attendance'
+                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
+                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4" />
+                <span>Attendance</span>
+              </div>
+            </button>
           </nav>
         </div>
 
@@ -683,6 +698,23 @@ const ClassSectionDetail: React.FC = () => {
                   <ClassSectionCoreValuesTab
                     classSectionId={id!}
                     classSectionData={classSectionData}
+                  />
+                </motion.div>
+              )}
+
+              {activeTab === 'attendance' && (
+                <motion.div
+                  key="attendance"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ClassSectionAttendanceTab
+                    classSectionId={id!}
+                    students={students}
+                    academicYear={classSectionData?.academic_year || ''}
+                    getFullName={getFullName}
                   />
                 </motion.div>
               )}
