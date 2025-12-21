@@ -16,6 +16,8 @@ interface StudentScoreInputProps {
   initialScore?: number;
   scoreId?: string;
   onSuccess?: (score: StudentScore) => void;
+  onEnterPress?: () => void;
+  inputId?: string;
   disabled?: boolean;
 }
 
@@ -34,11 +36,14 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
   initialScore = 0,
   scoreId,
   onSuccess,
+  onEnterPress,
+  inputId,
   disabled,
 }) => {
   const queryClient = useQueryClient();
   const [currentScoreId, setCurrentScoreId] = useState<string | undefined>(scoreId);
   const [hasExistingScore, setHasExistingScore] = useState<boolean>(!!scoreId);
+  const [pendingMoveToNext, setPendingMoveToNext] = useState(false);
 
   // Update state when props change
   useEffect(() => {
@@ -61,10 +66,16 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
       toast.success('Score added!');
       queryClient.invalidateQueries({ queryKey: ['student-scores'] });
       onSuccess?.(newScore);
+      // Move to next input if Enter was pressed
+      if (pendingMoveToNext) {
+        setPendingMoveToNext(false);
+        setTimeout(() => onEnterPress?.(), 50);
+      }
     },
     onError: (error) => {
       const err = ErrorHandler.handle(error);
       toast.error(err.message);
+      setPendingMoveToNext(false);
     },
   });
 
@@ -79,10 +90,16 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
       toast.success('Score updated!');
       queryClient.invalidateQueries({ queryKey: ['student-scores'] });
       onSuccess?.(data.data ?? data);
+      // Move to next input if Enter was pressed
+      if (pendingMoveToNext) {
+        setPendingMoveToNext(false);
+        setTimeout(() => onEnterPress?.(), 50);
+      }
     },
     onError: (error) => {
       const err = ErrorHandler.handle(error);
       toast.error(err.message);
+      setPendingMoveToNext(false);
       // If update fails because score doesn't exist, try creating instead
       if (err.message.includes('not found') || err.message.includes('404')) {
         setCurrentScoreId(undefined);
@@ -109,10 +126,21 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
     },
   });
 
-  const handleScoreChange = async (score: number) => {
+  const handleScoreChange = async (score: number, moveToNext?: boolean) => {
     // Additional validation to prevent unnecessary API calls
-    if (score === initialScore) {
+    if (score === initialScore && !moveToNext) {
       return; // No change, don't make API call
+    }
+
+    // If Enter was pressed but no change, still move to next
+    if (score === initialScore && moveToNext) {
+      onEnterPress?.();
+      return;
+    }
+
+    // Set flag to move to next after save
+    if (moveToNext) {
+      setPendingMoveToNext(true);
     }
 
     if (hasExistingScore && currentScoreId) {
@@ -122,8 +150,9 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
     }
   };
 
+
   const isLoading = createMutation.status === 'pending' || updateMutation.status === 'pending';
-  console.log("FUCKER");
+  
   return (
     <Formik
       initialValues={{ score: initialScore }}
@@ -134,7 +163,7 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
         setSubmitting(false);
       }}
     >
-      {({ errors, touched, isSubmitting, handleBlur, values }) => (
+      {({ errors, touched, isSubmitting, handleBlur, values, submitForm }) => (
         <Form>
           <div className="relative flex items-center space-x-1">
             <Field name="score">
@@ -148,6 +177,19 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
                   disabled={disabled || isSubmitting || isLoading}
                   className={`text-center ${hasExistingScore ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}
                   placeholder={hasExistingScore ? 'Enter score' : 'Enter score'}
+                  data-input-id={inputId}
+                  onKeyDown={async (e: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      // Validate and save
+                      if (values.score >= 0 && values.score <= maxScore) {
+                        await handleScoreChange(values.score, true);
+                      } else {
+                        // Even if invalid, move to next if Enter is pressed
+                        onEnterPress?.();
+                      }
+                    }
+                  }}
                   onBlur={async (e: React.FocusEvent<HTMLInputElement>) => {
                     handleBlur(e);
                     // Only submit if value changed and is valid

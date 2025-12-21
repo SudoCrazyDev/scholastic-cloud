@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   UserGroupIcon,
   DocumentTextIcon,
   CheckCircleIcon,
   PlusIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
   AcademicCapIcon,
   CalendarIcon,
   UserIcon,
   UsersIcon,
-  PencilIcon
+  PencilIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
 import { AddGradeItemModal } from './AddGradeItemModal'
 import { EditGradeItemModal } from './EditGradeItemModal'
@@ -75,8 +75,6 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
   item,
   scores,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true)
-
   const getGenderIcon = (gender: string) => {
     switch (gender) {
       case 'male':
@@ -85,17 +83,6 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
         return <UsersIcon className="w-4 h-4 text-pink-600" />
       default:
         return <UserGroupIcon className="w-4 h-4 text-gray-600" />
-    }
-  }
-
-  const getGenderColor = (gender: string) => {
-    switch (gender) {
-      case 'male':
-        return 'bg-blue-50 border-blue-200'
-      case 'female':
-        return 'bg-pink-50 border-pink-200'
-      default:
-        return 'bg-gray-50 border-gray-200'
     }
   }
 
@@ -111,72 +98,75 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
   }
 
   return (
-    <div className={`rounded-lg border ${getGenderColor(gender)}`}>
-      <div
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/50 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center space-x-3">
-          {getGenderIcon(gender)}
-          <div>
-            <h3 className="text-sm font-medium text-gray-900">{getGenderText(gender)}</h3>
-            <p className="text-xs text-gray-500">{students.length} students</p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <div className="text-xs text-gray-500">
-            {isExpanded ? 'Collapse' : 'Expand'}
-          </div>
-          {isExpanded ? (
-            <ChevronDownIcon className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronRightIcon className="w-4 h-4 text-gray-400" />
-          )}
-        </div>
+    <div className="space-y-2">
+      {/* Gender Header */}
+      <div className="flex items-center space-x-2 mb-3">
+        {getGenderIcon(gender)}
+        <h3 className="text-sm font-semibold text-gray-900">{getGenderText(gender)}</h3>
+        <span className="text-xs text-gray-500">({students.length})</span>
       </div>
 
-      {isExpanded && (
-        <div className="border-t border-gray-200 bg-white rounded-b-lg">
-          {students.map((student) => {
-            const scoreObj = scores.find(s => s.student_id === student.id && s.subject_ecr_item_id === item.id)
-            return (
-              <div key={`${student.id}-${item.id}`} className="flex items-center justify-between py-3 px-4 bg-white border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <span className="text-xs font-medium text-indigo-600">
-                        {student.first_name.charAt(0)}{student.last_name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900 truncate">
-                        {student.first_name} {student.last_name}
-                      </h4>
-                      <p className="text-xs text-gray-500">LRN: {student.lrn || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
+      {/* Students List - Always visible, no collapse */}
+      <div className="space-y-2">
+        {students.map((student, index) => {
+          const scoreObj = scores.find(s => s.student_id === student.id && s.subject_ecr_item_id === item.id)
+          const inputId = `score-input-${student.id}-${item.id}`
+          const nextInputId = index < students.length - 1 
+            ? `score-input-${students[index + 1].id}-${item.id}`
+            : null
+          
+          return (
+            <div 
+              key={`${student.id}-${item.id}`} 
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-3">
-                  <div className="text-sm font-medium">
-                    <span>{scoreObj?.score ?? 0}</span>
-                    <span className="text-gray-400">/{item.score}</span>
+                  <div className="w-10 h-10 sm:w-8 sm:h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs sm:text-xs font-medium text-indigo-600">
+                      {student.first_name.charAt(0)}{student.last_name.charAt(0)}
+                    </span>
                   </div>
-                  <div className="w-24">
-                    <StudentScoreInput
-                      studentId={student.id}
-                      itemId={item.id}
-                      maxScore={item.score}
-                      initialScore={scoreObj?.score ?? 0}
-                      scoreId={scoreObj?.id}
-                    />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm sm:text-base font-medium text-gray-900 truncate">
+                      {student.first_name} {student.last_name}
+                    </h4>
+                    <p className="text-xs text-gray-500">LRN: {student.lrn || 'N/A'}</p>
                   </div>
                 </div>
               </div>
-            )
-          })}
-        </div>
-      )}
+              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+                <div className="text-sm sm:text-base font-medium whitespace-nowrap">
+                  <span>{scoreObj?.score ?? '-'}</span>
+                  <span className="text-gray-400">/{item.score}</span>
+                </div>
+                <div className="w-24 sm:w-28">
+                  <StudentScoreInput
+                    studentId={student.id}
+                    itemId={item.id}
+                    maxScore={item.score}
+                    initialScore={scoreObj?.score}
+                    scoreId={scoreObj?.id}
+                    inputId={inputId}
+                    onEnterPress={() => {
+                      // Move focus to next input
+                      if (nextInputId) {
+                        setTimeout(() => {
+                          const nextInput = document.querySelector(`input[data-input-id="${nextInputId}"]`) as HTMLInputElement
+                          if (nextInput) {
+                            nextInput.focus()
+                            nextInput.select()
+                          }
+                        }, 100)
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -194,7 +184,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   scores,
   onEditItem,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Group students by gender and sort alphabetically
   const groupedStudents = students.reduce((groups, student) => {
@@ -242,68 +232,104 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   }
 
   return (
-    <div className={`rounded-lg border ${getCategoryColor(item.category)}`}>
-      <div
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/50 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center space-x-3">
-          {getCategoryIcon(item.category)}
-          <div>
-            <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
-            <p className="text-xs text-gray-500">{item.description}</p>
-            <div className="flex items-center space-x-2 mt-1">
-              <CalendarIcon className="w-3 h-3 text-gray-400" />
-              <span className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()}</span>
-              <span className="text-xs text-gray-400">•</span>
-              <span className="text-xs text-gray-500">{item.subject_ecr?.title || item.category}</span>
-              <span className="text-xs text-gray-400">•</span>
-              <span className="text-xs text-gray-500">{item.quarter}</span>
+    <>
+      <div className={`rounded-lg border ${getCategoryColor(item.category)}`}>
+        <div
+          className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/50 transition-colors"
+          onClick={() => setIsModalOpen(true)}
+        >
+          <div className="flex items-center space-x-3">
+            {getCategoryIcon(item.category)}
+            <div>
+              <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
+              <p className="text-xs text-gray-500">{item.description}</p>
+              <div className="flex items-center space-x-2 mt-1">
+                <CalendarIcon className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()}</span>
+                <span className="text-xs text-gray-400">•</span>
+                <span className="text-xs text-gray-500">{item.subject_ecr?.title || item.category}</span>
+                <span className="text-xs text-gray-400">•</span>
+                <span className="text-xs text-gray-500">{item.quarter}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="text-right">
-            <div className="text-sm font-medium text-gray-900">
-              {students.length} students
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <div className="text-sm font-medium text-gray-900">
+                {students.length} students
+              </div>
+              <div className="text-xs text-gray-500">
+                Max: {item.score} pts
+              </div>
             </div>
-            <div className="text-xs text-gray-500">
-              Max: {item.score} pts
-            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEditItem(item)
+              }}
+              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+              title="Edit grade item"
+            >
+              <PencilIcon className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onEditItem(item)
-            }}
-            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-            title="Edit grade item"
-          >
-            <PencilIcon className="w-4 h-4" />
-          </button>
-          {isExpanded ? (
-            <ChevronDownIcon className="w-4 h-4 text-gray-400" />
-          ) : (
-            <ChevronRightIcon className="w-4 h-4 text-gray-400" />
-          )}
         </div>
       </div>
 
-      {isExpanded && (
-        <div className="border-t border-gray-200 bg-white rounded-b-lg p-4 space-y-4">
-          {Object.entries(groupedStudents).map(([gender, studentsInGroup]) => (
-            <StudentGroup
-              key={gender}
-              gender={gender as 'male' | 'female' | 'other'}
-              students={studentsInGroup}
-              item={item}
-              scores={scores}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      {/* Full Screen Modal - Optimized for Mobile and Tablet */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-full items-start sm:items-center justify-center p-0 sm:p-4">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity"
+                onClick={() => setIsModalOpen(false)}
+              />
+
+              {/* Modal - Full screen on mobile, centered on tablet/desktop */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="relative transform overflow-hidden bg-white shadow-xl transition-all w-full h-full sm:h-auto sm:max-h-[90vh] sm:rounded-lg sm:w-full sm:max-w-4xl flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header - Only Close Button */}
+                <div className="flex items-center justify-end p-4 sm:p-6 border-b border-gray-200">
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 p-2"
+                    aria-label="Close"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Student List - Centered, Optimized for Mobile */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                  <div className="max-w-3xl mx-auto space-y-6">
+                    {Object.entries(groupedStudents).map(([gender, studentsInGroup]) => (
+                      <StudentGroup
+                        key={gender}
+                        gender={gender as 'male' | 'female' | 'other'}
+                        students={studentsInGroup}
+                        item={item}
+                        scores={scores}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 
@@ -328,7 +354,6 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   // Reset filters and refetch data when subject changes
   useEffect(() => {
     setActiveQuarter('All')
-    setActiveCategory('All')
     // Force refetch when subject changes
     if (subjectId && classSectionId) {
       refetchGradeItems()
@@ -337,7 +362,6 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   }, [subjectId, classSectionId, refetchGradeItems, refetchScores])
 
   const [activeQuarter, setActiveQuarter] = useState<string>('All')
-  const [activeCategory, setActiveCategory] = useState<string>('All')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedGradeItem, setSelectedGradeItem] = useState<any>(null)
@@ -379,15 +403,27 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   // Filtered items
   const quarters = ['1', '2', '3', '4']
   
-  // Get unique categories from subject_ecr titles
-  const uniqueCategories = [...new Set(gradeItemsData?.data?.map((item: GradeItem) => item.subject_ecr?.title).filter(Boolean) || [])]
-  const categories = ['All', ...uniqueCategories] as string[]
+  // Only process grade items if we have valid subject ECR IDs for this subject
+  // This ensures we don't show items from other subjects
+  const gradeItems = (subjectEcrIds.length > 0 && gradeItemsData?.data) ? gradeItemsData.data : []
   
-  const gradeItems = gradeItemsData?.data || []
   const filteredItems = gradeItems.filter((item: GradeItem) => {
+    // Ensure the item belongs to one of the current subject's ECRs
+    // Check both the relationship and direct property to handle different data structures
+    const itemEcrId = item.subject_ecr?.id || (item as any).subject_ecr_id
+    if (!itemEcrId) {
+      return false // Don't show items without a valid ECR ID
+    }
+    
+    // Only show items that belong to the current subject's ECRs
+    const belongsToSubject = subjectEcrIds.includes(itemEcrId)
+    if (!belongsToSubject) {
+      return false
+    }
+    
+    // Apply quarter filter
     const quarterMatch = activeQuarter === 'All' || item.quarter === activeQuarter
-    const categoryMatch = activeCategory === 'All' || item.subject_ecr?.title === activeCategory
-    return quarterMatch && categoryMatch
+    return quarterMatch
   })
   
   // Calculate statistics
@@ -517,37 +553,27 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Quarter Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Quarter</label>
-            <select
-              value={activeQuarter}
-              onChange={(e) => setActiveQuarter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="All">All Quarters</option>
-              {quarters.map(quarter => (
-                <option key={quarter} value={quarter}>{quarter}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Category Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <select
-              value={activeCategory}
-              onChange={(e) => setActiveCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              {categories.map((category: string) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </div>
+      {/* Quarter Tabs */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8 px-4" aria-label="Quarters">
+            {['All', ...quarters].map((quarter) => {
+              const quarterLabel = quarter === 'All' ? 'All Quarters' : `Quarter ${quarter}`
+              return (
+                <button
+                  key={quarter}
+                  onClick={() => setActiveQuarter(quarter)}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeQuarter === quarter
+                      ? 'border-indigo-500 text-indigo-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {quarterLabel}
+                </button>
+              )
+            })}
+          </nav>
         </div>
       </div>
 

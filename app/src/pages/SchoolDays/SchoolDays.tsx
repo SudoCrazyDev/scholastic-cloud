@@ -30,7 +30,6 @@ const SchoolDays: React.FC = () => {
   const { hasAccess } = useRoleAccess(['principal', 'institution-administrator'])
   const { user } = useAuth()
   const currentYear = new Date().getFullYear()
-  const currentMonth = new Date().getMonth() + 1
 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('')

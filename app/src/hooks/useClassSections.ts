@@ -194,7 +194,7 @@ export const useClassSections = (options: UseClassSectionsOptions = {}) => {
           adviser: data.adviser,
           academic_year: data.academic_year,
         }
-        const result = await updateMutation.mutateAsync({
+        await updateMutation.mutateAsync({
           id: editingClassSection.id,
           data: updateData
         })

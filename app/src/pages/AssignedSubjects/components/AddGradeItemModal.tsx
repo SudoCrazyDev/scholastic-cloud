@@ -25,6 +25,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
   const createMutation = useCreateSubjectEcrItem()
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   const subjectEcrs = subjectEcrsData?.data || []
+  const hasComponents = subjectEcrs.length > 0
 
   const formik = useFormik({
     initialValues: {
@@ -44,6 +45,13 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
       quarter: Yup.string().required('Quarter is required'),
     }),
     onSubmit: async (values, { resetForm, setSubmitting, setErrors }) => {
+      // Check if components are available first
+      if (!hasComponents) {
+        setErrors({ title: 'No Components, Please Create First' })
+        setSubmitting(false)
+        return
+      }
+      
       try {
         // Find the selected subject_ecr to infer type if possible
         const selectedEcr = subjectEcrs.find((ecr: any) => ecr.id === values.subject_ecr_id)
@@ -190,6 +198,10 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                       <div className="text-gray-500 text-sm">Loading components...</div>
                     ) : subjectEcrsError ? (
                       <div className="text-red-600 text-sm">Failed to load components.</div>
+                    ) : !hasComponents ? (
+                      <div className="w-full px-3 py-2 border border-yellow-300 bg-yellow-50 rounded-md text-sm text-yellow-800">
+                        No components available
+                      </div>
                     ) : (
                       <select
                         id="subject_ecr_id"
@@ -226,12 +238,16 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                   </div>
                 </div>
 
-                {/* Error Message */}
-                {formik.errors.title && typeof formik.errors.title === 'string' && (
+                {/* Error Message - Show component error first if no components, otherwise show form errors */}
+                {!subjectEcrsLoading && !subjectEcrsError && !hasComponents ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm text-red-800">No Components, Please Create First</p>
+                  </div>
+                ) : formik.errors.title && typeof formik.errors.title === 'string' ? (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                     <p className="text-sm text-red-800">{formik.errors.title}</p>
                   </div>
-                )}
+                ) : null}
 
                 {/* Actions */}
                 <div className="flex items-center justify-end space-x-3 pt-4">
@@ -244,7 +260,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={formik.isSubmitting || createMutation.status === 'pending'}
+                    disabled={formik.isSubmitting || createMutation.status === 'pending' || !hasComponents}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {formik.isSubmitting || createMutation.status === 'pending' ? (

@@ -167,7 +167,6 @@ export function ClassSectionModal({
     // Clear search query when clearing selection
     if (!teacher) {
       setTeacherSearchQuery('')
-      setDebouncedSearchQuery('')
     }
   }
 

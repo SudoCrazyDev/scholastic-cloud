@@ -15,7 +15,6 @@ import {
   GraduationCap as StudentsIcon,
   BookOpen,
   BookOpen as AssignedSubjectsIcon,
-  Clock,
   BarChart3,
   X,
   Calendar
