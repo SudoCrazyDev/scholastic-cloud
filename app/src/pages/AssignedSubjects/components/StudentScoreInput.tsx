@@ -163,7 +163,7 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
         setSubmitting(false);
       }}
     >
-      {({ errors, touched, isSubmitting, handleBlur, values, submitForm }) => (
+      {({ errors, touched, isSubmitting, handleBlur, values }) => (
         <Form>
           <div className="relative flex items-center space-x-1">
             <Field name="score">
