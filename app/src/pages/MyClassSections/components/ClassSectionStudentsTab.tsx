@@ -1,9 +1,114 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../../../components/button';
 import { Badge } from '../../../components/badge';
+import { Select } from '../../../components/select';
 import { Search, User, Plus, Edit, Trash2 } from 'lucide-react';
 import type { Student, Subject } from '../../../types';
+
+// Student Card Component with image error handling
+const StudentCard: React.FC<{
+  student: Student & { assignmentId: string };
+  index: number;
+  getFullName: (student: Student) => string;
+  onEditStudent: (student: Student & { assignmentId: string }) => void;
+  onRemoveStudent: (student: Student & { assignmentId: string }) => void;
+  navigate: (url: string) => void;
+  removeStudentMutationPending: boolean;
+}> = ({ student, index, getFullName, onEditStudent, onRemoveStudent, navigate, removeStudentMutationPending }) => {
+  const [imageError, setImageError] = useState(false);
+  const hasProfilePicture = student.profile_picture && student.profile_picture.trim() !== '';
+
+  return (
+    <motion.div
+      key={student.id}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer group"
+      onClick={() => navigate(`/students/${student.id}`)}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3 flex-1">
+          <div className="flex-shrink-0 relative">
+            {hasProfilePicture && !imageError ? (
+              <img
+                src={student.profile_picture}
+                alt={getFullName(student)}
+                className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 group-hover:border-indigo-300 transition-colors"
+                onError={() => {
+                  setImageError(true);
+                }}
+                onLoad={() => {
+                  setImageError(false);
+                }}
+              />
+            ) : (
+              <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center border-2 border-gray-200 group-hover:border-indigo-300 transition-colors">
+                <User className="w-6 h-6 text-gray-600" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors uppercase overflow-wrap max-w-[200px]">
+              {getFullName(student)}
+            </p>
+            <div className="flex items-center space-x-2 mt-1">
+              <Badge color={student.gender === 'male' ? 'blue' : 'pink'} className="text-xs px-1 py-0.5">
+                {student.gender === 'male' ? 'M' : 'F'}
+              </Badge>
+              <span className="text-xs text-gray-500">LRN: {student.lrn}</span>
+            </div>
+            {student.religion && (
+              <p className="text-xs text-gray-500 mt-1">
+                {student.religion}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col items-center space-x-1">
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditStudent(student);
+            }}
+            variant="ghost"
+            size="sm"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all"
+            title="Edit student information"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/students/${student.id}`);
+            }}
+            variant="ghost"
+            size="sm"
+            className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all"
+            title="View student details"
+          >
+            <User className="w-4 h-4" />
+          </Button>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveStudent(student);
+            }}
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+            disabled={removeStudentMutationPending}
+            title="Remove student from class"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 interface ClassSectionStudentsTabProps {
   students: (Student & { assignmentId: string })[];
@@ -11,6 +116,8 @@ interface ClassSectionStudentsTabProps {
   subjects: Subject[];
   studentSearchTerm: string;
   setStudentSearchTerm: (term: string) => void;
+  genderFilter: string;
+  setGenderFilter: (filter: string) => void;
   onCreateStudent: () => void;
   onAssignStudents: () => void;
   onEditStudent: (student: Student & { assignmentId: string }) => void;
@@ -28,6 +135,8 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   subjects,
   studentSearchTerm,
   setStudentSearchTerm,
+  genderFilter,
+  setGenderFilter,
   onCreateStudent,
   onAssignStudents,
   onEditStudent,
@@ -38,6 +147,12 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   getFullName,
   navigate,
 }) => {
+  const genderOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'male', label: 'Male' },
+    { value: 'female', label: 'Female' },
+    { value: 'other', label: 'Other' },
+  ];
   return (
     <motion.div
       key="students"
@@ -76,20 +191,10 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
         </div>
       </div>
 
-      {/* Add Students Button and Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      {/* Header and Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <h3 className="text-lg font-medium text-gray-900">Class Students</h3>
         <div className="flex items-center space-x-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search students..."
-              value={studentSearchTerm}
-              onChange={(e) => setStudentSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-            />
-          </div>
           <Button
             onClick={onCreateStudent}
             size="sm"
@@ -105,6 +210,28 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
             <Plus className="w-4 h-4 mr-2" />
             Assign Students
           </Button>
+        </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search students..."
+            value={studentSearchTerm}
+            onChange={(e) => setStudentSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+          />
+        </div>
+        <div className="sm:w-48">
+          <Select
+            value={genderFilter}
+            onChange={(e) => setGenderFilter(e.target.value)}
+            options={genderOptions}
+            className="w-full"
+          />
         </div>
       </div>
 
@@ -156,87 +283,16 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {studentsList.map((student, index) => (
-                  <motion.div
+                  <StudentCard
                     key={student.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer group"
-                    onClick={() => navigate(`/students/${student.id}`)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3 flex-1">
-                        <div className="flex-shrink-0">
-                          {student.profile_picture ? (
-                            <img
-                              src={student.profile_picture}
-                              alt={getFullName(student)}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 group-hover:border-indigo-300 transition-colors"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center border-2 border-gray-200 group-hover:border-indigo-300 transition-colors">
-                              <User className="w-6 h-6 text-gray-600" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors uppercase overflow-wrap max-w-[200px]">
-                            {getFullName(student)}
-                          </p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <Badge color={student.gender === 'male' ? 'blue' : 'pink'} className="text-xs px-1 py-0.5">
-                              {student.gender === 'male' ? 'M' : 'F'}
-                            </Badge>
-                            <span className="text-xs text-gray-500">LRN: {student.lrn}</span>
-                          </div>
-                          {student.religion && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              {student.religion}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-center space-x-1">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditStudent(student);
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all"
-                          title="Edit student information"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/students/${student.id}`);
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all"
-                          title="View student details"
-                        >
-                          <User className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRemoveStudent(student);
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
-                          disabled={removeStudentMutationPending}
-                          title="Remove student from class"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.div>
+                    student={student}
+                    index={index}
+                    getFullName={getFullName}
+                    onEditStudent={onEditStudent}
+                    onRemoveStudent={onRemoveStudent}
+                    navigate={navigate}
+                    removeStudentMutationPending={removeStudentMutationPending}
+                  />
                 ))}
               </div>
             </div>

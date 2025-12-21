@@ -41,13 +41,72 @@ class StudentService {
   }
 
   async createStudent(data: CreateStudentData) {
-    const response = await api.post<{ success: boolean; data: Student }>(this.baseUrl, data)
-    return response.data
+    // Check if profile_picture is a File object
+    const hasFile = data.profile_picture instanceof File
+    
+    if (hasFile) {
+      // Create FormData for file upload
+      const formData = new FormData()
+      formData.append('first_name', data.first_name)
+      if (data.middle_name) formData.append('middle_name', data.middle_name)
+      formData.append('last_name', data.last_name)
+      if (data.ext_name) formData.append('ext_name', data.ext_name)
+      formData.append('gender', data.gender)
+      if (data.religion) formData.append('religion', data.religion)
+      formData.append('birthdate', data.birthdate)
+      if (data.lrn) formData.append('lrn', data.lrn)
+      if (data.profile_picture instanceof File) {
+        formData.append('profile_picture', data.profile_picture)
+      }
+      if (data.is_active !== undefined) {
+        formData.append('is_active', data.is_active.toString())
+      }
+      
+      // Axios will automatically set Content-Type with boundary for FormData
+      const response = await api.post<{ success: boolean; data: Student }>(this.baseUrl, formData)
+      return response.data
+    } else {
+      // Regular JSON request
+      const response = await api.post<{ success: boolean; data: Student }>(this.baseUrl, data)
+      return response.data
+    }
   }
 
   async updateStudent(id: string, data: UpdateStudentData) {
-    const response = await api.put<{ success: boolean; data: Student }>(`${this.baseUrl}/${id}`, data)
-    return response.data
+    // Check if profile_picture is a File object
+    const hasFile = data.profile_picture instanceof File
+    
+    if (hasFile) {
+      // Create FormData for file upload
+      const formData = new FormData()
+      if (data.first_name) formData.append('first_name', data.first_name)
+      if (data.middle_name) formData.append('middle_name', data.middle_name)
+      if (data.last_name) formData.append('last_name', data.last_name)
+      if (data.ext_name) formData.append('ext_name', data.ext_name)
+      if (data.gender) formData.append('gender', data.gender)
+      if (data.religion) formData.append('religion', data.religion)
+      if (data.birthdate) formData.append('birthdate', data.birthdate)
+      if (data.lrn) formData.append('lrn', data.lrn)
+      if (data.profile_picture instanceof File) {
+        formData.append('profile_picture', data.profile_picture, data.profile_picture.name)
+      }
+      if (data.is_active !== undefined) {
+        formData.append('is_active', data.is_active.toString())
+      }
+      
+      // Use POST endpoint specifically for file uploads (PUT/PATCH don't handle multipart/form-data correctly in Laravel)
+      // The interceptor will handle Content-Type automatically for FormData
+      const response = await api.post<{ success: boolean; data: Student }>(`${this.baseUrl}/${id}/update`, formData)
+      return response.data
+    } else {
+      // Regular JSON request - exclude profile_picture if it's not a file
+      const jsonData = { ...data }
+      if (jsonData.profile_picture && !(jsonData.profile_picture instanceof File)) {
+        delete jsonData.profile_picture
+      }
+      const response = await api.put<{ success: boolean; data: Student }>(`${this.baseUrl}/${id}`, jsonData)
+      return response.data
+    }
   }
 
   async deleteStudent(id: string) {

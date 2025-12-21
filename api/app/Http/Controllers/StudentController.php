@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class StudentController extends Controller
@@ -99,7 +100,8 @@ class StudentController extends Controller
             ], 400);
         }
 
-        $validated = $request->validate([
+        // Build validation rules
+        $rules = [
             'lrn' => 'nullable|string|unique:students,lrn',
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
@@ -108,13 +110,46 @@ class StudentController extends Controller
             'gender' => 'required|string',
             'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,Others',
             'birthdate' => 'required|date',
-            'profile_picture' => 'nullable|string',
             'is_active' => 'boolean',
-        ]);
+        ];
+
+        // Only validate profile_picture as file if it's actually being uploaded
+        if ($request->hasFile('profile_picture')) {
+            $rules['profile_picture'] = 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
+        }
+
+        $validated = $request->validate($rules);
 
         DB::beginTransaction();
         try {
-            $student = Student::create($validated);
+            // Create student first (without profile picture)
+            $studentData = $validated;
+            unset($studentData['profile_picture']);
+            $student = Student::create($studentData);
+
+            // Handle profile picture upload to S3
+            if ($request->hasFile('profile_picture')) {
+                try {
+                    $file = $request->file('profile_picture');
+                    // Use original filename, sanitize it to prevent path traversal
+                    $originalName = $file->getClientOriginalName();
+                    $fileName = basename($originalName); // Remove any path components
+                    
+                    // Path: institutionID/student/studentID/profile/
+                    $s3Path = $defaultInstitutionId . '/student/' . $student->id . '/profile/' . $fileName;
+                    
+                    // Upload to S3 with public visibility
+                    $uploadedPath = Storage::disk('s3')->put($s3Path, file_get_contents($file));
+                    Storage::disk('s3')->setVisibility($s3Path, 'public');
+                    
+                    if ($uploadedPath) {
+                        // Store the S3 path instead of URL (temporary URLs will be generated via accessor)
+                        $student->update(['profile_picture' => $s3Path]);
+                    }
+                } catch (\Exception $e) {
+                    // Continue without profile picture - student is already created
+                }
+            }
 
             // Create only one institution relationship with the user's institution
             StudentInstitution::create([
@@ -125,7 +160,7 @@ class StudentController extends Controller
             ]);
 
             DB::commit();
-            return response()->json(['success' => true, 'data' => $student->load('studentInstitutions')], 201);
+            return response()->json(['success' => true, 'data' => $student->fresh()->load('studentInstitutions')], 201);
         } catch (ValidationException $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'errors' => $e->errors()], 422);
@@ -203,7 +238,8 @@ class StudentController extends Controller
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
         
-        $validated = $request->validate([
+        // Build validation rules
+        $rules = [
             'lrn' => 'nullable|string|unique:students,lrn,' . $id,
             'first_name' => 'sometimes|required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
@@ -212,10 +248,192 @@ class StudentController extends Controller
             'gender' => 'sometimes|required|string',
             'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,Others',
             'birthdate' => 'sometimes|required|date',
-            'profile_picture' => 'nullable|string',
             'is_active' => 'boolean',
-        ]);
-        $student->update($validated);
+        ];
+
+        // Only validate profile_picture as file if it's actually being uploaded
+        // Check both hasFile() and direct file() access for compatibility with PUT requests
+        $profilePictureFileForValidation = $request->file('profile_picture');
+        if ($request->hasFile('profile_picture') || ($profilePictureFileForValidation instanceof \Illuminate\Http\UploadedFile)) {
+            $rules['profile_picture'] = 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
+        }
+
+        $validated = $request->validate($rules);
+
+        // Prepare update data (exclude file from validated data)
+        $updateData = $validated;
+        unset($updateData['profile_picture']);
+
+        // Handle profile picture upload to S3
+        // Try multiple methods to detect file upload (some servers don't handle PUT with files correctly)
+        $profilePictureFile = $request->file('profile_picture');
+        $hasProfilePictureFile = $request->hasFile('profile_picture') || ($profilePictureFile instanceof \Illuminate\Http\UploadedFile);
+        
+        if ($hasProfilePictureFile && $profilePictureFile) {
+            // Delete old profile picture from S3 if exists
+            if ($student->profile_picture) {
+                try {
+                    // Get the raw path from database (before accessor transforms it)
+                    $oldPath = $student->getRawOriginal('profile_picture');
+                    
+                    // If it's a URL (legacy data), extract the path
+                    if (str_starts_with($oldPath, 'http://') || str_starts_with($oldPath, 'https://')) {
+                        $parsedUrl = parse_url($oldPath);
+                        if (isset($parsedUrl['path'])) {
+                            $oldPath = ltrim($parsedUrl['path'], '/');
+                            $bucketName = env('AWS_BUCKET');
+                            if ($bucketName && strpos($oldPath, $bucketName) === 0) {
+                                $oldPath = substr($oldPath, strlen($bucketName) + 1);
+                            }
+                        }
+                    }
+                    
+                    // Delete from S3 if path exists
+                    if ($oldPath && Storage::disk('s3')->exists($oldPath)) {
+                        Storage::disk('s3')->delete($oldPath);
+                    }
+                } catch (\Exception $e) {
+                    // Silently fail if deletion fails
+                }
+            }
+
+            try {
+                $file = $profilePictureFile;
+                // Use original filename, sanitize it to prevent path traversal
+                $originalName = $file->getClientOriginalName();
+                $fileName = basename($originalName); // Remove any path components
+                
+                // Path: institutionID/student/studentID/profile/
+                $s3Path = $defaultInstitutionId . '/student/' . $student->id . '/profile/' . $fileName;
+                
+                // Upload to S3 with public visibility
+                $uploadedPath = Storage::disk('s3')->put($s3Path, file_get_contents($file));
+                Storage::disk('s3')->setVisibility($s3Path, 'public');
+                
+                if ($uploadedPath) {
+                    // Store the S3 path instead of URL (temporary URLs will be generated via accessor)
+                    $updateData['profile_picture'] = $s3Path;
+                }
+            } catch (\Exception $e) {
+                // Don't update profile picture if upload fails
+            }
+        }
+        
+        $student->update($updateData);
+        return response()->json(['success' => true, 'data' => $student->fresh('studentInstitutions')]);
+    }
+
+    /**
+     * Update student with file upload support (POST method)
+     * This method is specifically for updating student data when file uploads are involved,
+     * as PUT/PATCH requests don't handle multipart/form-data correctly in Laravel.
+     */
+    public function updateWithFile(Request $request, $id): JsonResponse
+    {
+        // Get the authenticated user's institution
+        $user = $request->user();
+        $defaultInstitutionId = $user->getDefaultInstitutionId();
+        
+        // If no default institution, try to get the first available institution
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
+        
+        if (!$defaultInstitutionId) {
+            return response()->json([
+                'success' => false, 
+                'error' => 'User does not have any institution assigned'
+            ], 400);
+        }
+
+        $student = Student::whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
+            $q->where('institution_id', $defaultInstitutionId);
+        })->find($id);
+        
+        if (!$student) {
+            return response()->json(['success' => false, 'message' => 'Student not found'], 404);
+        }
+        
+        // Build validation rules
+        $rules = [
+            'lrn' => 'nullable|string|unique:students,lrn,' . $id,
+            'first_name' => 'sometimes|required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'ext_name' => 'nullable|string|max:255',
+            'gender' => 'sometimes|required|string',
+            'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,Others',
+            'birthdate' => 'sometimes|required|date',
+            'is_active' => 'boolean',
+        ];
+
+        // Only validate profile_picture as file if it's actually being uploaded
+        if ($request->hasFile('profile_picture')) {
+            $rules['profile_picture'] = 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
+        }
+
+        $validated = $request->validate($rules);
+
+        // Prepare update data (exclude file from validated data)
+        $updateData = $validated;
+        unset($updateData['profile_picture']);
+
+        // Handle profile picture upload to S3
+        if ($request->hasFile('profile_picture')) {
+            $profilePictureFile = $request->file('profile_picture');
+            
+            // Delete old profile picture from S3 if exists
+            if ($student->profile_picture) {
+                try {
+                    // Get the raw path from database (before accessor transforms it)
+                    $oldPath = $student->getRawOriginal('profile_picture');
+                    
+                    // If it's a URL (legacy data), extract the path
+                    if (str_starts_with($oldPath, 'http://') || str_starts_with($oldPath, 'https://')) {
+                        $parsedUrl = parse_url($oldPath);
+                        if (isset($parsedUrl['path'])) {
+                            $oldPath = ltrim($parsedUrl['path'], '/');
+                            $bucketName = env('AWS_BUCKET');
+                            if ($bucketName && strpos($oldPath, $bucketName) === 0) {
+                                $oldPath = substr($oldPath, strlen($bucketName) + 1);
+                            }
+                        }
+                    }
+                    
+                    // Delete from S3 if path exists
+                    if ($oldPath && Storage::disk('s3')->exists($oldPath)) {
+                        Storage::disk('s3')->delete($oldPath);
+                    }
+                } catch (\Exception $e) {
+                    // Silently fail if deletion fails
+                }
+            }
+
+            try {
+                // Use original filename, sanitize it to prevent path traversal
+                $originalName = $profilePictureFile->getClientOriginalName();
+                $fileName = basename($originalName); // Remove any path components
+                
+                // Path: institutionID/student/studentID/profile/
+                $s3Path = $defaultInstitutionId . '/student/' . $student->id . '/profile/' . $fileName;
+                
+                // Upload to S3 with public visibility
+                $uploadedPath = Storage::disk('s3')->put($s3Path, file_get_contents($profilePictureFile));
+                Storage::disk('s3')->setVisibility($s3Path, 'public');
+                
+                if ($uploadedPath) {
+                    // Store the S3 path instead of URL (temporary URLs will be generated via accessor)
+                    $updateData['profile_picture'] = $s3Path;
+                }
+            } catch (\Exception $e) {
+                // Don't update profile picture if upload fails
+            }
+        }
+        
+        $student->update($updateData);
         return response()->json(['success' => true, 'data' => $student->fresh('studentInstitutions')]);
     }
 

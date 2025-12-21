@@ -89,6 +89,7 @@ Route::middleware('auth.token')->group(function () {
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
+    Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
     Route::apiResource('students', StudentController::class);
     // Staff routes
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);

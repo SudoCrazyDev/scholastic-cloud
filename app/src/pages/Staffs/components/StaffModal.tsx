@@ -235,10 +235,12 @@ const StaffModal: React.FC<StaffModalProps> = ({
                       onChange={handleSelectChange}
                       required
                       placeholder="Select a role"
-                      options={roles.map(role => ({
-                        value: role.id.toString(),
-                        label: role.title
-                      }))}
+                      options={roles
+                        .filter(role => role.slug !== 'super-administrator')
+                        .map(role => ({
+                          value: role.id.toString(),
+                          label: role.title
+                        }))}
                     />
                   </div>
                 </div>

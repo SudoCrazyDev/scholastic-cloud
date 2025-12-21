@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use App\Models\StudentInstitution;
 
 class Student extends Model
@@ -72,5 +74,33 @@ class Student extends Model
     public function ecrItemScores()
     {
         return $this->hasMany(StudentEcrItemScore::class);
+    }
+
+    /**
+     * Get the profile picture URL with temporary signed URL if it's an S3 path.
+     */
+    public function getProfilePictureAttribute($value)
+    {
+        if (!$value) {
+            return null;
+        }
+
+        // If it's already a full URL (starts with http), return as is (for legacy data)
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
+        }
+
+        // If it's an S3 path, generate a temporary signed URL (valid for 1 hour)
+        try {
+            return Storage::disk('s3')->temporaryUrl($value, now()->addHours(1));
+        } catch (\Exception $e) {
+            // If temporary URL generation fails, try regular URL as fallback
+            try {
+                return Storage::disk('s3')->url($value);
+            } catch (\Exception $e2) {
+                Log::warning('Failed to generate profile picture URL for student: ' . $this->id . ' - ' . $e2->getMessage());
+                return null;
+            }
+        }
     }
 } 

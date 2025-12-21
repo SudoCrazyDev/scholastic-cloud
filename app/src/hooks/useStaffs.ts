@@ -91,12 +91,18 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     },
     onError: (error: any) => {
       console.error('Error creating staff:', error)
-      if (error.response?.data?.message) {
-        setModalError(error.response.data.message)
-      } else if (error.response?.data?.errors) {
+      if (error.response?.data?.errors) {
         const errors = error.response.data.errors
-        const errorMessages = Object.values(errors).flat().join(', ')
-        setModalError(errorMessages)
+        // Get the first error from the first field
+        const firstErrorKey = Object.keys(errors)[0]
+        const firstErrorArray = errors[firstErrorKey]
+        if (Array.isArray(firstErrorArray) && firstErrorArray.length > 0) {
+          setModalError(firstErrorArray[0])
+        } else {
+          setModalError('Validation failed. Please check your input.')
+        }
+      } else if (error.response?.data?.message) {
+        setModalError(error.response.data.message)
       } else {
         setModalError('Failed to create staff member. Please try again.')
       }
@@ -114,12 +120,18 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     },
     onError: (error: any) => {
       console.error('Error updating staff:', error)
-      if (error.response?.data?.message) {
-        setModalError(error.response.data.message)
-      } else if (error.response?.data?.errors) {
+      if (error.response?.data?.errors) {
         const errors = error.response.data.errors
-        const errorMessages = Object.values(errors).flat().join(', ')
-        setModalError(errorMessages)
+        // Get the first error from the first field
+        const firstErrorKey = Object.keys(errors)[0]
+        const firstErrorArray = errors[firstErrorKey]
+        if (Array.isArray(firstErrorArray) && firstErrorArray.length > 0) {
+          setModalError(firstErrorArray[0])
+        } else {
+          setModalError('Validation failed. Please check your input.')
+        }
+      } else if (error.response?.data?.message) {
+        setModalError(error.response.data.message)
       } else {
         setModalError('Failed to update staff member. Please try again.')
       }
@@ -137,12 +149,18 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     },
     onError: (error: any) => {
       console.error('Error updating staff role:', error)
-      if (error.response?.data?.message) {
-        setChangeRoleError(error.response.data.message)
-      } else if (error.response?.data?.errors) {
+      if (error.response?.data?.errors) {
         const errors = error.response.data.errors
-        const errorMessages = Object.values(errors).flat().join(', ')
-        setChangeRoleError(errorMessages)
+        // Get the first error from the first field
+        const firstErrorKey = Object.keys(errors)[0]
+        const firstErrorArray = errors[firstErrorKey]
+        if (Array.isArray(firstErrorArray) && firstErrorArray.length > 0) {
+          setChangeRoleError(firstErrorArray[0])
+        } else {
+          setChangeRoleError('Validation failed. Please check your input.')
+        }
+      } else if (error.response?.data?.message) {
+        setChangeRoleError(error.response.data.message)
       } else {
         setChangeRoleError('Failed to update staff role. Please try again.')
       }
@@ -170,12 +188,18 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     },
     onError: (error: any) => {
       console.error('Error resetting password:', error)
-      if (error.response?.data?.message) {
-        setResetPasswordError(error.response.data.message)
-      } else if (error.response?.data?.errors) {
+      if (error.response?.data?.errors) {
         const errors = error.response.data.errors
-        const errorMessages = Object.values(errors).flat().join(', ')
-        setResetPasswordError(errorMessages)
+        // Get the first error from the first field
+        const firstErrorKey = Object.keys(errors)[0]
+        const firstErrorArray = errors[firstErrorKey]
+        if (Array.isArray(firstErrorArray) && firstErrorArray.length > 0) {
+          setResetPasswordError(firstErrorArray[0])
+        } else {
+          setResetPasswordError('Validation failed. Please check your input.')
+        }
+      } else if (error.response?.data?.message) {
+        setResetPasswordError(error.response.data.message)
       } else {
         setResetPasswordError('Failed to reset password. Please try again.')
       }

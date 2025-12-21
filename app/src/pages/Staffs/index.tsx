@@ -5,7 +5,6 @@ import { Alert } from '../../components/alert';
 import { Toaster } from 'react-hot-toast';
 
 const Staffs: React.FC = () => {
-  console.log('Staffs component rendering');
   const {
     // Data
     staffs,
@@ -58,13 +57,6 @@ const Staffs: React.FC = () => {
     search: '',
     page: 1,
     limit: 15,
-  });
-
-  console.log('Staffs component state:', { 
-    isResetPasswordModalOpen, 
-    resettingPasswordStaff,
-    isChangeRoleModalOpen,
-    changingRoleStaff 
   });
 
   return (

@@ -460,7 +460,8 @@ export interface CreateStudentData {
   gender: 'male' | 'female' | 'other';
   religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
   lrn: string;
-  profile_picture?: string;
+  profile_picture?: string | File;
+  is_active?: boolean;
 }
 
 export interface UpdateStudentData {
@@ -472,7 +473,8 @@ export interface UpdateStudentData {
   gender?: 'male' | 'female' | 'other';
   religion?: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
   lrn?: string;
-  profile_picture?: string;
+  profile_picture?: string | File;
+  is_active?: boolean;
 }
 
 // Student Attendance types

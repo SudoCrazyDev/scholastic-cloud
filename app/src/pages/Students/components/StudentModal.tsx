@@ -91,6 +91,7 @@ export function StudentModal({
   success = null
 }: StudentModalProps) {
   const [profileImage, setProfileImage] = useState<string | null>(null)
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [showAlert, setShowAlert] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
@@ -111,28 +112,53 @@ export function StudentModal({
     }
   }, [error, success])
 
+  // Initialize profile image when modal opens or student changes
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    // Set preview image from student's existing profile picture
+    if (student?.profile_picture) {
+      setProfileImage(student.profile_picture)
+    } else {
+      setProfileImage(null)
+    }
+    
+    // Only reset file when modal first opens (when isOpen changes from false to true)
+    // Don't reset if user has already uploaded a new file
+    // We'll use a ref to track if this is the first open
+  }, [student?.id, isOpen])
+  
+  // Reset file only when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setProfileImageFile(null)
+    }
+  }, [isOpen])
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       setIsUploading(true)
-      // Simulate upload delay
-      setTimeout(() => {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          setProfileImage(e.target?.result as string)
-          setIsUploading(false)
-        }
-        reader.readAsDataURL(file)
-      }, 1000)
+      setProfileImageFile(file)
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setProfileImage(e.target?.result as string)
+        setIsUploading(false)
+      }
+      reader.readAsDataURL(file)
     }
   }
 
   const handleRemoveImage = () => {
     setProfileImage(null)
+    setProfileImageFile(null)
   }
 
   const handleClose = () => {
     setShowAlert(false)
+    setProfileImage(null)
+    setProfileImageFile(null)
     onClose()
   }
 
@@ -212,16 +238,24 @@ export function StudentModal({
                 validationSchema={validationSchema}
                 onSubmit={async (values, { setSubmitting, resetForm }) => {
                   try {
+                    // Capture profileImageFile at submit time to avoid stale closure issues
+                    const fileToSubmit = profileImageFile;
+                    
                     const submitData: CreateStudentData = {
                       ...values,
                       gender: values.gender as 'male' | 'female' | 'other',
                       religion: values.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others',
-                      profile_picture: profileImage || undefined,
+                      profile_picture: fileToSubmit || undefined,
                     }
+                    
                     await onSubmit(submitData)
                     if (!isEditing) {
                       resetForm()
                       setProfileImage(null)
+                      setProfileImageFile(null)
+                    } else {
+                      // Auto-close modal after successful update
+                      onClose()
                     }
                   } catch (error) {
                     // Error handling is done by the parent component
@@ -235,50 +269,55 @@ export function StudentModal({
                   <Form className="px-4 pb-4">
                     <div className="space-y-6">
                       {/* Profile Picture */}
-                      <div className="flex justify-center">
-                        <div className="relative">
-                          <div className="h-24 w-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
-                            {profileImage ? (
-                              <img
-                                src={profileImage}
-                                alt="Profile"
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center">
-                                <PhotoIcon className="h-12 w-12 text-gray-400" />
+                      <div className="flex flex-col items-center">
+                        <div className="flex justify-center">
+                          <div className="relative">
+                            <div className="h-24 w-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+                              {profileImage ? (
+                                <img
+                                  src={profileImage}
+                                  alt="Profile"
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <PhotoIcon className="h-12 w-12 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="absolute -bottom-1 -right-1">
+                              <label className="cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleImageUpload}
+                                  className="hidden"
+                                  disabled={isUploading}
+                                />
+                                <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center hover:bg-blue-700 transition-colors">
+                                  <CameraIcon className="h-4 w-4 text-white" />
+                                </div>
+                              </label>
+                            </div>
+                            {isUploading && (
+                              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                               </div>
                             )}
                           </div>
-                          <div className="absolute -bottom-1 -right-1">
-                            <label className="cursor-pointer">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                                disabled={isUploading}
-                              />
-                              <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center hover:bg-blue-700 transition-colors">
-                                <CameraIcon className="h-4 w-4 text-white" />
-                              </div>
-                            </label>
-                          </div>
-                          {isUploading && (
-                            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                            </div>
+                          {profileImage && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              className="ml-2 text-sm text-red-600 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
                           )}
                         </div>
-                        {profileImage && (
-                          <button
-                            type="button"
-                            onClick={handleRemoveImage}
-                            className="ml-2 text-sm text-red-600 hover:text-red-700"
-                          >
-                            Remove
-                          </button>
-                        )}
+                        <p className="mt-2 text-xs text-gray-500 text-center">
+                          Maximum file size: 5MB
+                        </p>
                       </div>
 
                       {/* Form Fields */}

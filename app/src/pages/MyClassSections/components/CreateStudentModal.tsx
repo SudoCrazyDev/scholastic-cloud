@@ -94,6 +94,7 @@ export function CreateStudentModal({
 }: CreateStudentModalProps) {
   const queryClient = useQueryClient()
   const [profileImage, setProfileImage] = useState<string | null>(null)
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [showAlert, setShowAlert] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
@@ -141,25 +142,26 @@ export function CreateStudentModal({
     const file = event.target.files?.[0]
     if (file) {
       setIsUploading(true)
-      // Simulate upload delay
-      setTimeout(() => {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          setProfileImage(e.target?.result as string)
-          setIsUploading(false)
-        }
-        reader.readAsDataURL(file)
-      }, 1000)
+      setProfileImageFile(file)
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setProfileImage(e.target?.result as string)
+        setIsUploading(false)
+      }
+      reader.readAsDataURL(file)
     }
   }
 
   const handleRemoveImage = () => {
     setProfileImage(null)
+    setProfileImageFile(null)
   }
 
   const handleClose = () => {
     setShowAlert(false)
     setProfileImage(null)
+    setProfileImageFile(null)
     setAddToSection(false)
     onClose()
   }
@@ -181,7 +183,7 @@ export function CreateStudentModal({
         ...values,
         gender: values.gender as 'male' | 'female' | 'other',
         religion: values.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others',
-        profile_picture: profileImage || undefined,
+        profile_picture: profileImageFile || undefined,
       }
 
       const result = await createStudentMutation.mutateAsync(submitData)
@@ -203,6 +205,7 @@ export function CreateStudentModal({
 
       resetForm()
       setProfileImage(null)
+      setProfileImageFile(null)
       setAddToSection(false)
     } catch (error) {
       // Error handling is done by the mutation
@@ -286,50 +289,55 @@ export function CreateStudentModal({
                   <Form className="px-4 pb-4">
                     <div className="space-y-6">
                       {/* Profile Picture */}
-                      <div className="flex justify-center">
-                        <div className="relative">
-                          <div className="h-24 w-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
-                            {profileImage ? (
-                              <img
-                                src={profileImage}
-                                alt="Profile"
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center">
-                                <PhotoIcon className="h-12 w-12 text-gray-400" />
+                      <div className="flex flex-col items-center">
+                        <div className="flex justify-center">
+                          <div className="relative">
+                            <div className="h-24 w-24 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+                              {profileImage ? (
+                                <img
+                                  src={profileImage}
+                                  alt="Profile"
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <PhotoIcon className="h-12 w-12 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="absolute -bottom-1 -right-1">
+                              <label className="cursor-pointer">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleImageUpload}
+                                  className="hidden"
+                                  disabled={isUploading}
+                                />
+                                <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center hover:bg-blue-700 transition-colors">
+                                  <CameraIcon className="h-4 w-4 text-white" />
+                                </div>
+                              </label>
+                            </div>
+                            {isUploading && (
+                              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                                <Loader2 className="h-6 w-6 animate-spin text-white" />
                               </div>
                             )}
                           </div>
-                          <div className="absolute -bottom-1 -right-1">
-                            <label className="cursor-pointer">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="hidden"
-                                disabled={isUploading}
-                              />
-                              <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center hover:bg-blue-700 transition-colors">
-                                <CameraIcon className="h-4 w-4 text-white" />
-                              </div>
-                            </label>
-                          </div>
-                          {isUploading && (
-                            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                              <Loader2 className="h-6 w-6 animate-spin text-white" />
-                            </div>
+                          {profileImage && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              className="ml-2 text-sm text-red-600 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
                           )}
                         </div>
-                        {profileImage && (
-                          <button
-                            type="button"
-                            onClick={handleRemoveImage}
-                            className="ml-2 text-sm text-red-600 hover:text-red-700"
-                          >
-                            Remove
-                          </button>
-                        )}
+                        <p className="mt-2 text-xs text-gray-500 text-center">
+                          Maximum file size: 5MB
+                        </p>
                       </div>
 
                       {/* Form Fields */}

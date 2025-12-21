@@ -103,13 +103,13 @@ const menuItems: MenuItem[] = [
     path: '/students',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
-  {
-    id: 'teacher-attendance',
-    label: 'Teacher Attendance',
-    icon: <Clock className="w-5 h-5" />,
-    path: '/teacher-attendance',
-    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
-  },
+  // {
+  //   id: 'teacher-attendance',
+  //   label: 'Teacher Attendance',
+  //   icon: <Clock className="w-5 h-5" />,
+  //   path: '/teacher-attendance',
+  //   allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+  // },
   {
     id: 'consolidated-grades',
     label: 'Consolidated Grades',

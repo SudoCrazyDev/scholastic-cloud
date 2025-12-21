@@ -64,6 +64,7 @@ const ClassSectionDetail: React.FC = () => {
   const [editModalError, setEditModalError] = useState<string | null>(null)
   const [editModalSuccess, setEditModalSuccess] = useState<string | null>(null)
   const [studentSearchTerm, setStudentSearchTerm] = useState('')
+  const [genderFilter, setGenderFilter] = useState<string>('all')
 
   // Subject-related state
   const [showSubjectModal, setShowSubjectModal] = useState(false)
@@ -260,19 +261,30 @@ const ClassSectionDetail: React.FC = () => {
   }, [])
 
   const filteredStudents = useMemo(() => {
-    if (!studentSearchTerm) return students
-    const searchLower = studentSearchTerm.toLowerCase()
-    return students.filter(student => {
-      const fullName = getFullName(student).toLowerCase()
-      const lrn = student.lrn?.toLowerCase() || ''
-      return fullName.includes(searchLower) || lrn.includes(searchLower)
-    })
-  }, [students, studentSearchTerm, getFullName])
+    let filtered = students
+    
+    // Apply gender filter
+    if (genderFilter !== 'all') {
+      filtered = filtered.filter(student => student.gender === genderFilter)
+    }
+    
+    // Apply search filter
+    if (studentSearchTerm) {
+      const searchLower = studentSearchTerm.toLowerCase()
+      filtered = filtered.filter(student => {
+        const fullName = getFullName(student).toLowerCase()
+        const lrn = student.lrn?.toLowerCase() || ''
+        return fullName.includes(searchLower) || lrn.includes(searchLower)
+      })
+    }
+    
+    return filtered
+  }, [students, studentSearchTerm, genderFilter, getFullName])
 
   const groupedStudents = useMemo(() => {
     const grouped: Record<string, (Student & { assignmentId: string })[]> = {}
     
-    students.forEach(student => {
+    filteredStudents.forEach(student => {
       const gender = student.gender || 'other'
       if (!grouped[gender]) {
         grouped[gender] = []
@@ -289,7 +301,7 @@ const ClassSectionDetail: React.FC = () => {
     })
 
     return grouped
-  }, [students])
+  }, [filteredStudents])
 
   const handleCreateSubject = useCallback(() => {
     setEditingSubject(null)
@@ -596,11 +608,13 @@ const ClassSectionDetail: React.FC = () => {
             >
               {activeTab === 'students' && (
                 <ClassSectionStudentsTab
-                  students={students}
+                  students={filteredStudents}
                   groupedStudents={groupedStudents}
                   subjects={subjects}
                   studentSearchTerm={studentSearchTerm}
                   setStudentSearchTerm={setStudentSearchTerm}
+                  genderFilter={genderFilter}
+                  setGenderFilter={setGenderFilter}
                   onCreateStudent={() => setShowCreateStudentModal(true)}
                   onAssignStudents={() => setShowAssignmentModal(true)}
                   onEditStudent={handleEditStudent}
