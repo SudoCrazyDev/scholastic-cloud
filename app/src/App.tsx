@@ -4,7 +4,7 @@ import { QueryProvider } from './providers/QueryProvider';
 import { AuthProvider } from './providers/AuthProvider';
 import PublicLayout from './components/layouts/PublicLayout';
 import PrivateLayout from './components/layouts/PrivateLayout';
-import Login from './pages/Login';
+import UnderMaintenance from './pages/UnderMaintenance';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Institutions from './pages/Institutions';
@@ -38,7 +38,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<PublicLayout />}>
               <Route index element={<Navigate to="/login" replace />} />
-              <Route path="login" element={<Login />} />
+              <Route path="login" element={<UnderMaintenance />} />
             </Route>
 
             {/* Set New Password Route - Separate from PrivateLayout */}
