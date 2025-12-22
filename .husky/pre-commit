@@ -1,0 +1,8 @@
+cd app
+npm run build
+
+# Exit with error if build fails
+if [ $? -ne 0 ]; then
+  echo "Build failed. Commit aborted."
+  exit 1
+fi
