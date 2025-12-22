@@ -25,7 +25,7 @@ const UnderMaintenance: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -38,7 +38,7 @@ const UnderMaintenance: React.FC = () => {
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-            className="mx-auto h-24 w-24 bg-orange-500 rounded-full flex items-center justify-center shadow-lg"
+            className="mx-auto h-24 w-24 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg"
           >
             <svg
               className="h-12 w-12 text-white"
@@ -91,7 +91,7 @@ const UnderMaintenance: React.FC = () => {
           {[0, 1, 2].map((index) => (
             <motion.div
               key={index}
-              className="w-3 h-3 bg-orange-500 rounded-full"
+              className="w-3 h-3 bg-indigo-600 rounded-full"
               animate={{
                 y: [0, -10, 0],
                 opacity: [0.5, 1, 0.5],
