@@ -42,6 +42,14 @@ Route::middleware('auth.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile/password', [AuthController::class, 'updatePassword']);
+    
+    // Desktop app specific endpoints - for offline data synchronization
+    Route::prefix('desktop')->group(function () {
+        Route::get('/institution', [\App\Http\Controllers\DesktopController::class, 'getInstitution']);
+        Route::get('/class-sections', [\App\Http\Controllers\DesktopController::class, 'getClassSections']);
+        Route::get('/assigned-loads', [\App\Http\Controllers\DesktopController::class, 'getAssignedLoads']);
+        Route::get('/sync', [\App\Http\Controllers\DesktopController::class, 'sync']);
+    });
     // Role routes
     Route::apiResource('roles', RoleController::class);
     // Subscription routes

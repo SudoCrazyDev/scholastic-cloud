@@ -1,6 +1,7 @@
 import { initUserTable } from "./users";
 import { initInstitutionTable } from "./institutions";
 import { initClassSectionTable } from "./class_sections";
+import { initSubjectTable } from "./subjects";
 
 /**
  * Initialize all database tables needed for the app.
@@ -13,6 +14,7 @@ export async function initDatabaseSchema() {
   await initUserTable();
   await initInstitutionTable();
   await initClassSectionTable();
+  await initSubjectTable();
 }
 
 

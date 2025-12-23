@@ -15,6 +15,9 @@ import {
   getAllClassSections,
   getUserClassSections,
   clearClassSectionCache,
+  getAllSubjects,
+  getUserSubjects,
+  clearSubjectCache,
 } from "@/lib/db";
 
 /**
@@ -30,12 +33,15 @@ export function DebugDatabase({ isOpen, onClose }) {
   const [institutionCount, setInstitutionCount] = useState(0);
   const [classSections, setClassSections] = useState([]);
   const [classSectionCount, setClassSectionCount] = useState(0);
+  const [subjects, setSubjects] = useState([]);
+  const [subjectCount, setSubjectCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dbPath, setDbPath] = useState("");
   const [tableExists, setTableExists] = useState(false);
   const [institutionTableExists, setInstitutionTableExists] = useState(false);
   const [classSectionTableExists, setClassSectionTableExists] = useState(false);
+  const [subjectTableExists, setSubjectTableExists] = useState(false);
   const [allTables, setAllTables] = useState([]);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -52,9 +58,11 @@ export function DebugDatabase({ isOpen, onClose }) {
       const usersExists = await checkTableExists("users");
       const institutionsExists = await checkTableExists("institutions");
       const classSectionsExists = await checkTableExists("class_sections");
+      const subjectsExists = await checkTableExists("subjects");
       setTableExists(usersExists);
       setInstitutionTableExists(institutionsExists);
       setClassSectionTableExists(classSectionsExists);
+      setSubjectTableExists(subjectsExists);
       const tables = await getAllTables();
       setAllTables(tables);
     } catch (err) {
@@ -67,12 +75,13 @@ export function DebugDatabase({ isOpen, onClose }) {
       setLoading(true);
       setError(null);
       const currentUser = await getCurrentUser();
-      const [allUsers, count, allInstitutions, currentInst, allClassSections] = await Promise.all([
+      const [allUsers, count, allInstitutions, currentInst, allClassSections, allSubjects] = await Promise.all([
         getAllUsers(),
         getUserCount(),
         getAllInstitutions(),
         getCurrentInstitution(),
         currentUser ? getUserClassSections(currentUser.id) : Promise.resolve([]),
+        currentUser ? getUserSubjects(currentUser.id) : Promise.resolve([]),
       ]);
       setUsers(allUsers);
       setCurrentUser(currentUser);
@@ -82,6 +91,8 @@ export function DebugDatabase({ isOpen, onClose }) {
       setInstitutionCount(allInstitutions.length);
       setClassSections(allClassSections);
       setClassSectionCount(allClassSections.length);
+      setSubjects(allSubjects);
+      setSubjectCount(allSubjects.length);
     } catch (error) {
       setError(error.message || String(error));
     } finally {
@@ -93,11 +104,12 @@ export function DebugDatabase({ isOpen, onClose }) {
     if (!window.confirm("Clear all data from the local database?")) return;
     try {
       setIsClearing(true);
-      // Clear users, institutions, and class sections
+      // Clear users, institutions, class sections, and subjects
       await Promise.all([
         clearUserCache(),
         clearInstitutionCache(),
         clearClassSectionCache(),
+        clearSubjectCache(),
       ]);
       await loadData();
     } catch (error) {
@@ -179,12 +191,13 @@ export function DebugDatabase({ isOpen, onClose }) {
               <div><strong>Users table exists:</strong> {tableExists ? "✓ Yes" : "✗ No"}</div>
               <div><strong>Institutions table exists:</strong> {institutionTableExists ? "✓ Yes" : "✗ No"}</div>
               <div><strong>Class Sections table exists:</strong> {classSectionTableExists ? "✓ Yes" : "✗ No"}</div>
+              <div><strong>Subjects table exists:</strong> {subjectTableExists ? "✓ Yes" : "✗ No"}</div>
               <div><strong>Tables:</strong> {allTables.length > 0 ? allTables.join(", ") : "None"}</div>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-6 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="text-sm text-blue-600 font-medium">Total Users</div>
               <div className="text-2xl font-bold text-blue-900">{userCount}</div>
@@ -208,6 +221,10 @@ export function DebugDatabase({ isOpen, onClose }) {
             <div className="bg-teal-50 p-4 rounded-lg">
               <div className="text-sm text-teal-600 font-medium">Class Sections</div>
               <div className="text-2xl font-bold text-teal-900">{classSectionCount}</div>
+            </div>
+            <div className="bg-pink-50 p-4 rounded-lg">
+              <div className="text-sm text-pink-600 font-medium">Assigned Loads</div>
+              <div className="text-2xl font-bold text-pink-900">{subjectCount}</div>
             </div>
           </div>
 
@@ -414,6 +431,83 @@ export function DebugDatabase({ isOpen, onClose }) {
             )}
           </div>
 
+          {/* All Subjects Table (Assigned Loads) */}
+          <div className="border-t pt-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Assigned Loads ({subjects.length})</h2>
+            {subjects.length === 0 ? (
+              <div className="text-gray-500 text-center py-8">No subjects found in database</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        ID
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Title
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Variant
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Time
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Limited
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Updated
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {subjects.map((subject) => (
+                      <tr key={subject.id}>
+                        <td className="px-4 py-3 text-xs text-gray-900 font-mono">
+                          {subject.id.substring(0, 8)}...
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                          {subject.title || "N/A"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            subject.subject_type === 'parent' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {subject.subject_type || "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {subject.variant || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {subject.start_time && subject.end_time 
+                            ? `${subject.start_time} - ${subject.end_time}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {subject.is_limited_student ? (
+                            <span className="text-green-600">✓ Yes</span>
+                          ) : (
+                            <span className="text-gray-400">✗ No</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500">
+                          {subject.updated_at || "N/A"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Raw JSON */}
           <div className="border-t pt-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Raw JSON Data</h2>
@@ -439,6 +533,14 @@ export function DebugDatabase({ isOpen, onClose }) {
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <pre className="text-xs overflow-auto max-h-96">
                     {JSON.stringify(classSections, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Subjects (Assigned Loads)</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-xs overflow-auto max-h-96">
+                    {JSON.stringify(subjects, null, 2)}
                   </pre>
                 </div>
               </div>

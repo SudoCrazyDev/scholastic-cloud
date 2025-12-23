@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { downloadCurrentUserInstitution } from "@/lib/downloadInstitution";
 import { downloadCurrentUserClassSections } from "@/lib/downloadClassSections";
+import { downloadCurrentUserAssignedLoads } from "@/lib/downloadAssignedLoads";
 
 export function LoadingScreen() {
   const [progress, setProgress] = useState(0);
@@ -13,7 +14,7 @@ export function LoadingScreen() {
       try {
         // Step 1: Download Institution
         setCurrentStep("Downloading institution data...");
-        setProgress(25);
+        setProgress(20);
         
         const institutionResult = await downloadCurrentUserInstitution();
         
@@ -25,7 +26,7 @@ export function LoadingScreen() {
 
         // Step 2: Download Class Sections
         setCurrentStep("Downloading class sections...");
-        setProgress(50);
+        setProgress(40);
         
         const classSectionsResult = await downloadCurrentUserClassSections();
         
@@ -35,7 +36,19 @@ export function LoadingScreen() {
           return;
         }
 
-        // Step 3: Complete
+        // Step 3: Download Assigned Loads (subjects, cascading to class_sections and users)
+        setCurrentStep("Downloading assigned loads...");
+        setProgress(70);
+        
+        const assignedLoadsResult = await downloadCurrentUserAssignedLoads();
+        
+        if (!assignedLoadsResult.success) {
+          setError(assignedLoadsResult.error || "Failed to download assigned loads");
+          setProgress(0);
+          return;
+        }
+
+        // Step 4: Complete
         setCurrentStep("Setup complete!");
         setProgress(100);
         

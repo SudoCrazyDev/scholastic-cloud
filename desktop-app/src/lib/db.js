@@ -14,6 +14,7 @@ export {
   getUserById,
   getCurrentUser,
   getUserCount,
+  saveUser,
   clearUserCache,
 } from "./db/queries/users";
 
@@ -35,6 +36,16 @@ export {
   getClassSectionsByInstitution,
   clearClassSectionCache,
 } from "./db/queries/class_sections";
+
+// Query functions for subjects
+export {
+  saveSubject,
+  getSubjectById,
+  getUserSubjects,
+  getAllSubjects,
+  getSubjectsByClassSection,
+  clearSubjectCache,
+} from "./db/queries/subjects";
 
 // Database utilities
 export { getDatabasePath, checkTableExists, getAllTables } from "./db/utils";
