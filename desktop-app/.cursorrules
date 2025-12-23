@@ -1,0 +1,218 @@
+# Scholastic Cloud Desktop - Cursor Rules
+
+## Color Palette
+
+### Primary Color
+- **Primary**: Blue-600 (#2563eb) - `blue-600` in Tailwind CSS
+- **Variants**: 
+  - `blue-500` - Lighter primary
+  - `blue-600` - Main primary
+  - `blue-700` - Darker primary
+  - `blue-800` - Darkest primary
+- **Usage**: Primary actions, links, and accents throughout the UI
+
+### Secondary Colors
+- **Secondary**: Gray-600 (#4b5563) - `gray-600` in Tailwind CSS
+- **Success**: Green-600 (#16a34a) - `green-600` in Tailwind CSS
+- **Warning**: Yellow-500 (#eab308) - `yellow-500` in Tailwind CSS
+- **Danger**: Red-600 (#dc2626) - `red-600` in Tailwind CSS
+- **Info**: Cyan-600 (#0891b2) - `cyan-600` in Tailwind CSS
+
+### Color Usage Guidelines
+- Always use the exact Tailwind color classes specified above
+- For hover states, use one shade darker (e.g., `blue-600` → `blue-700` on hover)
+- For disabled states, use `gray-400` or `gray-500`
+- For backgrounds, use appropriate shades (e.g., `blue-50` for light backgrounds, `blue-900` for dark)
+
+## Component Architecture
+
+### Reusable Components Rule
+**ALWAYS create and use reusable components for consistent design.**
+
+1. **Before creating any UI element**, check if a similar component already exists in:
+   - `src/components/` directory
+   - shadcn/ui components (if installed)
+   
+2. **If a component doesn't exist**, create it as a reusable component in `src/components/`
+
+3. **Component Structure**:
+   - Use shadcn/ui components as base when available
+   - Follow the existing component patterns
+   - Export components from `src/components/index.js` for easy imports
+   - Use TypeScript-style JSDoc comments for props (even in JSX files)
+
+4. **Component Naming**:
+   - Use PascalCase for component files (e.g., `Button.jsx`, `Card.jsx`)
+   - Use descriptive names that indicate purpose
+   - Prefix with `App` or feature name if component is feature-specific (e.g., `AppHeader.jsx`)
+
+5. **Component Props**:
+   - Always accept `className` prop for styling flexibility
+   - Use the `cn()` utility from `@/lib/utils` to merge classes
+   - Follow consistent prop naming conventions
+
+6. **When to Create New Components**:
+   - UI elements used in 2+ places
+   - Complex UI patterns (forms, cards, modals, etc.)
+   - Elements that need consistent styling across the app
+
+7. **When NOT to Create Components**:
+   - One-off UI elements used only once
+   - Simple wrappers that don't add value
+   - Over-abstracting simple elements
+
+### Separate Logic from UI
+**ALWAYS extract complex logic and state management into custom hooks, keeping components focused on rendering.**
+
+1. **Create Custom Hooks** for:
+   - Data fetching and API calls
+   - Complex state management logic
+   - Form handling and validation
+   - Business logic calculations
+   - Event handlers with complex logic
+   - Side effects (useEffect with complex dependencies)
+   - Zustand store interactions
+
+2. **Hook Naming Convention**:
+   - Start with `use` prefix (e.g., `useUserData.js`, `useFormValidation.js`)
+   - Use descriptive names that indicate purpose
+   - Place hooks in `src/hooks/` directory
+
+3. **Component Structure**:
+   - Components should primarily handle rendering
+   - Use custom hooks to get data and handlers
+   - Keep component code clean and readable
+   - Minimize inline logic in components
+
+4. **When to Extract Logic**:
+   - Logic is used in multiple components
+   - Complex state management (multiple useState/useEffect)
+   - API calls or data fetching
+   - Form validation logic
+   - Complex calculations or transformations
+   - Any logic that makes a component hard to read
+
+5. **Example Structure**:
+   ```
+   src/
+     hooks/
+       useUserData.js        // Fetch and manage user data
+       useFormValidation.js  // Form validation logic
+       useSyncData.js        // Data synchronization logic
+     components/
+       UserProfile.jsx      // Clean, focused on rendering
+   ```
+
+## Styling Guidelines
+
+1. **Use Tailwind CSS** for all styling
+2. **Use the `cn()` utility** from `@/lib/utils` for conditional classes
+3. **Follow the color palette** strictly - do not introduce new colors without approval
+4. **Use shadcn/ui components** as the foundation for UI elements
+5. **Maintain consistent spacing** using Tailwind's spacing scale
+6. **Use semantic color names** in code comments when referencing colors
+
+## File Organization
+
+- Components: `src/components/`
+- Utilities: `src/lib/`
+- Hooks: `src/hooks/`
+- Stores (Zustand): `src/stores/`
+- Services/API: `src/services/`
+- Types/Schemas: `src/types/` or `src/schemas/`
+
+## Code Style
+
+- Use functional components with hooks
+- Prefer named exports for components
+- Use async/await for async operations
+- Follow React best practices (keys, proper hooks usage, etc.)
+
+## Examples
+
+### Good Component Usage
+```jsx
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+
+function UserProfile() {
+  return (
+    <Card>
+      <Button className="bg-blue-600 hover:bg-blue-700">
+        Save Profile
+      </Button>
+    </Card>
+  );
+}
+```
+
+### Bad - Inline Styles/Non-reusable
+```jsx
+function UserProfile() {
+  return (
+    <div className="border rounded p-4">
+      <button className="bg-blue-600">Save</button>
+    </div>
+  );
+}
+```
+
+### Good - Separated Logic with Custom Hooks
+```jsx
+// src/hooks/useUserData.js
+export function useUserData(userId) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    // Complex data fetching logic
+    fetchUser(userId).then(setUser).finally(() => setLoading(false));
+  }, [userId]);
+  
+  return { user, loading };
+}
+
+// src/components/UserProfile.jsx
+import { useUserData } from "@/hooks/useUserData";
+
+function UserProfile({ userId }) {
+  const { user, loading } = useUserData(userId);
+  
+  if (loading) return <div>Loading...</div>;
+  
+  return (
+    <Card>
+      <h2>{user.name}</h2>
+      {/* Clean rendering logic */}
+    </Card>
+  );
+}
+```
+
+### Bad - Logic Mixed with UI
+```jsx
+function UserProfile({ userId }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    // Complex logic mixed in component
+    fetch(`/api/users/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        // Complex data transformation
+        const transformed = transformUserData(data);
+        setUser(transformed);
+      })
+      .catch(err => {
+        // Error handling logic
+        console.error(err);
+      })
+      .finally(() => setLoading(false));
+  }, [userId]);
+  
+  // Component is now cluttered with logic
+  return <div>...</div>;
+}
+```
+
