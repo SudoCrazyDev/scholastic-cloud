@@ -1,0 +1,112 @@
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { downloadCurrentUserInstitution } from "@/lib/downloadInstitution";
+import { downloadCurrentUserClassSections } from "@/lib/downloadClassSections";
+
+export function LoadingScreen() {
+  const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState("Initializing...");
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function downloadData() {
+      try {
+        // Step 1: Download Institution
+        setCurrentStep("Downloading institution data...");
+        setProgress(25);
+        
+        const institutionResult = await downloadCurrentUserInstitution();
+        
+        if (!institutionResult.success) {
+          setError(institutionResult.error || "Failed to download institution data");
+          setProgress(0);
+          return;
+        }
+
+        // Step 2: Download Class Sections
+        setCurrentStep("Downloading class sections...");
+        setProgress(50);
+        
+        const classSectionsResult = await downloadCurrentUserClassSections();
+        
+        if (!classSectionsResult.success) {
+          setError(classSectionsResult.error || "Failed to download class sections");
+          setProgress(0);
+          return;
+        }
+
+        // Step 3: Complete
+        setCurrentStep("Setup complete!");
+        setProgress(100);
+        
+        // TODO: Navigate to main app after a short delay
+        // setTimeout(() => {
+        //   navigate("/dashboard");
+        // }, 1000);
+      } catch (err) {
+        setError(err.message || "An unexpected error occurred");
+        setProgress(0);
+      }
+    }
+
+    downloadData();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center space-y-4">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+            className="mx-auto h-12 w-12 bg-indigo-600 rounded-full flex items-center justify-center"
+          >
+            <svg
+              className="h-6 w-6 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </motion.div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Preparing your workspace
+          </h2>
+          <p className="text-sm text-gray-600">
+            {currentStep}
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="space-y-3">
+          <div className="w-full bg-white/60 rounded-full h-3 shadow-inner overflow-hidden border border-indigo-100">
+            <motion.div
+              className="h-3 bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-500"
+              initial={{ width: "0%" }}
+              animate={{ width: `${progress}%` }}
+              transition={{
+                duration: 0.5,
+                ease: "easeOut",
+              }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 text-center">
+            {error ? (
+              <span className="text-red-600">{error}</span>
+            ) : (
+              "Syncing data… please keep the app open."
+            )}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
