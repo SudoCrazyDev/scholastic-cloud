@@ -62,6 +62,19 @@ export async function getStudentEcrItemScoresByStudentId(studentId) {
 }
 
 /**
+ * Get student ECR item scores by subject ECR item ID
+ */
+export async function getStudentEcrItemScoresByItemId(subjectEcrItemId) {
+  try {
+    await initDatabaseSchema();
+    const db = await getDatabase();
+    return await db.select("SELECT * FROM student_ecr_item_scores WHERE subject_ecr_item_id = ?", [subjectEcrItemId]);
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
  * Clear all cached student ECR item scores (used by Debug Database "Clear Data")
  */
 export async function clearStudentEcrItemScoreCache() {
@@ -73,4 +86,3 @@ export async function clearStudentEcrItemScoreCache() {
     throw error;
   }
 }
-

@@ -7,6 +7,7 @@ import { Dashboard } from "@/pages/Dashboard";
 import { MyClassSections } from "@/pages/MyClassSections";
 import { AssignedSubjects } from "@/pages/AssignedSubjects";
 import { ClassSectionDetail } from "@/pages/ClassSectionDetail";
+import { SubjectDetail } from "@/pages/SubjectDetail";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Fab } from "@/components";
 import { DebugDatabase } from "@/pages/DebugDatabase";
@@ -53,6 +54,14 @@ function App() {
           element={
             <AppLayout>
               <AssignedSubjects />
+            </AppLayout>
+          }
+        />
+        <Route
+          path="/assigned-subjects/:id"
+          element={
+            <AppLayout>
+              <SubjectDetail />
             </AppLayout>
           }
         />

@@ -85,6 +85,7 @@ export {
   saveStudentEcrItemScore,
   getAllStudentEcrItemScores,
   getStudentEcrItemScoresByStudentId,
+  getStudentEcrItemScoresByItemId,
   clearStudentEcrItemScoreCache,
 } from "./db/queries/student_ecr_item_scores";
 

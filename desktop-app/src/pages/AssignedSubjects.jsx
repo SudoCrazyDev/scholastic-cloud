@@ -37,9 +37,7 @@ export function AssignedSubjects() {
   });
 
   const handleSubjectClick = (subject) => {
-    // Navigate to subject detail (to be implemented later)
-    // navigate(`/assigned-subjects/${subject.id}`);
-    console.log("Subject clicked:", subject);
+    navigate(`/assigned-subjects/${subject.id}`);
   };
 
   return (
