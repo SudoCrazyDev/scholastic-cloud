@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { downloadCurrentUserInstitution } from "@/lib/downloadInstitution";
 import { downloadCurrentUserClassSections } from "@/lib/downloadClassSections";
 import { downloadCurrentUserAssignedLoads } from "@/lib/downloadAssignedLoads";
+import { downloadStudentsForClassSections } from "@/lib/downloadStudents";
+import { downloadEcrData } from "@/lib/downloadEcrData";
+import { downloadStudentRunningGrades } from "@/lib/downloadRunningGrades";
 
 export function LoadingScreen() {
+  const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("Initializing...");
   const [error, setError] = useState(null);
@@ -14,7 +19,7 @@ export function LoadingScreen() {
       try {
         // Step 1: Download Institution
         setCurrentStep("Downloading institution data...");
-        setProgress(20);
+        setProgress(10);
         
         const institutionResult = await downloadCurrentUserInstitution();
         
@@ -26,7 +31,7 @@ export function LoadingScreen() {
 
         // Step 2: Download Class Sections
         setCurrentStep("Downloading class sections...");
-        setProgress(40);
+        setProgress(20);
         
         const classSectionsResult = await downloadCurrentUserClassSections();
         
@@ -38,7 +43,7 @@ export function LoadingScreen() {
 
         // Step 3: Download Assigned Loads (subjects, cascading to class_sections and users)
         setCurrentStep("Downloading assigned loads...");
-        setProgress(70);
+        setProgress(40);
         
         const assignedLoadsResult = await downloadCurrentUserAssignedLoads();
         
@@ -48,14 +53,50 @@ export function LoadingScreen() {
           return;
         }
 
-        // Step 4: Complete
+        // Step 4: Download Students for Class Sections
+        setCurrentStep("Downloading students...");
+        setProgress(60);
+        
+        const studentsResult = await downloadStudentsForClassSections();
+        
+        if (!studentsResult.success) {
+          setError(studentsResult.error || "Failed to download students");
+          setProgress(0);
+          return;
+        }
+
+        // Step 5: Download ECR Data
+        setCurrentStep("Downloading ECR data...");
+        setProgress(75);
+        
+        const ecrResult = await downloadEcrData();
+        
+        if (!ecrResult.success) {
+          setError(ecrResult.error || "Failed to download ECR data");
+          setProgress(0);
+          return;
+        }
+
+        // Step 6: Download Running Grades
+        setCurrentStep("Downloading running grades...");
+        setProgress(90);
+        
+        const gradesResult = await downloadStudentRunningGrades();
+        
+        if (!gradesResult.success) {
+          setError(gradesResult.error || "Failed to download running grades");
+          setProgress(0);
+          return;
+        }
+
+        // Step 7: Complete
         setCurrentStep("Setup complete!");
         setProgress(100);
         
-        // TODO: Navigate to main app after a short delay
-        // setTimeout(() => {
-        //   navigate("/dashboard");
-        // }, 1000);
+        // Navigate to dashboard after a short delay
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1000);
       } catch (err) {
         setError(err.message || "An unexpected error occurred");
         setProgress(0);

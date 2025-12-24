@@ -48,6 +48,9 @@ Route::middleware('auth.token')->group(function () {
         Route::get('/institution', [\App\Http\Controllers\DesktopController::class, 'getInstitution']);
         Route::get('/class-sections', [\App\Http\Controllers\DesktopController::class, 'getClassSections']);
         Route::get('/assigned-loads', [\App\Http\Controllers\DesktopController::class, 'getAssignedLoads']);
+        Route::get('/class-sections/{classSectionId}/students', [\App\Http\Controllers\DesktopController::class, 'getStudentsByClassSection']);
+        Route::get('/ecr-data', [\App\Http\Controllers\DesktopController::class, 'getEcrData']);
+        Route::get('/running-grades', [\App\Http\Controllers\DesktopController::class, 'getStudentRunningGrades']);
         Route::get('/sync', [\App\Http\Controllers\DesktopController::class, 'sync']);
     });
     // Role routes

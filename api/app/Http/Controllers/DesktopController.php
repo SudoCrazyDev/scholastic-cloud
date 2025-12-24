@@ -199,5 +199,221 @@ class DesktopController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get students for a specific class section
+     * Returns students with their student_section pivot data
+     */
+    public function getStudentsByClassSection(Request $request, $classSectionId): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            // Verify the class section exists and user has access
+            $classSection = \App\Models\ClassSection::where('id', $classSectionId)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$classSection) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Class section not found'
+                ], 404);
+            }
+
+            // Get students for this class section with their student_section data
+            $studentSections = \App\Models\StudentSection::where('section_id', $classSectionId)
+                ->where('is_active', true)
+                ->with('student')
+                ->get();
+
+            $students = $studentSections->map(function ($studentSection) {
+                $student = $studentSection->student;
+                if ($student) {
+                    $student->student_section = [
+                        'id' => $studentSection->id,
+                        'academic_year' => $studentSection->academic_year,
+                        'is_active' => $studentSection->is_active,
+                        'is_promoted' => $studentSection->is_promoted,
+                    ];
+                }
+                return $student;
+            })->filter();
+
+            return response()->json([
+                'success' => true,
+                'data' => $students
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve students',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get ECR data for user's subjects
+     * Returns subjects_ecr, subject_ecr_items, and student_ecr_item_scores
+     */
+    public function getEcrData(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            // Get all subjects where user is adviser
+            $subjects = \App\Models\Subject::where('adviser', $user->id)
+                ->get();
+
+            if ($subjects->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => []
+                ]);
+            }
+
+            // Load ECR items and scores separately to avoid N+1
+            $subjectIds = $subjects->pluck('id')->toArray();
+            $subjectEcrsCollection = \App\Models\SubjectEcr::whereIn('subject_id', $subjectIds)
+                ->get();
+
+            $subjectEcrIds = $subjectEcrsCollection->pluck('id')->toArray();
+            $subjectEcrItemsCollection = collect([]);
+            if (!empty($subjectEcrIds)) {
+                $subjectEcrItemsCollection = \App\Models\SubjectEcrItem::whereIn('subject_ecr_id', $subjectEcrIds)
+                    ->get();
+            }
+
+            $subjectEcrItemIds = $subjectEcrItemsCollection->pluck('id')->toArray();
+            $studentScoresCollection = collect([]);
+            if (!empty($subjectEcrItemIds)) {
+                $studentScoresCollection = \App\Models\StudentEcrItemScore::whereIn('subject_ecr_item_id', $subjectEcrItemIds)
+                    ->get();
+            }
+
+            // Build response with nested structure
+            $ecrData = [];
+            foreach ($subjects as $subject) {
+                $subjectEcrs = [];
+                $subjectEcrList = $subjectEcrsCollection->where('subject_id', $subject->id);
+                foreach ($subjectEcrList as $ecr) {
+                    $ecrItems = [];
+                    $items = $subjectEcrItemsCollection->where('subject_ecr_id', $ecr->id);
+                    foreach ($items as $item) {
+                        $itemScores = [];
+                        $scores = $studentScoresCollection->where('subject_ecr_item_id', $item->id);
+                        foreach ($scores as $score) {
+                            $itemScores[] = [
+                                'id' => $score->id,
+                                'student_id' => $score->student_id,
+                                'subject_ecr_item_id' => $score->subject_ecr_item_id,
+                                'score' => $score->score,
+                                'created_at' => $score->created_at,
+                                'updated_at' => $score->updated_at,
+                            ];
+                        }
+                        $ecrItems[] = [
+                            'id' => $item->id,
+                            'subject_ecr_id' => $item->subject_ecr_id,
+                            'type' => $item->type,
+                            'title' => $item->title,
+                            'description' => $item->description,
+                            'quarter' => $item->quarter,
+                            'academic_year' => $item->academic_year,
+                            'score' => $item->score,
+                            'created_at' => $item->created_at,
+                            'updated_at' => $item->updated_at,
+                            'student_scores' => $itemScores,
+                        ];
+                    }
+                    $subjectEcrs[] = [
+                        'id' => $ecr->id,
+                        'subject_id' => $ecr->subject_id,
+                        'title' => $ecr->title,
+                        'percentage' => $ecr->percentage,
+                        'created_at' => $ecr->created_at,
+                        'updated_at' => $ecr->updated_at,
+                        'items' => $ecrItems,
+                    ];
+                }
+                $ecrData[] = [
+                    'subject_id' => $subject->id,
+                    'subject_ecrs' => $subjectEcrs,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $ecrData
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve ECR data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get student running grades for user's subjects
+     */
+    public function getStudentRunningGrades(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            // Get all subjects where user is adviser
+            $subjectIds = \App\Models\Subject::where('adviser', $user->id)
+                ->pluck('id')
+                ->toArray();
+
+            if (empty($subjectIds)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => []
+                ]);
+            }
+
+            // Get running grades for these subjects
+            $runningGrades = \App\Models\StudentRunningGrade::whereIn('subject_id', $subjectIds)
+                ->whereNull('deleted_at')
+                ->with(['student', 'subject'])
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $runningGrades
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve student running grades',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

@@ -11,4 +11,5 @@ export { Input } from "./ui/Input";
 export { Card } from "./ui/Card";
 export { Alert } from "./ui/Alert";
 export { Fab } from "./ui/Fab";
+export { Badge } from "./ui/Badge";
 

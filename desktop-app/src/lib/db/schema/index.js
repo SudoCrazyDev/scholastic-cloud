@@ -2,6 +2,12 @@ import { initUserTable } from "./users";
 import { initInstitutionTable } from "./institutions";
 import { initClassSectionTable } from "./class_sections";
 import { initSubjectTable } from "./subjects";
+import { initStudentTable } from "./students";
+import { initStudentSectionTable } from "./student_sections";
+import { initSubjectEcrTable } from "./subjects_ecr";
+import { initSubjectEcrItemTable } from "./subject_ecr_items";
+import { initStudentEcrItemScoreTable } from "./student_ecr_item_scores";
+import { initStudentRunningGradeTable } from "./student_running_grades";
 
 /**
  * Initialize all database tables needed for the app.
@@ -15,6 +21,12 @@ export async function initDatabaseSchema() {
   await initInstitutionTable();
   await initClassSectionTable();
   await initSubjectTable();
+  await initStudentTable();
+  await initStudentSectionTable();
+  await initSubjectEcrTable();
+  await initSubjectEcrItemTable();
+  await initStudentEcrItemScoreTable();
+  await initStudentRunningGradeTable();
 }
 
 

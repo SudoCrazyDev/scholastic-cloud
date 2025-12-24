@@ -18,6 +18,18 @@ import {
   getAllSubjects,
   getUserSubjects,
   clearSubjectCache,
+  getAllStudents,
+  clearStudentCache,
+  getAllStudentSections,
+  clearStudentSectionCache,
+  getAllSubjectEcrs,
+  clearSubjectEcrCache,
+  getAllSubjectEcrItems,
+  clearSubjectEcrItemCache,
+  getAllStudentEcrItemScores,
+  clearStudentEcrItemScoreCache,
+  getAllStudentRunningGrades,
+  clearStudentRunningGradeCache,
 } from "@/lib/db";
 
 /**
@@ -35,6 +47,18 @@ export function DebugDatabase({ isOpen, onClose }) {
   const [classSectionCount, setClassSectionCount] = useState(0);
   const [subjects, setSubjects] = useState([]);
   const [subjectCount, setSubjectCount] = useState(0);
+  const [students, setStudents] = useState([]);
+  const [studentCount, setStudentCount] = useState(0);
+  const [studentSections, setStudentSections] = useState([]);
+  const [studentSectionCount, setStudentSectionCount] = useState(0);
+  const [subjectEcrs, setSubjectEcrs] = useState([]);
+  const [subjectEcrCount, setSubjectEcrCount] = useState(0);
+  const [subjectEcrItems, setSubjectEcrItems] = useState([]);
+  const [subjectEcrItemCount, setSubjectEcrItemCount] = useState(0);
+  const [studentEcrItemScores, setStudentEcrItemScores] = useState([]);
+  const [studentEcrItemScoreCount, setStudentEcrItemScoreCount] = useState(0);
+  const [studentRunningGrades, setStudentRunningGrades] = useState([]);
+  const [studentRunningGradeCount, setStudentRunningGradeCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dbPath, setDbPath] = useState("");
@@ -42,6 +66,12 @@ export function DebugDatabase({ isOpen, onClose }) {
   const [institutionTableExists, setInstitutionTableExists] = useState(false);
   const [classSectionTableExists, setClassSectionTableExists] = useState(false);
   const [subjectTableExists, setSubjectTableExists] = useState(false);
+  const [studentTableExists, setStudentTableExists] = useState(false);
+  const [studentSectionTableExists, setStudentSectionTableExists] = useState(false);
+  const [subjectEcrTableExists, setSubjectEcrTableExists] = useState(false);
+  const [subjectEcrItemTableExists, setSubjectEcrItemTableExists] = useState(false);
+  const [studentEcrItemScoreTableExists, setStudentEcrItemScoreTableExists] = useState(false);
+  const [studentRunningGradeTableExists, setStudentRunningGradeTableExists] = useState(false);
   const [allTables, setAllTables] = useState([]);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -55,14 +85,39 @@ export function DebugDatabase({ isOpen, onClose }) {
   async function getDbInfo() {
     try {
       setDbPath(getDatabasePath());
-      const usersExists = await checkTableExists("users");
-      const institutionsExists = await checkTableExists("institutions");
-      const classSectionsExists = await checkTableExists("class_sections");
-      const subjectsExists = await checkTableExists("subjects");
+      const [
+        usersExists,
+        institutionsExists,
+        classSectionsExists,
+        subjectsExists,
+        studentsExists,
+        studentSectionsExists,
+        subjectEcrsExists,
+        subjectEcrItemsExists,
+        studentEcrItemScoresExists,
+        studentRunningGradesExists,
+      ] = await Promise.all([
+        checkTableExists("users"),
+        checkTableExists("institutions"),
+        checkTableExists("class_sections"),
+        checkTableExists("subjects"),
+        checkTableExists("students"),
+        checkTableExists("student_sections"),
+        checkTableExists("subjects_ecr"),
+        checkTableExists("subject_ecr_items"),
+        checkTableExists("student_ecr_item_scores"),
+        checkTableExists("student_running_grades"),
+      ]);
       setTableExists(usersExists);
       setInstitutionTableExists(institutionsExists);
       setClassSectionTableExists(classSectionsExists);
       setSubjectTableExists(subjectsExists);
+      setStudentTableExists(studentsExists);
+      setStudentSectionTableExists(studentSectionsExists);
+      setSubjectEcrTableExists(subjectEcrsExists);
+      setSubjectEcrItemTableExists(subjectEcrItemsExists);
+      setStudentEcrItemScoreTableExists(studentEcrItemScoresExists);
+      setStudentRunningGradeTableExists(studentRunningGradesExists);
       const tables = await getAllTables();
       setAllTables(tables);
     } catch (err) {
@@ -75,13 +130,32 @@ export function DebugDatabase({ isOpen, onClose }) {
       setLoading(true);
       setError(null);
       const currentUser = await getCurrentUser();
-      const [allUsers, count, allInstitutions, currentInst, allClassSections, allSubjects] = await Promise.all([
+      const [
+        allUsers,
+        count,
+        allInstitutions,
+        currentInst,
+        allClassSections,
+        allSubjects,
+        allStudents,
+        allStudentSections,
+        allSubjectEcrs,
+        allSubjectEcrItems,
+        allStudentEcrItemScores,
+        allStudentRunningGrades,
+      ] = await Promise.all([
         getAllUsers(),
         getUserCount(),
         getAllInstitutions(),
         getCurrentInstitution(),
         currentUser ? getUserClassSections(currentUser.id) : Promise.resolve([]),
         currentUser ? getUserSubjects(currentUser.id) : Promise.resolve([]),
+        getAllStudents(),
+        getAllStudentSections(),
+        getAllSubjectEcrs(),
+        getAllSubjectEcrItems(),
+        getAllStudentEcrItemScores(),
+        getAllStudentRunningGrades(),
       ]);
       setUsers(allUsers);
       setCurrentUser(currentUser);
@@ -93,6 +167,18 @@ export function DebugDatabase({ isOpen, onClose }) {
       setClassSectionCount(allClassSections.length);
       setSubjects(allSubjects);
       setSubjectCount(allSubjects.length);
+      setStudents(allStudents);
+      setStudentCount(allStudents.length);
+      setStudentSections(allStudentSections);
+      setStudentSectionCount(allStudentSections.length);
+      setSubjectEcrs(allSubjectEcrs);
+      setSubjectEcrCount(allSubjectEcrs.length);
+      setSubjectEcrItems(allSubjectEcrItems);
+      setSubjectEcrItemCount(allSubjectEcrItems.length);
+      setStudentEcrItemScores(allStudentEcrItemScores);
+      setStudentEcrItemScoreCount(allStudentEcrItemScores.length);
+      setStudentRunningGrades(allStudentRunningGrades);
+      setStudentRunningGradeCount(allStudentRunningGrades.length);
     } catch (error) {
       setError(error.message || String(error));
     } finally {
@@ -104,12 +190,18 @@ export function DebugDatabase({ isOpen, onClose }) {
     if (!window.confirm("Clear all data from the local database?")) return;
     try {
       setIsClearing(true);
-      // Clear users, institutions, class sections, and subjects
+      // Clear all tables
       await Promise.all([
         clearUserCache(),
         clearInstitutionCache(),
         clearClassSectionCache(),
         clearSubjectCache(),
+        clearStudentCache(),
+        clearStudentSectionCache(),
+        clearSubjectEcrCache(),
+        clearSubjectEcrItemCache(),
+        clearStudentEcrItemScoreCache(),
+        clearStudentRunningGradeCache(),
       ]);
       await loadData();
     } catch (error) {
@@ -188,43 +280,61 @@ export function DebugDatabase({ isOpen, onClose }) {
             <div className="text-sm font-medium text-gray-700">Database Information</div>
             <div className="text-xs text-gray-600">
               <div><strong>Path:</strong> {dbPath || "Loading..."}</div>
-              <div><strong>Users table exists:</strong> {tableExists ? "✓ Yes" : "✗ No"}</div>
-              <div><strong>Institutions table exists:</strong> {institutionTableExists ? "✓ Yes" : "✗ No"}</div>
-              <div><strong>Class Sections table exists:</strong> {classSectionTableExists ? "✓ Yes" : "✗ No"}</div>
-              <div><strong>Subjects table exists:</strong> {subjectTableExists ? "✓ Yes" : "✗ No"}</div>
-              <div><strong>Tables:</strong> {allTables.length > 0 ? allTables.join(", ") : "None"}</div>
+              <div><strong>Users:</strong> {tableExists ? "✓" : "✗"}</div>
+              <div><strong>Institutions:</strong> {institutionTableExists ? "✓" : "✗"}</div>
+              <div><strong>Class Sections:</strong> {classSectionTableExists ? "✓" : "✗"}</div>
+              <div><strong>Subjects:</strong> {subjectTableExists ? "✓" : "✗"}</div>
+              <div><strong>Students:</strong> {studentTableExists ? "✓" : "✗"}</div>
+              <div><strong>Student Sections:</strong> {studentSectionTableExists ? "✓" : "✗"}</div>
+              <div><strong>Subjects ECR:</strong> {subjectEcrTableExists ? "✓" : "✗"}</div>
+              <div><strong>Subject ECR Items:</strong> {subjectEcrItemTableExists ? "✓" : "✗"}</div>
+              <div><strong>Student ECR Item Scores:</strong> {studentEcrItemScoreTableExists ? "✓" : "✗"}</div>
+              <div><strong>Student Running Grades:</strong> {studentRunningGradeTableExists ? "✓" : "✗"}</div>
+              <div><strong>All Tables:</strong> {allTables.length > 0 ? allTables.join(", ") : "None"}</div>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-6 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-sm text-blue-600 font-medium">Total Users</div>
-              <div className="text-2xl font-bold text-blue-900">{userCount}</div>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="text-xs text-blue-600 font-medium">Users</div>
+              <div className="text-xl font-bold text-blue-900">{userCount}</div>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-sm text-green-600 font-medium">Current User</div>
-              <div className="text-lg font-bold text-green-900">
-                {currentUser ? "✓ Found" : "✗ None"}
-              </div>
+            <div className="bg-orange-50 p-3 rounded-lg">
+              <div className="text-xs text-orange-600 font-medium">Institutions</div>
+              <div className="text-xl font-bold text-orange-900">{institutionCount}</div>
             </div>
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="text-sm text-orange-600 font-medium">Total Institutions</div>
-              <div className="text-2xl font-bold text-orange-900">{institutionCount}</div>
+            <div className="bg-teal-50 p-3 rounded-lg">
+              <div className="text-xs text-teal-600 font-medium">Class Sections</div>
+              <div className="text-xl font-bold text-teal-900">{classSectionCount}</div>
             </div>
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <div className="text-sm text-purple-600 font-medium">Current Institution</div>
-              <div className="text-lg font-bold text-purple-900">
-                {currentInstitution ? "✓ Found" : "✗ None"}
-              </div>
+            <div className="bg-pink-50 p-3 rounded-lg">
+              <div className="text-xs text-pink-600 font-medium">Subjects</div>
+              <div className="text-xl font-bold text-pink-900">{subjectCount}</div>
             </div>
-            <div className="bg-teal-50 p-4 rounded-lg">
-              <div className="text-sm text-teal-600 font-medium">Class Sections</div>
-              <div className="text-2xl font-bold text-teal-900">{classSectionCount}</div>
+            <div className="bg-indigo-50 p-3 rounded-lg">
+              <div className="text-xs text-indigo-600 font-medium">Students</div>
+              <div className="text-xl font-bold text-indigo-900">{studentCount}</div>
             </div>
-            <div className="bg-pink-50 p-4 rounded-lg">
-              <div className="text-sm text-pink-600 font-medium">Assigned Loads</div>
-              <div className="text-2xl font-bold text-pink-900">{subjectCount}</div>
+            <div className="bg-cyan-50 p-3 rounded-lg">
+              <div className="text-xs text-cyan-600 font-medium">Student Sections</div>
+              <div className="text-xl font-bold text-cyan-900">{studentSectionCount}</div>
+            </div>
+            <div className="bg-yellow-50 p-3 rounded-lg">
+              <div className="text-xs text-yellow-600 font-medium">Subject ECRs</div>
+              <div className="text-xl font-bold text-yellow-900">{subjectEcrCount}</div>
+            </div>
+            <div className="bg-amber-50 p-3 rounded-lg">
+              <div className="text-xs text-amber-600 font-medium">ECR Items</div>
+              <div className="text-xl font-bold text-amber-900">{subjectEcrItemCount}</div>
+            </div>
+            <div className="bg-emerald-50 p-3 rounded-lg">
+              <div className="text-xs text-emerald-600 font-medium">ECR Scores</div>
+              <div className="text-xl font-bold text-emerald-900">{studentEcrItemScoreCount}</div>
+            </div>
+            <div className="bg-violet-50 p-3 rounded-lg">
+              <div className="text-xs text-violet-600 font-medium">Running Grades</div>
+              <div className="text-xl font-bold text-violet-900">{studentRunningGradeCount}</div>
             </div>
           </div>
 
@@ -508,12 +618,58 @@ export function DebugDatabase({ isOpen, onClose }) {
             )}
           </div>
 
+          {/* Students Table */}
+          <div className="border-t pt-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Students ({students.length})</h2>
+            {students.length === 0 ? (
+              <div className="text-gray-500 text-center py-8">No students found in database</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">LRN</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Active</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {students.slice(0, 10).map((student) => (
+                      <tr key={student.id}>
+                        <td className="px-4 py-3 text-xs text-gray-900 font-mono">{student.id.substring(0, 8)}...</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {student.first_name} {student.last_name || ""}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{student.lrn || "—"}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{student.gender || "—"}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {student.is_active ? (
+                            <span className="text-green-600">✓ Yes</span>
+                          ) : (
+                            <span className="text-gray-400">✗ No</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {students.length > 10 && (
+                  <div className="text-xs text-gray-500 text-center py-2">
+                    Showing 10 of {students.length} students
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Raw JSON */}
           <div className="border-t pt-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Raw JSON Data</h2>
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Users</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Users ({users.length})</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <pre className="text-xs overflow-auto max-h-96">
                     {JSON.stringify(users, null, 2)}
@@ -521,7 +677,7 @@ export function DebugDatabase({ isOpen, onClose }) {
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Institutions</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Institutions ({institutions.length})</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <pre className="text-xs overflow-auto max-h-96">
                     {JSON.stringify(institutions, null, 2)}
@@ -529,7 +685,7 @@ export function DebugDatabase({ isOpen, onClose }) {
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Class Sections</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Class Sections ({classSections.length})</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <pre className="text-xs overflow-auto max-h-96">
                     {JSON.stringify(classSections, null, 2)}
@@ -537,10 +693,58 @@ export function DebugDatabase({ isOpen, onClose }) {
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Subjects (Assigned Loads)</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Subjects ({subjects.length})</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <pre className="text-xs overflow-auto max-h-96">
                     {JSON.stringify(subjects, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Students ({students.length})</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-xs overflow-auto max-h-96">
+                    {JSON.stringify(students, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Student Sections ({studentSections.length})</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-xs overflow-auto max-h-96">
+                    {JSON.stringify(studentSections, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Subject ECRs ({subjectEcrs.length})</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-xs overflow-auto max-h-96">
+                    {JSON.stringify(subjectEcrs, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Subject ECR Items ({subjectEcrItems.length})</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-xs overflow-auto max-h-96">
+                    {JSON.stringify(subjectEcrItems, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Student ECR Item Scores ({studentEcrItemScores.length})</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-xs overflow-auto max-h-96">
+                    {JSON.stringify(studentEcrItemScores, null, 2)}
+                  </pre>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Student Running Grades ({studentRunningGrades.length})</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-xs overflow-auto max-h-96">
+                    {JSON.stringify(studentRunningGrades, null, 2)}
                   </pre>
                 </div>
               </div>

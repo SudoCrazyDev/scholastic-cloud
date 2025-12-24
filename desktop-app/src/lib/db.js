@@ -47,6 +47,56 @@ export {
   clearSubjectCache,
 } from "./db/queries/subjects";
 
+// Query functions for students
+export {
+  saveStudent,
+  getStudentById,
+  getAllStudents,
+  getStudentsByClassSection,
+  clearStudentCache,
+} from "./db/queries/students";
+
+// Query functions for student_sections
+export {
+  saveStudentSection,
+  getAllStudentSections,
+  getStudentSectionsByClassSection,
+  clearStudentSectionCache,
+} from "./db/queries/student_sections";
+
+// Query functions for subjects_ecr
+export {
+  saveSubjectEcr,
+  getAllSubjectEcrs,
+  getSubjectEcrsBySubjectId,
+  clearSubjectEcrCache,
+} from "./db/queries/subjects_ecr";
+
+// Query functions for subject_ecr_items
+export {
+  saveSubjectEcrItem,
+  getAllSubjectEcrItems,
+  getSubjectEcrItemsBySubjectEcrId,
+  clearSubjectEcrItemCache,
+} from "./db/queries/subject_ecr_items";
+
+// Query functions for student_ecr_item_scores
+export {
+  saveStudentEcrItemScore,
+  getAllStudentEcrItemScores,
+  getStudentEcrItemScoresByStudentId,
+  clearStudentEcrItemScoreCache,
+} from "./db/queries/student_ecr_item_scores";
+
+// Query functions for student_running_grades
+export {
+  saveStudentRunningGrade,
+  getAllStudentRunningGrades,
+  getStudentRunningGradesByStudentId,
+  getStudentRunningGradesBySubjectId,
+  clearStudentRunningGradeCache,
+} from "./db/queries/student_running_grades";
+
 // Database utilities
 export { getDatabasePath, checkTableExists, getAllTables } from "./db/utils";
 
