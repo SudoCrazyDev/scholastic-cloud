@@ -30,6 +30,8 @@ import {
   clearStudentEcrItemScoreCache,
   getAllStudentRunningGrades,
   clearStudentRunningGradeCache,
+  getPendingCount,
+  clearAllSyncData,
 } from "@/lib/db";
 
 /**
@@ -187,8 +189,17 @@ export function DebugDatabase({ isOpen, onClose }) {
   }
 
   async function handleClearCache() {
-    if (!window.confirm("Clear all data from the local database?")) return;
     try {
+      // Check for unsynced data
+      const pendingCount = await getPendingCount();
+      
+      let message = "Clear all data from the local database?";
+      if (pendingCount > 0) {
+        message = `There are ${pendingCount} unsynced changes. These changes will be lost.\n\nAre you sure you want to clear all data?`;
+      }
+
+      if (!window.confirm(message)) return;
+
       setIsClearing(true);
       // Clear all tables
       await Promise.all([
@@ -202,6 +213,7 @@ export function DebugDatabase({ isOpen, onClose }) {
         clearSubjectEcrItemCache(),
         clearStudentEcrItemScoreCache(),
         clearStudentRunningGradeCache(),
+        clearAllSyncData(),
       ]);
       await loadData();
     } catch (error) {

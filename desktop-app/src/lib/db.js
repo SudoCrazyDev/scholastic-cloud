@@ -66,6 +66,10 @@ export {
 
 // Query functions for subjects_ecr
 export {
+  createSubjectEcr,
+  updateSubjectEcr,
+  deleteSubjectEcr,
+  deleteSubjectEcrsBySubjectId,
   saveSubjectEcr,
   getAllSubjectEcrs,
   getSubjectEcrsBySubjectId,
@@ -82,6 +86,10 @@ export {
 
 // Query functions for student_ecr_item_scores
 export {
+  createStudentEcrItemScore,
+  updateStudentEcrItemScore,
+  deleteStudentEcrItemScore,
+  getStudentEcrItemScore,
   saveStudentEcrItemScore,
   getAllStudentEcrItemScores,
   getStudentEcrItemScoresByStudentId,
@@ -91,12 +99,49 @@ export {
 
 // Query functions for student_running_grades
 export {
+  createStudentRunningGrade,
+  updateStudentRunningGrade,
+  upsertStudentRunningGrade,
+  getStudentRunningGradesBySubjectAndQuarter,
+  getStudentRunningGradesBySubjectAndClassSection,
   saveStudentRunningGrade,
   getAllStudentRunningGrades,
   getStudentRunningGradesByStudentId,
   getStudentRunningGradesBySubjectId,
   clearStudentRunningGradeCache,
 } from "./db/queries/student_running_grades";
+
+// Query functions for sync_queue
+export {
+  addToSyncQueue,
+  getPendingSyncItems,
+  getPendingCount,
+  markAsSyncing,
+  markAsSynced,
+  markAsFailed,
+  incrementRetryCount,
+  clearSyncedItems,
+  getFailedItems,
+  resetFailedItem,
+} from "./db/queries/sync_queue";
+
+// Query functions for sync_log
+export {
+  createSyncLog,
+  updateSyncLog,
+  completeSyncLog,
+  failSyncLog,
+  getLastSyncLog,
+  getAllSyncLogs,
+  clearOldSyncLogs,
+} from "./db/queries/sync_log";
+
+// Clear functions for sync tables
+export {
+  clearSyncQueue,
+  clearSyncLog,
+  clearAllSyncData,
+} from "./db/queries/sync_clear";
 
 // Database utilities
 export { getDatabasePath, checkTableExists, getAllTables } from "./db/utils";

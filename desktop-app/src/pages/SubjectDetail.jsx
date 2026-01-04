@@ -12,61 +12,66 @@ import {
   Loader2,
   FileText,
   List,
-  User,
+  CheckCircle,
+  User as UserIcon,
 } from "lucide-react";
 import {
   getSubjectEcrsBySubjectId,
   getSubjectEcrItemsBySubjectEcrId,
   getStudentEcrItemScoresByItemId,
 } from "@/lib/db";
+import { GradeItemCard, SummativeAssessmentTab, ClassRecordTab } from "@/components";
 
 export function SubjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { subject, classSection, students, institution, loading, error } = useSubjectDetail(id);
-  const [activeTab, setActiveTab] = useState("student-scores");
+  const { subject, classSection, students, institution, loading, error } =
+    useSubjectDetail(id);
+  const [activeTab, setActiveTab] = useState("class-record");
   const [activeQuarter, setActiveQuarter] = useState("All");
   const [ecrItems, setEcrItems] = useState([]);
   const [studentScores, setStudentScores] = useState([]);
   const [loadingEcrData, setLoadingEcrData] = useState(false);
+  const [subjectEcrs, setSubjectEcrs] = useState([]);
 
   // Load ECR items and scores when subject changes
-  useEffect(() => {
-    async function loadEcrData() {
-      if (!subject?.id) return;
+  const loadEcrData = async () => {
+    if (!subject?.id) return;
 
-      try {
-        setLoadingEcrData(true);
+    try {
+      setLoadingEcrData(true);
 
-        // Get subject ECRs
-        const subjectEcrs = await getSubjectEcrsBySubjectId(subject.id);
+      // Get subject ECRs
+      const ecrs = await getSubjectEcrsBySubjectId(subject.id);
+      setSubjectEcrs(ecrs);
 
-        // Get ECR items for each ECR
-        const itemsPromises = subjectEcrs.map(async (ecr) => {
-          const items = await getSubjectEcrItemsBySubjectEcrId(ecr.id);
-          return items.map((item) => ({ ...item, subject_ecr: ecr }));
-        });
+      // Get ECR items for each ECR
+      const itemsPromises = ecrs.map(async (ecr) => {
+        const items = await getSubjectEcrItemsBySubjectEcrId(ecr.id);
+        return items.map((item) => ({ ...item, subject_ecr: ecr }));
+      });
 
-        const itemsArrays = await Promise.all(itemsPromises);
-        const allItems = itemsArrays.flat();
-        setEcrItems(allItems);
+      const itemsArrays = await Promise.all(itemsPromises);
+      const allItems = itemsArrays.flat();
+      setEcrItems(allItems);
 
-        // Get scores for all items
-        const scoresPromises = allItems.map(async (item) => {
-          const scores = await getStudentEcrItemScoresByItemId(item.id);
-          return scores.map((score) => ({ ...score, item }));
-        });
+      // Get scores for all items
+      const scoresPromises = allItems.map(async (item) => {
+        const scores = await getStudentEcrItemScoresByItemId(item.id);
+        return scores.map((score) => ({ ...score, item }));
+      });
 
-        const scoresArrays = await Promise.all(scoresPromises);
-        const allScores = scoresArrays.flat();
-        setStudentScores(allScores);
-      } catch (err) {
-        console.error("Error loading ECR data:", err);
-      } finally {
-        setLoadingEcrData(false);
-      }
+      const scoresArrays = await Promise.all(scoresPromises);
+      const allScores = scoresArrays.flat();
+      setStudentScores(allScores);
+    } catch (err) {
+      console.error("Error loading ECR data:", err);
+    } finally {
+      setLoadingEcrData(false);
     }
+  };
 
+  useEffect(() => {
     loadEcrData();
   }, [subject?.id]);
 
@@ -86,44 +91,34 @@ export function SubjectDetail() {
     return ecrItems.filter((item) => item.quarter === activeQuarter);
   }, [ecrItems, activeQuarter]);
 
-  // Group students by gender
-  const groupedStudents = useMemo(() => {
-    const grouped = {};
+  // Calculate statistics
+  const totalStudents = students.length;
+  const totalItems = filteredEcrItems.length;
+  const totalScores = studentScores.length;
+  const completionRate =
+    totalItems > 0
+      ? Math.round((totalScores / (totalStudents * totalItems)) * 100)
+      : 0;
 
-    students.forEach((student) => {
-      const gender = student.gender || "other";
-      if (!grouped[gender]) {
-        grouped[gender] = [];
-      }
-      grouped[gender].push(student);
-    });
-
-    // Sort each group alphabetically
-    Object.keys(grouped).forEach((gender) => {
-      grouped[gender].sort((a, b) => {
-        const nameA = `${a.last_name} ${a.first_name} ${a.middle_name || ""}`.toLowerCase();
-        const nameB = `${b.last_name} ${b.first_name} ${b.middle_name || ""}`.toLowerCase();
-        return nameA.localeCompare(nameB);
-      });
-    });
-
-    return grouped;
-  }, [students]);
-
-  // Get score for a student and item
-  const getStudentScore = (studentId, itemId) => {
-    const score = studentScores.find(
-      (s) => s.student_id === studentId && s.subject_ecr_item_id === itemId
-    );
-    return score?.score ?? null;
-  };
+  // Gender distribution
+  const genderDistribution = students.reduce((acc, student) => {
+    const gender = student.gender || "other";
+    acc[gender] = (acc[gender] || 0) + 1;
+    return acc;
+  }, {});
 
   const tabs = [
-    {
-      id: "student-scores",
-      label: "Student Scores",
-      icon: Users,
-    },
+    // Temporarily hidden - Phase 1 focus on Class Record only
+    // {
+    //   id: "student-scores",
+    //   label: "Student Scores",
+    //   icon: Users,
+    // },
+    // {
+    //   id: "summative-assessment",
+    //   label: "Components of Summative Assessment",
+    //   icon: List,
+    // },
     {
       id: "class-record",
       label: "Class Record",
@@ -148,7 +143,9 @@ export function SubjectDetail() {
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <BookOpen className="w-8 h-8 text-red-600" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Subject Not Found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Subject Not Found
+            </h3>
             <p className="text-gray-500 mb-6">
               {error || "The subject you're looking for doesn't exist."}
             </p>
@@ -185,8 +182,12 @@ export function SubjectDetail() {
               <BookOpen className="w-6 h-6 text-indigo-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{subject.title}</h1>
-              {subject.variant && <p className="text-sm text-gray-600">{subject.variant}</p>}
+              <h1 className="text-2xl font-bold text-gray-900">
+                {subject.title}
+              </h1>
+              {subject.variant && (
+                <p className="text-sm text-gray-600">{subject.variant}</p>
+              )}
             </div>
           </div>
         </div>
@@ -262,123 +263,229 @@ export function SubjectDetail() {
             >
               {activeTab === "student-scores" && (
                 <div className="space-y-6">
-                  {/* Quarter Filter */}
-                  <div className="flex items-center gap-4 mb-4">
-                    <label className="text-sm font-medium text-gray-700">Filter by Quarter:</label>
-                    <select
-                      value={activeQuarter}
-                      onChange={(e) => setActiveQuarter(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="All">All Quarters</option>
-                      <option value="1">First Quarter</option>
-                      <option value="2">Second Quarter</option>
-                      <option value="3">Third Quarter</option>
-                      <option value="4">Fourth Quarter</option>
-                    </select>
-                  </div>
-
-                  {loadingEcrData ? (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-                      <span className="ml-3 text-gray-600">Loading grade items...</span>
-                    </div>
-                  ) : filteredEcrItems.length === 0 ? (
-                    <div className="text-center py-12">
-                      <List className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Grade Items</h3>
-                      <p className="text-gray-600">
-                        {activeQuarter === "All"
-                          ? "No grade items have been created for this subject yet."
-                          : `No grade items found for ${activeQuarter === "1" ? "First" : activeQuarter === "2" ? "Second" : activeQuarter === "3" ? "Third" : "Fourth"} Quarter.`}
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Student Scores
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Manage grades for {students.length} students
                       </p>
                     </div>
-                  ) : (
-                    <div className="space-y-8">
-                      {filteredEcrItems.map((item) => (
-                        <div key={item.id} className="border border-gray-200 rounded-lg p-6">
-                          <div className="mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
-                            {item.description && (
-                              <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-                            )}
-                            <div className="flex items-center gap-4 mt-2">
-                              <span className="text-xs text-gray-500">
-                                Category: {item.subject_ecr?.title || "N/A"}
-                              </span>
-                              {item.quarter && (
-                                <span className="text-xs text-gray-500">
-                                  Quarter: {item.quarter}
-                                </span>
-                              )}
-                              {item.score && (
-                                <span className="text-xs text-gray-500">Max Score: {item.score}</span>
-                              )}
-                            </div>
-                          </div>
+                  </div>
 
-                          {/* Students Scores Table */}
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Student Name
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                                    Score
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {Object.entries(groupedStudents).map(([gender, genderStudents]) =>
-                                  genderStudents.map((student) => {
-                                    const score = getStudentScore(student.id, item.id);
-                                    return (
-                                      <tr key={student.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 text-sm text-gray-900">
-                                          <div className="flex items-center space-x-2">
-                                            {student.profile_picture ? (
-                                              <img
-                                                src={student.profile_picture}
-                                                alt={getFullName(student)}
-                                                className="w-8 h-8 rounded-full object-cover"
-                                              />
-                                            ) : (
-                                              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                                                <User className="w-4 h-4 text-gray-600" />
-                                              </div>
-                                            )}
-                                            <span className="uppercase">{getFullName(student)}</span>
-                                          </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-600">
-                                          {score !== null ? score : "—"}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                  {/* Student Statistics */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Users className="w-4 h-4 text-blue-600" />
                         </div>
-                      ))}
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-500">
+                            Total Students
+                          </p>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {totalStudents}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-500">
+                            Grade Items
+                          </p>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {totalItems}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-4 h-4 text-yellow-600" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-500">
+                            Scores Entered
+                          </p>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {totalScores}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <GraduationCap className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-500">
+                            Completion
+                          </p>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {completionRate}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gender Distribution */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">
+                      Student Distribution
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
+                        <UserIcon className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium text-blue-900">
+                            Male Students
+                          </p>
+                          <p className="text-lg font-semibold text-blue-700">
+                            {genderDistribution.male || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 p-3 bg-pink-50 rounded-lg">
+                        <Users className="w-5 h-5 text-pink-600" />
+                        <div>
+                          <p className="text-sm font-medium text-pink-900">
+                            Female Students
+                          </p>
+                          <p className="text-lg font-semibold text-pink-700">
+                            {genderDistribution.female || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <Users className="w-5 h-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            Other Students
+                          </p>
+                          <p className="text-lg font-semibold text-gray-700">
+                            {genderDistribution.other || 0}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quarter Filter */}
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="border-b border-gray-200">
+                      <nav className="flex space-x-8 px-4" aria-label="Quarters">
+                        {["All", "1", "2", "3", "4"].map((quarter) => {
+                          const quarterLabel =
+                            quarter === "All"
+                              ? "All Quarters"
+                              : `Quarter ${quarter}`;
+                          return (
+                            <button
+                              key={quarter}
+                              onClick={() => setActiveQuarter(quarter)}
+                              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                activeQuarter === quarter
+                                  ? "border-indigo-500 text-indigo-600"
+                                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                              }`}
+                            >
+                              {quarterLabel}
+                            </button>
+                          );
+                        })}
+                      </nav>
+                    </div>
+                  </div>
+
+                  {/* Components of Summative Assessment Info */}
+                  {subjectEcrs.length > 0 ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">
+                        Components of Summative Assessment
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-800">
+                        {subjectEcrs.map((component) => (
+                          <div key={component.id}>
+                            <span className="font-medium">
+                              {component.title}:
+                            </span>{" "}
+                            {component.percentage}% of Quarter Grade
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-yellow-900 mb-2">
+                        Components of Summative Assessment
+                      </h4>
+                      <p className="text-sm text-yellow-800">
+                        No components of summative assessment have been created
+                        yet. Please sync data from the server.
+                      </p>
                     </div>
                   )}
+
+                  {/* Grade Items */}
+                  <div className="space-y-4">
+                    {loadingEcrData ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                        <span className="ml-3 text-gray-600">
+                          Loading grade items...
+                        </span>
+                      </div>
+                    ) : filteredEcrItems.length === 0 ? (
+                      <div className="text-center py-12">
+                        <List className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          No Grade Items
+                        </h3>
+                        <p className="text-gray-600">
+                          {activeQuarter === "All"
+                            ? "No grade items have been synced for this subject yet."
+                            : `No grade items found for Quarter ${activeQuarter}.`}
+                        </p>
+                      </div>
+                    ) : (
+                      filteredEcrItems.map((item) => (
+                        <GradeItemCard
+                          key={item.id}
+                          item={item}
+                          students={students}
+                          scores={studentScores}
+                          onScoresUpdate={loadEcrData}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
 
+              {activeTab === "summative-assessment" && (
+                <SummativeAssessmentTab subjectId={subject.id} />
+              )}
+
               {activeTab === "class-record" && (
-                <div className="space-y-4">
-                  <div className="text-center py-12">
-                    <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Class Record</h3>
-                    <p className="text-gray-600">
-                      Class record functionality will be available soon.
-                    </p>
-                  </div>
-                </div>
+                <ClassRecordTab
+                  subjectId={subject.id}
+                  classSectionId={subject.class_section_id}
+                  students={students}
+                />
               )}
             </motion.div>
           </AnimatePresence>
@@ -387,4 +494,3 @@ export function SubjectDetail() {
     </motion.div>
   );
 }
-

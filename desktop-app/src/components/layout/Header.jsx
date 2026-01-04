@@ -14,6 +14,8 @@ import {
   clearSubjectEcrItemCache,
   clearStudentEcrItemScoreCache,
   clearStudentRunningGradeCache,
+  clearAllSyncData,
+  getPendingCount,
 } from "@/lib/db";
 
 export function Header({ onMenuClick }) {
@@ -45,6 +47,17 @@ export function Header({ onMenuClick }) {
 
   const handleLogout = async () => {
     try {
+      // Check for unsynced data
+      const pendingCount = await getPendingCount();
+      
+      if (pendingCount > 0) {
+        const confirm = window.confirm(
+          `There are ${pendingCount} unsynced changes. These changes will be lost if you logout.\n\nAre you sure you want to logout and clear all data?`
+        );
+        
+        if (!confirm) return;
+      }
+
       // Clear all data from SQLite
       await Promise.all([
         clearUserCache(),
@@ -57,7 +70,11 @@ export function Header({ onMenuClick }) {
         clearSubjectEcrItemCache(),
         clearStudentEcrItemScoreCache(),
         clearStudentRunningGradeCache(),
+        clearAllSyncData(),
       ]);
+
+      // Remove token from localStorage
+      localStorage.removeItem("token");
 
       // Navigate to login
       navigate("/login");

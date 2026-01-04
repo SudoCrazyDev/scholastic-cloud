@@ -415,5 +415,181 @@ class DesktopController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Download running grades for a specific subject (for desktop sync)
+     */
+    public function downloadRunningGrades(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $subjectId = $request->query('subject_id');
+            $classSectionId = $request->query('class_section_id');
+
+            if (!$subjectId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'subject_id is required'
+                ], 400);
+            }
+
+            // Verify user has access to this subject
+            $subject = \App\Models\Subject::where('id', $subjectId)
+                ->where('adviser', $user->id)
+                ->first();
+
+            if (!$subject) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Subject not found or access denied'
+                ], 403);
+            }
+
+            // Get running grades for this subject
+            $query = \App\Models\StudentRunningGrade::where('subject_id', $subjectId)
+                ->whereNull('deleted_at');
+
+            // If class_section_id provided, filter by it
+            if ($classSectionId) {
+                $query->whereHas('student.studentSections', function ($q) use ($classSectionId) {
+                    $q->where('section_id', $classSectionId);
+                });
+            }
+
+            $runningGrades = $query->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $runningGrades,
+                'timestamp' => now()->toISOString()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to download running grades',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload running grades from desktop app (batch sync)
+     */
+    public function uploadRunningGrades(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $grades = $request->input('grades', []);
+
+            if (empty($grades)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No grades provided'
+                ], 400);
+            }
+
+            $synced = [];
+            $failed = [];
+            $conflicts = [];
+
+            foreach ($grades as $gradeData) {
+                try {
+                    // Verify user has access to this subject
+                    $subject = \App\Models\Subject::where('id', $gradeData['subject_id'])
+                        ->where('adviser', $user->id)
+                        ->first();
+
+                    if (!$subject) {
+                        $failed[] = [
+                            'data' => $gradeData,
+                            'error' => 'Subject not found or access denied'
+                        ];
+                        continue;
+                    }
+
+                    // Check if grade exists
+                    $existingGrade = \App\Models\StudentRunningGrade::find($gradeData['id']);
+
+                    if ($existingGrade) {
+                        // Conflict detection: compare updated_at timestamps
+                        $localUpdatedAt = new \DateTime($gradeData['updated_at']);
+                        $serverUpdatedAt = new \DateTime($existingGrade->updated_at);
+
+                        if ($serverUpdatedAt > $localUpdatedAt) {
+                            // Server is newer - conflict
+                            $conflicts[] = [
+                                'data' => $gradeData,
+                                'server_data' => $existingGrade,
+                                'message' => 'Server version is newer'
+                            ];
+                            continue;
+                        }
+
+                        // Local is newer or equal - update
+                        $existingGrade->final_grade = $gradeData['final_grade'] ?? $existingGrade->final_grade;
+                        $existingGrade->note = $gradeData['note'] ?? $existingGrade->note;
+                        $existingGrade->updated_at = now();
+                        $existingGrade->save();
+
+                        $synced[] = $gradeData['id'];
+                    } else {
+                        // Create new grade
+                        $newGrade = new \App\Models\StudentRunningGrade();
+                        $newGrade->id = $gradeData['id'];
+                        $newGrade->student_id = $gradeData['student_id'];
+                        $newGrade->subject_id = $gradeData['subject_id'];
+                        $newGrade->quarter = $gradeData['quarter'];
+                        $newGrade->grade = $gradeData['grade'] ?? null;
+                        $newGrade->final_grade = $gradeData['final_grade'] ?? null;
+                        $newGrade->academic_year = $gradeData['academic_year'] ?? '2025-2026';
+                        $newGrade->note = $gradeData['note'] ?? null;
+                        $newGrade->save();
+
+                        $synced[] = $gradeData['id'];
+                    }
+                } catch (\Exception $e) {
+                    $failed[] = [
+                        'data' => $gradeData,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'synced' => $synced,
+                'failed' => $failed,
+                'conflicts' => $conflicts,
+                'summary' => [
+                    'total' => count($grades),
+                    'synced_count' => count($synced),
+                    'failed_count' => count($failed),
+                    'conflict_count' => count($conflicts)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload running grades',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

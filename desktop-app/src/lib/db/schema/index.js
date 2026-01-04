@@ -8,6 +8,8 @@ import { initSubjectEcrTable } from "./subjects_ecr";
 import { initSubjectEcrItemTable } from "./subject_ecr_items";
 import { initStudentEcrItemScoreTable } from "./student_ecr_item_scores";
 import { initStudentRunningGradeTable } from "./student_running_grades";
+import { initSyncQueueTable } from "./sync_queue";
+import { initSyncLogTable } from "./sync_log";
 
 /**
  * Initialize all database tables needed for the app.
@@ -27,6 +29,9 @@ export async function initDatabaseSchema() {
   await initSubjectEcrItemTable();
   await initStudentEcrItemScoreTable();
   await initStudentRunningGradeTable();
-}
 
+  // Sync tables
+  await initSyncQueueTable();
+  await initSyncLogTable();
+}
 

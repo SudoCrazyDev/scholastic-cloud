@@ -4,7 +4,6 @@ import { QueryProvider } from './providers/QueryProvider';
 import { AuthProvider } from './providers/AuthProvider';
 import PublicLayout from './components/layouts/PublicLayout';
 import PrivateLayout from './components/layouts/PrivateLayout';
-import UnderMaintenance from './pages/UnderMaintenance';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Institutions from './pages/Institutions';
@@ -27,6 +26,7 @@ import SetNewPassword from './pages/SetNewPassword';
 import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
 import CertificateList from './pages/CertificateBuilder/CertificateList';
 import SchoolDays from './pages/SchoolDays';
+import Login from './pages/Login';
 
 
 function App() {
@@ -38,7 +38,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<PublicLayout />}>
               <Route index element={<Navigate to="/login" replace />} />
-              <Route path="login" element={<UnderMaintenance />} />
+              <Route path="login" element={<Login />} />
             </Route>
 
             {/* Set New Password Route - Separate from PrivateLayout */}

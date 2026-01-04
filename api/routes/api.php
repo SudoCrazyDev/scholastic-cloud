@@ -52,6 +52,10 @@ Route::middleware('auth.token')->group(function () {
         Route::get('/ecr-data', [\App\Http\Controllers\DesktopController::class, 'getEcrData']);
         Route::get('/running-grades', [\App\Http\Controllers\DesktopController::class, 'getStudentRunningGrades']);
         Route::get('/sync', [\App\Http\Controllers\DesktopController::class, 'sync']);
+        
+        // Manual sync endpoints for running grades
+        Route::get('/running-grades/download', [\App\Http\Controllers\DesktopController::class, 'downloadRunningGrades']);
+        Route::post('/running-grades/upload', [\App\Http\Controllers\DesktopController::class, 'uploadRunningGrades']);
     });
     // Role routes
     Route::apiResource('roles', RoleController::class);

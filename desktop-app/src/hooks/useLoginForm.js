@@ -58,6 +58,9 @@ export function useLoginForm(options = {}) {
         throw new Error("Invalid profile response from server.");
       }
 
+      // Save token to localStorage for easy access
+      localStorage.setItem("token", token);
+
       // 3) Ensure DB schema exists
       await initDatabaseSchema();
       const db = await getDatabase();

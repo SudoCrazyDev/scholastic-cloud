@@ -12,4 +12,10 @@ export { Card } from "./ui/Card";
 export { Alert } from "./ui/Alert";
 export { Fab } from "./ui/Fab";
 export { Badge } from "./ui/Badge";
+export { StudentScoreInput } from "./StudentScoreInput";
+export { GradeItemCard } from "./GradeItemCard";
+export { SummativeAssessmentTab } from "./SummativeAssessmentTab";
+export { ClassRecordTab } from "./ClassRecordTab";
+
+
 
