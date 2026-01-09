@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'react-hot-toast'
 import { institutionService } from '../services/institutionService'
 import { subscriptionService } from '../services/subscriptionService'
 import type { Institution, CreateInstitutionData, UpdateInstitutionData } from '../types'
@@ -89,18 +90,22 @@ export const useInstitutions = (options: UseInstitutionsOptions = {}) => {
       setIsModalOpen(false)
       setEditingInstitution(null)
       setModalError(null)
+      toast.success('Institution created successfully!')
     },
     onError: (error: any) => {
       console.error('Error creating institution:', error)
+      let errorMessage = 'Failed to create institution. Please try again.'
       if (error.response?.data?.message) {
-        setModalError(error.response.data.message)
+        errorMessage = error.response.data.message
+        setModalError(errorMessage)
       } else if (error.response?.data?.errors) {
         const errors = error.response.data.errors
-        const errorMessages = Object.values(errors).flat().join(', ')
-        setModalError(errorMessages)
+        errorMessage = Object.values(errors).flat().join(', ')
+        setModalError(errorMessage)
       } else {
-        setModalError('Failed to create institution. Please try again.')
+        setModalError(errorMessage)
       }
+      toast.error(errorMessage)
     },
   })
 
@@ -113,18 +118,22 @@ export const useInstitutions = (options: UseInstitutionsOptions = {}) => {
       setIsModalOpen(false)
       setEditingInstitution(null)
       setModalError(null)
+      toast.success('Institution updated successfully!')
     },
     onError: (error: any) => {
       console.error('Error updating institution:', error)
+      let errorMessage = 'Failed to update institution. Please try again.'
       if (error.response?.data?.message) {
-        setModalError(error.response.data.message)
+        errorMessage = error.response.data.message
+        setModalError(errorMessage)
       } else if (error.response?.data?.errors) {
         const errors = error.response.data.errors
-        const errorMessages = Object.values(errors).flat().join(', ')
-        setModalError(errorMessages)
+        errorMessage = Object.values(errors).flat().join(', ')
+        setModalError(errorMessage)
       } else {
-        setModalError('Failed to update institution. Please try again.')
+        setModalError(errorMessage)
       }
+      toast.error(errorMessage)
     },
   })
 
@@ -134,16 +143,19 @@ export const useInstitutions = (options: UseInstitutionsOptions = {}) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['institutions'] })
       setDeleteConfirmation(prev => ({ ...prev, isOpen: false, loading: false }))
+      toast.success('Institution deleted successfully!')
     },
     onError: (error: any) => {
       console.error('Error deleting institution:', error)
+      const errorMessage = error.response?.data?.message || 'Failed to delete institution. Please try again.'
       setDeleteConfirmation(prev => ({ 
         ...prev, 
         loading: false,
         title: 'Error',
-        message: error.response?.data?.message || 'Failed to delete institution. Please try again.',
+        message: errorMessage,
         onConfirm: () => setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
       }))
+      toast.error(errorMessage)
     },
   })
 
@@ -154,16 +166,19 @@ export const useInstitutions = (options: UseInstitutionsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ['institutions'] })
       setSelectedRows([])
       setDeleteConfirmation(prev => ({ ...prev, isOpen: false, loading: false }))
+      toast.success('Institutions deleted successfully!')
     },
     onError: (error: any) => {
       console.error('Error deleting institutions:', error)
+      const errorMessage = error.response?.data?.message || 'Failed to delete some institutions. Please try again.'
       setDeleteConfirmation(prev => ({ 
         ...prev, 
         loading: false,
         title: 'Error',
-        message: error.response?.data?.message || 'Failed to delete some institutions. Please try again.',
+        message: errorMessage,
         onConfirm: () => setDeleteConfirmation(prev => ({ ...prev, isOpen: false }))
       }))
+      toast.error(errorMessage)
     },
   })
 

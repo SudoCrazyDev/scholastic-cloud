@@ -103,7 +103,7 @@ export interface CreateInstitutionData {
   division?: string;
   region?: string;
   gov_id?: string;
-  logo?: string;
+  logo?: string | File;
   subscription_id?: string;
 }
 
@@ -114,7 +114,7 @@ export interface UpdateInstitutionData {
   division?: string;
   region?: string;
   gov_id?: string;
-  logo?: string;
+  logo?: string | File;
   subscription_id?: string;
 }
 

@@ -1,12 +1,14 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import { useQueries } from '@tanstack/react-query'
 import { 
   BookOpenIcon, 
   ClockIcon,
   UserGroupIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline'
+import { studentService } from '../../../services/studentService'
 import type { AssignedSubject } from '../../../types'
 
 interface AssignedSubjectsGridProps {
@@ -22,6 +24,39 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
   loading,
   error,
 }) => {
+  // Get unique class section IDs
+  const uniqueSectionIds = useMemo(() => {
+    const sectionIds = new Set<string>()
+    assignedSubjects.forEach(subject => {
+      if (subject.class_section?.id) {
+        sectionIds.add(subject.class_section.id)
+      }
+    })
+    return Array.from(sectionIds)
+  }, [assignedSubjects])
+
+  // Fetch students for each unique class section
+  const sectionStudentQueries = useQueries({
+    queries: uniqueSectionIds.map(sectionId => ({
+      queryKey: ['students-by-section', sectionId],
+      queryFn: () => studentService.getStudentsByClassSection(sectionId),
+      enabled: !!sectionId && sectionId !== 'no-section',
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    }))
+  })
+
+  // Create a map of section ID to student count
+  const sectionStudentCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    sectionStudentQueries.forEach((query, index) => {
+      const sectionId = uniqueSectionIds[index]
+      if (sectionId && query.data?.data) {
+        counts[sectionId] = query.data.data.length || 0
+      }
+    })
+    return counts
+  }, [sectionStudentQueries, uniqueSectionIds])
+
   // Group subjects by class section
   const groupedSubjects = assignedSubjects.reduce((groups, subject) => {
     const sectionKey = subject.class_section?.id || 'no-section'
@@ -157,7 +192,10 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
                       <div className="flex items-center text-xs text-gray-600">
                         <UserGroupIcon className="w-3 h-3 mr-1 flex-shrink-0" />
                         <span>
-                          {subject.student_count || 0} / {subject.total_students || 0} students
+                          {subject.class_section?.id 
+                            ? `${sectionStudentCounts[subject.class_section.id] ?? 0} students`
+                            : '0 students'
+                          }
                         </span>
                       </div>
                     </div>

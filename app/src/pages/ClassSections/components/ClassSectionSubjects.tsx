@@ -357,9 +357,9 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={onDissolveSection}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
             >
-                    <span>Student Transfer</span>
+                    <span>Dissolve</span>
             </motion.button>
           )}
         </div>

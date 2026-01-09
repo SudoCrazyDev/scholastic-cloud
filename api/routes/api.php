@@ -63,6 +63,7 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('subscriptions', SubscriptionController::class);
     // Institution routes
     Route::apiResource('institutions', InstitutionController::class);
+    Route::post('institutions/{id}', [InstitutionController::class, 'update']); // POST route for file uploads
     Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
     Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
     // User routes

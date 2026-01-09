@@ -20,6 +20,7 @@ class Institution extends Model
     protected $fillable = [
         'title',
         'abbr',
+        'address',
         'division',
         'region',
         'gov_id',
@@ -60,10 +61,11 @@ class Institution extends Model
         return [
             'title' => 'required|string|max:255',
             'abbr' => 'required|string|max:50',
+            'address' => 'nullable|string|max:500',
             'division' => 'nullable|string|max:255',
             'region' => 'nullable|string|max:255',
             'gov_id' => 'nullable|string|max:255',
-            'logo' => 'nullable|string|max:500',
+            'logo' => 'nullable|file|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'subscription_id' => 'nullable|uuid|exists:subscriptions,id',
         ];
     }
