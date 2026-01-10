@@ -2,7 +2,7 @@ name: Deploy API to Production
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - 'api/**'
   workflow_dispatch:
@@ -113,12 +113,24 @@ jobs:
             echo "Found zip: $ZIP_FILE"
 
             # Backup existing api directory
+            BACKUP_DIR=""
             if [ -d "api" ]; then
-              mv api api-backup-$(date +%Y%m%d-%H%M%S)
+              BACKUP_DIR="api-backup-$(date +%Y%m%d-%H%M%S)"
+              mv api "$BACKUP_DIR"
+              echo "Backup created: $BACKUP_DIR"
             fi
 
             # Extract into parent (v2) under api/
             unzip -o "$ZIP_FILE" -d api/
+            
+            # Restore .env file from backup if it exists
+            if [ -n "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/.env" ]; then
+              echo "Restoring .env file from backup..."
+              cp "$BACKUP_DIR/.env" api/.env
+              echo "✓ .env file restored from backup"
+            else
+              echo "⚠ No .env file found in backup or backup not created"
+            fi
             
             # Ensure required Laravel directories exist
             mkdir -p api/storage/logs
@@ -162,6 +174,13 @@ jobs:
             # Re-apply permissions after clearing cache
             chmod -R 775 api/storage
             chmod -R 775 api/bootstrap/cache
+
+            # Run Laravel migrations
+            echo "=== Running Laravel migrations ==="
+            cd api
+            php artisan migrate --force
+            cd ..
+            echo "✓ Migrations completed"
 
             # Place web entry files into the public web root (v2)
             # Copy .htaccess and index.php from Laravel's public/ to the web root
