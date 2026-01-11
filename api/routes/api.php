@@ -22,6 +22,7 @@ use App\Http\Controllers\SF9Controller;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\SchoolDayController;
+use App\Http\Controllers\AiAssistantController;
 
 /*
 |--------------------------------------------------------------------------
@@ -171,6 +172,9 @@ Route::middleware('auth.token')->group(function () {
 
     // Certificate routes
     Route::apiResource('certificates', CertificateController::class);
+
+    // AI-assisted tools
+    Route::post('/ai/assist', [AiAssistantController::class, 'assist']);
 });
 
 Route::get('/health', function () {

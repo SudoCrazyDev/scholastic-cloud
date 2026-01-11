@@ -28,6 +28,7 @@ import CertificateList from './pages/CertificateBuilder/CertificateList';
 import SchoolDays from './pages/SchoolDays';
 import Settings from './pages/Settings/Settings';
 import Login from './pages/Login';
+import AiAssistant from './pages/AiAssistant';
 
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
             {/* Private Routes */}
             <Route element={<PrivateLayout />}>
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="ai-assistant" element={<AiAssistant />} />
               <Route path="users" element={<Users />} />
               <Route path="user-profile" element={<UserProfile />} />
               <Route path="institutions" element={<Institutions />} />

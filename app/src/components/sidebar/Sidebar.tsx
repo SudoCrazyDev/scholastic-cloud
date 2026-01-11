@@ -18,7 +18,8 @@ import {
   BarChart3,
   X,
   Calendar,
-  Settings
+  Settings,
+  Sparkles
 } from 'lucide-react';
 
 interface MenuItem {
@@ -39,6 +40,12 @@ const menuItems: MenuItem[] = [
     label: 'Dashboard',
     icon: <LayoutDashboard className="w-5 h-5" />,
     path: '/dashboard',
+  },
+  {
+    id: 'ai-assistant',
+    label: 'AI Assistant',
+    icon: <Sparkles className="w-5 h-5" />,
+    path: '/ai-assistant',
   },
   {
     id: 'my-class-sections',
