@@ -1,16 +1,978 @@
 ---
+import '../styles/global.css';
 
+// Smooth scroll behavior for navigation
+if (typeof window !== 'undefined') {
+	document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+		anchor.addEventListener('click', function (e) {
+			e.preventDefault();
+			const target = document.querySelector(this.getAttribute('href'));
+			if (target) {
+				const headerOffset = 80;
+				const elementPosition = target.getBoundingClientRect().top;
+				const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+				window.scrollTo({
+					top: offsetPosition,
+					behavior: 'smooth'
+				});
+			}
+		});
+	});
+}
 ---
 
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
+		<meta name="description" content="Scholastic Cloud - Modern Education Management Platform" />
+		<title>Scholastic Cloud - Modern Education Management</title>
 	</head>
 	<body>
-		<h1>Astro</h1>
+		<!-- Navigation -->
+		<nav class="fixed top-0 w-full bg-white/80 backdrop-blur-xl shadow-lg z-50 border-b border-indigo-100/50 transition-all duration-300 glass" id="navbar">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="flex justify-between items-center h-16">
+					<div class="flex items-center space-x-2">
+						<div class="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-lg animate-pulse-glow icon-3d float-3d" style="transform-style: preserve-3d;">
+							<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: translateZ(5px);">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+							</svg>
+						</div>
+						<h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent gradient-animated">Scholastic Cloud</h1>
+					</div>
+					<div class="hidden md:flex items-center space-x-8">
+						<a href="#features" class="text-gray-600 hover:text-indigo-600 transition-colors font-medium scroll-smooth">Features</a>
+						<a href="#solution" class="text-gray-600 hover:text-indigo-600 transition-colors font-medium scroll-smooth">Solutions</a>
+						<a href="#benefits" class="text-gray-600 hover:text-indigo-600 transition-colors font-medium scroll-smooth">Benefits</a>
+						<a href="#cta" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transform scroll-smooth">Get Started</a>
+					</div>
+					<button class="md:hidden text-gray-600 hover:text-indigo-600">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+						</svg>
+					</button>
+				</div>
+			</div>
+		</nav>
+
+		<!-- Hero Section -->
+		<section class="relative min-h-screen flex items-center justify-center pt-16 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+			<!-- Vibrant Background Gradient -->
+			<div class="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50"></div>
+			<div class="absolute inset-0 bg-gradient-to-tr from-indigo-100/50 via-purple-100/30 to-pink-100/50"></div>
+			
+			<!-- Geometric Grid Background -->
+			<div class="geometric-grid"></div>
+			
+			<!-- Animated Geometric Lines -->
+			<div class="geometric-lines">
+				<svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+					<defs>
+						<linearGradient id="gradient-line-1" x1="0%" y1="0%" x2="100%" y2="100%">
+							<stop offset="0%" class="gradient-stop-1" stop-color="#6366f1" />
+							<stop offset="50%" class="gradient-stop-2" stop-color="#8b5cf6" />
+							<stop offset="100%" class="gradient-stop-3" stop-color="#ec4899" />
+						</linearGradient>
+						<linearGradient id="gradient-line-2" x1="100%" y1="0%" x2="0%" y2="100%">
+							<stop offset="0%" class="gradient-stop-2" stop-color="#8b5cf6" />
+							<stop offset="50%" class="gradient-stop-3" stop-color="#ec4899" />
+							<stop offset="100%" class="gradient-stop-1" stop-color="#6366f1" />
+						</linearGradient>
+						<linearGradient id="gradient-line-3" x1="0%" y1="100%" x2="100%" y2="0%">
+							<stop offset="0%" class="gradient-stop-3" stop-color="#ec4899" />
+							<stop offset="50%" class="gradient-stop-1" stop-color="#6366f1" />
+							<stop offset="100%" class="gradient-stop-2" stop-color="#8b5cf6" />
+						</linearGradient>
+						<linearGradient id="gradient-line-4" x1="50%" y1="0%" x2="50%" y2="100%">
+							<stop offset="0%" class="gradient-stop-1" stop-color="#6366f1" />
+							<stop offset="50%" class="gradient-stop-3" stop-color="#ec4899" />
+							<stop offset="100%" class="gradient-stop-2" stop-color="#8b5cf6" />
+						</linearGradient>
+					</defs>
+					<!-- Diagonal Lines -->
+					<path class="geometric-line geometric-line-1" d="M0,200 Q300,100 600,200 T1200,200" stroke-dasharray="10,5" />
+					<path class="geometric-line geometric-line-2" d="M0,400 Q400,300 800,400 T1600,400" stroke-dasharray="15,8" />
+					<path class="geometric-line geometric-line-3" d="M0,600 Q200,500 400,600 T1200,600" stroke-dasharray="12,6" />
+					<!-- Curved Lines -->
+					<path class="geometric-line geometric-line-4" d="M200,0 Q400,200 200,400 Q0,600 200,800" stroke-dasharray="20,10" />
+					<path class="geometric-line geometric-line-1" d="M1000,0 Q1200,200 1000,400 Q800,600 1000,800" stroke-dasharray="18,9" />
+					<!-- Horizontal Lines -->
+					<line class="geometric-line geometric-line-2" x1="0" y1="150" x2="1200" y2="150" stroke-dasharray="8,4" />
+					<line class="geometric-line geometric-line-3" x1="0" y1="350" x2="1200" y2="350" stroke-dasharray="10,5" />
+					<line class="geometric-line geometric-line-4" x1="0" y1="550" x2="1200" y2="550" stroke-dasharray="12,6" />
+					<!-- Vertical Lines -->
+					<line class="geometric-line geometric-line-1" x1="300" y1="0" x2="300" y2="800" stroke-dasharray="9,4.5" />
+					<line class="geometric-line geometric-line-2" x1="600" y1="0" x2="600" y2="800" stroke-dasharray="11,5.5" />
+					<line class="geometric-line geometric-line-3" x1="900" y1="0" x2="900" y2="800" stroke-dasharray="13,6.5" />
+				</svg>
+			</div>
+			
+			<!-- Animated Background Elements -->
+			<div class="absolute top-20 left-10 w-72 h-72 bg-indigo-400/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+			<div class="absolute top-40 right-10 w-72 h-72 bg-purple-400/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+			<div class="absolute -bottom-8 left-1/2 w-72 h-72 bg-pink-400/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+			
+			<!-- Geometric Shapes -->
+			<div class="geometric-shape" style="top: 10%; left: 5%; width: 100px; height: 100px; border-color: #6366f1; border-radius: 20px; transform: rotate(45deg);"></div>
+			<div class="geometric-shape" style="top: 60%; right: 8%; width: 80px; height: 80px; border-color: #8b5cf6; border-radius: 50%;"></div>
+			<div class="geometric-shape" style="bottom: 15%; left: 15%; width: 120px; height: 120px; border-color: #ec4899; clip-path: polygon(50% 0%, 0% 100%, 100% 100%);"></div>
+			<div class="geometric-shape" style="top: 30%; right: 20%; width: 60px; height: 60px; border-color: #6366f1; transform: rotate(45deg);"></div>
+			
+			<div class="relative max-w-7xl mx-auto w-full" style="z-index: 10; position: relative;">
+				<div class="text-center">
+					<h1 class="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+						Transform Your Educational Institution
+					</h1>
+					<p class="text-xl md:text-2xl text-gray-700 mb-8 max-w-3xl mx-auto font-medium">
+						Streamline academic management, track student progress, and empower educators with our comprehensive cloud-based platform.
+					</p>
+					<div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+						<a href="#cta" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-xl hover:shadow-2xl hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transform scroll-smooth">
+							Start Free Trial
+						</a>
+						<button class="border-2 border-indigo-600 text-indigo-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-indigo-600 hover:text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg hover:shadow-xl transform hover:scale-105">
+							Watch Demo
+						</button>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Single Stop Solution Section -->
+		<section id="solution" class="relative section-padding bg-gradient-to-b from-white via-indigo-50/20 to-white overflow-hidden">
+			<!-- Decorative Background Elements -->
+			<div class="absolute top-0 left-0 w-full h-full">
+				<div class="absolute top-20 left-0 w-96 h-96 bg-indigo-200/10 rounded-full blur-3xl"></div>
+				<div class="absolute bottom-20 right-0 w-96 h-96 bg-purple-200/10 rounded-full blur-3xl"></div>
+			</div>
+			
+			<div class="relative max-w-7xl mx-auto z-10">
+				<div class="text-center mb-16 reveal reveal-child">
+					<div class="inline-block mb-4">
+						<span class="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-sm font-semibold">
+							🎯 All-in-One Platform
+						</span>
+					</div>
+					<h2 class="text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-6 gradient-animated">
+						Single Stop Solution
+					</h2>
+					<p class="text-xl text-gray-700 max-w-2xl mx-auto font-medium leading-relaxed">
+						Everything you need to manage your educational institution in one comprehensive platform
+					</p>
+				</div>
+				
+				<!-- Carousel Container -->
+				<div class="relative max-w-6xl mx-auto">
+					<!-- Carousel Wrapper -->
+					<div class="carousel-container overflow-visible rounded-2xl py-4">
+						<div class="carousel-track flex transition-transform duration-500 ease-in-out" id="solutionCarousel" style="min-height: 220px;">
+							<!-- Student Management -->
+							<div class="carousel-slide flex-shrink-0 px-3">
+								<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-indigo-300 hover:shadow-2xl transition-all duration-300 overflow-visible card-3d h-full min-h-[200px]">
+									<div class="absolute inset-0 bg-gradient-to-br from-indigo-50/0 to-indigo-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative z-10">
+										<div class="flex items-center mb-4">
+											<div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg icon-3d mr-4">
+												<svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+												</svg>
+											</div>
+											<h3 class="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">Student Management</h3>
+										</div>
+										<p class="text-gray-600 text-sm leading-relaxed mb-4">Comprehensive student records, enrollment, and academic tracking system.</p>
+									</div>
+								</div>
+							</div>
+
+							<!-- Employee Management -->
+							<div class="carousel-slide flex-shrink-0 px-3">
+								<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-purple-300 hover:shadow-2xl transition-all duration-300 overflow-visible card-3d h-full min-h-[200px]">
+									<div class="absolute inset-0 bg-gradient-to-br from-purple-50/0 to-purple-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative z-10">
+										<div class="flex items-center mb-4">
+											<div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg icon-3d mr-4">
+												<svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+												</svg>
+											</div>
+											<h3 class="text-xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors">Employee Management</h3>
+										</div>
+										<p class="text-gray-600 text-sm leading-relaxed mb-4">Manage faculty, staff, and administrative personnel with ease.</p>
+									</div>
+								</div>
+							</div>
+
+							<!-- School Reports -->
+							<div class="carousel-slide flex-shrink-0 px-3">
+								<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-cyan-300 hover:shadow-2xl transition-all duration-300 overflow-visible card-3d h-full min-h-[200px]">
+									<div class="absolute inset-0 bg-gradient-to-br from-cyan-50/0 to-cyan-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative z-10">
+										<div class="flex items-center mb-4">
+											<div class="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg icon-3d mr-4">
+												<svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+												</svg>
+											</div>
+											<h3 class="text-xl font-bold text-gray-900 group-hover:text-cyan-600 transition-colors">School Reports</h3>
+										</div>
+										<p class="text-gray-600 text-sm leading-relaxed mb-4">Generate comprehensive school-wide reports and analytics.</p>
+									</div>
+								</div>
+							</div>
+
+							<!-- Card Reports -->
+							<div class="carousel-slide flex-shrink-0 px-3">
+								<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-green-300 hover:shadow-2xl transition-all duration-300 overflow-visible card-3d h-full min-h-[200px]">
+									<div class="absolute inset-0 bg-gradient-to-br from-green-50/0 to-green-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative z-10">
+										<div class="flex items-center mb-4">
+											<div class="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg icon-3d mr-4">
+												<svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+												</svg>
+											</div>
+											<h3 class="text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">Card Reports</h3>
+										</div>
+										<p class="text-gray-600 text-sm leading-relaxed mb-4">Create and manage report cards with customizable templates.</p>
+									</div>
+								</div>
+							</div>
+
+							<!-- Attendance -->
+							<div class="carousel-slide flex-shrink-0 px-3">
+								<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-yellow-300 hover:shadow-2xl transition-all duration-300 overflow-visible card-3d h-full min-h-[200px]">
+									<div class="absolute inset-0 bg-gradient-to-br from-yellow-50/0 to-yellow-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative z-10">
+										<div class="flex items-center mb-4">
+											<div class="w-14 h-14 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg icon-3d mr-4">
+												<svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 4h6m-6 4h6m-2 4h2M9 9h6m-6 4h6m-2 4h2"></path>
+												</svg>
+											</div>
+											<h3 class="text-xl font-bold text-gray-900 group-hover:text-yellow-600 transition-colors">Attendance</h3>
+										</div>
+										<p class="text-gray-600 text-sm leading-relaxed mb-4">Real-time attendance tracking for students and staff members.</p>
+									</div>
+								</div>
+							</div>
+
+							<!-- Class Management -->
+							<div class="carousel-slide flex-shrink-0 px-3">
+								<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-pink-300 hover:shadow-2xl transition-all duration-300 overflow-visible card-3d h-full min-h-[200px]">
+									<div class="absolute inset-0 bg-gradient-to-br from-pink-50/0 to-pink-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative z-10">
+										<div class="flex items-center mb-4">
+											<div class="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shadow-lg icon-3d mr-4">
+												<svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+												</svg>
+											</div>
+											<h3 class="text-xl font-bold text-gray-900 group-hover:text-pink-600 transition-colors">Class Management</h3>
+										</div>
+										<p class="text-gray-600 text-sm leading-relaxed mb-4">Organize and manage classes, sections, and schedules efficiently.</p>
+									</div>
+								</div>
+							</div>
+
+							<!-- Subjects Management -->
+							<div class="carousel-slide flex-shrink-0 px-3">
+								<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-indigo-300 hover:shadow-2xl transition-all duration-300 overflow-visible card-3d h-full min-h-[200px]">
+									<div class="absolute inset-0 bg-gradient-to-br from-indigo-50/0 to-indigo-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+									<div class="relative z-10">
+										<div class="flex items-center mb-4">
+											<div class="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg icon-3d mr-4">
+												<svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+												</svg>
+											</div>
+											<h3 class="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">Subjects Management</h3>
+										</div>
+										<p class="text-gray-600 text-sm leading-relaxed mb-4">Manage curriculum, subjects, and course materials seamlessly.</p>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Carousel Navigation -->
+					<button class="carousel-btn carousel-btn-prev absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white rounded-full p-3 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 z-20 btn-3d" aria-label="Previous" style="top: calc(50% + 20px);">
+						<svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+						</svg>
+					</button>
+					<button class="carousel-btn carousel-btn-next absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white rounded-full p-3 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-500 z-20 btn-3d" aria-label="Next" style="top: calc(50% + 20px);">
+						<svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+						</svg>
+					</button>
+					
+					<!-- Carousel Indicators -->
+					<div class="flex justify-center mt-8 gap-2" id="carouselIndicators">
+						<!-- Indicators will be generated by JavaScript -->
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Features Section -->
+		<section id="features" class="relative section-padding bg-gradient-to-b from-gray-50 via-white to-indigo-50/30 overflow-hidden">
+			<!-- Decorative Elements -->
+			<div class="absolute top-0 left-0 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+			<div class="absolute bottom-0 right-0 w-96 h-96 bg-purple-200/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+			
+			<div class="relative max-w-7xl mx-auto">
+				<div class="text-center mb-16">
+					<div class="inline-block mb-4">
+						<span class="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-sm font-semibold">
+							✨ Features
+						</span>
+					</div>
+					<h2 class="text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-6 gradient-animated">
+						Powerful Features
+					</h2>
+					<p class="text-xl text-gray-700 max-w-2xl mx-auto font-medium leading-relaxed">
+						Everything you need to manage your educational institution efficiently
+					</p>
+				</div>
+				
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+					<!-- Feature 1 -->
+					<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-indigo-300 hover:shadow-2xl transition-all duration-300 overflow-hidden reveal reveal-child">
+						<div class="absolute inset-0 bg-gradient-to-br from-indigo-50/0 to-indigo-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+						<div class="relative z-10">
+							<!-- Feature Illustration -->
+							<div class="mb-6 flex justify-center">
+								<div class="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+									<svg class="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+									</svg>
+								</div>
+							</div>
+							<div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 mx-auto">
+								<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+								</svg>
+							</div>
+							<h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-indigo-600 transition-colors text-center">Class Management</h3>
+							<p class="text-gray-700 leading-relaxed text-center">Organize classes, sections, and subjects with ease. Manage student enrollments and class schedules efficiently.</p>
+							<div class="mt-4 flex items-center justify-center text-sm font-semibold text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+								Explore feature
+								<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</div>
+						</div>
+					</div>
+
+					<!-- Feature 2 -->
+					<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-green-300 hover:shadow-2xl transition-all duration-300 overflow-hidden reveal reveal-child" style="animation-delay: 0.1s">
+						<div class="absolute inset-0 bg-gradient-to-br from-green-50/0 to-green-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+						<div class="relative z-10">
+							<div class="mb-6 flex justify-center">
+								<div class="w-24 h-24 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+									<svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 4h6m-6 4h6m-2 4h2M9 9h6m-6 4h6m-2 4h2"></path>
+									</svg>
+								</div>
+							</div>
+							<div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 mx-auto">
+								<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 4h6m-6 4h6m-2 4h2M9 9h6m-6 4h6m-2 4h2"></path>
+								</svg>
+							</div>
+							<h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-green-600 transition-colors text-center">Attendance Tracking</h3>
+							<p class="text-gray-700 leading-relaxed text-center">Real-time attendance monitoring with automated reports and notifications for parents and administrators.</p>
+							<div class="mt-4 flex items-center justify-center text-sm font-semibold text-green-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+								Explore feature
+								<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</div>
+						</div>
+					</div>
+
+					<!-- Feature 3 -->
+					<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-cyan-300 hover:shadow-2xl transition-all duration-300 overflow-hidden reveal reveal-child" style="animation-delay: 0.2s">
+						<div class="absolute inset-0 bg-gradient-to-br from-cyan-50/0 to-cyan-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+						<div class="relative z-10">
+							<div class="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+								<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+								</svg>
+							</div>
+							<h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-cyan-600 transition-colors">Gradebook System</h3>
+							<p class="text-gray-700 leading-relaxed">Comprehensive grading system with weighted assessments, rubrics, and automated grade calculations.</p>
+							<div class="mt-4 flex items-center text-sm font-semibold text-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+								Explore feature
+								<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</div>
+						</div>
+					</div>
+
+					<!-- Feature 4 -->
+					<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-yellow-300 hover:shadow-2xl transition-all duration-300 overflow-hidden reveal reveal-child" style="animation-delay: 0.3s">
+						<div class="absolute inset-0 bg-gradient-to-br from-yellow-50/0 to-yellow-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+						<div class="relative z-10">
+							<div class="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+								<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+								</svg>
+							</div>
+							<h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-yellow-600 transition-colors">Report Generation</h3>
+							<p class="text-gray-700 leading-relaxed">Generate professional report cards, transcripts, and certificates with customizable templates.</p>
+							<div class="mt-4 flex items-center text-sm font-semibold text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+								Explore feature
+								<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</div>
+						</div>
+					</div>
+
+					<!-- Feature 5 -->
+					<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-red-300 hover:shadow-2xl transition-all duration-300 overflow-hidden reveal reveal-child" style="animation-delay: 0.4s">
+						<div class="absolute inset-0 bg-gradient-to-br from-red-50/0 to-red-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+						<div class="relative z-10">
+							<div class="w-16 h-16 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+								<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+								</svg>
+							</div>
+							<h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-red-600 transition-colors">Secure & Private</h3>
+							<p class="text-gray-700 leading-relaxed">Enterprise-grade security with role-based access control and data encryption to protect sensitive information.</p>
+							<div class="mt-4 flex items-center text-sm font-semibold text-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+								Explore feature
+								<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</div>
+						</div>
+					</div>
+
+					<!-- Feature 6 -->
+					<div class="group relative bg-white rounded-2xl p-8 shadow-xl interactive-card border-2 border-transparent hover:border-purple-300 hover:shadow-2xl transition-all duration-300 overflow-hidden reveal reveal-child" style="animation-delay: 0.5s">
+						<div class="absolute inset-0 bg-gradient-to-br from-purple-50/0 to-purple-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+						<div class="relative z-10">
+							<div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+								<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+								</svg>
+							</div>
+							<h3 class="text-2xl font-bold text-gray-900 mb-3 group-hover:text-purple-600 transition-colors">Real-time Sync</h3>
+							<p class="text-gray-700 leading-relaxed">Cloud-based platform with real-time synchronization across all devices and locations.</p>
+							<div class="mt-4 flex items-center text-sm font-semibold text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+								Explore feature
+								<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Stats/Benefits Section -->
+		<section id="benefits" class="relative section-padding bg-gradient-to-b from-white via-indigo-50/20 to-white overflow-hidden">
+			<!-- Decorative Elements -->
+			<div class="absolute top-20 right-0 w-96 h-96 bg-purple-200/10 rounded-full blur-3xl"></div>
+			<div class="absolute bottom-20 left-0 w-96 h-96 bg-indigo-200/10 rounded-full blur-3xl"></div>
+			
+			<div class="relative max-w-7xl mx-auto">
+				<div class="text-center mb-16">
+					<div class="inline-block mb-4">
+						<span class="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-sm font-semibold">
+							⭐ Why Choose Us
+						</span>
+					</div>
+					<h2 class="text-4xl md:text-5xl lg:text-6xl font-extrabold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-6 gradient-animated">
+						Why Choose Scholastic Cloud?
+					</h2>
+					<p class="text-xl text-gray-700 max-w-2xl mx-auto font-medium leading-relaxed">
+						Join thousands of educational institutions already using our platform
+					</p>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+					<div class="group text-center p-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border-2 border-indigo-100 hover:border-indigo-400 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 interactive-card reveal reveal-child">
+						<div class="text-6xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3 gradient-animated">99.9%</div>
+						<div class="text-gray-700 font-semibold text-lg">Uptime Guarantee</div>
+						<div class="mt-2 text-sm text-gray-500">Reliable & Always Available</div>
+					</div>
+					<div class="group text-center p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-100 hover:border-green-400 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 interactive-card reveal reveal-child" style="animation-delay: 0.1s">
+						<div class="text-6xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-3 gradient-animated">10K+</div>
+						<div class="text-gray-700 font-semibold text-lg">Active Users</div>
+						<div class="mt-2 text-sm text-gray-500">Growing Community</div>
+					</div>
+					<div class="group text-center p-8 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl border-2 border-cyan-100 hover:border-cyan-400 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 interactive-card reveal reveal-child" style="animation-delay: 0.2s">
+						<div class="text-6xl font-extrabold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent mb-3 gradient-animated">500+</div>
+						<div class="text-gray-700 font-semibold text-lg">Institutions</div>
+						<div class="mt-2 text-sm text-gray-500">Trusted Worldwide</div>
+					</div>
+					<div class="group text-center p-8 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl border-2 border-yellow-100 hover:border-yellow-400 hover:shadow-2xl transition-all duration-300 transform hover:scale-105 interactive-card reveal reveal-child" style="animation-delay: 0.3s">
+						<div class="text-6xl font-extrabold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent mb-3 gradient-animated">24/7</div>
+						<div class="text-gray-700 font-semibold text-lg">Support</div>
+						<div class="mt-2 text-sm text-gray-500">Always Here to Help</div>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+					<div class="reveal reveal-child">
+						<h3 class="text-3xl font-bold text-gray-900 mb-6">Streamline Your Workflow</h3>
+						<div class="space-y-4">
+							<div class="flex items-start">
+								<div class="flex-shrink-0 w-6 h-6 bg-success-100 rounded-full flex items-center justify-center mt-1">
+									<svg class="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+									</svg>
+								</div>
+								<div class="ml-4">
+									<h4 class="font-semibold text-gray-900 mb-1">Automated Processes</h4>
+									<p class="text-gray-600">Reduce manual work with automated grading, attendance, and reporting.</p>
+								</div>
+							</div>
+							<div class="flex items-start">
+								<div class="flex-shrink-0 w-6 h-6 bg-success-100 rounded-full flex items-center justify-center mt-1">
+									<svg class="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+									</svg>
+								</div>
+								<div class="ml-4">
+									<h4 class="font-semibold text-gray-900 mb-1">Mobile Access</h4>
+									<p class="text-gray-600">Access your data anywhere, anytime with our responsive web and mobile apps.</p>
+								</div>
+							</div>
+							<div class="flex items-start">
+								<div class="flex-shrink-0 w-6 h-6 bg-success-100 rounded-full flex items-center justify-center mt-1">
+									<svg class="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+									</svg>
+								</div>
+								<div class="ml-4">
+									<h4 class="font-semibold text-gray-900 mb-1">Data Analytics</h4>
+									<p class="text-gray-600">Make informed decisions with comprehensive analytics and insights.</p>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 rounded-2xl p-8 border-2 border-indigo-200 reveal reveal-child" style="animation-delay: 0.2s">
+						<div class="bg-white rounded-xl p-6 shadow-xl border-2 border-indigo-100">
+							<div class="flex items-center mb-4">
+								<div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+									<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+									</svg>
+								</div>
+								<div class="ml-4">
+									<h4 class="font-semibold text-gray-900">Fast Implementation</h4>
+									<p class="text-sm text-gray-600">Get started in minutes</p>
+								</div>
+							</div>
+							<p class="text-gray-700 mb-4 font-medium">
+								"Our institution saw a 40% reduction in administrative workload within the first month of implementation."
+							</p>
+							<div class="flex items-center">
+								<!-- Avatar with gradient -->
+								<div class="relative w-12 h-12">
+									<div class="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full"></div>
+									<div class="absolute inset-0.5 bg-white rounded-full flex items-center justify-center">
+										<svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+										</svg>
+									</div>
+								</div>
+								<div class="ml-3">
+									<div class="font-semibold text-gray-900">Dr. Sarah Johnson</div>
+									<div class="text-sm text-gray-600">Principal, ABC Academy</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- CTA Section -->
+		<section id="cta" class="relative section-padding bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white overflow-hidden particle-bg">
+			<!-- Animated Background Elements -->
+			<div class="absolute top-0 left-0 w-full h-full opacity-10">
+				<div class="absolute top-10 left-10 w-96 h-96 bg-white rounded-full mix-blend-overlay filter blur-3xl"></div>
+				<div class="absolute bottom-10 right-10 w-96 h-96 bg-white rounded-full mix-blend-overlay filter blur-3xl"></div>
+			</div>
+			<div class="relative max-w-4xl mx-auto text-center reveal reveal-child">
+				<!-- CTA Illustration with 3D Effect -->
+				<div class="mb-8 flex justify-center reveal reveal-child float-3d" style="animation-delay: 0.1s">
+					<div class="w-32 h-32 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-4 border-white/30 shadow-3d icon-3d" style="transform-style: preserve-3d;">
+						<svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="transform: translateZ(20px);">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+						</svg>
+					</div>
+				</div>
+				<h2 class="text-4xl md:text-5xl font-bold mb-6 drop-shadow-lg">Ready to Transform Your Institution?</h2>
+				<p class="text-xl text-indigo-50 mb-8 font-medium reveal reveal-child" style="animation-delay: 0.2s">
+					Start your free trial today and experience the future of education management.
+				</p>
+					<div class="flex flex-col sm:flex-row gap-4 justify-center reveal reveal-child" style="animation-delay: 0.3s">
+					<button class="bg-white text-indigo-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-50 transition-all duration-200 shadow-2xl hover:shadow-3xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white transform btn-3d" style="transform-style: preserve-3d;">
+						<span style="transform: translateZ(10px); display: block;">Get Started Free</span>
+					</button>
+					<button class="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-indigo-600 transition-all duration-200 shadow-xl hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white transform btn-3d" style="transform-style: preserve-3d;">
+						<span style="transform: translateZ(10px); display: block;">Schedule a Demo</span>
+					</button>
+				</div>
+			</div>
+		</section>
+
+		<!-- Footer -->
+		<footer class="bg-gray-900 text-gray-300 py-12 px-4 sm:px-6 lg:px-8">
+			<div class="max-w-7xl mx-auto">
+				<div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+					<div>
+						<h3 class="text-2xl font-bold text-white mb-4">Scholastic Cloud</h3>
+						<p class="text-gray-400">
+							Modern education management platform for institutions of all sizes.
+						</p>
+					</div>
+					<div>
+						<h4 class="font-semibold text-white mb-4">Product</h4>
+						<ul class="space-y-2">
+							<li><a href="#features" class="hover:text-indigo-400 transition-colors scroll-smooth">Features</a></li>
+							<li><a href="#benefits" class="hover:text-indigo-400 transition-colors scroll-smooth">Pricing</a></li>
+							<li><a href="#features" class="hover:text-indigo-400 transition-colors scroll-smooth">Security</a></li>
+							<li><a href="#cta" class="hover:text-indigo-400 transition-colors scroll-smooth">Get Started</a></li>
+						</ul>
+					</div>
+					<div>
+						<h4 class="font-semibold text-white mb-4">Company</h4>
+						<ul class="space-y-2">
+							<li><a href="#benefits" class="hover:text-indigo-400 transition-colors scroll-smooth">About</a></li>
+							<li><a href="#" class="hover:text-indigo-400 transition-colors">Blog</a></li>
+							<li><a href="#" class="hover:text-indigo-400 transition-colors">Careers</a></li>
+							<li><a href="#cta" class="hover:text-indigo-400 transition-colors scroll-smooth">Contact</a></li>
+						</ul>
+					</div>
+					<div>
+						<h4 class="font-semibold text-white mb-4">Support</h4>
+						<ul class="space-y-2">
+							<li><a href="#" class="hover:text-indigo-400 transition-colors">Documentation</a></li>
+							<li><a href="#" class="hover:text-indigo-400 transition-colors">Help Center</a></li>
+							<li><a href="#" class="hover:text-indigo-400 transition-colors">Community</a></li>
+							<li><a href="#cta" class="hover:text-indigo-400 transition-colors scroll-smooth">Get Support</a></li>
+						</ul>
+					</div>
+				</div>
+				<div class="border-t border-gray-800 pt-8 text-center text-gray-400">
+					<p>&copy; 2024 Scholastic Cloud. All rights reserved.</p>
+				</div>
+			</div>
+		</footer>
+
+		<script>
+			// Enhanced smooth scrolling for anchor links
+			document.addEventListener('DOMContentLoaded', function() {
+				// Handle all anchor links
+				document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+					anchor.addEventListener('click', function (e) {
+						const href = this.getAttribute('href');
+						if (href === '#' || href === '') return;
+						
+						e.preventDefault();
+						const target = document.querySelector(href);
+						
+						if (target) {
+							const headerOffset = 80; // Account for fixed navbar
+							const elementPosition = target.getBoundingClientRect().top;
+							const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+							window.scrollTo({
+								top: offsetPosition,
+								behavior: 'smooth'
+							});
+						}
+					});
+				});
+
+				// Smooth scroll on page load if hash exists
+				if (window.location.hash) {
+					setTimeout(() => {
+						const target = document.querySelector(window.location.hash);
+						if (target) {
+							const headerOffset = 80;
+							const elementPosition = target.getBoundingClientRect().top;
+							const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+							
+							window.scrollTo({
+								top: offsetPosition,
+								behavior: 'smooth'
+							});
+						}
+					}, 100);
+				}
+
+				// Scroll reveal animations (reactbits.dev style)
+				const observerOptions = {
+					threshold: 0.1,
+					rootMargin: '0px 0px -100px 0px'
+				};
+
+				const observer = new IntersectionObserver((entries) => {
+					entries.forEach(entry => {
+						if (entry.isIntersecting) {
+							entry.target.classList.add('active');
+							// Stagger animation for child elements
+							const children = entry.target.querySelectorAll('.reveal-child');
+							children.forEach((child, index) => {
+								setTimeout(() => {
+									child.classList.add('active');
+								}, index * 100);
+							});
+						}
+					});
+				}, observerOptions);
+
+				// Observe all reveal elements
+				document.querySelectorAll('.reveal').forEach(el => {
+					observer.observe(el);
+				});
+
+				// Navbar scroll effect
+				let lastScroll = 0;
+				const navbar = document.getElementById('navbar');
+				window.addEventListener('scroll', () => {
+					const currentScroll = window.pageYOffset;
+					if (currentScroll > 100) {
+						navbar.style.background = 'rgba(255, 255, 255, 0.95)';
+						navbar.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.1)';
+					} else {
+						navbar.style.background = 'rgba(255, 255, 255, 0.80)';
+						navbar.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+					}
+					lastScroll = currentScroll;
+				});
+
+				// Enhanced 3D interactive card tilt effect
+				document.querySelectorAll('.card-3d, .interactive-card').forEach(card => {
+					card.addEventListener('mousemove', (e) => {
+						const rect = card.getBoundingClientRect();
+						const x = e.clientX - rect.left;
+						const y = e.clientY - rect.top;
+						
+						const centerX = rect.width / 2;
+						const centerY = rect.height / 2;
+						
+						const rotateX = (y - centerY) / 15;
+						const rotateY = (centerX - x) / 15;
+						
+						// Enhanced 3D transform with perspective
+						card.style.transform = `perspective(1500px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-8px) translateZ(30px) scale(1.02)`;
+						
+						// Add 3D effect to child elements
+						const icon = card.querySelector('.icon-3d');
+						if (icon) {
+							icon.style.transform = `translateZ(50px) rotateY(${rotateY * 2}deg) rotateX(${rotateX * 2}deg)`;
+						}
+					});
+					
+					card.addEventListener('mouseleave', () => {
+						card.style.transform = '';
+						const icon = card.querySelector('.icon-3d');
+						if (icon) {
+							icon.style.transform = '';
+						}
+					});
+				});
+				
+				// 3D parallax effect on scroll
+				window.addEventListener('scroll', () => {
+					const scrolled = window.pageYOffset;
+					document.querySelectorAll('.parallax-3d').forEach((el, index) => {
+						const speed = 0.5 + (index * 0.1);
+						const yPos = -(scrolled * speed);
+						el.style.transform = `translateY(${yPos}px) translateZ(${scrolled * 0.1}px)`;
+					});
+				});
+				
+				// 3D button press effect
+				document.querySelectorAll('.btn-3d').forEach(btn => {
+					btn.addEventListener('mousedown', () => {
+						btn.style.transform = 'translateZ(0px) scale(0.98)';
+					});
+					btn.addEventListener('mouseup', () => {
+						btn.style.transform = 'translateZ(5px)';
+					});
+				});
+				
+				// Carousel functionality
+				const carousel = document.getElementById('solutionCarousel');
+				const prevBtn = document.querySelector('.carousel-btn-prev');
+				const nextBtn = document.querySelector('.carousel-btn-next');
+				const indicatorsContainer = document.getElementById('carouselIndicators');
+				
+				if (carousel && prevBtn && nextBtn) {
+					const slides = carousel.querySelectorAll('.carousel-slide');
+					let currentIndex = 0;
+					let slidesToShow = 1;
+					let autoPlayInterval;
+					
+					// Determine slides to show based on screen size
+					function updateSlidesToShow() {
+						if (window.innerWidth >= 1024) {
+							slidesToShow = 3;
+						} else if (window.innerWidth >= 768) {
+							slidesToShow = 2;
+						} else {
+							slidesToShow = 1;
+						}
+						updateCarousel();
+					}
+					
+					// Create indicators
+					function createIndicators() {
+						indicatorsContainer.innerHTML = '';
+						const totalSlides = slides.length;
+						const totalIndicators = Math.ceil(totalSlides / slidesToShow);
+						
+						for (let i = 0; i < totalIndicators; i++) {
+							const indicator = document.createElement('button');
+							indicator.className = 'carousel-indicator';
+							indicator.setAttribute('aria-label', `Go to slide ${i + 1}`);
+							indicator.addEventListener('click', () => goToSlide(i));
+							indicatorsContainer.appendChild(indicator);
+						}
+						updateIndicators();
+					}
+					
+					// Update carousel position
+					function updateCarousel() {
+						const slideWidth = 100 / slidesToShow;
+						const translateX = -(currentIndex * slideWidth);
+						carousel.style.transform = `translateX(${translateX}%)`;
+						updateIndicators();
+						updateButtons();
+					}
+					
+					// Update indicators
+					function updateIndicators() {
+						const indicators = indicatorsContainer.querySelectorAll('.carousel-indicator');
+						const activeIndicator = Math.floor(currentIndex / slidesToShow);
+						indicators.forEach((indicator, index) => {
+							if (index === activeIndicator) {
+								indicator.classList.add('active');
+							} else {
+								indicator.classList.remove('active');
+							}
+						});
+					}
+					
+					// Update navigation buttons
+					function updateButtons() {
+						const maxIndex = Math.max(0, slides.length - slidesToShow);
+						prevBtn.disabled = currentIndex === 0;
+						nextBtn.disabled = currentIndex >= maxIndex;
+					}
+					
+					// Go to specific slide
+					function goToSlide(index) {
+						const maxIndex = Math.max(0, slides.length - slidesToShow);
+						currentIndex = Math.max(0, Math.min(index * slidesToShow, maxIndex));
+						updateCarousel();
+						resetAutoPlay();
+					}
+					
+					// Next slide
+					function nextSlide() {
+						const maxIndex = Math.max(0, slides.length - slidesToShow);
+						if (currentIndex < maxIndex) {
+							currentIndex += slidesToShow;
+						} else {
+							currentIndex = 0; // Loop back to start
+						}
+						updateCarousel();
+						resetAutoPlay();
+					}
+					
+					// Previous slide
+					function prevSlide() {
+						if (currentIndex > 0) {
+							currentIndex -= slidesToShow;
+						} else {
+							const maxIndex = Math.max(0, slides.length - slidesToShow);
+							currentIndex = maxIndex; // Loop to end
+						}
+						updateCarousel();
+						resetAutoPlay();
+					}
+					
+					// Auto-play functionality
+					function startAutoPlay() {
+						autoPlayInterval = setInterval(() => {
+							nextSlide();
+						}, 5000); // Change slide every 5 seconds
+					}
+					
+					function stopAutoPlay() {
+						if (autoPlayInterval) {
+							clearInterval(autoPlayInterval);
+						}
+					}
+					
+					function resetAutoPlay() {
+						stopAutoPlay();
+						startAutoPlay();
+					}
+					
+					// Event listeners
+					nextBtn.addEventListener('click', nextSlide);
+					prevBtn.addEventListener('click', prevSlide);
+					
+					// Pause on hover
+					carousel.closest('.carousel-container').addEventListener('mouseenter', stopAutoPlay);
+					carousel.closest('.carousel-container').addEventListener('mouseleave', startAutoPlay);
+					
+					// Touch/swipe support
+					let touchStartX = 0;
+					let touchEndX = 0;
+					
+					carousel.addEventListener('touchstart', (e) => {
+						touchStartX = e.changedTouches[0].screenX;
+					});
+					
+					carousel.addEventListener('touchend', (e) => {
+						touchEndX = e.changedTouches[0].screenX;
+						handleSwipe();
+					});
+					
+					function handleSwipe() {
+						const swipeThreshold = 50;
+						const diff = touchStartX - touchEndX;
+						
+						if (Math.abs(diff) > swipeThreshold) {
+							if (diff > 0) {
+								nextSlide();
+							} else {
+								prevSlide();
+							}
+						}
+					}
+					
+					// Initialize
+					updateSlidesToShow();
+					createIndicators();
+					window.addEventListener('resize', () => {
+						updateSlidesToShow();
+						createIndicators();
+					});
+					
+					// Start auto-play
+					startAutoPlay();
+				}
+			});
+		</script>
 	</body>
 </html>

@@ -1,0 +1,40 @@
+name: Deploy Website to Production
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'website/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Step 3: Install dependencies and build the project
+      - name: Install dependencies and build
+        run: |
+          cd website
+          npm ci
+          npm run build  # This builds your Astro project into the 'dist' folder
+
+      # Step 4: Deploy the dist folder to Hostinger using FTP
+      - name: Deploy to FTP server
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.DEPLOYMENT_SERVER }}
+          username: ${{ secrets.DEPLOYMENT_USERNAME }}
+          password: ${{ secrets.DEPLOYMENT_PASSWORD }}
+          local-dir: website/dist/
+          server-dir: "~/domains/scholastic.cloud/public_html/"
