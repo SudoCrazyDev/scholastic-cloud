@@ -18,10 +18,11 @@ import { ClassRecordTab } from './components/ClassRecordTab'
 import { TopicsTab } from './components/TopicsTab'
 import { CalendarTab } from './components/CalendarTab'
 import { StudentScoresTab } from './components/StudentScoresTab'
+import { AiPlannerTab } from './components/AiPlannerTab'
 import SummativeAssessmentTab from './components/SummativeAssessmentTab'
 import type { Subject, Student, ClassSection } from '../../types'
 
-type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment'
+type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'ai-planner'
 
 // Extend types locally to allow students array on class_section
 interface ClassSectionWithStudents extends ClassSection {
@@ -97,6 +98,11 @@ const SubjectDetail: React.FC = () => {
     {
       id: 'topics' as TabType,
       label: 'Topics',
+      icon: ListBulletIcon,
+    },
+    {
+      id: 'ai-planner' as TabType,
+      label: 'AI Planner',
       icon: ListBulletIcon,
     },
     // {
@@ -207,6 +213,7 @@ const SubjectDetail: React.FC = () => {
           )}
           {activeTab === 'summative-assessment' && <SummativeAssessmentTab subjectId={subject.id} />}
           {activeTab === 'topics' && <TopicsTab subjectId={subject.id} />}
+          {activeTab === 'ai-planner' && <AiPlannerTab subjectId={subject.id} />}
           {activeTab === 'calendar' && <CalendarTab subjectId={subject.id} />}
         </div>
       </div>

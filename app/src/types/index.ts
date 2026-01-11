@@ -298,6 +298,40 @@ export interface Topic {
   updated_at: string;
 }
 
+export interface SubjectQuarterPlan {
+  id: string;
+  subject_id: string;
+  quarter: string; // '1' | '2' | '3' | '4'
+  start_date: string; // YYYY-MM-DD
+  exam_date: string; // YYYY-MM-DD
+  meeting_days?: string[] | null; // e.g. ['monday','wednesday']
+  excluded_dates?: string[] | null; // YYYY-MM-DD
+  quizzes_count: number;
+  assignments_count: number;
+  activities_count: number;
+  projects_count: number;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LessonPlan {
+  id: string;
+  subject_id: string;
+  subject_quarter_plan_id?: string | null;
+  topic_id?: string | null;
+  quarter: string;
+  lesson_date: string; // YYYY-MM-DD
+  title?: string | null;
+  content?: unknown;
+  generated_by?: string | null;
+  generated_by_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  topic?: Topic;
+}
+
 export interface CreateTopicData {
   subject_id: string;
   title: string;

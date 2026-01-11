@@ -134,6 +134,7 @@ class TopicController extends Controller
             'description' => 'nullable|string',
             'order' => 'sometimes|required|integer|min:0',
             'is_completed' => 'boolean',
+            'quarter' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
