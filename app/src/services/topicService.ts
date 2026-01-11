@@ -24,6 +24,15 @@ export interface ReorderTopicsData {
   }>
 }
 
+export interface BulkCreateTopicsData {
+  subject_id: string
+  quarter?: string
+  topics: Array<{
+    title: string
+    description?: string
+  }>
+}
+
 export const topicService = {
   /**
    * Get all topics for a subject
@@ -66,6 +75,19 @@ export const topicService = {
       return response.data.data
     } catch (error) {
       console.error('Error creating topic:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Bulk create topics (recommended for AI generation).
+   */
+  async bulkCreateTopics(data: BulkCreateTopicsData): Promise<Topic[]> {
+    try {
+      const response = await api.post<ApiResponse<Topic[]>>('/topics/bulk', data)
+      return response.data.data
+    } catch (error) {
+      console.error('Error bulk creating topics:', error)
       throw error
     }
   },

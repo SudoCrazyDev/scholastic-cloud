@@ -90,6 +90,16 @@ class Subject extends Model
         return $this->hasMany(Topic::class)->orderBy('order');
     }
 
+    public function quarterPlans(): HasMany
+    {
+        return $this->hasMany(SubjectQuarterPlan::class);
+    }
+
+    public function lessonPlans(): HasMany
+    {
+        return $this->hasMany(LessonPlan::class);
+    }
+
     /**
      * Check if this subject has child subjects
      */

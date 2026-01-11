@@ -130,12 +130,28 @@ Route::middleware('auth.token')->group(function () {
     // Topic routes
     Route::get('topics', [App\Http\Controllers\TopicController::class, 'index']);
     Route::post('topics', [App\Http\Controllers\TopicController::class, 'store']);
+    Route::post('topics/bulk', [App\Http\Controllers\TopicBulkController::class, 'store']);
     Route::get('topics/{id}', [App\Http\Controllers\TopicController::class, 'show']);
     Route::put('topics/{id}', [App\Http\Controllers\TopicController::class, 'update']);
     Route::patch('topics/{id}', [App\Http\Controllers\TopicController::class, 'update']);
     Route::delete('topics/{id}', [App\Http\Controllers\TopicController::class, 'destroy']);
     Route::post('topics/reorder', [App\Http\Controllers\TopicController::class, 'reorder']);
     Route::patch('topics/{id}/toggle-completion', [App\Http\Controllers\TopicController::class, 'toggleCompletion']);
+
+    // Subject quarter plans (AI planner)
+    Route::get('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'showBySubjectAndQuarter']);
+    Route::put('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'upsertBySubjectAndQuarter']);
+
+    // Lesson plans
+    Route::get('lesson-plans', [App\Http\Controllers\LessonPlanController::class, 'index']);
+    Route::get('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'show']);
+    Route::patch('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'update']);
+    Route::delete('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'destroy']);
+
+    // AI planner generation endpoints
+    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/topics/generate', [App\Http\Controllers\AiPlannerController::class, 'generateTopics']);
+    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/lesson-plans/generate', [App\Http\Controllers\AiPlannerController::class, 'generateLessonPlans']);
+    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/assessments/generate', [App\Http\Controllers\AiPlannerController::class, 'generateAssessments']);
     // SubjectEcr routes
     Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class);
     Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class);
