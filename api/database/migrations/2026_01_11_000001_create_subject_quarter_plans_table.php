@@ -3,17 +3,44 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    private function getColumnCharsetAndCollation(string $table, string $column): array
+    {
+        try {
+            $row = DB::selectOne(
+                "SELECT CHARACTER_SET_NAME AS charset, COLLATION_NAME AS collation
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = ?
+                   AND COLUMN_NAME = ?
+                 LIMIT 1",
+                [$table, $column]
+            );
+            if ($row && !empty($row->charset) && !empty($row->collation)) {
+                return [(string)$row->charset, (string)$row->collation];
+            }
+        } catch (\Throwable) {
+            // ignore and fallback
+        }
+
+        // Conservative defaults commonly used by Laravel on MariaDB/MySQL
+        return ['utf8mb4', 'utf8mb4_unicode_ci'];
+    }
+
     /**
      * Run the migrations.
      */
     public function up(): void
     {
+        [$uuidCharset, $uuidCollation] = $this->getColumnCharsetAndCollation('subjects', 'id');
+
         Schema::create('subject_quarter_plans', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('subject_id')->constrained('subjects')->onDelete('cascade');
+            // Match existing subjects.id charset/collation to avoid errno 150 on older databases.
+            $table->char('subject_id', 36)->charset($uuidCharset)->collation($uuidCollation);
 
             // 1..4 (stored as string to match existing Topic.quarter usage)
             $table->string('quarter');
@@ -41,6 +68,10 @@ return new class extends Migration
             $table->unique(['subject_id', 'quarter']);
             $table->index(['subject_id', 'quarter', 'exam_date']);
         });
+
+        Schema::table('subject_quarter_plans', function (Blueprint $table) {
+            $table->foreign('subject_id')->references('id')->on('subjects')->onDelete('cascade');
+        });
     }
 
     /**
@@ -48,6 +79,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('subject_quarter_plans', function (Blueprint $table) {
+            $table->dropForeign(['subject_id']);
+        });
         Schema::dropIfExists('subject_quarter_plans');
     }
 };
