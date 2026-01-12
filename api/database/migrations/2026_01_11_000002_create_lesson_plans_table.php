@@ -26,6 +26,17 @@ return new class extends Migration
             // ignore and fallback
         }
 
+        try {
+            $row = DB::selectOne("SHOW FULL COLUMNS FROM `{$table}` LIKE ?", [$column]);
+            if ($row && !empty($row->Collation)) {
+                $collation = (string)$row->Collation;
+                $charset = explode('_', $collation)[0] ?? 'utf8mb4';
+                return [$charset, $collation];
+            }
+        } catch (\Throwable) {
+            // ignore and fallback
+        }
+
         return ['utf8mb4', 'utf8mb4_unicode_ci'];
     }
 
@@ -40,6 +51,7 @@ return new class extends Migration
         [$topicsCharset, $topicsCollation] = $this->getColumnCharsetAndCollation('topics', 'id');
 
         Schema::create('lesson_plans', function (Blueprint $table) use ($subjectsCharset, $subjectsCollation, $plansCharset, $plansCollation, $topicsCharset, $topicsCollation) {
+            $table->engine = 'InnoDB';
             $table->uuid('id')->primary();
             // Match existing referenced UUID columns' charset/collation to avoid FK errors.
             $table->char('subject_id', 36)->charset($subjectsCharset)->collation($subjectsCollation);
