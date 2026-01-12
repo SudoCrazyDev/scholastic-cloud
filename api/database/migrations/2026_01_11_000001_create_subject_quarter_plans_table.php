@@ -26,7 +26,19 @@ return new class extends Migration
             // ignore and fallback
         }
 
-        // Conservative defaults commonly used by Laravel on MariaDB/MySQL
+        // Fallback: some managed MariaDB users cannot read information_schema.COLUMNS.
+        try {
+            $row = DB::selectOne("SHOW FULL COLUMNS FROM `{$table}` LIKE ?", [$column]);
+            if ($row && !empty($row->Collation)) {
+                $collation = (string)$row->Collation;
+                $charset = explode('_', $collation)[0] ?? 'utf8mb4';
+                return [$charset, $collation];
+            }
+        } catch (\Throwable) {
+            // ignore and fallback
+        }
+
+        // Conservative defaults commonly used by Laravel on MariaDB/MySQL.
         return ['utf8mb4', 'utf8mb4_unicode_ci'];
     }
 
@@ -38,6 +50,8 @@ return new class extends Migration
         [$uuidCharset, $uuidCollation] = $this->getColumnCharsetAndCollation('subjects', 'id');
 
         Schema::create('subject_quarter_plans', function (Blueprint $table) use ($uuidCharset, $uuidCollation) {
+            // Ensure FK support (MariaDB/MySQL): must be InnoDB.
+            $table->engine = 'InnoDB';
             $table->uuid('id')->primary();
             // Match existing subjects.id charset/collation to avoid errno 150 on older databases.
             $table->char('subject_id', 36)->charset($uuidCharset)->collation($uuidCollation);
