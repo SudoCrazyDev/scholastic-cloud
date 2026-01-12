@@ -332,6 +332,43 @@ class AiPlannerController extends Controller
             return response()->json(['success' => false, 'message' => 'Quarter plan not found. Save schedule first.'], 422);
         }
 
+        // Compute lesson dates (meeting days excluding exam day and excluded dates).
+        $meetingDays = $plan->meeting_days ?? [];
+        $excluded = collect($plan->excluded_dates ?? [])->map(fn ($d) => (string)$d)->flip();
+
+        $weekdayMap = [
+            'monday' => Carbon::MONDAY,
+            'tuesday' => Carbon::TUESDAY,
+            'wednesday' => Carbon::WEDNESDAY,
+            'thursday' => Carbon::THURSDAY,
+            'friday' => Carbon::FRIDAY,
+            'saturday' => Carbon::SATURDAY,
+            'sunday' => Carbon::SUNDAY,
+        ];
+        $meetingDow = collect($meetingDays)
+            ->map(fn ($d) => $weekdayMap[strtolower($d)] ?? null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $start = Carbon::parse($plan->start_date)->startOfDay();
+        $exam = Carbon::parse($plan->exam_date)->startOfDay();
+        $examDateStr = $exam->toDateString();
+
+        $lessonDates = [];
+        if ($meetingDow->isNotEmpty()) {
+            $cursor = $start->copy();
+            while ($cursor->lessThanOrEqualTo($exam)) {
+                $dateStr = $cursor->toDateString();
+                $isExcluded = $excluded->has($dateStr);
+                $isMeetingDay = $meetingDow->contains($cursor->dayOfWeek);
+                if (!$isExcluded && $isMeetingDay && $dateStr !== $examDateStr) {
+                    $lessonDates[] = $dateStr;
+                }
+                $cursor->addDay();
+            }
+        }
+
         $subjectEcrId = $validated['subject_ecr_id'] ?? null;
         if (!$subjectEcrId) {
             $firstEcr = SubjectEcr::where('subject_id', $subjectId)->orderBy('created_at')->first();
@@ -429,9 +466,19 @@ class AiPlannerController extends Controller
                         'description' => isset($it['description']) ? (string)$it['description'] : null,
                         'quarter' => $quarterValidated['quarter'],
                         'academic_year' => $academicYear,
+                        'scheduled_date' => null,
                         'score' => $score,
                     ];
                 })->values()->all();
+            }
+
+            // Assign scheduled dates to items (round-robin across lesson days; if no lesson days, leave null).
+            if (!empty($lessonDates)) {
+                $lessonCount = count($lessonDates);
+                foreach ($items as $idx => &$item) {
+                    $item['scheduled_date'] = $lessonDates[$idx % $lessonCount];
+                }
+                unset($item);
             }
 
             $created = [];

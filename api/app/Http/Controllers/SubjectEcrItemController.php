@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Subject;
 use App\Models\SubjectEcrItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
 
 class SubjectEcrItemController extends Controller
 {
@@ -15,10 +18,52 @@ class SubjectEcrItemController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = SubjectEcrItem::query();
-        
-        // Filter by subject_ecr_id if provided (support multiple IDs)
-        if ($request->has('subject_ecr_id')) {
+        $validated = Validator::make($request->all(), [
+            'subject_id' => ['nullable', 'uuid', 'exists:subjects,id'],
+            // Accepts subject_ecr_id as string or array (same behavior as before)
+            'subject_ecr_id' => ['nullable'],
+            'type' => ['nullable', 'string', Rule::in(['quiz', 'assignment', 'activity', 'project', 'exam', 'other'])],
+            'quarter' => ['nullable', 'string', Rule::in(['1', '2', '3', '4'])],
+            'scheduled_date' => ['nullable', 'date_format:Y-m-d'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ])->validate();
+
+        // If subject_id is used, enforce institution access similar to other controllers.
+        if (!empty($validated['subject_id'])) {
+            $authenticatedUser = $request->user();
+            $defaultInstitution = $authenticatedUser->userInstitutions()
+                ->where('is_default', true)
+                ->first();
+
+            if (!$defaultInstitution) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No default institution found for authenticated user'
+                ], 403);
+            }
+
+            $subject = Subject::where('id', $validated['subject_id'])
+                ->where('institution_id', $defaultInstitution->institution_id)
+                ->first();
+
+            if (!$subject) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Subject not found or access denied'
+                ], 404);
+            }
+        }
+
+        $query = SubjectEcrItem::query()->with('subjectEcr');
+
+        if (!empty($validated['subject_id'])) {
+            $query->whereHas('subjectEcr', function ($q) use ($validated) {
+                $q->where('subject_id', $validated['subject_id']);
+            });
+        }
+
+        if (!empty($validated['subject_ecr_id'])) {
             $subjectEcrIds = $request->query('subject_ecr_id');
             if (is_array($subjectEcrIds)) {
                 $query->whereIn('subject_ecr_id', $subjectEcrIds);
@@ -26,18 +71,31 @@ class SubjectEcrItemController extends Controller
                 $query->where('subject_ecr_id', $subjectEcrIds);
             }
         }
-        
-        // Filter by type if provided
-        if ($request->has('type')) {
-            $query->where('type', $request->query('type'));
+
+        if (!empty($validated['type'])) {
+            $query->where('type', $validated['type']);
         }
-        
-        $items = $query->with('subjectEcr')->orderBy('created_at', 'desc')->get();
-        
-        return response()->json([
-            'success' => true,
-            'data' => $items
-        ]);
+
+        if (!empty($validated['quarter'])) {
+            $query->where('quarter', $validated['quarter']);
+        }
+
+        if (!empty($validated['scheduled_date'])) {
+            $query->whereDate('scheduled_date', $validated['scheduled_date']);
+        }
+
+        if (!empty($validated['date_from'])) {
+            $query->whereDate('scheduled_date', '>=', $validated['date_from']);
+        }
+        if (!empty($validated['date_to'])) {
+            $query->whereDate('scheduled_date', '<=', $validated['date_to']);
+        }
+
+        $items = $query->orderByRaw('scheduled_date IS NULL, scheduled_date ASC')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json(['success' => true, 'data' => $items]);
     }
 
     /**
@@ -52,6 +110,7 @@ class SubjectEcrItemController extends Controller
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'quarter' => 'nullable|string',
+                'scheduled_date' => 'nullable|date_format:Y-m-d',
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 
@@ -110,6 +169,7 @@ class SubjectEcrItemController extends Controller
                 'type' => 'nullable|string|max:255',
                 'title' => 'sometimes|required|string|max:255',
                 'description' => 'nullable|string',
+                'scheduled_date' => 'nullable|date_format:Y-m-d',
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 

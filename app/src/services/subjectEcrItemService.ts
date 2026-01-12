@@ -7,6 +7,9 @@ export interface SubjectEcrItem {
   title: string;
   description?: string;
   score?: number;
+  quarter?: string;
+  academic_year?: string;
+  scheduled_date?: string | null; // YYYY-MM-DD
 }
 
 class SubjectEcrItemService {
@@ -18,6 +21,18 @@ class SubjectEcrItemService {
     const response = await api.get(this.baseUrl, {
       params
     });
+    return response.data;
+  }
+
+  async listBySubject(params: {
+    subject_id: string;
+    quarter?: string;
+    scheduled_date?: string;
+    date_from?: string;
+    date_to?: string;
+    type?: string;
+  }) {
+    const response = await api.get(this.baseUrl, { params });
     return response.data;
   }
 
