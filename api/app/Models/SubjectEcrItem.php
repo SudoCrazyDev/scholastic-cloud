@@ -23,11 +23,13 @@ class SubjectEcrItem extends Model
         'description',
         'quarter',
         'academic_year',
+        'scheduled_date',
         'score',
     ];
 
     protected $casts = [
         'score' => 'decimal:2',
+        'scheduled_date' => 'date:Y-m-d',
     ];
 
     /**

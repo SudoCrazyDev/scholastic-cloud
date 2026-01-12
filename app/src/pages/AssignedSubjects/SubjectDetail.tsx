@@ -9,7 +9,8 @@ import {
   AcademicCapIcon,
   BuildingOfficeIcon,
   ListBulletIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline'
 import { useSubjectDetail } from '@hooks'
 import { useQuery } from '@tanstack/react-query'
@@ -19,10 +20,11 @@ import { TopicsTab } from './components/TopicsTab'
 import { CalendarTab } from './components/CalendarTab'
 import { StudentScoresTab } from './components/StudentScoresTab'
 import { AiPlannerTab } from './components/AiPlannerTab'
+import { LessonPlanCalendarTab } from './components/LessonPlanCalendarTab'
 import SummativeAssessmentTab from './components/SummativeAssessmentTab'
 import type { Subject, Student, ClassSection } from '../../types'
 
-type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'ai-planner'
+type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'ai-planner' | 'lesson-plan-calendar'
 
 // Extend types locally to allow students array on class_section
 interface ClassSectionWithStudents extends ClassSection {
@@ -104,6 +106,11 @@ const SubjectDetail: React.FC = () => {
       id: 'ai-planner' as TabType,
       label: 'AI Planner',
       icon: ListBulletIcon,
+    },
+    {
+      id: 'lesson-plan-calendar' as TabType,
+      label: 'Lesson Plan Calendar',
+      icon: CalendarIcon,
     },
     // {
     //   id: 'calendar' as TabType,
@@ -214,6 +221,7 @@ const SubjectDetail: React.FC = () => {
           {activeTab === 'summative-assessment' && <SummativeAssessmentTab subjectId={subject.id} />}
           {activeTab === 'topics' && <TopicsTab subjectId={subject.id} />}
           {activeTab === 'ai-planner' && <AiPlannerTab subjectId={subject.id} />}
+          {activeTab === 'lesson-plan-calendar' && <LessonPlanCalendarTab subjectId={subject.id} />}
           {activeTab === 'calendar' && <CalendarTab subjectId={subject.id} />}
         </div>
       </div>
