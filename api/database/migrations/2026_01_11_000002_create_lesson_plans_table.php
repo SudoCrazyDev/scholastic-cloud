@@ -39,7 +39,7 @@ return new class extends Migration
         [$plansCharset, $plansCollation] = $this->getColumnCharsetAndCollation('subject_quarter_plans', 'id');
         [$topicsCharset, $topicsCollation] = $this->getColumnCharsetAndCollation('topics', 'id');
 
-        Schema::create('lesson_plans', function (Blueprint $table) {
+        Schema::create('lesson_plans', function (Blueprint $table) use ($subjectsCharset, $subjectsCollation, $plansCharset, $plansCollation, $topicsCharset, $topicsCollation) {
             $table->uuid('id')->primary();
             // Match existing referenced UUID columns' charset/collation to avoid FK errors.
             $table->char('subject_id', 36)->charset($subjectsCharset)->collation($subjectsCollation);

@@ -37,7 +37,7 @@ return new class extends Migration
     {
         [$uuidCharset, $uuidCollation] = $this->getColumnCharsetAndCollation('subjects', 'id');
 
-        Schema::create('subject_quarter_plans', function (Blueprint $table) {
+        Schema::create('subject_quarter_plans', function (Blueprint $table) use ($uuidCharset, $uuidCollation) {
             $table->uuid('id')->primary();
             // Match existing subjects.id charset/collation to avoid errno 150 on older databases.
             $table->char('subject_id', 36)->charset($uuidCharset)->collation($uuidCollation);
