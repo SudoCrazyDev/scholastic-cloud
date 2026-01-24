@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { ApiResponse, LessonPlan } from '../types'
+import type { ApiResponse } from '../types'
 
 export interface AiTopicSuggestion {
   title: string

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/button'
 import { Input } from '@/components/input'
 import { Alert } from '@/components/alert'
-import { Fieldset, Field, Label } from '@/components/fieldset'
+import { Field, Label } from '@/components/fieldset'
 import { Divider } from '@/components/divider'
 import type { SubjectQuarterPlan } from '@/types'
 import { aiPlannerService } from '@/services/aiPlannerService'
@@ -63,7 +63,6 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
   const [busy, setBusy] = useState(false)
   const [generatingLessonPlans, setGeneratingLessonPlans] = useState(false)
   const [generationProgress, setGenerationProgress] = useState<number>(0)
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null)
 
   // Clear per-quarter suggestions/messages when switching quarters to prevent confusion.
   React.useEffect(() => {
@@ -265,7 +264,6 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
           setGeneratingLessonPlans(false)
           setBusy(false)
           setGenerationProgress(0)
-          setCurrentTaskId(null)
           await lessonPlansQuery.refetch()
           return
         }
@@ -275,7 +273,6 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
           setGeneratingLessonPlans(false)
           setBusy(false)
           setGenerationProgress(0)
-          setCurrentTaskId(null)
           return
         }
 
@@ -306,7 +303,6 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
     
     try {
       const result = await aiPlannerService.generateLessonPlans(subjectId, quarter, overwrite)
-      setCurrentTaskId(result.task_id)
       setSuccess('Lesson plan generation started. Monitoring progress...')
       
       // Start polling
@@ -429,7 +425,7 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
 
       {/* Expandable Sections */}
       <div className="space-y-4">
-        {sections.map((section, idx) => {
+        {sections.map((section) => {
           const Icon = section.icon
           const isExpanded = expandedSections[section.id]
           

@@ -542,9 +542,9 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
                 {/* Lesson Plan */}
                 <div>
                   <LessonPlanViewer
-                    title={selectedLessonPlan?.title}
+                    title={selectedLessonPlan?.title ?? undefined}
                     date={selectedYmd || undefined}
-                    content={selectedLessonPlan?.content}
+                    content={selectedLessonPlan?.content as any}
                   />
                 </div>
 

@@ -91,6 +91,7 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
         total_score: gradeItem.score || 10,
         subject_ecr_id: gradeItem.subject_ecr_id || '',
         quarter: gradeItem.quarter || '1',
+        type: gradeItem.type || '',
       })
     }
   }, [gradeItem])
