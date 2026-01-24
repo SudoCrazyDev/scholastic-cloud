@@ -29,7 +29,8 @@ class UserFactory extends Factory
             'email' => "philiplouis0717@gmail.com",
             'email_verified_at' => now(),
             'birthdate' => fake()->date(),
-            'password' => Hash::make('password')
+            'password' => Hash::make('password'),
+            'is_new' => true,
         ];
     }
 

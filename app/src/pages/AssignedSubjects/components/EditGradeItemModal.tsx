@@ -21,6 +21,7 @@ interface EditGradeItemModalProps {
     score?: number
     subject_ecr_id: string
     quarter?: string
+    type?: string
   } | null
 }
 
@@ -42,6 +43,7 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
       total_score: gradeItem?.score || 10,
       subject_ecr_id: gradeItem?.subject_ecr_id || '',
       quarter: gradeItem?.quarter || '1',
+      type: gradeItem?.type || '',
     },
     validationSchema: Yup.object({
       title: Yup.string().required('Title is required'),
@@ -49,6 +51,7 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
       total_score: Yup.number().min(1).required('Total score is required'),
       subject_ecr_id: Yup.string().required('Component is required'),
       quarter: Yup.string().required('Quarter is required'),
+      type: Yup.string(),
     }),
     onSubmit: async (values, { resetForm, setSubmitting, setErrors }) => {
       if (!gradeItem?.id) {
@@ -57,14 +60,12 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
       }
 
       try {
-        // Find the selected subject_ecr to infer type if possible
-        const selectedEcr = subjectEcrs.find((ecr: any) => ecr.id === values.subject_ecr_id)
         await updateMutation.mutateAsync({
           id: gradeItem.id,
           data: {
             ...values,
             subject_ecr_id: values.subject_ecr_id,
-            ...(selectedEcr?.type ? { type: selectedEcr.type } : {}),
+            ...(values.type ? { type: values.type } : {}),
             title: values.title,
             description: values.description,
             score: values.total_score,
@@ -231,6 +232,27 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
                       <div className="text-xs text-red-600 mt-1">{formik.errors.quarter}</div>
                     )}
                   </div>
+                </div>
+
+                {/* Type */}
+                <div>
+                  <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">
+                    Type (Optional)
+                  </label>
+                  <select
+                    id="type"
+                    {...formik.getFieldProps('type')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">Select Type...</option>
+                    <option value="quiz">📝 Quiz</option>
+                    <option value="assignment">📋 Assignment</option>
+                    <option value="activity">✏️ Activity</option>
+                    <option value="project">🎯 Project</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Helps identify the assessment type (Quiz, Assignment, Activity, or Project)
+                  </p>
                 </div>
 
                 {/* Error Message */}

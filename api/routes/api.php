@@ -152,6 +152,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('ai/subjects/{subjectId}/quarters/{quarter}/topics/generate', [App\Http\Controllers\AiPlannerController::class, 'generateTopics']);
     Route::post('ai/subjects/{subjectId}/quarters/{quarter}/lesson-plans/generate', [App\Http\Controllers\AiPlannerController::class, 'generateLessonPlans']);
     Route::post('ai/subjects/{subjectId}/quarters/{quarter}/assessments/generate', [App\Http\Controllers\AiPlannerController::class, 'generateAssessments']);
+    Route::get('ai/generation-tasks/{taskId}/status', [App\Http\Controllers\AiPlannerController::class, 'checkGenerationStatus']);
     // SubjectEcr routes
     Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class);
     Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class);

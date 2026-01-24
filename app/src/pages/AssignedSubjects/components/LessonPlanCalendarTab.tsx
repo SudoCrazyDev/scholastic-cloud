@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, PrinterIcon } from '@heroicons/react/24/outline'
 import { Button } from '@/components/button'
 import { Alert } from '@/components/alert'
-import { Dialog, DialogActions, DialogBody, DialogTitle } from '@/components/dialog'
 import type { LessonPlan } from '@/types'
 import { lessonPlanService } from '@/services/lessonPlanService'
 import { subjectEcrItemService, type SubjectEcrItem } from '@/services/subjectEcrItemService'
+import { LessonPlanViewer } from './LessonPlanViewer'
+import { QuizQuestionsViewer } from './QuizQuestionsViewer'
 
 interface LessonPlanCalendarTabProps {
   subjectId: string
@@ -46,6 +47,55 @@ function countByType(items: SubjectEcrItem[]) {
     counts[t] = (counts[t] ?? 0) + 1
   }
   return counts
+}
+
+// Type badge component
+const TypeBadge: React.FC<{ type?: string }> = ({ type }) => {
+  if (!type) return null
+  
+  const getTypeConfig = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'quiz':
+        return {
+          label: 'Quiz',
+          className: 'bg-blue-100 text-blue-800 border-blue-300',
+          icon: '📝'
+        }
+      case 'assignment':
+        return {
+          label: 'Assignment',
+          className: 'bg-purple-100 text-purple-800 border-purple-300',
+          icon: '📋'
+        }
+      case 'activity':
+        return {
+          label: 'Activity',
+          className: 'bg-green-100 text-green-800 border-green-300',
+          icon: '✏️'
+        }
+      case 'project':
+        return {
+          label: 'Project',
+          className: 'bg-orange-100 text-orange-800 border-orange-300',
+          icon: '🎯'
+        }
+      default:
+        return {
+          label: type,
+          className: 'bg-gray-100 text-gray-800 border-gray-300',
+          icon: '📄'
+        }
+    }
+  }
+
+  const config = getTypeConfig(type)
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}>
+      <span>{config.icon}</span>
+      <span>{config.label}</span>
+    </span>
+  )
 }
 
 export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ subjectId }) => {
@@ -125,14 +175,167 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
     return out
   }, [monthStart, monthEnd])
 
+  const generateLessonPlanHTML = (content: any): string => {
+    if (!content) return '<p>No lesson plan content available.</p>'
+
+    const objectives = content.learning_objectives || content.objectives || []
+    const materials = content.subject_matter?.materials || content.materials || []
+    const references = content.subject_matter?.references || []
+    const assignment = content.assignment || content.homework || ''
+
+    let html = ''
+
+    // I. LEARNING OBJECTIVES
+    if (objectives.length > 0) {
+      html += `
+        <div style="margin-bottom: 16px;">
+          <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">I. LEARNING OBJECTIVES</h2>
+          <p style="font-size: 14px; margin-bottom: 8px;">At the end of the lesson, learners are expected to:</p>
+          <ol style="margin-left: 24px; font-size: 14px;">
+            ${objectives.map((obj: string) => `<li style="margin-bottom: 4px;">${obj}</li>`).join('')}
+          </ol>
+        </div>
+      `
+    }
+
+    // II. SUBJECT MATTER
+    if (content.subject_matter?.topic || materials.length > 0) {
+      html += `<div style="margin-bottom: 16px;">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">II. SUBJECT MATTER</h2>`
+      if (content.subject_matter?.topic) {
+        html += `<p style="font-size: 14px; margin-left: 16px;"><strong>Topic:</strong> ${content.subject_matter.topic}</p>`
+      }
+      if (materials.length > 0) {
+        html += `<p style="font-size: 14px; margin-left: 16px; margin-top: 8px;"><strong>Materials:</strong></p>
+          <ul style="margin-left: 32px; font-size: 14px;">
+            ${materials.map((mat: string) => `<li>${mat}</li>`).join('')}
+          </ul>`
+      }
+      if (references.length > 0) {
+        html += `<p style="font-size: 14px; margin-left: 16px; margin-top: 8px;"><strong>References:</strong></p>
+          <ul style="margin-left: 32px; font-size: 14px;">
+            ${references.map((ref: string) => `<li>${ref}</li>`).join('')}
+          </ul>`
+      }
+      html += `</div>`
+    }
+
+    // III. PROCEDURE
+    if (content.procedure) {
+      html += `<div style="margin-bottom: 16px;">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">III. PROCEDURE</h2>`
+      
+      // Introduction
+      if (content.procedure.introduction) {
+        html += `<div style="margin-left: 16px; margin-bottom: 12px;">
+          <h3 style="font-size: 14px; font-weight: bold;">A. Introduction (${content.procedure.introduction.time_minutes || 10} minutes)</h3>`
+        if (content.procedure.introduction.activity_name) {
+          html += `<p style="font-size: 14px; margin-top: 4px;"><strong>Activity:</strong> '${content.procedure.introduction.activity_name}'</p>`
+        }
+        if (content.procedure.introduction.steps) {
+          html += `<ol style="margin-left: 24px; font-size: 14px; margin-top: 4px;">
+            ${content.procedure.introduction.steps.map((step: string) => `<li style="margin-bottom: 4px;">${step}</li>`).join('')}
+          </ol>`
+        }
+        html += `</div>`
+      }
+
+      // Presentation
+      if (content.procedure.presentation?.discussion_points) {
+        html += `<div style="margin-left: 16px; margin-bottom: 12px;">
+          <h3 style="font-size: 14px; font-weight: bold;">B. Presentation / Discussion (${content.procedure.presentation.time_minutes || 20} minutes)</h3>
+          <ol style="margin-left: 24px; font-size: 14px; margin-top: 4px;">
+            ${content.procedure.presentation.discussion_points.map((point: string) => `<li style="margin-bottom: 4px;">${point}</li>`).join('')}
+          </ol>
+        </div>`
+      }
+
+      // Guided Practice
+      if (content.procedure.guided_practice) {
+        html += `<div style="margin-left: 16px; margin-bottom: 12px;">
+          <h3 style="font-size: 14px; font-weight: bold;">C. Guided Practice (${content.procedure.guided_practice.time_minutes || 20} minutes)</h3>`
+        if (content.procedure.guided_practice.activity_name) {
+          html += `<p style="font-size: 14px; margin-top: 4px;"><strong>Activity:</strong> '${content.procedure.guided_practice.activity_name}'</p>`
+        }
+        if (content.procedure.guided_practice.instructions) {
+          html += `<ol style="margin-left: 24px; font-size: 14px; margin-top: 4px;">
+            ${content.procedure.guided_practice.instructions.map((inst: string) => `<li style="margin-bottom: 4px;">${inst}</li>`).join('')}
+          </ol>`
+        }
+        html += `</div>`
+      }
+
+      // Independent Practice
+      if (content.procedure.independent_practice) {
+        html += `<div style="margin-left: 16px; margin-bottom: 12px;">
+          <h3 style="font-size: 14px; font-weight: bold;">D. Independent Practice (${content.procedure.independent_practice.time_minutes || 15} minutes)</h3>`
+        if (content.procedure.independent_practice.activity_name) {
+          html += `<p style="font-size: 14px; margin-top: 4px;"><strong>Activity:</strong> '${content.procedure.independent_practice.activity_name}'</p>`
+        }
+        if (content.procedure.independent_practice.tasks) {
+          html += `<ol style="margin-left: 24px; font-size: 14px; margin-top: 4px;">
+            ${content.procedure.independent_practice.tasks.map((task: string) => `<li style="margin-bottom: 4px;">${task}</li>`).join('')}
+          </ol>`
+        }
+        html += `</div>`
+      }
+
+      // Generalization
+      if (content.procedure.generalization?.key_questions) {
+        html += `<div style="margin-left: 16px; margin-bottom: 12px;">
+          <h3 style="font-size: 14px; font-weight: bold;">E. Generalization (${content.procedure.generalization.time_minutes || 5} minutes)</h3>
+          <p style="font-size: 14px; margin-top: 4px; margin-left: 16px;"><strong>Ask:</strong></p>
+          <ul style="margin-left: 32px; font-size: 14px; margin-top: 4px;">
+            ${content.procedure.generalization.key_questions.map((q: string) => `<li style="margin-bottom: 4px;">${q}</li>`).join('')}
+          </ul>
+        </div>`
+      }
+      
+      html += `</div>`
+    }
+
+    // IV. EVALUATION
+    if (content.evaluation?.items?.length > 0) {
+      html += `<div style="margin-bottom: 16px;">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">IV. EVALUATION</h2>
+        <p style="font-size: 14px; margin-left: 16px; margin-bottom: 8px;"><strong>${content.evaluation.type || 'Multiple Choice'}</strong>. Choose the correct answer.</p>
+        <div style="margin-left: 16px;">`
+      content.evaluation.items.forEach((item: any, idx: number) => {
+        html += `<div style="margin-bottom: 12px;">
+          <p style="font-size: 14px;"><strong>${idx + 1}.</strong> ${item.question}</p>`
+        if (item.choices) {
+          html += `<div style="margin-left: 24px; font-size: 14px; margin-top: 4px;">
+            ${item.choices.map((choice: string) => `<div>${choice}</div>`).join('')}
+          </div>`
+        }
+        if (item.answer) {
+          html += `<p style="font-size: 12px; color: green; margin-left: 24px; margin-top: 4px;"><strong>Answer:</strong> ${item.answer}</p>`
+        }
+        html += `</div>`
+      })
+      html += `</div></div>`
+    }
+
+    // V. ASSIGNMENT
+    if (assignment) {
+      html += `<div style="margin-bottom: 16px;">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">V. ASSIGNMENT</h2>
+        <p style="font-size: 14px; margin-left: 16px;">${assignment}</p>
+      </div>`
+    }
+
+    return html
+  }
+
   const handlePrintDay = () => {
     if (!selectedYmd) return
     const win = window.open('', '_blank', 'noopener,noreferrer')
     if (!win) return
 
     const title = selectedLessonPlan?.title ?? `Lesson Plan (${selectedYmd})`
+    const lessonPlanHtml = generateLessonPlanHTML(selectedLessonPlan?.content)
     const itemsHtml = selectedItems
-      .map((it) => `<li><strong>${(it.type ?? 'item').toUpperCase()}</strong>: ${it.title}</li>`)
+      .map((it) => `<li><strong>${(it.type ?? 'item').toUpperCase()}</strong>: ${it.title} ${it.score ? `(${it.score} pts)` : ''}</li>`)
       .join('')
 
     win.document.write(`
@@ -140,21 +343,65 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
         <head>
           <title>${title}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 24px; }
-            h1 { font-size: 18px; margin: 0 0 8px; }
-            h2 { font-size: 14px; margin: 16px 0 8px; }
-            pre { white-space: pre-wrap; word-wrap: break-word; }
-            .muted { color: #666; font-size: 12px; }
+            @media print {
+              @page { margin: 1cm; }
+            }
+            body { 
+              font-family: 'Times New Roman', Times, serif; 
+              padding: 24px;
+              max-width: 210mm;
+              margin: 0 auto;
+              line-height: 1.6;
+            }
+            h1 { 
+              font-size: 20px; 
+              margin: 0 0 4px; 
+              text-align: center;
+              text-transform: uppercase;
+              border-bottom: 2px solid #000;
+              padding-bottom: 8px;
+            }
+            h2 { 
+              font-size: 16px; 
+              margin: 16px 0 8px;
+              font-weight: bold;
+            }
+            h3 {
+              font-size: 14px;
+              font-weight: bold;
+              margin: 8px 0 4px;
+            }
+            .meta { 
+              text-align: center;
+              color: #333; 
+              font-size: 14px;
+              margin-bottom: 16px;
+            }
+            .items-section {
+              margin-top: 24px;
+              padding-top: 16px;
+              border-top: 1px solid #ccc;
+            }
           </style>
         </head>
         <body>
           <h1>${title}</h1>
-          <div class="muted">${selectedYmd}</div>
-          <h2>Daily Lesson Plan</h2>
-          <pre>${selectedLessonPlan?.content ? JSON.stringify(selectedLessonPlan.content, null, 2) : 'No lesson plan saved for this day.'}</pre>
-          <h2>Scheduled items</h2>
-          <ul>${itemsHtml || '<li>None</li>'}</ul>
-          <script>window.onload = () => window.print();</script>
+          <div class="meta">Date: ${selectedYmd}</div>
+          
+          ${lessonPlanHtml}
+          
+          ${selectedItems.length > 0 ? `
+            <div class="items-section">
+              <h2>Scheduled Assessment Items</h2>
+              <ul>${itemsHtml}</ul>
+            </div>
+          ` : ''}
+          
+          <script>
+            window.onload = () => {
+              setTimeout(() => window.print(), 250);
+            };
+          </script>
         </body>
       </html>
     `)
@@ -257,59 +504,101 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
         })}
       </div>
 
-      <Dialog open={!!selectedDate} onClose={() => setSelectedDate(null)} size="2xl">
-        <DialogTitle>{selectedDate ? dayLabel(selectedDate) : 'Day'}</DialogTitle>
-        <DialogBody>
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm font-semibold text-gray-900">Daily Lesson Plan</div>
-              <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-3 text-xs">
-                {selectedLessonPlan?.title ? (
-                  <div className="mb-2 text-sm font-medium text-gray-900">{selectedLessonPlan.title}</div>
-                ) : null}
-                {selectedLessonPlan?.content ? (
-                  <pre className="whitespace-pre-wrap">{JSON.stringify(selectedLessonPlan.content, null, 2)}</pre>
-                ) : (
-                  <div className="text-gray-600">No lesson plan saved for this day.</div>
+      {/* Custom Full-Screen Light Mode Dialog for Lesson Plan Viewing */}
+      {selectedDate && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 backdrop-blur-sm">
+          <div className="min-h-screen px-4 py-8 flex items-start justify-center">
+            <div className="relative w-full max-w-6xl bg-white rounded-lg shadow-2xl">
+              {/* Header */}
+              <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {selectedDate ? dayLabel(selectedDate) : 'Day'}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    {selectedLessonPlan?.title || 'Lesson Plan & Assessments'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button type="button" onClick={handlePrintDay} disabled={!selectedYmd}>
+                    <PrinterIcon className="h-4 w-4 mr-2" />
+                    Print / Export
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(null)}
+                    className="rounded-full p-2 hover:bg-gray-100 transition-colors"
+                    aria-label="Close"
+                  >
+                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+                {/* Lesson Plan */}
+                <div>
+                  <LessonPlanViewer
+                    title={selectedLessonPlan?.title}
+                    date={selectedYmd || undefined}
+                    content={selectedLessonPlan?.content}
+                  />
+                </div>
+
+                {/* Scheduled Assessments */}
+                {selectedItems.length > 0 && (
+                  <div className="border-t border-gray-200 pt-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <CalendarIcon className="w-5 h-5 text-indigo-600" />
+                      Scheduled Assessments for this Day
+                    </h3>
+                    <div className="space-y-4">
+                      {selectedItems.map((it) => (
+                        <div key={it.id ?? it.title} className="rounded-lg border border-gray-200 bg-gray-50 p-5 hover:shadow-md transition-shadow">
+                          <div className="flex items-center gap-2 mb-3">
+                            <TypeBadge type={it.type} />
+                            {typeof it.score === 'number' && (
+                              <span className="text-sm font-semibold text-indigo-600">
+                                {it.score} points
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="text-base font-semibold text-gray-900 mb-2">{it.title}</h4>
+                          {it.description && (
+                            <p className="text-sm text-gray-600 mb-3">{it.description}</p>
+                          )}
+                          
+                          {it.content?.questions && it.content.questions.length > 0 && (
+                            <QuizQuestionsViewer
+                              questions={it.content.questions}
+                              showAnswers={true}
+                              title={`${it.type === 'quiz' ? 'Quiz' : 'Activity'} Questions`}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
 
-            <div>
-              <div className="text-sm font-semibold text-gray-900">Scheduled quizzes / assignments / activities / projects</div>
-              <div className="mt-2 rounded border border-gray-200 bg-white p-3 text-sm">
-                {selectedItems.length === 0 ? (
-                  <div className="text-gray-600">None scheduled.</div>
-                ) : (
-                  <ul className="space-y-2">
-                    {selectedItems.map((it) => (
-                      <li key={it.id ?? it.title} className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold text-gray-700">{(it.type ?? 'item').toUpperCase()}</div>
-                          <div className="text-sm font-medium text-gray-900">{it.title}</div>
-                          {it.description && <div className="text-xs text-gray-600">{it.description}</div>}
-                        </div>
-                        {typeof it.score === 'number' ? (
-                          <div className="text-xs text-gray-500">Score: {it.score}</div>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              {/* Footer */}
+              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-lg flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setSelectedDate(null)}>
+                  Close
+                </Button>
+                <Button type="button" color="primary" onClick={handlePrintDay} disabled={!selectedYmd}>
+                  <PrinterIcon className="h-4 w-4 mr-2" />
+                  Print Day
+                </Button>
               </div>
             </div>
           </div>
-        </DialogBody>
-        <DialogActions>
-          <Button type="button" variant="outline" color="primary" onClick={() => setSelectedDate(null)}>
-            Close
-          </Button>
-          <Button type="button" onClick={handlePrintDay} disabled={!selectedYmd}>
-            <PrinterIcon className="h-4 w-4 mr-2" />
-            Print day
-          </Button>
-        </DialogActions>
-      </Dialog>
+        </div>
+      )}
     </div>
   )
 }

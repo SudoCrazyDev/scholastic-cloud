@@ -6,6 +6,13 @@ export interface SubjectEcrItem {
   type?: string;
   title: string;
   description?: string;
+  content?: {
+    questions?: Array<{
+      question: string;
+      choices?: string[];
+      answer?: string;
+    }>;
+  };
   score?: number;
   quarter?: string;
   academic_year?: string;

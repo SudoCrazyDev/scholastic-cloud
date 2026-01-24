@@ -21,6 +21,7 @@ class SubjectEcrItem extends Model
         'type',
         'title',
         'description',
+        'content',
         'quarter',
         'academic_year',
         'scheduled_date',
@@ -28,6 +29,7 @@ class SubjectEcrItem extends Model
     ];
 
     protected $casts = [
+        'content' => 'array',
         'score' => 'decimal:2',
         'scheduled_date' => 'date:Y-m-d',
     ];

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\GenerateLessonPlansJob;
+use App\Models\AiGenerationTask;
 use App\Models\LessonPlan;
 use App\Models\Subject;
 use App\Models\SubjectEcr;
@@ -20,7 +22,6 @@ class AiPlannerController extends Controller
 {
     /**
      * Generate topic suggestions (no persistence).
-     * Note: This is a deterministic placeholder generator; can be swapped with a real LLM later.
      */
     public function generateTopics(Request $request, string $subjectId, string $quarter): JsonResponse
     {
@@ -49,12 +50,14 @@ class AiPlannerController extends Controller
         $count = $validated['count'] ?? 10;
         $subjectTitle = trim(($subject->title ?? '') . ' ' . ($subject->variant ?? ''));
         $subjectTitle = trim($subjectTitle) ?: 'the subject';
+        $gradeLevel = $subject->classSection?->grade_level ?? null;
 
         $ai = AiManager::make();
         $raw = $ai->generateTopics([
             'subject_title' => $subjectTitle,
             'quarter' => $quarterValidated['quarter'],
             'count' => $count,
+            'grade_level' => $gradeLevel,
         ]);
 
         $topics = $raw['topics'] ?? [];
@@ -82,7 +85,8 @@ class AiPlannerController extends Controller
     }
 
     /**
-     * Generate and persist lesson plans for a subject + quarter based on the saved quarter plan and topics.
+     * Generate and persist lesson plans for a subject + quarter (background job).
+     * Returns immediately with a task_id for polling progress.
      */
     public function generateLessonPlans(Request $request, string $subjectId, string $quarter): JsonResponse
     {
@@ -128,171 +132,65 @@ class AiPlannerController extends Controller
             return response()->json(['success' => false, 'message' => 'No topics found for this quarter. Add or generate topics first.'], 422);
         }
 
-        $excluded = collect($plan->excluded_dates ?? [])->map(fn ($d) => (string)$d)->flip();
-        $start = Carbon::parse($plan->start_date)->startOfDay();
-        $exam = Carbon::parse($plan->exam_date)->startOfDay();
+        // Create a task record for background processing
+        $task = AiGenerationTask::create([
+            'type' => 'lesson_plans',
+            'subject_id' => $subjectId,
+            'quarter' => $quarterValidated['quarter'],
+            'user_id' => $user->id,
+            'status' => 'pending',
+        ]);
 
-        $weekdayMap = [
-            'monday' => Carbon::MONDAY,
-            'tuesday' => Carbon::TUESDAY,
-            'wednesday' => Carbon::WEDNESDAY,
-            'thursday' => Carbon::THURSDAY,
-            'friday' => Carbon::FRIDAY,
-            'saturday' => Carbon::SATURDAY,
-            'sunday' => Carbon::SUNDAY,
+        // Dispatch the job to background queue
+        GenerateLessonPlansJob::dispatch(
+            $task->id,
+            $subjectId,
+            $quarterValidated['quarter'],
+            !empty($validated['overwrite']),
+            $user->id
+        );
+
+        return response()->json([
+            'success' => true,
+            'task_id' => $task->id,
+            'message' => 'Lesson plan generation started in background. Use the task_id to check progress.',
+        ]);
+    }
+
+    /**
+     * Check the status of an AI generation task.
+     */
+    public function checkGenerationStatus(Request $request, string $taskId): JsonResponse
+    {
+        $task = AiGenerationTask::find($taskId);
+        if (!$task) {
+            return response()->json(['success' => false, 'message' => 'Task not found'], 404);
+        }
+
+        // Only allow users to check their own tasks
+        if ($task->user_id !== $request->user()->id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $response = [
+            'success' => true,
+            'task' => [
+                'id' => $task->id,
+                'type' => $task->type,
+                'status' => $task->status,
+                'total_items' => $task->total_items,
+                'processed_items' => $task->processed_items,
+                'progress_percentage' => $task->total_items > 0 
+                    ? round(($task->processed_items / $task->total_items) * 100) 
+                    : 0,
+                'result' => $task->result,
+                'error_message' => $task->error_message,
+                'created_at' => $task->created_at,
+                'updated_at' => $task->updated_at,
+            ],
         ];
-        $meetingDow = collect($meetingDays)
-            ->map(fn ($d) => $weekdayMap[strtolower($d)] ?? null)
-            ->filter()
-            ->unique()
-            ->values();
 
-        if ($meetingDow->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'Invalid meeting days provided.'], 422);
-        }
-
-        $sessionDates = [];
-        $cursor = $start->copy();
-        while ($cursor->lessThanOrEqualTo($exam)) {
-            $dateStr = $cursor->toDateString();
-            $isExcluded = $excluded->has($dateStr);
-            $isMeetingDay = $meetingDow->contains($cursor->dayOfWeek);
-
-            // Generate lesson plans on meeting days, but reserve exam_date for the exam entry.
-            if (!$isExcluded && $isMeetingDay && $dateStr !== $exam->toDateString()) {
-                $sessionDates[] = $dateStr;
-            }
-            $cursor->addDay();
-        }
-
-        // Always include an explicit exam-day entry.
-        $examDateStr = $exam->toDateString();
-
-        DB::beginTransaction();
-        try {
-            if (!empty($validated['overwrite'])) {
-                LessonPlan::where('subject_id', $subjectId)
-                    ->where('quarter', $quarterValidated['quarter'])
-                    ->delete();
-            }
-
-            $created = [];
-            $topicIndex = 0;
-            $ai = AiManager::make();
-            foreach ($sessionDates as $i => $dateStr) {
-                $topic = $topics[$topicIndex % $topics->count()];
-                $topicIndex++;
-
-                $content = $ai->generateLessonPlanContent([
-                    'subject_title' => trim(($subject->title ?? '') . ' ' . ($subject->variant ?? '')),
-                    'quarter' => $quarterValidated['quarter'],
-                    'lesson_date' => $dateStr,
-                    'topic_title' => $topic->title,
-                ]);
-
-                // Validate lesson plan content minimally (don’t fail hard; fallback to template if invalid).
-                $contentValidator = Validator::make(['content' => $content], [
-                    'content' => ['required', 'array'],
-                    'content.kind' => ['nullable', 'string'],
-                    'content.objectives' => ['nullable', 'array'],
-                    'content.objectives.*' => ['string'],
-                    'content.materials' => ['nullable', 'array'],
-                    'content.materials.*' => ['string'],
-                    'content.procedure' => ['nullable', 'array'],
-                    'content.procedure.*' => ['string'],
-                ]);
-                if ($contentValidator->fails()) {
-                    $content = [
-                        'kind' => 'lesson',
-                        'topic' => [
-                            'id' => $topic->id,
-                            'title' => $topic->title,
-                        ],
-                        'objectives' => [
-                            "Explain key ideas from '{$topic->title}'.",
-                            "Apply the concept through guided practice.",
-                        ],
-                        'materials' => [
-                            'Learner’s material / textbook',
-                            'Board/markers or slides',
-                        ],
-                        'procedure' => [
-                            'Review of previous lesson',
-                            'Motivation / engagement activity',
-                            'Discussion / demonstration',
-                            'Guided practice',
-                            'Independent practice',
-                            'Wrap-up / reflection',
-                        ],
-                        'assessment' => [
-                            'exit_ticket' => 'Short formative check (5 items).',
-                        ],
-                        'homework' => 'Practice exercises related to the topic.',
-                    ];
-                }
-
-                $payload = [
-                    'subject_id' => $subjectId,
-                    'subject_quarter_plan_id' => $plan->id,
-                    'topic_id' => $topic->id,
-                    'quarter' => $quarterValidated['quarter'],
-                    'lesson_date' => $dateStr,
-                    'title' => 'Lesson ' . ($i + 1) . ': ' . $topic->title,
-                    'content' => $content,
-                    'generated_by' => 'ai',
-                    'generated_by_user_id' => $user?->id,
-                ];
-
-                $created[] = LessonPlan::updateOrCreate(
-                    [
-                        'subject_id' => $subjectId,
-                        'quarter' => $quarterValidated['quarter'],
-                        'lesson_date' => $dateStr,
-                    ],
-                    $payload
-                );
-            }
-
-            // Upsert the exam day entry
-            $created[] = LessonPlan::updateOrCreate(
-                [
-                    'subject_id' => $subjectId,
-                    'quarter' => $quarterValidated['quarter'],
-                    'lesson_date' => $examDateStr,
-                ],
-                [
-                    'subject_id' => $subjectId,
-                    'subject_quarter_plan_id' => $plan->id,
-                    'topic_id' => null,
-                    'quarter' => $quarterValidated['quarter'],
-                    'lesson_date' => $examDateStr,
-                    'title' => "Quarter {$quarterValidated['quarter']} Exam",
-                    'content' => [
-                        'kind' => 'exam',
-                        'notes' => 'Summative assessment day.',
-                    ],
-                    'generated_by' => 'ai',
-                    'generated_by_user_id' => $user?->id,
-                ]
-            );
-
-            DB::commit();
-
-            $createdFresh = LessonPlan::with(['topic'])
-                ->where('subject_id', $subjectId)
-                ->where('quarter', $quarterValidated['quarter'])
-                ->orderBy('lesson_date')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $createdFresh,
-                'message' => 'Lesson plans generated successfully',
-            ]);
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => 'Failed to generate lesson plans', 'error' => $e->getMessage()], 500);
-        }
+        return response()->json($response);
     }
 
     /**
@@ -428,6 +326,7 @@ class AiPlannerController extends Controller
             $raw = $ai->generateAssessments([
                 'subject_title' => trim(($subject->title ?? '') . ' ' . ($subject->variant ?? '')),
                 'quarter' => $quarterValidated['quarter'],
+                'grade_level' => $subject->classSection?->grade_level ?? null,
                 'counts' => [
                     'quizzes' => (int)$plan->quizzes_count,
                     'assignments' => (int)$plan->assignments_count,
@@ -459,11 +358,21 @@ class AiPlannerController extends Controller
                 $items = collect($aiItems)->map(function ($it) use ($subjectEcrId, $quarterValidated, $academicYear, $defaultScores) {
                     $type = (string)($it['type'] ?? 'activity');
                     $score = array_key_exists('score', $it) ? (float)$it['score'] : (float)($defaultScores[$type] ?? 10);
+                    
+                    // Extract questions if present (for quizzes and activities)
+                    $content = null;
+                    if (isset($it['questions']) && is_array($it['questions']) && count($it['questions']) > 0) {
+                        $content = [
+                            'questions' => $it['questions'],
+                        ];
+                    }
+                    
                     return [
                         'subject_ecr_id' => $subjectEcrId,
                         'type' => $type,
                         'title' => (string)$it['title'],
                         'description' => isset($it['description']) ? (string)$it['description'] : null,
+                        'content' => $content,
                         'quarter' => $quarterValidated['quarter'],
                         'academic_year' => $academicYear,
                         'scheduled_date' => null,
@@ -499,4 +408,3 @@ class AiPlannerController extends Controller
         }
     }
 }
-

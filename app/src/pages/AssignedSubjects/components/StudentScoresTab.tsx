@@ -31,6 +31,55 @@ interface StudentScoresTabProps {
   assignedStudentIds?: string[]
 }
 
+// Type badge component
+const TypeBadge: React.FC<{ type?: string }> = ({ type }) => {
+  if (!type) return null
+  
+  const getTypeConfig = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'quiz':
+        return {
+          label: 'Quiz',
+          className: 'bg-blue-100 text-blue-800 border-blue-300',
+          icon: '📝'
+        }
+      case 'assignment':
+        return {
+          label: 'Assignment',
+          className: 'bg-purple-100 text-purple-800 border-purple-300',
+          icon: '📋'
+        }
+      case 'activity':
+        return {
+          label: 'Activity',
+          className: 'bg-green-100 text-green-800 border-green-300',
+          icon: '✏️'
+        }
+      case 'project':
+        return {
+          label: 'Project',
+          className: 'bg-orange-100 text-orange-800 border-orange-300',
+          icon: '🎯'
+        }
+      default:
+        return {
+          label: type,
+          className: 'bg-gray-100 text-gray-800 border-gray-300',
+          icon: '📄'
+        }
+    }
+  }
+
+  const config = getTypeConfig(type)
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}>
+      <span>{config.icon}</span>
+      <span>{config.label}</span>
+    </span>
+  )
+}
+
 interface StudentScore {
   id?: string
   student_id: string
@@ -51,6 +100,7 @@ interface GradeItem {
   date: string
   description: string
   score: number
+  type?: 'quiz' | 'assignment' | 'activity' | 'project'
   category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment'
   quarter: 'First Quarter' | 'Second Quarter' | 'Third Quarter' | 'Fourth Quarter'
   subject_ecr: {
@@ -241,7 +291,10 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
           <div className="flex items-center space-x-3">
             {getCategoryIcon(item.category)}
             <div>
-              <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
+                <TypeBadge type={item.type} />
+              </div>
               <p className="text-xs text-gray-500">{item.description}</p>
               <div className="flex items-center space-x-2 mt-1">
                 <CalendarIcon className="w-3 h-3 text-gray-400" />
