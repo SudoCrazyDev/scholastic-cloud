@@ -82,6 +82,152 @@ export interface UpdateSubscriptionData {
   price?: number;
 }
 
+// Finance types
+export interface SchoolFee {
+  id: string;
+  institution_id: string;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSchoolFeeData {
+  name: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface UpdateSchoolFeeData {
+  name?: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface SchoolFeeDefault {
+  id: string;
+  school_fee_id: string;
+  institution_id: string;
+  grade_level: string;
+  academic_year: string;
+  amount: number;
+  school_fee?: SchoolFee;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSchoolFeeDefaultData {
+  school_fee_id: string;
+  grade_level: string;
+  academic_year: string;
+  amount: number;
+}
+
+export interface UpdateSchoolFeeDefaultData {
+  grade_level?: string;
+  academic_year?: string;
+  amount?: number;
+}
+
+export interface BulkSchoolFeeDefaultData {
+  grade_level: string;
+  academic_year: string;
+  defaults: Array<{
+    school_fee_id: string;
+    amount: number;
+  }>;
+}
+
+export interface StudentPayment {
+  id: string;
+  institution_id: string;
+  student_id: string;
+  school_fee_id?: string | null;
+  academic_year: string;
+  amount: number;
+  payment_date: string;
+  payment_method?: string | null;
+  reference_number?: string | null;
+  receipt_number?: string | null;
+  remarks?: string | null;
+  created_at: string;
+  updated_at: string;
+  school_fee?: SchoolFee;
+  student?: Student;
+}
+
+export interface CreateStudentPaymentData {
+  student_id: string;
+  academic_year: string;
+  amount: number;
+  payment_date?: string;
+  payment_method?: string;
+  reference_number?: string;
+  remarks?: string;
+  school_fee_id?: string;
+}
+
+export interface StudentLedgerEntry {
+  type: 'balance_forward' | 'charge' | 'payment';
+  description: string;
+  amount: number;
+  date?: string | null;
+  fee_id?: string;
+  fee_name?: string;
+  receipt_number?: string;
+  reference_number?: string;
+  payment_id?: string;
+  running_balance?: number;
+}
+
+export interface StudentLedgerResponse {
+  student: Student;
+  academic_year: string;
+  grade_level?: string;
+  entries: StudentLedgerEntry[];
+  totals: {
+    charges: number;
+    payments: number;
+    balance_forward: number;
+    balance: number;
+  };
+  available_academic_years?: string[];
+}
+
+export interface StudentNOAResponse {
+  student: Student;
+  academic_year: string;
+  grade_level?: string;
+  fees: Array<{
+    fee_id: string;
+    fee_name: string;
+    amount: number;
+  }>;
+  payments: Array<{
+    payment_id: string;
+    amount: number;
+    payment_date?: string | null;
+    receipt_number?: string | null;
+    reference_number?: string | null;
+    fee_name?: string | null;
+  }>;
+  totals: {
+    charges: number;
+    payments: number;
+    balance_forward: number;
+    balance: number;
+  };
+  available_academic_years?: string[];
+}
+
+export interface StudentReceipt {
+  payment: StudentPayment;
+  student: Student;
+  institution?: Institution;
+  received_by?: User;
+}
+
 // Institution types
 export interface Institution {
   id: string;
