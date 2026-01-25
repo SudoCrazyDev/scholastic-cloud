@@ -22,6 +22,10 @@ use App\Http\Controllers\SF9Controller;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\SchoolDayController;
+use App\Http\Controllers\SchoolFeeController;
+use App\Http\Controllers\SchoolFeeDefaultController;
+use App\Http\Controllers\StudentPaymentController;
+use App\Http\Controllers\StudentFinanceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -104,6 +108,8 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'destroy']);
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
+    Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger']);
+    Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
     Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
     Route::apiResource('students', StudentController::class);
@@ -175,6 +181,19 @@ Route::middleware('auth.token')->group(function () {
     // SchoolDays routes
     Route::post('school-days/bulk-upsert', [SchoolDayController::class, 'bulkUpsert']);
     Route::apiResource('school-days', SchoolDayController::class);
+
+    // School fee and student finance routes
+    Route::apiResource('school-fees', SchoolFeeController::class);
+    Route::post('school-fee-defaults/bulk-upsert', [SchoolFeeDefaultController::class, 'bulkUpsert']);
+    Route::get('school-fee-defaults', [SchoolFeeDefaultController::class, 'index']);
+    Route::post('school-fee-defaults', [SchoolFeeDefaultController::class, 'store']);
+    Route::put('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'update']);
+    Route::patch('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'update']);
+    Route::delete('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'destroy']);
+    Route::get('student-payments', [StudentPaymentController::class, 'index']);
+    Route::post('student-payments', [StudentPaymentController::class, 'store']);
+    Route::get('student-payments/{id}', [StudentPaymentController::class, 'show']);
+    Route::get('student-payments/{id}/receipt', [StudentPaymentController::class, 'receipt']);
     
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
