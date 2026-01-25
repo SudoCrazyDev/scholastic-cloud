@@ -24,6 +24,7 @@ use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\SchoolDayController;
 use App\Http\Controllers\SchoolFeeController;
 use App\Http\Controllers\SchoolFeeDefaultController;
+use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\StudentFinanceController;
@@ -185,6 +186,7 @@ Route::middleware('auth.token')->group(function () {
 
     // School fee and student finance routes
     Route::apiResource('school-fees', SchoolFeeController::class);
+    Route::get('finance/dashboard', [FinanceDashboardController::class, 'summary']);
     Route::post('school-fee-defaults/bulk-upsert', [SchoolFeeDefaultController::class, 'bulkUpsert']);
     Route::get('school-fee-defaults', [SchoolFeeDefaultController::class, 'index']);
     Route::post('school-fee-defaults', [SchoolFeeDefaultController::class, 'store']);
