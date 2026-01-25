@@ -8,6 +8,7 @@ import {
   Building2, 
   Shield, 
   CreditCard,
+  Wallet,
   Menu,
   Lock,
   GraduationCap,
@@ -101,6 +102,13 @@ const menuItems: MenuItem[] = [
     label: 'Students',
     icon: <StudentsIcon className="w-5 h-5" />,
     path: '/students',
+    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    icon: <Wallet className="w-5 h-5" />,
+    path: '/finance',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
   // {

@@ -11,10 +11,12 @@ import {
   CameraIcon,
   XMarkIcon,
   PhotoIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  BanknotesIcon
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
+import { StudentFinanceTab } from './components'
 import { studentService } from '../../services/studentService'
 import type { Student } from '../../types'
 
@@ -23,6 +25,7 @@ const tabs = [
   { id: 'academic', name: 'Academic Information', icon: AcademicCapIcon },
   { id: 'medical', name: 'Medical Records', icon: HeartIcon },
   { id: 'documents', name: 'Documents', icon: IdentificationIcon },
+  { id: 'finance', name: 'Finance', icon: BanknotesIcon },
 ]
 
 export default function StudentDetail() {
@@ -378,6 +381,8 @@ export default function StudentDetail() {
         return renderMedicalRecords()
       case 'documents':
         return renderDocuments()
+      case 'finance':
+        return <StudentFinanceTab student={student} studentId={student.id} />
       default:
         return renderPersonalDetails()
     }
