@@ -266,6 +266,33 @@ export interface StudentReceipt {
   received_by?: User;
 }
 
+export interface FinanceDashboardFee {
+  id: string;
+  name: string;
+}
+
+export interface FinanceGradeSummary {
+  grade_level: string;
+  student_count: number;
+  payable: {
+    total: number;
+    by_fee: Record<string, number>;
+    balance_forward: number;
+    discounts: number;
+  };
+  payments: {
+    total: number;
+    by_fee: Record<string, number>;
+    unassigned: number;
+  };
+}
+
+export interface FinanceDashboardSummary {
+  academic_year: string;
+  fees: FinanceDashboardFee[];
+  grades: FinanceGradeSummary[];
+}
+
 // Institution types
 export interface Institution {
   id: string;
