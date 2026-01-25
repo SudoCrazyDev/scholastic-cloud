@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\StudentSection;
 use App\Models\SchoolFeeDefault;
+use App\Models\StudentDiscount;
 use App\Models\StudentPayment;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -67,7 +68,20 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        $discounts = StudentDiscount::with('schoolFee')
+            ->where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->orderBy('created_at')
+            ->get();
+
+        $feeAmountMap = $feeDefaults->keyBy('school_fee_id')->map(function ($default) {
+            return (float) $default->amount;
+        });
+
         $chargesTotal = (float) $feeDefaults->sum('amount');
+        $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $chargesTotal);
+        $discountsTotal = (float) $discountsWithAmount->sum('amount');
         $paymentsTotal = (float) $payments->sum('amount');
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
@@ -97,6 +111,25 @@ class StudentFinanceController extends Controller
             ];
         });
 
+        $discountEntries = $discountsWithAmount->map(function ($payload) {
+            $discount = $payload['discount'];
+            $feeName = $discount->schoolFee?->name;
+            $label = $feeName ? 'Discount - ' . $feeName : 'Discount';
+            $description = $discount->description ? $label . ' (' . $discount->description . ')' : $label;
+
+            return [
+                'type' => 'discount',
+                'description' => $description,
+                'amount' => -1 * (float) $payload['amount'],
+                'date' => $discount->created_at?->toDateString(),
+                'discount_id' => $discount->id,
+                'discount_type' => $discount->discount_type,
+                'discount_value' => (float) $discount->value,
+                'fee_id' => $discount->school_fee_id,
+                'fee_name' => $feeName,
+            ];
+        });
+
         $paymentEntries = $payments->map(function ($payment) {
             $feeName = $payment->schoolFee?->name;
             $label = $feeName ? 'Payment - ' . $feeName : 'Payment';
@@ -113,13 +146,14 @@ class StudentFinanceController extends Controller
             ];
         });
 
-        $entries = $entries->merge($chargeEntries)->merge($paymentEntries);
+        $entries = $entries->merge($chargeEntries)->merge($discountEntries)->merge($paymentEntries);
 
         $entries = $entries->sortBy(function ($entry) {
             $typeOrder = [
                 'balance_forward' => 0,
                 'charge' => 1,
-                'payment' => 2,
+                'discount' => 2,
+                'payment' => 3,
             ];
             $order = $typeOrder[$entry['type']] ?? 3;
             $date = $entry['date'] ? strtotime($entry['date']) : 0;
@@ -133,7 +167,7 @@ class StudentFinanceController extends Controller
             return $entry;
         });
 
-        $balance = $balanceForward + $chargesTotal - $paymentsTotal;
+        $balance = $balanceForward + $chargesTotal - $discountsTotal - $paymentsTotal;
 
         return response()->json([
             'success' => true,
@@ -144,6 +178,7 @@ class StudentFinanceController extends Controller
                 'entries' => $entries,
                 'totals' => [
                     'charges' => round($chargesTotal, 2),
+                    'discounts' => round($discountsTotal, 2),
                     'payments' => round($paymentsTotal, 2),
                     'balance_forward' => round($balanceForward, 2),
                     'balance' => round($balance, 2),
@@ -201,6 +236,13 @@ class StudentFinanceController extends Controller
                 ->get();
         }
 
+        $discounts = StudentDiscount::with('schoolFee')
+            ->where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->orderBy('created_at')
+            ->get();
+
         $payments = StudentPayment::with('schoolFee')
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
@@ -209,7 +251,13 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        $feeAmountMap = $feeDefaults->keyBy('school_fee_id')->map(function ($default) {
+            return (float) $default->amount;
+        });
+
         $chargesTotal = (float) $feeDefaults->sum('amount');
+        $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $chargesTotal);
+        $discountsTotal = (float) $discountsWithAmount->sum('amount');
         $paymentsTotal = (float) $payments->sum('amount');
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
@@ -218,7 +266,7 @@ class StudentFinanceController extends Controller
             $studentId
         );
 
-        $balance = $balanceForward + $chargesTotal - $paymentsTotal;
+        $balance = $balanceForward + $chargesTotal - $discountsTotal - $paymentsTotal;
 
         return response()->json([
             'success' => true,
@@ -233,6 +281,19 @@ class StudentFinanceController extends Controller
                         'amount' => (float) $default->amount,
                     ];
                 }),
+                'discounts' => $discountsWithAmount->map(function ($payload) {
+                    $discount = $payload['discount'];
+                    return [
+                        'discount_id' => $discount->id,
+                        'discount_type' => $discount->discount_type,
+                        'discount_value' => (float) $discount->value,
+                        'amount' => (float) $payload['amount'],
+                        'description' => $discount->description,
+                        'fee_id' => $discount->school_fee_id,
+                        'fee_name' => $discount->schoolFee?->name,
+                        'created_at' => $discount->created_at?->toDateString(),
+                    ];
+                }),
                 'payments' => $payments->map(function ($payment) {
                     return [
                         'payment_id' => $payment->id,
@@ -245,6 +306,7 @@ class StudentFinanceController extends Controller
                 }),
                 'totals' => [
                     'charges' => round($chargesTotal, 2),
+                    'discounts' => round($discountsTotal, 2),
                     'payments' => round($paymentsTotal, 2),
                     'balance_forward' => round($balanceForward, 2),
                     'balance' => round($balance, 2),
@@ -340,10 +402,24 @@ class StudentFinanceController extends Controller
 
             $gradeLevel = $this->resolveGradeLevel($studentSections, $year);
             $charges = 0.0;
+            $discountsTotal = 0.0;
             if ($gradeLevel) {
-                $charges = (float) SchoolFeeDefault::where('institution_id', $institutionId)
+                $feeDefaults = SchoolFeeDefault::where('institution_id', $institutionId)
                     ->where('grade_level', $gradeLevel)
                     ->where('academic_year', $year)
+                    ->get();
+
+                $charges = (float) $feeDefaults->sum('amount');
+                $feeAmountMap = $feeDefaults->keyBy('school_fee_id')->map(function ($default) {
+                    return (float) $default->amount;
+                });
+
+                $discounts = StudentDiscount::where('institution_id', $institutionId)
+                    ->where('student_id', $studentId)
+                    ->where('academic_year', $year)
+                    ->get();
+
+                $discountsTotal = (float) $this->applyDiscounts($discounts, $feeAmountMap, $charges)
                     ->sum('amount');
             }
 
@@ -352,7 +428,7 @@ class StudentFinanceController extends Controller
                 ->where('academic_year', $year)
                 ->sum('amount');
 
-            $balanceForward += ($charges - $payments);
+            $balanceForward += ($charges - $discountsTotal - $payments);
         }
 
         return round($balanceForward, 2);
@@ -375,5 +451,32 @@ class StudentFinanceController extends Controller
     {
         $currentYear = now()->year;
         return $currentYear . '-' . ($currentYear + 1);
+    }
+
+    private function applyDiscounts($discounts, $feeAmountMap, float $chargesTotal)
+    {
+        return $discounts->map(function ($discount) use ($feeAmountMap, $chargesTotal) {
+            $baseAmount = $chargesTotal;
+            if ($discount->school_fee_id) {
+                $baseAmount = (float) ($feeAmountMap[$discount->school_fee_id] ?? 0);
+            }
+
+            $amount = 0.0;
+            if ($discount->discount_type === 'percentage') {
+                $amount = $baseAmount * ((float) $discount->value / 100);
+            } else {
+                $amount = (float) $discount->value;
+            }
+
+            if ($baseAmount > 0) {
+                $amount = min($amount, $baseAmount);
+            }
+
+            return [
+                'discount' => $discount,
+                'amount' => round($amount, 2),
+                'base' => round($baseAmount, 2),
+            ];
+        });
     }
 }
