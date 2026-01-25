@@ -24,6 +24,7 @@ use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\SchoolDayController;
 use App\Http\Controllers\SchoolFeeController;
 use App\Http\Controllers\SchoolFeeDefaultController;
+use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\StudentFinanceController;
 
@@ -194,6 +195,11 @@ Route::middleware('auth.token')->group(function () {
     Route::post('student-payments', [StudentPaymentController::class, 'store']);
     Route::get('student-payments/{id}', [StudentPaymentController::class, 'show']);
     Route::get('student-payments/{id}/receipt', [StudentPaymentController::class, 'receipt']);
+    Route::get('student-discounts', [StudentDiscountController::class, 'index']);
+    Route::post('student-discounts', [StudentDiscountController::class, 'store']);
+    Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update']);
+    Route::patch('student-discounts/{id}', [StudentDiscountController::class, 'update']);
+    Route::delete('student-discounts/{id}', [StudentDiscountController::class, 'destroy']);
     
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
