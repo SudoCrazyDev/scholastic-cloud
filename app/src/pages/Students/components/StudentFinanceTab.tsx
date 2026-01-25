@@ -6,8 +6,9 @@ import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
 import { schoolFeeService } from '../../../services/schoolFeeService'
 import { studentFinanceService } from '../../../services/studentFinanceService'
+import { studentDiscountService } from '../../../services/studentDiscountService'
 import { studentPaymentService } from '../../../services/studentPaymentService'
-import type { CreateStudentPaymentData, Student, StudentPayment } from '../../../types'
+import type { CreateStudentDiscountData, CreateStudentPaymentData, Student, StudentPayment } from '../../../types'
 
 interface StudentFinanceTabProps {
   student: Student
@@ -30,6 +31,13 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   })
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [receipt, setReceipt] = useState<StudentPayment | null>(null)
+  const [discountForm, setDiscountForm] = useState({
+    discount_type: 'fixed',
+    value: '',
+    school_fee_id: '',
+    description: '',
+  })
+  const [discountError, setDiscountError] = useState<string | null>(null)
 
   const feesQuery = useQuery({
     queryKey: ['school-fees'],
@@ -86,6 +94,24 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     },
   })
 
+  const createDiscountMutation = useMutation({
+    mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
+    onSuccess: () => {
+      setDiscountForm({
+        discount_type: 'fixed',
+        value: '',
+        school_fee_id: '',
+        description: '',
+      })
+      setDiscountError(null)
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+    },
+    onError: (error: any) => {
+      setDiscountError(error.response?.data?.message || 'Failed to save discount.')
+    },
+  })
+
   const formatAmount = (amount?: number | null) => {
     const value = Number(amount || 0)
     return value.toFixed(2)
@@ -116,6 +142,32 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     createPaymentMutation.mutate(payload)
   }
 
+  const handleDiscountSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setDiscountError(null)
+
+    const value = Number(discountForm.value)
+    if (!value || value <= 0) {
+      setDiscountError('Discount value must be greater than zero.')
+      return
+    }
+    if (discountForm.discount_type === 'percentage' && value > 100) {
+      setDiscountError('Percentage discount cannot exceed 100%.')
+      return
+    }
+
+    const payload: CreateStudentDiscountData = {
+      student_id: studentId,
+      academic_year: resolvedAcademicYear,
+      discount_type: discountForm.discount_type as CreateStudentDiscountData['discount_type'],
+      value,
+      school_fee_id: discountForm.school_fee_id || undefined,
+      description: discountForm.description || undefined,
+    }
+
+    createDiscountMutation.mutate(payload)
+  }
+
   const totals = ledgerData?.totals
   const noaData = noaQuery.data?.data
 
@@ -124,7 +176,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold text-gray-900">Student Finance</h3>
-          <p className="text-gray-600">Ledger, payments, and Notice of Account (NOA).</p>
+          <p className="text-gray-600">Ledger, payments, discounts, and Notice of Account (NOA).</p>
         </div>
         <div className="w-full lg:w-64">
           <Select
@@ -136,7 +188,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-sm text-gray-500">Balance Forward</p>
           <p className="text-2xl font-semibold text-gray-900">
@@ -147,6 +199,12 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           <p className="text-sm text-gray-500">Charges</p>
           <p className="text-2xl font-semibold text-gray-900">
             {formatAmount(totals?.charges)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-sm text-gray-500">Discounts</p>
+          <p className="text-2xl font-semibold text-gray-900">
+            {formatAmount(totals?.discounts)}
           </p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -222,64 +280,146 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
-            Notice of Account (NOA)
+            Apply Discount
           </h4>
-          {noaQuery.isLoading ? (
-            <p className="text-gray-500">Loading NOA...</p>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-sm text-gray-600">
-                Grade Level: <span className="font-medium">{noaData?.grade_level || 'N/A'}</span>
-              </div>
+          <form className="space-y-4" onSubmit={handleDiscountSubmit}>
+            <Select
+              value={discountForm.discount_type}
+              onChange={(event) => setDiscountForm(prev => ({ ...prev, discount_type: event.target.value }))}
+              options={[
+                { value: 'fixed', label: 'Fixed Amount' },
+                { value: 'percentage', label: 'Percentage' },
+              ]}
+              className="w-full"
+            />
+            <Input
+              label={discountForm.discount_type === 'percentage' ? 'Percentage (%)' : 'Discount Amount'}
+              type="number"
+              min="0"
+              step="0.01"
+              value={discountForm.value}
+              onChange={(event) => setDiscountForm(prev => ({ ...prev, value: event.target.value }))}
+            />
+            <Select
+              value={discountForm.school_fee_id}
+              onChange={(event) => setDiscountForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
+              options={(feesQuery.data?.data || []).map((fee) => ({
+                value: fee.id,
+                label: fee.name,
+              }))}
+              placeholder="Apply to specific fee (optional)"
+              className="w-full"
+            />
+            <Input
+              label="Description"
+              value={discountForm.description}
+              onChange={(event) => setDiscountForm(prev => ({ ...prev, description: event.target.value }))}
+              placeholder="Optional note or reason"
+            />
+            {discountError && <p className="text-sm text-red-600">{discountError}</p>}
+            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              Save Discount
+            </Button>
+          </form>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+        <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
+          Notice of Account (NOA)
+        </h4>
+        {noaQuery.isLoading ? (
+          <p className="text-gray-500">Loading NOA...</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-sm text-gray-600">
+              Grade Level: <span className="font-medium">{noaData?.grade_level || 'N/A'}</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {noaData?.fees?.map((fee) => (
+                    <tr key={fee.fee_id}>
+                      <td className="px-4 py-2 text-sm text-gray-700">{fee.fee_name}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {formatAmount(fee.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                  {!noaData?.fees?.length && (
+                    <tr>
+                      <td colSpan={2} className="px-4 py-4 text-center text-gray-500">
+                        No fees configured for this academic year.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {Boolean(noaData?.discounts?.length) && (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Discount</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                       <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {noaData?.fees?.map((fee) => (
-                      <tr key={fee.fee_id}>
-                        <td className="px-4 py-2 text-sm text-gray-700">{fee.fee_name}</td>
+                    {noaData?.discounts?.map((discount) => (
+                      <tr key={discount.discount_id}>
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {discount.fee_name || 'General Discount'}
+                          {discount.description && (
+                            <div className="text-xs text-gray-500">{discount.description}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-600 capitalize">
+                          {discount.discount_type}
+                        </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {formatAmount(fee.amount)}
+                          {formatAmount(discount.amount)}
                         </td>
                       </tr>
                     ))}
-                    {!noaData?.fees?.length && (
-                      <tr>
-                        <td colSpan={2} className="px-4 py-4 text-center text-gray-500">
-                          No fees configured for this academic year.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
+            )}
 
-              <div className="border-t border-gray-200 pt-4 space-y-2 text-sm text-gray-700">
-                <div className="flex justify-between">
-                  <span>Balance Forward</span>
-                  <span className="font-medium">{formatAmount(noaData?.totals?.balance_forward)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Charges</span>
-                  <span className="font-medium">{formatAmount(noaData?.totals?.charges)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Payments</span>
-                  <span className="font-medium">{formatAmount(noaData?.totals?.payments)}</span>
-                </div>
-                <div className="flex justify-between text-base font-semibold text-gray-900">
-                  <span>Balance</span>
-                  <span>{formatAmount(noaData?.totals?.balance)}</span>
-                </div>
+            <div className="border-t border-gray-200 pt-4 space-y-2 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span>Balance Forward</span>
+                <span className="font-medium">{formatAmount(noaData?.totals?.balance_forward)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Charges</span>
+                <span className="font-medium">{formatAmount(noaData?.totals?.charges)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Discounts</span>
+                <span className="font-medium">{formatAmount(noaData?.totals?.discounts)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Payments</span>
+                <span className="font-medium">{formatAmount(noaData?.totals?.payments)}</span>
+              </div>
+              <div className="flex justify-between text-base font-semibold text-gray-900">
+                <span>Balance</span>
+                <span>{formatAmount(noaData?.totals?.balance)}</span>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
@@ -302,7 +442,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {ledgerData?.entries?.map((entry, index) => (
-                  <tr key={`${entry.type}-${entry.payment_id || entry.fee_id || index}`}>
+                  <tr key={`${entry.type}-${entry.payment_id || entry.discount_id || entry.fee_id || index}`}>
                     <td className="px-4 py-2 text-sm text-gray-600 capitalize">{entry.type.replace('_', ' ')}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{entry.description}</td>
                     <td className="px-4 py-2 text-sm text-gray-600">{entry.date || '—'}</td>

@@ -168,8 +168,31 @@ export interface CreateStudentPaymentData {
   school_fee_id?: string;
 }
 
+export interface StudentDiscount {
+  id: string;
+  institution_id: string;
+  student_id: string;
+  school_fee_id?: string | null;
+  academic_year: string;
+  discount_type: 'fixed' | 'percentage';
+  value: number;
+  description?: string | null;
+  created_at: string;
+  updated_at: string;
+  school_fee?: SchoolFee;
+}
+
+export interface CreateStudentDiscountData {
+  student_id: string;
+  academic_year: string;
+  discount_type: 'fixed' | 'percentage';
+  value: number;
+  school_fee_id?: string;
+  description?: string;
+}
+
 export interface StudentLedgerEntry {
-  type: 'balance_forward' | 'charge' | 'payment';
+  type: 'balance_forward' | 'charge' | 'discount' | 'payment';
   description: string;
   amount: number;
   date?: string | null;
@@ -178,6 +201,9 @@ export interface StudentLedgerEntry {
   receipt_number?: string;
   reference_number?: string;
   payment_id?: string;
+  discount_id?: string;
+  discount_type?: 'fixed' | 'percentage';
+  discount_value?: number;
   running_balance?: number;
 }
 
@@ -188,6 +214,7 @@ export interface StudentLedgerResponse {
   entries: StudentLedgerEntry[];
   totals: {
     charges: number;
+    discounts: number;
     payments: number;
     balance_forward: number;
     balance: number;
@@ -204,6 +231,16 @@ export interface StudentNOAResponse {
     fee_name: string;
     amount: number;
   }>;
+  discounts?: Array<{
+    discount_id: string;
+    discount_type: 'fixed' | 'percentage';
+    discount_value: number;
+    amount: number;
+    description?: string | null;
+    fee_id?: string | null;
+    fee_name?: string | null;
+    created_at?: string | null;
+  }>;
   payments: Array<{
     payment_id: string;
     amount: number;
@@ -214,6 +251,7 @@ export interface StudentNOAResponse {
   }>;
   totals: {
     charges: number;
+    discounts: number;
     payments: number;
     balance_forward: number;
     balance: number;
