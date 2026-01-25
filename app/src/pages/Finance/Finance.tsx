@@ -7,6 +7,7 @@ import { Input } from '../../components/input'
 import { Select } from '../../components/select'
 import { schoolFeeService } from '../../services/schoolFeeService'
 import { schoolFeeDefaultService } from '../../services/schoolFeeDefaultService'
+import { financeDashboardService } from '../../services/financeDashboardService'
 import type { SchoolFee, SchoolFeeDefault } from '../../types'
 
 const Finance: React.FC = () => {
@@ -34,6 +35,7 @@ const Finance: React.FC = () => {
     grade_level: '',
     academic_year: defaultAcademicYear,
   })
+  const [dashboardYear, setDashboardYear] = useState(defaultAcademicYear)
 
   const academicYearOptions = useMemo(() => {
     const years = []
@@ -48,6 +50,12 @@ const Finance: React.FC = () => {
   const feesQuery = useQuery({
     queryKey: ['school-fees'],
     queryFn: () => schoolFeeService.getSchoolFees(),
+  })
+
+  const dashboardQuery = useQuery({
+    queryKey: ['finance-dashboard', dashboardYear],
+    queryFn: () => financeDashboardService.getSummary(dashboardYear),
+    enabled: Boolean(dashboardYear),
   })
 
   const defaultsQuery = useQuery({
@@ -143,6 +151,12 @@ const Finance: React.FC = () => {
 
   const fees = feesQuery.data?.data || []
   const defaults = defaultsQuery.data?.data || []
+  const dashboardData = dashboardQuery.data?.data
+  const dashboardFees = dashboardData?.fees || []
+  const gradeSummaries = dashboardData?.grades || []
+  const hasUnassignedPayments = gradeSummaries.some(
+    (grade) => (grade.payments?.unassigned || 0) > 0
+  )
 
   useEffect(() => {
     if (!editingDefault) {
@@ -166,6 +180,11 @@ const Finance: React.FC = () => {
     } else {
       createFeeMutation.mutate()
     }
+  }
+
+  const formatAmount = (amount?: number | null) => {
+    const value = Number(amount || 0)
+    return value.toFixed(2)
   }
 
   const handleDefaultSubmit = (event: React.FormEvent) => {
@@ -247,6 +266,147 @@ const Finance: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Finance</h1>
         <p className="text-gray-600 mt-1">Manage school fees, defaults, and yearly amounts.</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Finance Dashboard</h2>
+            <p className="text-sm text-gray-600">
+              Total Payable shows collectibles for the selected academic year.
+            </p>
+          </div>
+          <div className="w-full lg:w-64">
+            <Select
+              value={dashboardYear}
+              onChange={(event) => setDashboardYear(event.target.value)}
+              options={academicYearOptions}
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Total Payable</h3>
+          {dashboardQuery.isLoading ? (
+            <p className="text-gray-500">Loading dashboard...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Grade Level
+                    </th>
+                    {dashboardFees.map((fee) => (
+                      <th
+                        key={fee.id}
+                        className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                      >
+                        {fee.name}
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {gradeSummaries.map((grade) => (
+                    <tr key={grade.grade_level}>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {grade.grade_level}
+                      </td>
+                      {dashboardFees.map((fee) => (
+                        <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
+                          {formatAmount(grade.payable.by_fee?.[fee.id])}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                        {formatAmount(grade.payable.total)}
+                      </td>
+                    </tr>
+                  ))}
+                  {!gradeSummaries.length && (
+                    <tr>
+                      <td
+                        colSpan={dashboardFees.length + 2}
+                        className="px-4 py-6 text-center text-gray-500"
+                      >
+                        No payable data found for this academic year.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-xs text-gray-500">
+            Totals include discounts and balance forward adjustments.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Total Payment</h3>
+          {dashboardQuery.isLoading ? (
+            <p className="text-gray-500">Loading dashboard...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Grade Level
+                    </th>
+                    {dashboardFees.map((fee) => (
+                      <th
+                        key={fee.id}
+                        className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                      >
+                        {fee.name}
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {gradeSummaries.map((grade) => (
+                    <tr key={grade.grade_level}>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {grade.grade_level}
+                      </td>
+                      {dashboardFees.map((fee) => (
+                        <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
+                          {formatAmount(grade.payments.by_fee?.[fee.id])}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                        {formatAmount(grade.payments.total)}
+                      </td>
+                    </tr>
+                  ))}
+                  {!gradeSummaries.length && (
+                    <tr>
+                      <td
+                        colSpan={dashboardFees.length + 2}
+                        className="px-4 py-6 text-center text-gray-500"
+                      >
+                        No payment data found for this academic year.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {hasUnassignedPayments && (
+            <p className="text-xs text-gray-500">
+              Totals include payments not tied to a specific fee.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
