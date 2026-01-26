@@ -385,10 +385,6 @@ const ClassSectionDetail: React.FC = () => {
     }
   }, [studentToRemove, removeStudentMutation])
 
-  const hasReportCardData = useMemo(() => {
-    return !!(finalInstitution && enhancedClassSectionData && selectedStudent && subjects.length > 0)
-  }, [finalInstitution, enhancedClassSectionData, selectedStudent, subjects])
-
   const handleViewTempReportCard = useCallback((studentId: string) => {
     const student = students.find(s => s.id === studentId)
     if (student) {
@@ -396,11 +392,10 @@ const ClassSectionDetail: React.FC = () => {
         id: studentId,
         name: getFullName(student)
       })
-      if (hasReportCardData) {
-        setShowReportCardModal(true)
-      }
+      // Open immediately; modal can show "preparing" while state/query catches up.
+      setShowReportCardModal(true)
     }
-  }, [students, getFullName, hasReportCardData])
+  }, [students, getFullName])
 
   const handleViewReportCard = useCallback((studentId: string) => {
     const student = students.find(s => s.id === studentId)
@@ -409,11 +404,10 @@ const ClassSectionDetail: React.FC = () => {
         id: studentId,
         name: getFullName(student)
       })
-      if (hasReportCardData) {
-        setShowStudentReportCardModal(true)
-      }
+      // Same fix as temp report card: open immediately on first click.
+      setShowStudentReportCardModal(true)
     }
-  }, [students, getFullName, hasReportCardData])
+  }, [students, getFullName])
 
   const handleStudentSubmit = useCallback(async (data: any) => {
     if (!studentToEdit) return
@@ -846,6 +840,9 @@ const ClassSectionDetail: React.FC = () => {
         }}
         studentName={selectedStudentForReport?.name}
         studentId={selectedStudentForReport?.id}
+        classSectionId={id}
+        institutionId={effectiveInstitutionId}
+        academicYear={enhancedClassSectionData?.academic_year}
       />
     </motion.div>
   )

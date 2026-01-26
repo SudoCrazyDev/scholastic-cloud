@@ -52,6 +52,10 @@ class StudentSectionController extends Controller
                 'students.is_active',
                 'student_sections.id as student_section_id'
             )
+            ->orderBy('students.last_name', 'asc')
+            ->orderBy('students.first_name', 'asc')
+            ->orderBy('students.middle_name', 'asc')
+            ->orderBy('students.ext_name', 'asc')
             ->get();
         return response()->json([
             'success' => true,

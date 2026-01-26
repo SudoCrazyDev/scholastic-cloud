@@ -4,6 +4,7 @@ import { institutionService } from '../services/institutionService'
 import { classSectionService } from '../services/classSectionService'
 import { subjectService } from '../services/subjectService'
 import { studentRunningGradeService } from '../services/studentRunningGradeService'
+import { coreValueMarkingService } from '../services/coreValueMarkingService'
 import type { Student, Institution, ClassSection, Subject } from '../types'
 import type { StudentRunningGrade } from '../services/studentRunningGradeService'
 
@@ -21,6 +22,7 @@ interface StudentReportCardData {
   classSection: ClassSection
   subjects: Subject[]
   grades: StudentRunningGrade[]
+  coreValueMarkings: any[]
   isLoading: boolean
   error: string | null
 }
@@ -42,6 +44,8 @@ export const useStudentReportCard = ({
     queryFn: () => studentService.getStudent(studentId),
     enabled: enabled && !!studentId,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   // Fetch institution data
@@ -54,6 +58,8 @@ export const useStudentReportCard = ({
     queryFn: () => institutionService.getInstitution(institutionId),
     enabled: enabled && !!institutionId,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   // Fetch class section data
@@ -66,6 +72,8 @@ export const useStudentReportCard = ({
     queryFn: () => classSectionService.getClassSection(classSectionId),
     enabled: enabled && !!classSectionId,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   // Fetch subjects for the class section
@@ -78,6 +86,8 @@ export const useStudentReportCard = ({
     queryFn: () => subjectService.getSubjects({ class_section_id: classSectionId }),
     enabled: enabled && !!classSectionId,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   // Fetch all grades for the student across all subjects
@@ -107,10 +117,42 @@ export const useStudentReportCard = ({
     },
     enabled: enabled && !!studentId && !!classSectionId && !!subjectsData?.data,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
-  const isLoading = studentLoading || institutionLoading || classSectionLoading || subjectsLoading || gradesLoading
-  const error = studentError?.message || institutionError?.message || classSectionError?.message || subjectsError?.message || gradesError?.message || null
+  // Fetch learner observed values markings (same source as Temp Report Card)
+  const {
+    data: coreValueMarkingsData,
+    isLoading: coreValueMarkingsLoading,
+    error: coreValueMarkingsError,
+  } = useQuery({
+    queryKey: ['core-value-markings', studentId, academicYear],
+    queryFn: () => coreValueMarkingService.get({ student_id: studentId, academic_year: academicYear }),
+    enabled: enabled && !!studentId && !!academicYear,
+    staleTime: 0,
+    retry: 1,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
+  const isLoading =
+    studentLoading ||
+    institutionLoading ||
+    classSectionLoading ||
+    subjectsLoading ||
+    gradesLoading ||
+    coreValueMarkingsLoading
+
+  const error =
+    studentError?.message ||
+    institutionError?.message ||
+    classSectionError?.message ||
+    subjectsError?.message ||
+    gradesError?.message ||
+    coreValueMarkingsError?.message ||
+    null
 
   return {
     student: studentData?.data || {} as Student,
@@ -118,6 +160,7 @@ export const useStudentReportCard = ({
     classSection: classSectionData?.data || {} as ClassSection,
     subjects: subjectsData?.data || [],
     grades: gradesData?.data || [],
+    coreValueMarkings: Array.isArray(coreValueMarkingsData) ? coreValueMarkingsData : [],
     isLoading,
     error
   }

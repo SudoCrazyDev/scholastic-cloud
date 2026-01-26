@@ -1,6 +1,24 @@
+import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer } from '@react-pdf/renderer';
 import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../../types';
 import { roundGrade } from '@/utils/gradeUtils';
+import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
+
+const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
+  'Maka-Diyos': [
+    "Expresses one's spiritual beliefs while respecting the spiritual beliefs of others.",
+    'Shows adherence to ethical principles by upholding truth',
+  ],
+  'Maka-Tao': [
+    'Is sensitive to individual, social, and cultural differences',
+    'Demonstrates contributions toward solidarity',
+  ],
+  'Makakalikasan': ['Cares for the environment and utilizes resources wisely, judiciously, and economically.'],
+  'Makabansa': [
+    'Demonstrates pride in being a Filipino; exercises the rights and responsibilities of a Filipino citizen',
+    'Demonstrates appropriate behavior in carrying out activities in the school, community, and country',
+  ],
+};
 
 interface PrintTempReportCardProps {
   sectionSubjects?: SectionSubject[]
@@ -17,7 +35,38 @@ export default function PrintTempReportCard({
   classSection,
   student
 }: PrintTempReportCardProps) {
-    console.log('studentSubjectsGrade', studentSubjectsGrade);
+    const academicYear = classSection?.academic_year || '';
+
+    const { data: coreValueMarkings } = useCoreValueMarkings(
+      {
+        student_id: student?.id,
+        academic_year: academicYear,
+      },
+      {
+        enabled: !!student?.id && !!academicYear,
+      }
+    );
+
+    const coreValueMap = useMemo(() => {
+      const map: Record<string, Record<string, Record<string, string>>> = {};
+      (Array.isArray(coreValueMarkings) ? coreValueMarkings : []).forEach((m: any) => {
+        const cv = String(m.core_value || '');
+        const bs = String(m.behavior_statement || '');
+        const q = String(m.quarter || '');
+        const marking = String(m.marking || '');
+
+        if (!cv || !bs || !q) return;
+        if (!map[cv]) map[cv] = {};
+        if (!map[cv][bs]) map[cv][bs] = {};
+        map[cv][bs][q] = marking;
+      });
+      return map;
+    }, [coreValueMarkings]);
+
+    const mark = (coreValue: string, behaviorStatement: string, quarter: '1' | '2' | '3' | '4') => {
+      return coreValueMap?.[coreValue]?.[behaviorStatement]?.[quarter] || '';
+    };
+
     return (
         <PDFViewer className='w-full' style={{height: '600px'}}>
             <Document>
@@ -324,12 +373,12 @@ export default function PrintTempReportCard({
                             <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '30px', borderBottom: '1px solid black'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        Expresses one's spiritual beliefs while respecting the spiritual beliefs of others
+                                        {CORE_VALUE_BEHAVIORS['Maka-Diyos'][0]}
                                     </Text>
                                 </View>
                                 <View>
                                     <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        Show adherence to ethical principles by upholding truth
+                                        {CORE_VALUE_BEHAVIORS['Maka-Diyos'][1]}
                                     </Text>
                                 </View>
                             </View>
@@ -337,48 +386,48 @@ export default function PrintTempReportCard({
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '1')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '1')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '2')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '2')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '3')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '3')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '4')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '4')}
                                         </Text>
                                     </View>
                                 </View>
@@ -392,12 +441,12 @@ export default function PrintTempReportCard({
                             <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '30px', borderBottom: '1px solid black'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        Is sensitive to individual, social, and cultural differences.
+                                        {CORE_VALUE_BEHAVIORS['Maka-Tao'][0]}
                                     </Text>
                                 </View>
                                 <View>
                                     <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        Demonstrates contributions toward solidarity.
+                                        {CORE_VALUE_BEHAVIORS['Maka-Tao'][1]}
                                     </Text>
                                 </View>
                             </View>
@@ -405,48 +454,48 @@ export default function PrintTempReportCard({
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '1')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '1')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '2')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '2')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '3')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '3')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '4')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '4')}
                                         </Text>
                                     </View>
                                 </View>
@@ -460,7 +509,7 @@ export default function PrintTempReportCard({
                             <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '30px'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        Cares for the environment and utilizes resources wisely, judiciously, and economically.
+                                        {CORE_VALUE_BEHAVIORS['Makakalikasan'][0]}
                                     </Text>
                                 </View>
                             </View>
@@ -468,28 +517,28 @@ export default function PrintTempReportCard({
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '1')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '2')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '3')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '4')}
                                         </Text>
                                     </View>
                                 </View>
@@ -503,12 +552,12 @@ export default function PrintTempReportCard({
                             <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '30px', borderBottom: '1px solid black'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        Demonstrates pride being a Filipino; excercises the rights and responsibilities of a Filipino Citizen.
+                                        {CORE_VALUE_BEHAVIORS['Makabansa'][0]}
                                     </Text>
                                 </View>
                                 <View>
                                     <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        Demonstrates appropriate behavior in carrying out activities in the school, community, and country.
+                                        {CORE_VALUE_BEHAVIORS['Makabansa'][1]}
                                     </Text>
                                 </View>
                             </View>
@@ -516,48 +565,48 @@ export default function PrintTempReportCard({
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '1')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '1')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '2')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '2')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '3')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '3')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '4')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '4')}
                                         </Text>
                                     </View>
                                 </View>

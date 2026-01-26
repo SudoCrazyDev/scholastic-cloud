@@ -1,10 +1,33 @@
 
-import { Page, Text, View, Document, PDFViewer, Image, StyleSheet } from '@react-pdf/renderer';
+import { useMemo } from 'react';
+import { Page, Text, View, Document, PDFViewer, StyleSheet } from '@react-pdf/renderer';
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAge } from '../../utils/gradeUtils';
 
+const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
+    'Maka-Diyos': [
+        "Expresses one's spiritual beliefs while respecting the spiritual beliefs of others.",
+        'Shows adherence to ethical principles by upholding truth',
+    ],
+    'Maka-Tao': [
+        'Is sensitive to individual, social, and cultural differences',
+        'Demonstrates contributions toward solidarity',
+    ],
+    'Makakalikasan': [
+        'Cares for the environment and utilizes resources wisely, judiciously, and economically.',
+    ],
+    'Makabansa': [
+        'Demonstrates pride in being a Filipino; exercises the rights and responsibilities of a Filipino citizen',
+        'Demonstrates appropriate behavior in carrying out activities in the school, community, and country',
+    ],
+};
+
 const styles = StyleSheet.create({
-    attendanceMonthContainer: {width: '7%', textAlign: 'center', borderRight: '1px solid black'},
+    // Attendance table:
+    // - 1 label column + 13 month/total columns
+    // - widths must not overflow (7% * 13 + 15% = 106% caused misalignment/double borders)
+    attendanceMonthContainer: {width: '6.53%', textAlign: 'center', borderRight: '1px solid black'},
+    attendanceMonthContainerLast: {width: '6.53%', textAlign: 'center'},
     attendanceMonthText: {fontSize: '7px', fontFamily: 'Helvetica'}
 });
 
@@ -13,13 +36,19 @@ interface PrintReportCardProps {
     classSectionId?: string;
     institutionId?: string;
     academicYear?: string;
+    viewerKey?: string;
+    viewerHeight?: string;
+    principalName?: string;
 }
 
 export default function PrintReportCard({ 
     studentId = "", 
     classSectionId = "", 
     institutionId = "", 
-    academicYear = '2024-2025' 
+    academicYear = '2025-2026',
+    viewerKey,
+    viewerHeight = '100%',
+    principalName = '',
 }: PrintReportCardProps) {
     const { 
         student, 
@@ -27,6 +56,7 @@ export default function PrintReportCard({
         classSection, 
         subjects, 
         grades, 
+        coreValueMarkings,
         isLoading, 
         error 
     } = useStudentReportCard({
@@ -37,40 +67,56 @@ export default function PrintReportCard({
         enabled: true
     });
 
+    // MUST be above early returns (hooks order must be consistent).
+    const coreValueMap = useMemo(() => {
+        const map: Record<string, Record<string, Record<string, string>>> = {};
+        (Array.isArray(coreValueMarkings) ? coreValueMarkings : []).forEach((m: any) => {
+            const cv = String(m.core_value || '');
+            const bs = String(m.behavior_statement || '');
+            const q = String(m.quarter || '');
+            const marking = String(m.marking || '');
+
+            if (!cv || !bs || !q) return;
+            if (!map[cv]) map[cv] = {};
+            if (!map[cv][bs]) map[cv][bs] = {};
+            map[cv][bs][q] = marking;
+        });
+        return map;
+    }, [coreValueMarkings]);
+
+    const mark = (coreValue: string, behaviorStatement: string, quarter: '1' | '2' | '3' | '4') => {
+        return coreValueMap?.[coreValue]?.[behaviorStatement]?.[quarter] || '';
+    };
+
     if (isLoading) {
         return (
-            <PDFViewer className='w-full' style={{height: '90vh'}}>
-                <Document>
-                    <Page size="A5" orientation="landscape">
-                        <View style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%'}}>
-                            <Text>Loading report card...</Text>
-                        </View>
-                    </Page>
-                </Document>
-            </PDFViewer>
+            <div className="w-full flex items-center justify-center bg-white" style={{ height: viewerHeight }}>
+                <div className="text-sm text-gray-600">Loading report card…</div>
+            </div>
         );
     }
 
     if (error) {
         return (
-            <PDFViewer className='w-full' style={{height: '90vh'}}>
-                <Document>
-                    <Page size="A5" orientation="landscape">
-                        <View style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%'}}>
-                            <Text>Error loading report card: {error}</Text>
-                        </View>
-                    </Page>
-                </Document>
-            </PDFViewer>
+            <div className="w-full flex items-center justify-center bg-white" style={{ height: viewerHeight }}>
+                <div className="text-sm text-red-700">Error loading report card: {error}</div>
+            </div>
         );
     }
 
     const finalGrade = calculateFinalGrade(grades);
     const finalGradeRemarks = getPassFailRemarks(finalGrade);
     const studentAge = calculateAge(student.birthdate);
-    
+    const teacher = (classSection as any)?.adviser
+    const teacherName = teacher
+      ? `${teacher.last_name || ''}, ${teacher.first_name || ''}${teacher.middle_name ? `, ${String(teacher.middle_name).trim().charAt(0)}.` : ''}${teacher.ext_name ? `, ${teacher.ext_name}` : ''}`.toUpperCase()
+      : ''
+    const principalDisplay = (principalName || '').trim() ? principalName : ' '
+
+    const pdfKey = viewerKey || `${studentId}|${classSectionId}|${institutionId}|${academicYear}`
+
     return(
-        <PDFViewer className='w-full' style={{height: '90vh'}}>
+        <PDFViewer key={pdfKey} className='w-full' style={{height: viewerHeight}}>
             <Document>
                 <Page size="A5" orientation="landscape" style={{display: 'flex', flexDirection: 'row'}}>
                     <View style={{width: '50%', padding: '20px'}}>
@@ -117,7 +163,7 @@ export default function PrintReportCard({
                                     <View style={styles.attendanceMonthContainer}>
                                         <Text style={styles.attendanceMonthText}>Jun</Text>
                                     </View>
-                                    <View style={styles.attendanceMonthContainer}>
+                                    <View style={styles.attendanceMonthContainerLast}>
                                         <Text style={styles.attendanceMonthText}>Total</Text>
                                     </View>
                                 </View>
@@ -125,43 +171,43 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of school days</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
                                 </View>
@@ -169,46 +215,43 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of days present</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
                                 </View>
@@ -216,43 +259,43 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of days absent</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
-                                    <View style={{width: '7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
                                     </View>
                                 </View>
@@ -273,14 +316,15 @@ export default function PrintReportCard({
                                 <Text style={{fontSize: '6px', fontFamily:'Helvetica', marginLeft: 'auto'}}>School ID: {institution.gov_id || 'N/A'}</Text>
                             </View>
                             <View style={{display: 'flex', flexDirection: 'row', marginBottom: '3px'}}>
-                                <Image source={`/deped-logo.png`} style={{height: 49, width: 49}}></Image>
-                                <View style={{display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '10px', marginHorizontal: '10px', gap: '1px'}}>
+                                {/* NOTE: temporarily removed logo images to prevent PDFViewer blanking if remote assets fail */}
+                                <View style={{height: 49, width: 49}} />
+                                <View style={{display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '10px', marginHorizontal: '10px'}}>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica'}}>Republic of the Philippines</Text>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica'}}>Department of Education</Text>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica-Bold'}}>Region XII-SOCCSKSARGEN</Text>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica'}}>Division of General Santos City</Text>
                                 </View>
-                                <Image source={`/deped-logo.png`} style={{height: 49, width: 49}}></Image>
+                                <View style={{height: 49, width: 49}} />
                             </View>
                             <Text style={{fontSize: '6px', fontFamily:'Helvetica-Bold', alignSelf:'center'}}>{institution.title}</Text>
                             <Text style={{fontSize: '6px', fontFamily:'Helvetica-Bold', alignSelf:'center'}}>{institution.address || 'Address not available'}</Text>
@@ -289,23 +333,32 @@ export default function PrintReportCard({
                                 <Text style={{color: 'white', fontSize: '8px', fontFamily:'Helvetica-Bold', alignSelf:'center'}}>REPORT CARD </Text>
                             </View>
                             
-                            <Text style={{fontFamily: 'Helvetica', fontSize: '8px', alignSelf:'flex-end'}}>LRN: {student.lrn}</Text>
+                            <Text style={{fontFamily: 'Helvetica', fontSize: '8px', alignSelf:'flex-end'}}>
+                                LRN: {student?.lrn && String(student.lrn).trim() ? student.lrn : '-'}
+                            </Text>
                             
                             <View style={{marginTop: '2px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start'}}>
-                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px', textTransform: 'uppercase'}}>Name:  <Text style={{textDecoration: 'underline'}}>{`${student.first_name} ${student.middle_name || ''} ${student.last_name} ${student.ext_name || ''}`.toUpperCase()}</Text></Text>
+                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px', textTransform: 'uppercase'}}>
+                                    Name:{' '}
+                                    <Text style={{textDecoration: 'underline'}}>
+                                        {`${student.last_name || ''}, ${student.first_name || ''}${
+                                            student.middle_name ? `, ${String(student.middle_name).trim().charAt(0)}.` : ''
+                                        }${student.ext_name ? `, ${student.ext_name}` : ''}`.toUpperCase()}
+                                    </Text>
+                                </Text>
                             </View>
                             
-                            <View style={{marginTop: '3px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start', gap: '20px'}}>
-                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px'}}>Age: <Text style={{textDecoration: 'underline'}}>{studentAge}</Text></Text>
+                            <View style={{marginTop: '3px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start'}}>
+                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px', marginRight: 20}}>Age: <Text style={{textDecoration: 'underline'}}>{studentAge}</Text></Text>
                                 <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px'}}>Sex: <Text style={{textDecoration: 'underline'}}>{student.gender === 'male' ? 'M' : student.gender === 'female' ? 'F' : 'O'}</Text></Text>
                             </View>
                             
-                            <View style={{marginTop: '3px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start', gap: '8px'}}>
-                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px'}}>Grade: <Text style={{textDecoration: 'underline'}}>{classSection.grade_level}</Text></Text>
+                            <View style={{marginTop: '3px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start'}}>
+                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px', marginRight: 8}}>Grade: <Text style={{textDecoration: 'underline'}}>{classSection.grade_level}</Text></Text>
                                 <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px'}}>Section: <Text style={{textDecoration: 'underline'}}>{classSection.title}</Text></Text>
                             </View>
                             
-                            <View style={{marginTop: '3px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start', gap: '5px'}}>
+                            <View style={{marginTop: '3px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start'}}>
                                 <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px'}}>School Year: {academicYear}</Text>
                             </View>
                             
@@ -319,11 +372,11 @@ export default function PrintReportCard({
                             
                             <View style={{marginTop: '3px', width: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between'}}>
                                 <View style={{marginTop: '8px', width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                    <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>JOHN A. DOE</Text>
+                                    <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{principalDisplay}</Text>
                                     <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Principal</Text>
                                 </View>
                                 <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                    <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>JANE B. SMITH</Text>
+                                    <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
                                     <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Teacher</Text>
                                 </View>
                             </View>
@@ -332,7 +385,7 @@ export default function PrintReportCard({
                                 <Text style={{color: 'white', fontSize: '8px', fontFamily:'Helvetica-Bold', alignSelf:'center'}}>Certificate of Transfer </Text>
                             </View>
                             
-                            <View style={{marginTop: '0px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px'}}>
+                            <View style={{marginTop: '0px', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
                                 <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '10px'}}></Text>
                                 <View style={{display: 'flex', flexDirection: 'row', marginTop: '2px', marginBottom: '8px', alignSelf: 'flex-start'}}>
                                     <Text style={{fontSize: '8px', fontFamily: 'Helvetica'}}>Admitted to Grade:______________</Text>
@@ -341,11 +394,11 @@ export default function PrintReportCard({
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'flex-start'}}>Eligibility for Admission to Grade:_______________________</Text>
                                 <View style={{display: 'flex', flexDirection: 'row', marginTop: '5px'}}>
                                     <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                        <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>JOHN A. DOE</Text>
+                                        <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{principalDisplay}</Text>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Principal</Text>
                                     </View>
                                     <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                        <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>JANE B. SMITH</Text>
+                                        <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Teacher</Text>
                                     </View>
                                 </View>
@@ -382,13 +435,13 @@ export default function PrintReportCard({
                             <View style={{width: '40%', display: 'flex', flexDirection: 'column', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center'}}>Quarter</Text>
                                 <View style={{display: 'flex', flexDirection: 'row', borderTop: '1px solid black'}}>
-                                    <View style={{width: '25%', borderRight: '1px sold black'}}>
+                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>1</Text>
                                     </View>
-                                    <View style={{width: '25%', borderRight: '1px sold black'}}>
+                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>2</Text>
                                     </View>
-                                    <View style={{width: '25%', borderRight: '1px sold black'}}>
+                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>3</Text>
                                     </View>
                                     <View style={{width: '25%'}}>
@@ -424,33 +477,33 @@ export default function PrintReportCard({
                                     <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black'}}>
                                         <View style={{width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2px'}}>
                                             <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>
-                                                {quarter1Grade > 0 ? quarter1Grade : '-'}
+                                                {quarter1Grade > 0 ? quarter1Grade : ''}
                                             </Text>
                                         </View>
                                         <View style={{width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2px'}}>
                                             <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>
-                                                {quarter2Grade > 0 ? quarter2Grade : '-'}
+                                                {quarter2Grade > 0 ? quarter2Grade : ''}
                                             </Text>
                                         </View>
                                         <View style={{width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2px'}}>
                                             <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>
-                                                {quarter3Grade > 0 ? quarter3Grade : '-'}
+                                                {quarter3Grade > 0 ? quarter3Grade : ''}
                                             </Text>
                                         </View>
                                         <View style={{width: '25%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2px'}}>
                                             <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>
-                                                {quarter4Grade > 0 ? quarter4Grade : '-'}
+                                                {quarter4Grade > 0 ? quarter4Grade : ''}
                                             </Text>
                                         </View>
                                     </View>
                                     <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                            {subjectFinalGrade > 0 ? subjectFinalGrade : '-'}
+                                            {subjectFinalGrade > 0 ? subjectFinalGrade : ''}
                                         </Text>
                                     </View>
                                     <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', padding: '2px'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                            {subjectFinalGrade > 0 ? subjectRemarks : '-'}
+                                            {subjectFinalGrade > 0 ? subjectRemarks : ''}
                                         </Text>
                                     </View>
                                 </View>
@@ -463,12 +516,12 @@ export default function PrintReportCard({
                             </View>
                             <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                    {finalGrade > 0 ? finalGrade : '-'}
+                                    {finalGrade > 0 ? finalGrade : ''}
                                 </Text>
                             </View>
                             <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                    {finalGrade > 0 ? finalGradeRemarks : '-'}
+                                    {finalGrade > 0 ? finalGradeRemarks : ''}
                                 </Text>
                             </View>
                         </View>
@@ -553,13 +606,13 @@ export default function PrintReportCard({
                             <View style={{width: '40%', display: 'flex', flexDirection: 'column'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center'}}>Quarter</Text>
                                 <View style={{display: 'flex', flexDirection: 'row', borderTop: '1px solid black'}}>
-                                    <View style={{width: '25%', borderRight: '1px sold black'}}>
+                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>1</Text>
                                     </View>
-                                    <View style={{width: '25%', borderRight: '1px sold black'}}>
+                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>2</Text>
                                     </View>
-                                    <View style={{width: '25%', borderRight: '1px sold black'}}>
+                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>3</Text>
                                     </View>
                                     <View style={{width: '25%'}}>
@@ -576,12 +629,12 @@ export default function PrintReportCard({
                             <View style={{width: '42%', display: 'flex', flexDirection:'column', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '30px', borderBottom: '1px solid black'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                        Expresses one's spiritual beliefs while respecting the spiritual beliefs of others
+                                        {CORE_VALUE_BEHAVIORS['Maka-Diyos'][0]}
                                     </Text>
                                 </View>
                                 <View>
                                     <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                        Shows adherence to ethical principles by upholding truth
+                                        {CORE_VALUE_BEHAVIORS['Maka-Diyos'][1]}
                                     </Text>
                                 </View>
                             </View>
@@ -589,48 +642,48 @@ export default function PrintReportCard({
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '1')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '1')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '2')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '2')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '3')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '3')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '4')}
                                         </Text>
                                     </View>
                                     <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                            AO
+                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '4')}
                                         </Text>
                                     </View>
                                 </View>
@@ -639,17 +692,17 @@ export default function PrintReportCard({
                         
                         <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
                             <View style={{width: '18%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center'}}>Makatao</Text>
+                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center'}}>Maka-Tao</Text>
                             </View>
                             <View style={{width: '42%', display: 'flex', flexDirection:'column', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '25px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                        Is sensitive to individual, social and cultural differences
+                                        {CORE_VALUE_BEHAVIORS['Maka-Tao'][0]}
                                     </Text>
                                 </View>
                                 <View style={{height: '25px', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
-                                        Demonstrates contributions towards solidarity
+                                        {CORE_VALUE_BEHAVIORS['Maka-Tao'][1]}
                                     </Text>
                                 </View>
                             </View>
@@ -657,40 +710,48 @@ export default function PrintReportCard({
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '25px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '1')}
                                         </Text>
                                     </View>
                                     <View style={{height: '25px', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '1')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '25px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '2')}
                                         </Text>
                                     </View>
                                     <View style={{height: '25px', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '2')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '25px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '3')}
                                         </Text>
                                     </View>
                                     <View style={{height: '25px', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '3')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '25px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '4')}
                                         </Text>
                                     </View>
                                     <View style={{height: '25px', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '4px'}}>
+                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '4')}
                                         </Text>
                                     </View>
                                 </View>
@@ -704,26 +765,22 @@ export default function PrintReportCard({
                             <View style={{width: '42%', display: 'flex', flexDirection:'column', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
-                                        Cares for the environment and utilizes resources wisely, judiciously, and economically.
+                                        {CORE_VALUE_BEHAVIORS['Makakalikasan'][0]}
                                     </Text>
                                 </View>
                             </View>
                             <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
                                 <View style={{height:'100%' ,fontSize: '6px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>
-                                    </Text>
+                                    <Text>{mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '1')}</Text>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '6px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>
-                                    </Text>
+                                    <Text>{mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '2')}</Text>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '6px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>
-                                    </Text>
+                                    <Text>{mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '3')}</Text>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '6px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>
-                                    </Text>
+                                    <Text>{mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '4')}</Text>
                                 </View>
                             </View>
                         </View>
@@ -735,12 +792,12 @@ export default function PrintReportCard({
                             <View style={{width: '42%', display: 'flex', flexDirection:'column', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <View style={{height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: '1px solid black'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
-                                        Demonstrates pride in being a Filipino; excercises the rights and responsibilities of a Filipino citizen.
+                                        {CORE_VALUE_BEHAVIORS['Makabansa'][0]}
                                     </Text>
                                 </View>
                                 <View style={{height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
                                     <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
-                                        Demonstrates appropriate behaviour in carrying out activities in the school, community, and country.
+                                        {CORE_VALUE_BEHAVIORS['Makabansa'][1]}
                                     </Text>
                                 </View>
                             </View>
@@ -748,40 +805,48 @@ export default function PrintReportCard({
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '30px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '1')}
                                         </Text>
                                     </View>
                                     <View style={{height: '30px', width: '100%',  display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '1')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '30px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '2')}
                                         </Text>
                                     </View>
                                     <View style={{height: '30px', width: '100%',  display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '2')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '30px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '3')}
                                         </Text>
                                     </View>
                                     <View style={{height: '30px', width: '100%',  display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '3')}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
                                     <View style={{height: '30px', width: '100%',  borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '4')}
                                         </Text>
                                     </View>
                                     <View style={{height: '30px', width: '100%',  display: 'flex', flexDirection: 'column', justifyContent:'center'}}>
                                         <Text style={{fontSize: '6px', fontFamily: 'Helvetica', alignSelf: 'center', padding: '3px'}}>
+                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '4')}
                                         </Text>
                                     </View>
                                 </View>
