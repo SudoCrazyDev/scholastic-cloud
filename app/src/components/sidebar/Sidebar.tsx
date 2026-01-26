@@ -229,9 +229,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
             <motion.div
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              className={`flex-shrink-0 ${
-                isCollapsed ? 'mx-auto' : ''
-              }`}
+              className={`flex-shrink-0 ${isCollapsed ? 'mx-auto' : ''}`}
             >
               {item.icon}
             </motion.div>

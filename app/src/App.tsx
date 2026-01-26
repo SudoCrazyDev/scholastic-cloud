@@ -71,6 +71,8 @@ function App() {
               <Route path="certificates" element={<CertificateList />} />
               <Route path="school-days" element={<SchoolDays />} />
               <Route path="finance" element={<Finance />} />
+              <Route path="finance/school-fees" element={<Finance />} />
+              <Route path="finance/default-amounts" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
 
             </Route>
