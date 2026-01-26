@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { NavLink, useLocation } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Select } from '../../components/select'
@@ -12,8 +14,27 @@ import type { SchoolFee, SchoolFeeDefault } from '../../types'
 
 const Finance: React.FC = () => {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const view = useMemo(() => {
+    const pathname = location.pathname
+    if (pathname.endsWith('/school-fees')) return 'school-fees'
+    if (pathname.endsWith('/default-amounts')) return 'default-amounts'
+    return 'dashboard'
+  }, [location.pathname])
+
   const currentYear = new Date().getFullYear()
   const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
+
+  const gradeLevelOptions = useMemo(() => {
+    const options = [
+      { value: 'Kinder 1', label: 'Kinder 1' },
+      { value: 'Kinder 2', label: 'Kinder 2' },
+    ]
+    for (let grade = 1; grade <= 12; grade += 1) {
+      options.push({ value: `Grade ${grade}`, label: `Grade ${grade}` })
+    }
+    return options
+  }, [])
 
   const [feeForm, setFeeForm] = useState({
     name: '',
@@ -55,7 +76,7 @@ const Finance: React.FC = () => {
   const dashboardQuery = useQuery({
     queryKey: ['finance-dashboard', dashboardYear],
     queryFn: () => financeDashboardService.getSummary(dashboardYear),
-    enabled: Boolean(dashboardYear),
+    enabled: view === 'dashboard' && Boolean(dashboardYear),
   })
 
   const defaultsQuery = useQuery({
@@ -65,6 +86,7 @@ const Finance: React.FC = () => {
         academic_year: filters.academic_year || undefined,
         grade_level: filters.grade_level || undefined,
       }),
+    enabled: view === 'default-amounts',
   })
 
   const createFeeMutation = useMutation({
@@ -73,9 +95,12 @@ const Finance: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['school-fees'] })
       setFeeForm({ name: '', description: '', is_active: true })
       setFeeError(null)
+      toast.success('School fee saved.')
     },
     onError: (error: any) => {
-      setFeeError(error.response?.data?.message || 'Failed to save school fee.')
+      const message = error.response?.data?.message || 'Failed to save school fee.'
+      setFeeError(message)
+      toast.error(message)
     },
   })
 
@@ -87,9 +112,12 @@ const Finance: React.FC = () => {
       setEditingFee(null)
       setFeeForm({ name: '', description: '', is_active: true })
       setFeeError(null)
+      toast.success('School fee updated.')
     },
     onError: (error: any) => {
-      setFeeError(error.response?.data?.message || 'Failed to update school fee.')
+      const message = error.response?.data?.message || 'Failed to update school fee.'
+      setFeeError(message)
+      toast.error(message)
     },
   })
 
@@ -97,6 +125,11 @@ const Finance: React.FC = () => {
     mutationFn: (id: string) => schoolFeeService.deleteSchoolFee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-fees'] })
+      toast.success('School fee deleted.')
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to delete school fee.'
+      toast.error(message)
     },
   })
 
@@ -256,6 +289,8 @@ const Finance: React.FC = () => {
     })
   }
 
+  const isSavingFee = createFeeMutation.isPending || updateFeeMutation.isPending
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -268,148 +303,186 @@ const Finance: React.FC = () => {
         <p className="text-gray-600 mt-1">Manage school fees, defaults, and yearly amounts.</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Finance Dashboard</h2>
-            <p className="text-sm text-gray-600">
-              Total Payable shows collectibles for the selected academic year.
-            </p>
-          </div>
-          <div className="w-full lg:w-64">
-            <Select
-              value={dashboardYear}
-              onChange={(event) => setDashboardYear(event.target.value)}
-              options={academicYearOptions}
-              className="w-full"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Total Payable</h3>
-          {dashboardQuery.isLoading ? (
-            <p className="text-gray-500">Loading dashboard...</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Grade Level
-                    </th>
-                    {dashboardFees.map((fee) => (
-                      <th
-                        key={fee.id}
-                        className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
-                      >
-                        {fee.name}
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {gradeSummaries.map((grade) => (
-                    <tr key={grade.grade_level}>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {grade.grade_level}
-                      </td>
-                      {dashboardFees.map((fee) => (
-                        <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
-                          {formatAmount(grade.payable.by_fee?.[fee.id])}
-                        </td>
-                      ))}
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                        {formatAmount(grade.payable.total)}
-                      </td>
-                    </tr>
-                  ))}
-                  {!gradeSummaries.length && (
-                    <tr>
-                      <td
-                        colSpan={dashboardFees.length + 2}
-                        className="px-4 py-6 text-center text-gray-500"
-                      >
-                        No payable data found for this academic year.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="text-xs text-gray-500">
-            Totals include discounts and balance forward adjustments.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Total Payment</h3>
-          {dashboardQuery.isLoading ? (
-            <p className="text-gray-500">Loading dashboard...</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Grade Level
-                    </th>
-                    {dashboardFees.map((fee) => (
-                      <th
-                        key={fee.id}
-                        className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
-                      >
-                        {fee.name}
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {gradeSummaries.map((grade) => (
-                    <tr key={grade.grade_level}>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {grade.grade_level}
-                      </td>
-                      {dashboardFees.map((fee) => (
-                        <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
-                          {formatAmount(grade.payments.by_fee?.[fee.id])}
-                        </td>
-                      ))}
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                        {formatAmount(grade.payments.total)}
-                      </td>
-                    </tr>
-                  ))}
-                  {!gradeSummaries.length && (
-                    <tr>
-                      <td
-                        colSpan={dashboardFees.length + 2}
-                        className="px-4 py-6 text-center text-gray-500"
-                      >
-                        No payment data found for this academic year.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {hasUnassignedPayments && (
-            <p className="text-xs text-gray-500">
-              Totals include payments not tied to a specific fee.
-            </p>
-          )}
+      <div className="bg-white rounded-xl border border-gray-200 p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          <NavLink
+            to="/finance"
+            end
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Dashboard
+          </NavLink>
+          <NavLink
+            to="/finance/school-fees"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            School Fees
+          </NavLink>
+          <NavLink
+            to="/finance/default-amounts"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Default Amounts
+          </NavLink>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      {view === 'dashboard' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Finance Dashboard</h2>
+              <p className="text-sm text-gray-600">
+                Total Payable shows collectibles for the selected academic year.
+              </p>
+            </div>
+            <div className="w-full lg:w-64">
+              <Select
+                value={dashboardYear}
+                onChange={(event) => setDashboardYear(event.target.value)}
+                options={academicYearOptions}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">Total Payable</h3>
+            {dashboardQuery.isLoading ? (
+              <p className="text-gray-500">Loading dashboard...</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Grade Level
+                      </th>
+                      {dashboardFees.map((fee) => (
+                        <th
+                          key={fee.id}
+                          className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                        >
+                          {fee.name}
+                        </th>
+                      ))}
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {gradeSummaries.map((grade) => (
+                      <tr key={grade.grade_level}>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {grade.grade_level}
+                        </td>
+                        {dashboardFees.map((fee) => (
+                          <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
+                            {formatAmount(grade.payable.by_fee?.[fee.id])}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                          {formatAmount(grade.payable.total)}
+                        </td>
+                      </tr>
+                    ))}
+                    {!gradeSummaries.length && (
+                      <tr>
+                        <td
+                          colSpan={dashboardFees.length + 2}
+                          className="px-4 py-6 text-center text-gray-500"
+                        >
+                          No payable data found for this academic year.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="text-xs text-gray-500">
+              Totals include discounts and balance forward adjustments.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">Total Payment</h3>
+            {dashboardQuery.isLoading ? (
+              <p className="text-gray-500">Loading dashboard...</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Grade Level
+                      </th>
+                      {dashboardFees.map((fee) => (
+                        <th
+                          key={fee.id}
+                          className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                        >
+                          {fee.name}
+                        </th>
+                      ))}
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {gradeSummaries.map((grade) => (
+                      <tr key={grade.grade_level}>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {grade.grade_level}
+                        </td>
+                        {dashboardFees.map((fee) => (
+                          <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
+                            {formatAmount(grade.payments.by_fee?.[fee.id])}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                          {formatAmount(grade.payments.total)}
+                        </td>
+                      </tr>
+                    ))}
+                    {!gradeSummaries.length && (
+                      <tr>
+                        <td
+                          colSpan={dashboardFees.length + 2}
+                          className="px-4 py-6 text-center text-gray-500"
+                        >
+                          No payment data found for this academic year.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {hasUnassignedPayments && (
+              <p className="text-xs text-gray-500">
+                Totals include payments not tied to a specific fee.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'school-fees' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">School Fees</h2>
           <form className="space-y-4" onSubmit={handleFeeSubmit}>
@@ -418,12 +491,14 @@ const Finance: React.FC = () => {
               value={feeForm.name}
               onChange={(event) => setFeeForm(prev => ({ ...prev, name: event.target.value }))}
               placeholder="e.g. Tuition Fee"
+              disabled={isSavingFee}
             />
             <Input
               label="Description"
               value={feeForm.description}
               onChange={(event) => setFeeForm(prev => ({ ...prev, description: event.target.value }))}
               placeholder="Optional notes"
+              disabled={isSavingFee}
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -437,17 +512,19 @@ const Finance: React.FC = () => {
                   { value: 'inactive', label: 'Inactive' },
                 ]}
                 className="w-full"
+                disabled={isSavingFee}
               />
             </div>
             {feeError && <p className="text-sm text-red-600">{feeError}</p>}
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                {editingFee ? 'Update Fee' : 'Add Fee'}
+              <Button type="submit" loading={isSavingFee} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                {editingFee ? (isSavingFee ? 'Updating Fee...' : 'Update Fee') : (isSavingFee ? 'Adding Fee...' : 'Add Fee')}
               </Button>
               {editingFee && (
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={isSavingFee}
                   onClick={() => {
                     setEditingFee(null)
                     setFeeForm({ name: '', description: '', is_active: true })
@@ -520,16 +597,24 @@ const Finance: React.FC = () => {
             )}
           </div>
         </div>
+      )}
 
+      {view === 'default-amounts' && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Default Amounts</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <Input
-              label="Filter Grade Level"
-              value={filters.grade_level}
-              onChange={(event) => setFilters(prev => ({ ...prev, grade_level: event.target.value }))}
-              placeholder="e.g. Grade 1"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filter Grade Level
+              </label>
+              <Select
+                value={filters.grade_level}
+                onChange={(event) => setFilters(prev => ({ ...prev, grade_level: event.target.value }))}
+                options={gradeLevelOptions}
+                placeholder="Select grade level"
+                className="w-full"
+              />
+            </div>
             <Select
               value={filters.academic_year}
               onChange={(event) => setFilters(prev => ({ ...prev, academic_year: event.target.value }))}
@@ -644,7 +729,7 @@ const Finance: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+      )}
     </motion.div>
   )
 }
