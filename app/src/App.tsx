@@ -73,6 +73,8 @@ function App() {
               <Route path="finance" element={<Finance />} />
               <Route path="finance/school-fees" element={<Finance />} />
               <Route path="finance/default-amounts" element={<Finance />} />
+              <Route path="finance/cashiering" element={<Finance />} />
+              <Route path="finance/ledger" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
 
             </Route>

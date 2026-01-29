@@ -10,7 +10,10 @@ import { Select } from '../../components/select'
 import { schoolFeeService } from '../../services/schoolFeeService'
 import { schoolFeeDefaultService } from '../../services/schoolFeeDefaultService'
 import { financeDashboardService } from '../../services/financeDashboardService'
-import type { SchoolFee, SchoolFeeDefault } from '../../types'
+import { studentService } from '../../services/studentService'
+import { studentPaymentService } from '../../services/studentPaymentService'
+import { studentFinanceService } from '../../services/studentFinanceService'
+import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentPaymentData, StudentPayment } from '../../types'
 
 const Finance: React.FC = () => {
   const queryClient = useQueryClient()
@@ -19,6 +22,8 @@ const Finance: React.FC = () => {
     const pathname = location.pathname
     if (pathname.endsWith('/school-fees')) return 'school-fees'
     if (pathname.endsWith('/default-amounts')) return 'default-amounts'
+    if (pathname.endsWith('/cashiering')) return 'cashiering'
+    if (pathname.endsWith('/ledger')) return 'ledger'
     return 'dashboard'
   }, [location.pathname])
 
@@ -35,6 +40,11 @@ const Finance: React.FC = () => {
     }
     return options
   }, [])
+
+  const filterGradeOptions = useMemo(
+    () => [{ value: '', label: 'All grades' }, ...gradeLevelOptions],
+    [gradeLevelOptions]
+  )
 
   const [feeForm, setFeeForm] = useState({
     name: '',
@@ -57,6 +67,36 @@ const Finance: React.FC = () => {
     academic_year: defaultAcademicYear,
   })
   const [dashboardYear, setDashboardYear] = useState(defaultAcademicYear)
+
+  const [studentSearchTerm, setStudentSearchTerm] = useState('')
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState('')
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [cashierPaymentForm, setCashierPaymentForm] = useState({
+    academic_year: defaultAcademicYear,
+    school_fee_id: '',
+    amount: '',
+    payment_date: new Date().toISOString().split('T')[0],
+    payment_method: '',
+    reference_number: '',
+    remarks: '',
+  })
+  const [cashierError, setCashierError] = useState<string | null>(null)
+  const [lastReceipt, setLastReceipt] = useState<StudentPayment | null>(null)
+
+  const [ledgerSearchTerm, setLedgerSearchTerm] = useState('')
+  const [debouncedLedgerSearch, setDebouncedLedgerSearch] = useState('')
+  const [selectedLedgerStudent, setSelectedLedgerStudent] = useState<Student | null>(null)
+  const [ledgerAcademicYear, setLedgerAcademicYear] = useState(defaultAcademicYear)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedStudentSearch(studentSearchTerm), 300)
+    return () => clearTimeout(timer)
+  }, [studentSearchTerm])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedLedgerSearch(ledgerSearchTerm), 300)
+    return () => clearTimeout(timer)
+  }, [ledgerSearchTerm])
 
   const academicYearOptions = useMemo(() => {
     const years = []
@@ -87,6 +127,55 @@ const Finance: React.FC = () => {
         grade_level: filters.grade_level || undefined,
       }),
     enabled: view === 'default-amounts',
+  })
+
+  const studentSearchQuery = useQuery({
+    queryKey: ['students-cashier-search', debouncedStudentSearch],
+    queryFn: () =>
+      studentService.searchStudentsForAssignment({
+        search: debouncedStudentSearch,
+        per_page: 20,
+      }),
+    enabled: view === 'cashiering' && debouncedStudentSearch.length >= 2,
+  })
+
+  const ledgerStudentSearchQuery = useQuery({
+    queryKey: ['students-ledger-search', debouncedLedgerSearch],
+    queryFn: () =>
+      studentService.searchStudentsForAssignment({
+        search: debouncedLedgerSearch,
+        per_page: 20,
+      }),
+    enabled: view === 'ledger' && debouncedLedgerSearch.length >= 2,
+  })
+
+  const ledgerQuery = useQuery({
+    queryKey: ['student-ledger', selectedLedgerStudent?.id, ledgerAcademicYear],
+    queryFn: () =>
+      studentFinanceService.getLedger(selectedLedgerStudent!.id, ledgerAcademicYear),
+    enabled: view === 'ledger' && Boolean(selectedLedgerStudent?.id),
+  })
+
+  const createPaymentMutation = useMutation({
+    mutationFn: (payload: CreateStudentPaymentData) => studentPaymentService.createPayment(payload),
+    onSuccess: (response) => {
+      setLastReceipt(response.data)
+      setCashierPaymentForm((prev) => ({
+        ...prev,
+        amount: '',
+        reference_number: '',
+        remarks: '',
+      }))
+      setCashierError(null)
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      toast.success(`Payment recorded. Receipt: ${response.data.receipt_number ?? response.data.id}`)
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to record payment.'
+      setCashierError(message)
+      toast.error(message)
+    },
   })
 
   const createFeeMutation = useMutation({
@@ -150,9 +239,12 @@ const Finance: React.FC = () => {
         amount: '',
       })
       setDefaultError(null)
+      toast.success('Default amount saved.')
     },
     onError: (error: any) => {
-      setDefaultError(error.response?.data?.message || 'Failed to save default amount.')
+      const message = error.response?.data?.message || 'Failed to save default amount.'
+      setDefaultError(message)
+      toast.error(message)
     },
   })
 
@@ -169,9 +261,12 @@ const Finance: React.FC = () => {
         amount: '',
       })
       setDefaultError(null)
+      toast.success('Default amount updated.')
     },
     onError: (error: any) => {
-      setDefaultError(error.response?.data?.message || 'Failed to update default amount.')
+      const message = error.response?.data?.message || 'Failed to update default amount.'
+      setDefaultError(message)
+      toast.error(message)
     },
   })
 
@@ -179,6 +274,10 @@ const Finance: React.FC = () => {
     mutationFn: (id: string) => schoolFeeDefaultService.deleteDefault(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-fee-defaults'] })
+      toast.success('Default amount removed.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to remove default amount.')
     },
   })
 
@@ -219,6 +318,18 @@ const Finance: React.FC = () => {
     const value = Number(amount || 0)
     return value.toFixed(2)
   }
+
+  const formatCurrency = (amount?: number | string | null) => {
+    const value = Number(amount ?? 0)
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+  }
+
+  const isSavingDefault = upsertDefaultMutation.isPending || updateDefaultMutation.isPending
 
   const handleDefaultSubmit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -279,6 +390,36 @@ const Finance: React.FC = () => {
     }
   }
 
+  const getStudentFullName = (s: Student) =>
+    [s.first_name, s.middle_name, s.last_name, s.ext_name].filter(Boolean).join(' ')
+
+  const handleCashierPaymentSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setCashierError(null)
+    if (!selectedStudent) {
+      setCashierError('Please select a student.')
+      toast.error('Please select a student.')
+      return
+    }
+    const amountValue = Number(cashierPaymentForm.amount)
+    if (!amountValue || amountValue <= 0) {
+      setCashierError('Payment amount must be greater than zero.')
+      toast.error('Payment amount must be greater than zero.')
+      return
+    }
+    const payload: CreateStudentPaymentData = {
+      student_id: selectedStudent.id,
+      academic_year: cashierPaymentForm.academic_year,
+      amount: amountValue,
+      payment_date: cashierPaymentForm.payment_date || new Date().toISOString().split('T')[0],
+      payment_method: cashierPaymentForm.payment_method || undefined,
+      reference_number: cashierPaymentForm.reference_number || undefined,
+      remarks: cashierPaymentForm.remarks || undefined,
+      school_fee_id: cashierPaymentForm.school_fee_id || undefined,
+    }
+    createPaymentMutation.mutate(payload)
+  }
+
   const resetDefaultForm = () => {
     setEditingDefault(null)
     setDefaultForm({
@@ -335,6 +476,26 @@ const Finance: React.FC = () => {
             }
           >
             Default Amounts
+          </NavLink>
+          <NavLink
+            to="/finance/cashiering"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Cashiering (POS)
+          </NavLink>
+          <NavLink
+            to="/finance/ledger"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Ledger
           </NavLink>
         </div>
       </div>
@@ -600,115 +761,199 @@ const Finance: React.FC = () => {
       )}
 
       {view === 'default-amounts' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Default Amounts</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Filter Grade Level
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Default Amounts</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Set default fee amounts per grade level and academic year. These are used when assigning fees to students.
+            </p>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3">
+            <div className="min-w-[140px]">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                Grade level
               </label>
               <Select
                 value={filters.grade_level}
-                onChange={(event) => setFilters(prev => ({ ...prev, grade_level: event.target.value }))}
-                options={gradeLevelOptions}
-                placeholder="Select grade level"
+                onChange={(e) => setFilters(prev => ({ ...prev, grade_level: e.target.value }))}
+                options={filterGradeOptions}
                 className="w-full"
               />
             </div>
-            <Select
-              value={filters.academic_year}
-              onChange={(event) => setFilters(prev => ({ ...prev, academic_year: event.target.value }))}
-              options={academicYearOptions}
-              className="w-full"
-            />
+            <div className="min-w-[140px]">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                Academic year
+              </label>
+              <Select
+                value={filters.academic_year}
+                onChange={(e) => setFilters(prev => ({ ...prev, academic_year: e.target.value }))}
+                options={academicYearOptions}
+                className="w-full"
+              />
+            </div>
+            <p className="text-sm text-gray-500 ml-auto self-center">
+              {defaultsQuery.isLoading
+                ? 'Loading…'
+                : `${defaults.length} default${defaults.length === 1 ? '' : 's'}`}
+            </p>
           </div>
 
-          <form className="space-y-4" onSubmit={handleDefaultSubmit}>
-            <Select
-              value={defaultForm.school_fee_id}
-              onChange={(event) => setDefaultForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
-              options={fees.map((fee) => ({ value: fee.id, label: fee.name }))}
-              placeholder="Select fee"
-              className="w-full"
-              disabled={Boolean(editingDefault)}
-            />
-            <Input
-              label="Grade Level"
-              value={defaultForm.grade_level}
-              onChange={(event) => setDefaultForm(prev => ({ ...prev, grade_level: event.target.value }))}
-              placeholder="e.g. Grade 2"
-              disabled={Boolean(editingDefault)}
-            />
-            <Input
-              label="Academic Year"
-              value={defaultForm.academic_year}
-              onChange={(event) => setDefaultForm(prev => ({ ...prev, academic_year: event.target.value }))}
-              placeholder="2025-2026"
-              disabled={Boolean(editingDefault)}
-            />
-            <Input
-              label="Default Amount"
-              type="number"
-              min="0"
-              step="0.01"
-              value={defaultForm.amount}
-              onChange={(event) => setDefaultForm(prev => ({ ...prev, amount: event.target.value }))}
-              placeholder="0.00"
-            />
-            {defaultError && <p className="text-sm text-red-600">{defaultError}</p>}
-            <div className="flex flex-wrap gap-3">
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                {editingDefault ? 'Update Amount' : 'Save Default'}
-              </Button>
-              {editingDefault && (
-                <Button type="button" variant="outline" onClick={resetDefaultForm}>
-                  Cancel
-                </Button>
+          {/* Add / Edit form */}
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">
+              {editingDefault ? 'Edit default amount' : 'Set default amount'}
+            </h3>
+            <form className="space-y-4" onSubmit={handleDefaultSubmit}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Fee</label>
+                  <Select
+                    value={defaultForm.school_fee_id}
+                    onChange={(e) => setDefaultForm(prev => ({ ...prev, school_fee_id: e.target.value }))}
+                    options={fees.map((fee) => ({ value: fee.id, label: fee.name }))}
+                    placeholder="Select fee"
+                    className="w-full"
+                    disabled={Boolean(editingDefault) || isSavingDefault}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Grade level</label>
+                  <Select
+                    value={defaultForm.grade_level}
+                    onChange={(e) => setDefaultForm(prev => ({ ...prev, grade_level: e.target.value }))}
+                    options={gradeLevelOptions}
+                    placeholder="Select grade"
+                    className="w-full"
+                    disabled={Boolean(editingDefault) || isSavingDefault}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Academic year</label>
+                  <Select
+                    value={defaultForm.academic_year}
+                    onChange={(e) => setDefaultForm(prev => ({ ...prev, academic_year: e.target.value }))}
+                    options={academicYearOptions}
+                    className="w-full"
+                    disabled={Boolean(editingDefault) || isSavingDefault}
+                  />
+                </div>
+                <div className="[&_input]:!py-[calc(--spacing(2.5)-1px)] [&_input]:!text-base/6 sm:[&_input]:!py-[calc(--spacing(1.5)-1px)] sm:[&_input]:!text-sm/6">
+                  <Input
+                    label="Amount (PHP)"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={defaultForm.amount}
+                    onChange={(e) => setDefaultForm(prev => ({ ...prev, amount: e.target.value }))}
+                    placeholder="0.00"
+                    disabled={isSavingDefault}
+                  />
+                </div>
+              </div>
+              {defaultError && (
+                <p className="text-sm text-red-600" role="alert">
+                  {defaultError}
+                </p>
               )}
-            </div>
-          </form>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="submit"
+                  loading={isSavingDefault}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  {editingDefault
+                    ? isSavingDefault
+                      ? 'Updating…'
+                      : 'Update amount'
+                    : isSavingDefault
+                      ? 'Saving…'
+                      : 'Save default'}
+                </Button>
+                {editingDefault && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSavingDefault}
+                    onClick={resetDefaultForm}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+          </div>
 
-          <div className="mt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Defaults for Selection</h3>
+          {/* Table */}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
+              <h3 className="text-base font-semibold text-gray-900">Default amounts list</h3>
+            </div>
             {defaultsQuery.isLoading ? (
-              <p className="text-gray-500">Loading defaults...</p>
+              <div className="p-8 text-center text-gray-500">
+                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600 mb-2" />
+                <p>Loading defaults…</p>
+              </div>
+            ) : !defaults.length ? (
+              <div className="py-12 text-center">
+                <p className="text-gray-500">No default amounts for the selected filters.</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Use the form above to add a default amount for a fee, grade, and academic year.
+                </p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Academic Year</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Fee
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Grade
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Academic year
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {defaults.map((feeDefault) => (
-                      <tr key={feeDefault.id}>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {feeDefault.school_fee?.name || 'School Fee'}
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {defaults.map((row) => (
+                      <tr
+                        key={row.id}
+                        className={editingDefault?.id === row.id ? 'bg-indigo-50/50' : 'hover:bg-gray-50/50'}
+                      >
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {row.school_fee?.name || '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{feeDefault.grade_level}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{feeDefault.academic_year}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                          {Number(feeDefault.amount).toFixed(2)}
+                        <td className="px-4 py-3 text-sm text-gray-600">{row.grade_level}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{row.academic_year}</td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 tabular-nums">
+                          {formatCurrency(row.amount)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditDefault(feeDefault)}
+                              onClick={() => handleEditDefault(row)}
+                              title="Edit amount"
                             >
                               <PencilSquareIcon className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteDefault(feeDefault)}
+                              onClick={() => handleDeleteDefault(row)}
                               className="text-red-600 border-red-200 hover:bg-red-50"
+                              title="Remove default"
                             >
                               <TrashIcon className="w-4 h-4" />
                             </Button>
@@ -716,16 +961,436 @@ const Finance: React.FC = () => {
                         </td>
                       </tr>
                     ))}
-                    {!defaults.length && (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
-                          No defaults found for the selected filters.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'cashiering' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Cashiering (POS)</h2>
+            <p className="text-sm text-gray-600">
+              Search for a student and record a payment. Receipt number will be shown after saving.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-gray-700">Student</label>
+                <div className="relative">
+                  <Input
+                    value={studentSearchTerm}
+                    onChange={(e) => {
+                      setStudentSearchTerm(e.target.value)
+                      if (!e.target.value) setSelectedStudent(null)
+                    }}
+                    placeholder="Search by name or LRN (min 2 characters)"
+                    className="w-full"
+                  />
+                  {studentSearchQuery.isFetching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                      Searching...
+                    </div>
+                  )}
+                  {debouncedStudentSearch.length >= 2 && !selectedStudent && (
+                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-auto">
+                      {studentSearchQuery.data?.data?.length ? (
+                        studentSearchQuery.data.data.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedStudent(s)
+                              setStudentSearchTerm(getStudentFullName(s))
+                              setDebouncedStudentSearch('')
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 flex flex-col"
+                          >
+                            <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
+                            {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500">No students found.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {selectedStudent && (
+                  <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
+                    <span className="text-sm font-medium text-indigo-900">
+                      {getStudentFullName(selectedStudent)}
+                      {selectedStudent.lrn && ` (LRN: ${selectedStudent.lrn})`}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedStudent(null)
+                        setStudentSearchTerm('')
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={handleCashierPaymentSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Academic year</label>
+                    <Select
+                      value={cashierPaymentForm.academic_year}
+                      onChange={(e) =>
+                        setCashierPaymentForm((prev) => ({ ...prev, academic_year: e.target.value }))
+                      }
+                      options={academicYearOptions}
+                      className="w-full"
+                      disabled={createPaymentMutation.isPending}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment date</label>
+                    <Input
+                      type="date"
+                      value={cashierPaymentForm.payment_date}
+                      onChange={(e) =>
+                        setCashierPaymentForm((prev) => ({ ...prev, payment_date: e.target.value }))
+                      }
+                      disabled={createPaymentMutation.isPending}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fee type (optional)
+                  </label>
+                  <Select
+                    value={cashierPaymentForm.school_fee_id}
+                    onChange={(e) =>
+                      setCashierPaymentForm((prev) => ({ ...prev, school_fee_id: e.target.value }))
+                    }
+                    options={[
+                      { value: '', label: '— Any / General' },
+                      ...(feesQuery.data?.data ?? []).map((f) => ({ value: f.id, label: f.name })),
+                    ]}
+                    className="w-full"
+                    disabled={createPaymentMutation.isPending}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₱) *</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={cashierPaymentForm.amount}
+                    onChange={(e) =>
+                      setCashierPaymentForm((prev) => ({ ...prev, amount: e.target.value }))
+                    }
+                    placeholder="0.00"
+                    disabled={createPaymentMutation.isPending}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Payment method (optional)
+                  </label>
+                  <Select
+                    value={cashierPaymentForm.payment_method}
+                    onChange={(e) =>
+                      setCashierPaymentForm((prev) => ({ ...prev, payment_method: e.target.value }))
+                    }
+                    options={[
+                      { value: '', label: '— Select' },
+                      { value: 'Cash', label: 'Cash' },
+                      { value: 'Check', label: 'Check' },
+                      { value: 'Bank Transfer', label: 'Bank Transfer' },
+                      { value: 'Online', label: 'Online' },
+                      { value: 'Other', label: 'Other' },
+                    ]}
+                    className="w-full"
+                    disabled={createPaymentMutation.isPending}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reference number (optional)
+                  </label>
+                  <Input
+                    value={cashierPaymentForm.reference_number}
+                    onChange={(e) =>
+                      setCashierPaymentForm((prev) => ({ ...prev, reference_number: e.target.value }))
+                    }
+                    placeholder="e.g. check no., transaction id"
+                    disabled={createPaymentMutation.isPending}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Remarks (optional)</label>
+                  <Input
+                    value={cashierPaymentForm.remarks}
+                    onChange={(e) =>
+                      setCashierPaymentForm((prev) => ({ ...prev, remarks: e.target.value }))
+                    }
+                    placeholder="Optional notes"
+                    disabled={createPaymentMutation.isPending}
+                  />
+                </div>
+                {cashierError && (
+                  <p className="text-sm text-red-600">{cashierError}</p>
+                )}
+                <Button
+                  type="submit"
+                  loading={createPaymentMutation.isPending}
+                  disabled={!selectedStudent}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
+                >
+                  {createPaymentMutation.isPending ? 'Recording...' : 'Record payment'}
+                </Button>
+              </form>
+            </div>
+
+            {lastReceipt && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-medium text-green-800">Last receipt</p>
+                <p className="text-lg font-semibold text-green-900 mt-1">
+                  Receipt # {lastReceipt.receipt_number ?? lastReceipt.id}
+                </p>
+                <p className="text-sm text-green-700 mt-1">
+                  Amount: ₱ {Number(lastReceipt.amount).toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'ledger' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Student Ledger</h2>
+            <p className="text-sm text-gray-600">
+              Search for a student to view their finance ledger (charges, payments, discounts, and running balance).
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
+            <div className="max-w-xl space-y-4">
+              <label className="block text-sm font-medium text-gray-700">Student</label>
+              <div className="relative">
+                <Input
+                  value={ledgerSearchTerm}
+                  onChange={(e) => {
+                    setLedgerSearchTerm(e.target.value)
+                    if (!e.target.value) setSelectedLedgerStudent(null)
+                  }}
+                  placeholder="Search by name or LRN (min 2 characters)"
+                  className="w-full"
+                />
+                {ledgerStudentSearchQuery.isFetching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                    Searching...
+                  </div>
+                )}
+                {debouncedLedgerSearch.length >= 2 && !selectedLedgerStudent && (
+                  <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-auto">
+                    {ledgerStudentSearchQuery.data?.data?.length ? (
+                      ledgerStudentSearchQuery.data.data.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedLedgerStudent(s)
+                            setLedgerSearchTerm(getStudentFullName(s))
+                            setDebouncedLedgerSearch('')
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 flex flex-col"
+                        >
+                          <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
+                          {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500">No students found.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedLedgerStudent && (
+                <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
+                  <span className="text-sm font-medium text-indigo-900">
+                    {getStudentFullName(selectedLedgerStudent)}
+                    {selectedLedgerStudent.lrn && ` (LRN: ${selectedLedgerStudent.lrn})`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={ledgerAcademicYear}
+                      onChange={(e) => setLedgerAcademicYear(e.target.value)}
+                      options={academicYearOptions}
+                      className="w-40"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedLedgerStudent(null)
+                        setLedgerSearchTerm('')
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selectedLedgerStudent && (
+              <>
+                {ledgerQuery.data?.data?.available_academic_years?.length &&
+                  !ledgerQuery.data.data.available_academic_years.includes(ledgerAcademicYear) && (
+                    <p className="text-sm text-amber-600">
+                      No ledger data for {ledgerAcademicYear}. Available:{' '}
+                      {ledgerQuery.data.data.available_academic_years.join(', ')}
+                    </p>
+                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Balance Forward</p>
+                    <p className="text-xl font-semibold text-gray-900 tabular-nums">
+                      ₱ {Number(ledgerQuery.data?.data?.totals?.balance_forward ?? 0).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Charges</p>
+                    <p className="text-xl font-semibold text-gray-900 tabular-nums">
+                      ₱ {Number(ledgerQuery.data?.data?.totals?.charges ?? 0).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Discounts</p>
+                    <p className="text-xl font-semibold text-gray-900 tabular-nums">
+                      ₱ {Number(ledgerQuery.data?.data?.totals?.discounts ?? 0).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">Payments</p>
+                    <p className="text-xl font-semibold text-gray-900 tabular-nums">
+                      ₱ {Number(ledgerQuery.data?.data?.totals?.payments ?? 0).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-indigo-50 p-4">
+                    <p className="text-sm text-gray-600 font-medium">Current Balance</p>
+                    <p className="text-xl font-semibold text-indigo-900 tabular-nums">
+                      ₱ {Number(ledgerQuery.data?.data?.totals?.balance ?? 0).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Ledger entries</h3>
+                  {ledgerQuery.isLoading ? (
+                    <p className="text-gray-500">Loading ledger...</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Type
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Description
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Date
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                              Amount
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                              Running Balance
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {ledgerQuery.data?.data?.entries?.map((entry, index) => (
+                            <tr
+                              key={
+                                `${entry.type}-${entry.payment_id ?? entry.discount_id ?? entry.fee_id ?? index}`
+                              }
+                            >
+                              <td className="px-4 py-3 text-sm text-gray-600 capitalize">
+                                {entry.type.replace('_', ' ')}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700">{entry.description}</td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                {entry.date ?? '—'}
+                              </td>
+                              <td
+                                className={`px-4 py-3 text-sm text-right tabular-nums ${
+                                  entry.amount < 0 ? 'text-red-600' : 'text-gray-900'
+                                }`}
+                              >
+                                ₱ {Number(entry.amount).toLocaleString('en-PH', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
+                                ₱ {Number(entry.running_balance ?? 0).toLocaleString('en-PH', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </td>
+                            </tr>
+                          ))}
+                          {!ledgerQuery.data?.data?.entries?.length && (
+                            <tr>
+                              <td
+                                colSpan={5}
+                                className="px-4 py-8 text-center text-gray-500"
+                              >
+                                No ledger entries for this academic year.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {!selectedLedgerStudent && (
+              <p className="text-sm text-gray-500">Select a student above to view their ledger.</p>
             )}
           </div>
         </div>
