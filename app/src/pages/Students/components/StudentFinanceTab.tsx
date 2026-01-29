@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PDFDownloadLink } from '@react-pdf/renderer'
 import { CreditCardIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
@@ -8,6 +9,7 @@ import { schoolFeeService } from '../../../services/schoolFeeService'
 import { studentFinanceService } from '../../../services/studentFinanceService'
 import { studentDiscountService } from '../../../services/studentDiscountService'
 import { studentPaymentService } from '../../../services/studentPaymentService'
+import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
 import type { CreateStudentDiscountData, CreateStudentPaymentData, Student, StudentPayment } from '../../../types'
 
 interface StudentFinanceTabProps {
@@ -325,10 +327,28 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
-          Notice of Account (NOA)
-        </h4>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
+            Notice of Account (NOA)
+          </h4>
+          {noaData && (
+            <PDFDownloadLink
+              document={<StudentNOAPDF data={noaData} />}
+              fileName={`NOA-${student.last_name}-${student.first_name}-${resolvedAcademicYear}`.replace(
+                /[^a-zA-Z0-9-_]/g,
+                '-'
+              )}
+            >
+              {({ loading }) => (
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <DocumentTextIcon className="w-4 h-4 text-indigo-600" />
+                  {loading ? 'Preparing PDF...' : 'Download PDF'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          )}
+        </div>
         {noaQuery.isLoading ? (
           <p className="text-gray-500">Loading NOA...</p>
         ) : (

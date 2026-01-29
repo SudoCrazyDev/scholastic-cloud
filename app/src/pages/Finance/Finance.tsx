@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PDFDownloadLink } from '@react-pdf/renderer'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { NavLink, useLocation } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
@@ -13,6 +14,7 @@ import { financeDashboardService } from '../../services/financeDashboardService'
 import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
+import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentPaymentData, StudentPayment } from '../../types'
 
 const Finance: React.FC = () => {
@@ -154,6 +156,12 @@ const Finance: React.FC = () => {
     queryFn: () =>
       studentFinanceService.getLedger(selectedLedgerStudent!.id, ledgerAcademicYear),
     enabled: view === 'ledger' && Boolean(selectedLedgerStudent?.id),
+  })
+
+  const ledgerNoaQuery = useQuery({
+    queryKey: ['student-noa', selectedLedgerStudent?.id, ledgerAcademicYear],
+    queryFn: () => studentFinanceService.getNoticeOfAccount(selectedLedgerStudent!.id, ledgerAcademicYear),
+    enabled: view === 'ledger' && Boolean(selectedLedgerStudent?.id && ledgerAcademicYear),
   })
 
   const createPaymentMutation = useMutation({
@@ -1178,11 +1186,28 @@ const Finance: React.FC = () => {
 
       {view === 'ledger' && (
         <div className="space-y-6">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Student Ledger</h2>
-            <p className="text-sm text-gray-600">
-              Search for a student to view their finance ledger (charges, payments, discounts, and running balance).
-            </p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Student Ledger</h2>
+              <p className="text-sm text-gray-600">
+                Search for a student to view their finance ledger (charges, payments, discounts, and running balance).
+              </p>
+            </div>
+            {selectedLedgerStudent && ledgerNoaQuery.data?.data && (
+              <PDFDownloadLink
+                document={<StudentNOAPDF data={ledgerNoaQuery.data.data} />}
+                fileName={`NOA-${selectedLedgerStudent.last_name}-${selectedLedgerStudent.first_name}-${ledgerAcademicYear}`.replace(
+                  /[^a-zA-Z0-9-_]/g,
+                  '-'
+                )}
+              >
+                {({ loading }) => (
+                  <Button variant="outline" size="sm">
+                    {loading ? 'Preparing Notice of Account...' : 'Download Notice of Account'}
+                  </Button>
+                )}
+              </PDFDownloadLink>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
