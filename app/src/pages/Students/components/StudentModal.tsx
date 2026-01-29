@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon, CameraIcon, PhotoIcon } from '@heroicons/react/24/outline'
 import { Formik, Form, Field, ErrorMessage } from 'formik'
 import * as Yup from 'yup'
+import { toast } from 'react-hot-toast'
 import { Input } from '../../../components/input'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
@@ -39,21 +40,21 @@ const validationSchema = Yup.object({
     .required('First name is required')
     .min(2, 'First name must be at least 2 characters')
     .max(50, 'First name must be less than 50 characters')
-    .matches(/^[a-zA-Z\s]+$/, 'First name can only contain letters and spaces'),
+    .matches(/^[\p{L}\s'\-.,]+$/u, 'First name contains invalid characters'),
   
   middle_name: Yup.string()
     .max(50, 'Middle name must be less than 50 characters')
-    .matches(/^[a-zA-Z\s]*$/, 'Middle name can only contain letters and spaces'),
+    .matches(/^[\p{L}\s'\-.,]*$/u, 'Middle name contains invalid characters'),
   
   last_name: Yup.string()
     .required('Last name is required')
     .min(2, 'Last name must be at least 2 characters')
     .max(50, 'Last name must be less than 50 characters')
-    .matches(/^[a-zA-Z\s]+$/, 'Last name can only contain letters and spaces'),
+    .matches(/^[\p{L}\s'\-.,]+$/u, 'Last name contains invalid characters'),
   
   ext_name: Yup.string()
     .max(20, 'Extension name must be less than 20 characters')
-    .matches(/^[a-zA-Z\s.,]*$/, 'Extension name can only contain letters, spaces, dots, and commas'),
+    .matches(/^[\p{L}\s'\-.,]*$/u, 'Extension name contains invalid characters'),
   
   birthdate: Yup.date()
     .required('Birthdate is required')
@@ -250,15 +251,30 @@ export function StudentModal({
                     
                     await onSubmit(submitData)
                     if (!isEditing) {
+                      toast.success('Student created successfully!', {
+                        duration: 4000,
+                        icon: '✅',
+                      })
                       resetForm()
                       setProfileImage(null)
                       setProfileImageFile(null)
                     } else {
+                      toast.success('Student updated successfully!', {
+                        duration: 4000,
+                        icon: '✅',
+                      })
                       // Auto-close modal after successful update
                       onClose()
                     }
-                  } catch (error) {
-                    // Error handling is done by the parent component
+                  } catch (error: unknown) {
+                    const errorMessage = error && typeof error === 'object' && 'response' in error 
+                      ? ((error.response as { data?: { message?: string } })?.data?.message) || 'Failed to update student'
+                      : isEditing ? 'Failed to update student' : 'Failed to create student'
+                    toast.error(errorMessage, {
+                      duration: 5000,
+                      icon: '❌',
+                    })
+                    // Error handling is also done by the parent component
                   } finally {
                     setSubmitting(false)
                   }
