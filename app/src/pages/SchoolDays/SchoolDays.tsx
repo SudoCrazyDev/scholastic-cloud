@@ -34,7 +34,6 @@ const SchoolDays: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('')
   const [schoolDaysData, setSchoolDaysData] = useState<Record<number, number>>({})
-  const [hasInitialized, setHasInitialized] = useState(false)
 
   // Get institution ID from user
   const institutionId = useMemo(() => {
@@ -76,25 +75,16 @@ const SchoolDays: React.FC = () => {
     enabled: !!institutionId && !!selectedAcademicYear,
   })
 
-  // Initialize school days data from API response (only once per filter change)
+  // Sync local form state from API whenever we have finished loading (fixes reload showing 0)
   React.useEffect(() => {
-    if (hasInitialized) return
-
+    if (isLoading) return
     const data: Record<number, number> = {}
-
-    if (schoolDays.length > 0) {
-      schoolDays.forEach((schoolDay) => {
-        data[schoolDay.month] = schoolDay.total_days
-      })
-    } else {
-      for (let month = 1; month <= 12; month++) {
-        data[month] = 0
-      }
+    for (let month = 1; month <= 12; month++) {
+      const record = schoolDays.find((d) => d.month === month)
+      data[month] = record?.total_days ?? 0
     }
-
     setSchoolDaysData(data)
-    setHasInitialized(true)
-  }, [schoolDays, hasInitialized])
+  }, [schoolDays, isLoading])
 
   // Auto-select first academic year if none selected
   React.useEffect(() => {
@@ -190,10 +180,7 @@ const SchoolDays: React.FC = () => {
                   <Select
                     options={academicYearOptions}
                     value={selectedAcademicYear}
-                    onChange={(e) => {
-                      setSelectedAcademicYear(e.target.value)
-                      setHasInitialized(false)
-                    }}
+                    onChange={(e) => setSelectedAcademicYear(e.target.value)}
                   />
                 </div>
               </div>
@@ -203,10 +190,7 @@ const SchoolDays: React.FC = () => {
                   <Select
                     options={yearOptions}
                     value={selectedYear.toString()}
-                    onChange={(e) => {
-                      setSelectedYear(parseInt(e.target.value))
-                      setHasInitialized(false)
-                    }}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                   />
                 </div>
               </div>

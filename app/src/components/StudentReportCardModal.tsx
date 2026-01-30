@@ -185,7 +185,7 @@ export function StudentReportCardModal({
                       studentId={studentId || ''}
                       classSectionId={classSectionId || ''}
                       institutionId={institutionId || ''}
-                      academicYear={academicYear}
+                      academicYear={academicYear || '2024-2025'}
                     />
                   </PdfErrorBoundary>
                 </div>

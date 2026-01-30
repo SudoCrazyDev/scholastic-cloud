@@ -5,7 +5,9 @@ import { classSectionService } from '../services/classSectionService'
 import { subjectService } from '../services/subjectService'
 import { studentRunningGradeService } from '../services/studentRunningGradeService'
 import { coreValueMarkingService } from '../services/coreValueMarkingService'
-import type { Student, Institution, ClassSection, Subject } from '../types'
+import { studentAttendanceService } from '../services/studentAttendanceService'
+import { schoolDayService } from '../services/schoolDayService'
+import type { Student, Institution, ClassSection, Subject, StudentAttendance, SchoolDay } from '../types'
 import type { StudentRunningGrade } from '../services/studentRunningGradeService'
 
 interface UseStudentReportCardParams {
@@ -23,6 +25,8 @@ interface StudentReportCardData {
   subjects: Subject[]
   grades: StudentRunningGrade[]
   coreValueMarkings: any[]
+  attendances: StudentAttendance[]
+  schoolDays: SchoolDay[]
   isLoading: boolean
   error: string | null
 }
@@ -76,13 +80,13 @@ export const useStudentReportCard = ({
     refetchOnReconnect: false,
   })
 
-  // Fetch subjects for the class section
+  // Fetch subjects for the class section (same query key as ClassSectionDetail so cache is shared)
   const {
     data: subjectsData,
     isLoading: subjectsLoading,
     error: subjectsError
   } = useQuery({
-    queryKey: ['subjects', classSectionId],
+    queryKey: ['subjects', { class_section_id: classSectionId }],
     queryFn: () => subjectService.getSubjects({ class_section_id: classSectionId }),
     enabled: enabled && !!classSectionId,
     staleTime: 5 * 60 * 1000,
@@ -90,49 +94,67 @@ export const useStudentReportCard = ({
     refetchOnReconnect: false,
   })
 
-  // Fetch all grades for the student across all subjects
+  // Fetch all grades for the student in one call (same as Temp Report Card / ClassSectionDetail)
   const {
     data: gradesData,
     isLoading: gradesLoading,
     error: gradesError
   } = useQuery({
-    queryKey: ['student-grades', studentId, classSectionId, academicYear],
-    queryFn: async () => {
-      const subjects = subjectsData?.data || []
-      const allGrades: StudentRunningGrade[] = []
-      
-      // Fetch grades for each subject
-      for (const subject of subjects) {
-        try {
-          const grades = await studentRunningGradeService.getByStudentAndSubject(studentId, subject.id)
-          if (grades.data) {
-            allGrades.push(...grades.data)
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch grades for subject ${subject.id}:`, error)
-        }
-      }
-      
-      return { data: allGrades }
-    },
-    enabled: enabled && !!studentId && !!classSectionId && !!subjectsData?.data,
+    queryKey: ['student-running-grades', { student_id: studentId }],
+    queryFn: () => studentRunningGradeService.list({ student_id: studentId }),
+    enabled: enabled && !!studentId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
 
-  // Fetch learner observed values markings (same source as Temp Report Card)
+  // Fetch learner observed values markings (same source as Temp Report Card and Core Values tab)
+  const coreValueMarkingsParams = { student_id: studentId, academic_year: academicYear }
   const {
     data: coreValueMarkingsData,
     isLoading: coreValueMarkingsLoading,
     error: coreValueMarkingsError,
   } = useQuery({
-    queryKey: ['core-value-markings', studentId, academicYear],
-    queryFn: () => coreValueMarkingService.get({ student_id: studentId, academic_year: academicYear }),
+    queryKey: ['core-value-markings', coreValueMarkingsParams],
+    queryFn: () => coreValueMarkingService.get(coreValueMarkingsParams),
     enabled: enabled && !!studentId && !!academicYear,
     staleTime: 0,
     retry: 1,
     retryDelay: 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
+  // Fetch attendance data for the student
+  const {
+    data: attendancesData,
+    isLoading: attendancesLoading,
+    error: attendancesError,
+  } = useQuery({
+    queryKey: ['student-attendances', studentId, classSectionId, academicYear],
+    queryFn: () => studentAttendanceService.getAttendances({
+      class_section_id: classSectionId,
+      academic_year: academicYear,
+    }),
+    enabled: enabled && !!studentId && !!classSectionId && !!academicYear,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+
+  // Fetch school days for the institution
+  const {
+    data: schoolDaysData,
+    isLoading: schoolDaysLoading,
+    error: schoolDaysError,
+  } = useQuery({
+    queryKey: ['school-days', institutionId, academicYear],
+    queryFn: () => schoolDayService.getSchoolDays({
+      institution_id: institutionId,
+      academic_year: academicYear,
+    }),
+    enabled: enabled && !!institutionId && !!academicYear,
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
@@ -143,7 +165,9 @@ export const useStudentReportCard = ({
     classSectionLoading ||
     subjectsLoading ||
     gradesLoading ||
-    coreValueMarkingsLoading
+    coreValueMarkingsLoading ||
+    attendancesLoading ||
+    schoolDaysLoading
 
   const error =
     studentError?.message ||
@@ -152,15 +176,27 @@ export const useStudentReportCard = ({
     subjectsError?.message ||
     gradesError?.message ||
     coreValueMarkingsError?.message ||
+    attendancesError?.message ||
+    schoolDaysError?.message ||
     null
+
+  // Filter attendances for this specific student
+  const studentAttendances = (attendancesData?.data || []).filter(
+    (attendance: StudentAttendance) => attendance.student_id === studentId
+  )
+
+  const subjectsOut = subjectsData?.data || []
+  const gradesOut = gradesData?.data || []
 
   return {
     student: studentData?.data || {} as Student,
     institution: institutionData?.data || {} as Institution,
     classSection: classSectionData?.data || {} as ClassSection,
-    subjects: subjectsData?.data || [],
-    grades: gradesData?.data || [],
+    subjects: subjectsOut,
+    grades: gradesOut,
     coreValueMarkings: Array.isArray(coreValueMarkingsData) ? coreValueMarkingsData : [],
+    attendances: studentAttendances,
+    schoolDays: schoolDaysData?.data || [],
     isLoading,
     error
   }

@@ -176,6 +176,23 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!selectedStudentForReport?.id,
   })
 
+  /** Each subject should have at most 4 grades (one per quarter). Flag if any subject has more than 4. */
+  const gradeAnomaly = useMemo(() => {
+    if (!studentGrades?.data || !Array.isArray(studentGrades.data)) return null
+    const bySubject: Record<string, number> = {}
+    studentGrades.data.forEach((g: any) => {
+      const sid = g.subject_id
+      if (sid) bySubject[sid] = (bySubject[sid] || 0) + 1
+    })
+    const overFour = Object.entries(bySubject).filter(([, count]) => count > 4)
+    if (overFour.length === 0) return null
+    return {
+      hasAnomaly: true,
+      subjectIds: overFour.map(([id]) => id),
+      countBySubject: Object.fromEntries(overFour),
+    }
+  }, [studentGrades?.data])
+
   const transformedGrades = useMemo((): StudentSubjectGrade[] => {
     if (!studentGrades?.data || !selectedStudentForReport?.id) return []
 
@@ -668,7 +685,16 @@ const ClassSectionDetail: React.FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
+                  className="space-y-4"
                 >
+                  {gradeAnomaly?.hasAnomaly && (
+                    <Alert
+                      type="warning"
+                      title="Grade data issue"
+                      message={`${gradeAnomaly.subjectIds.length} subject(s) have more than 4 grade records (expected: one per quarter). Please review or fix in Consolidated Grades.`}
+                      show={true}
+                    />
+                  )}
                   <ClassSectionReportCardsTab
                     filteredStudents={filteredStudents}
                     getFullName={getFullName}

@@ -57,6 +57,8 @@ export default function PrintReportCard({
         subjects, 
         grades, 
         coreValueMarkings,
+        attendances,
+        schoolDays,
         isLoading, 
         error 
     } = useStudentReportCard({
@@ -86,6 +88,62 @@ export default function PrintReportCard({
 
     const mark = (coreValue: string, behaviorStatement: string, quarter: '1' | '2' | '3' | '4') => {
         return coreValueMap?.[coreValue]?.[behaviorStatement]?.[quarter] || '';
+    };
+
+    // Organize attendance data by month (academic year order: Jul=7, Aug=8, ..., Jun=6)
+    // Map database months (1-12) to academic year order (7,8,9,10,11,12,1,2,3,4,5,6)
+    const attendanceByMonth = useMemo(() => {
+        const map: Record<number, { schoolDays: number; present: number; absent: number }> = {};
+        
+        // Initialize all months
+        const academicYearMonths = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+        academicYearMonths.forEach(month => {
+            map[month] = { schoolDays: 0, present: 0, absent: 0 };
+        });
+
+        // Fill in school days data (normalize month to number in case API returns string)
+        (schoolDays || []).forEach((schoolDay: any) => {
+            const month = Number(schoolDay.month);
+            if (month >= 1 && month <= 12 && map[month] !== undefined) {
+                map[month].schoolDays = Number(schoolDay.total_days) || 0;
+            }
+        });
+
+        // Fill in attendance data (days present from API)
+        (attendances || []).forEach((attendance: any) => {
+            const month = Number(attendance.month);
+            if (month >= 1 && month <= 12 && map[month] !== undefined) {
+                map[month].present = Number(attendance.days_present) || 0;
+            }
+        });
+
+        // Auto-calculate No. of days absent = school days - days present (per month)
+        academicYearMonths.forEach(month => {
+            const school = map[month].schoolDays;
+            const present = map[month].present;
+            map[month].absent = Math.max(0, school - present);
+        });
+
+        return map;
+    }, [attendances, schoolDays]);
+
+    // Calculate totals
+    const attendanceTotals = useMemo(() => {
+        const totals = { schoolDays: 0, present: 0, absent: 0 };
+        Object.values(attendanceByMonth).forEach(monthData => {
+            totals.schoolDays += monthData.schoolDays;
+            totals.present += monthData.present;
+            totals.absent += monthData.absent;
+        });
+        return totals;
+    }, [attendanceByMonth]);
+
+    // Helper to get attendance for a specific month (in academic year order)
+    const getAttendanceForMonth = (academicYearMonthIndex: number) => {
+        // academicYearMonthIndex: 0=Jul, 1=Aug, ..., 11=Jun
+        const academicYearMonths = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+        const month = academicYearMonths[academicYearMonthIndex];
+        return attendanceByMonth[month] || { schoolDays: 0, present: 0, absent: 0 };
     };
 
     if (isLoading) {
@@ -171,132 +229,49 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of school days</Text>
                                     </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
+                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => {
+                                        const monthData = getAttendanceForMonth(index);
+                                        return (
+                                            <View key={`school-days-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{monthData.schoolDays ?? ''}</Text>
+                                            </View>
+                                        );
+                                    })}
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center"}}>
+                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{attendanceTotals.schoolDays ?? ''}</Text>
                                     </View>
                                 </View>
                                 <View style={{width: '100%', display: 'flex', flexDirection: 'row', borderBottom: '1px solid black'}}>
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of days present</Text>
                                     </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
+                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => {
+                                        const monthData = getAttendanceForMonth(index);
+                                        return (
+                                            <View key={`present-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{monthData.present || ''}</Text>
+                                            </View>
+                                        );
+                                    })}
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center"}}>
+                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{attendanceTotals.present || ''}</Text>
                                     </View>
                                 </View>
                                 <View style={{width: '100%', display: 'flex', flexDirection: 'row'}}>
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of days absent</Text>
                                     </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
-                                    </View>
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center",}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>0</Text>
+                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => {
+                                        const monthData = getAttendanceForMonth(index);
+                                        const absent = Number(monthData.absent);
+                                        return (
+                                            <View key={`absent-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{isNaN(absent) ? '' : String(absent)}</Text>
+                                            </View>
+                                        );
+                                    })}
+                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center"}}>
+                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{isNaN(Number(attendanceTotals.absent)) ? '' : String(attendanceTotals.absent)}</Text>
                                     </View>
                                 </View>
                             </View>

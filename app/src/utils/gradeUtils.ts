@@ -90,13 +90,20 @@ export const toNumber = (grade: number | string | null | undefined): number => {
  */
 import type { StudentRunningGrade } from '../services/studentRunningGradeService'
 
+/** Prefer final_grade (encoded grade), fallback to grade. Same as Temp Report Card / backend. */
+function gradeValue(g: StudentRunningGrade): number {
+  const raw = g.final_grade != null ? g.final_grade : g.grade
+  const v = Number(raw)
+  return !Number.isNaN(v) ? v : 0
+}
+
 export const calculateFinalGrade = (grades: StudentRunningGrade[]): number => {
   if (grades.length === 0) return 0
-  
-  const validGrades = grades.filter(grade => grade.grade > 0)
+
+  const validGrades = grades.filter(grade => gradeValue(grade) > 0)
   if (validGrades.length === 0) return 0
-  
-  const sum = validGrades.reduce((total, grade) => total + grade.grade, 0)
+
+  const sum = validGrades.reduce((total, grade) => total + gradeValue(grade), 0)
   return Math.round((sum / validGrades.length) * 100) / 100
 }
 
@@ -113,8 +120,12 @@ export const getPassFailRemarks = (grade: number): string => {
 }
 
 export const getQuarterGrade = (grades: StudentRunningGrade[], quarter: '1' | '2' | '3' | '4'): number => {
-  const quarterGrade = grades.find(grade => grade.quarter === quarter)
-  return quarterGrade?.grade || 0
+  const q = String(quarter)
+  const quarterGrade = grades.find(
+    grade => String(grade.quarter) === q || Number(grade.quarter) === Number(quarter)
+  )
+  if (!quarterGrade) return 0
+  return gradeValue(quarterGrade)
 }
 
 export const calculateAge = (birthdate: string): number => {

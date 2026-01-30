@@ -1,8 +1,18 @@
 import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer } from '@react-pdf/renderer';
 import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../../types';
-import { roundGrade } from '@/utils/gradeUtils';
+import { roundGrade, getPassFailRemarks } from '@/utils/gradeUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
+
+/** Final grade = average of quarter grades (only quarters with valid grades). Rounded to 2 decimals. */
+function computeFinalGradeFromQuarters(q1?: number | string, q2?: number | string, q3?: number | string, q4?: number | string): number {
+  const values = [q1, q2, q3, q4]
+    .map(v => (v != null && v !== '' ? Number(v) : NaN))
+    .filter(n => !Number.isNaN(n) && n > 0);
+  if (values.length === 0) return 0;
+  const sum = values.reduce((a, b) => a + b, 0);
+  return Math.round((sum / values.length) * 100) / 100;
+}
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
   'Maka-Diyos': [
@@ -36,14 +46,15 @@ export default function PrintTempReportCard({
   student
 }: PrintTempReportCardProps) {
     const academicYear = classSection?.academic_year || '';
+    const studentId = student?.id || '';
 
     const { data: coreValueMarkings } = useCoreValueMarkings(
       {
-        student_id: student?.id,
+        student_id: studentId,
         academic_year: academicYear,
       },
       {
-        enabled: !!student?.id && !!academicYear,
+        enabled: !!studentId && !!academicYear,
       }
     );
 
@@ -112,12 +123,12 @@ export default function PrintTempReportCard({
                                     </View>
                                 </View>
                             </View>
-                            {/* <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                            <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Final Grade</Text>
-                            </View> */}
-                            {/* <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
+                            </View>
+                            <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Remarks</Text>
-                            </View> */}
+                            </View>
                         </View>
 
                         {/* Dynamic subject rows */}
@@ -179,12 +190,17 @@ export default function PrintTempReportCard({
                             })
                             .map((subject, index) => {
                             const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
-                            const quarter1Grade = roundGrade(studentGrade?.quarter1_grade) || '';
-                            const quarter2Grade = roundGrade(studentGrade?.quarter2_grade) || '';
-                            const quarter3Grade = roundGrade(studentGrade?.quarter3_grade) || '';
-                            const quarter4Grade = roundGrade(studentGrade?.quarter4_grade) || '';
-                            // const finalGrade = roundGrade(studentGrade?.final_grade) || '';
-                            // const remarks = studentGrade?.remarks || '';
+                            const q1 = studentGrade?.quarter1_grade;
+                            const q2 = studentGrade?.quarter2_grade;
+                            const q3 = studentGrade?.quarter3_grade;
+                            const q4 = studentGrade?.quarter4_grade;
+                            const quarter1Grade = roundGrade(q1) || '';
+                            const quarter2Grade = roundGrade(q2) || '';
+                            const quarter3Grade = roundGrade(q3) || '';
+                            const quarter4Grade = roundGrade(q4) || '';
+                            const finalGradeNum = computeFinalGradeFromQuarters(q1, q2, q3, q4);
+                            const finalGrade = finalGradeNum > 0 ? String(finalGradeNum) : '';
+                            const remarks = finalGradeNum > 0 ? getPassFailRemarks(finalGradeNum) : '';
 
                             return (
                               <View key={index} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
@@ -205,12 +221,12 @@ export default function PrintTempReportCard({
                                     <Text>{quarter4Grade}</Text>
                                   </View>
                                 </View>
-                                {/* <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{finalGrade}</Text>
                                 </View>
                                 <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{remarks}</Text>
-                                </View> */}
+                                </View>
                               </View>
                             );
                           })
