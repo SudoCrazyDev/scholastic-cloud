@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   ArrowLeftIcon,
@@ -31,6 +31,8 @@ const tabs = [
 export default function StudentDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const fromClassSectionId = (location.state as { fromClassSectionId?: string } | null)?.fromClassSectionId
   const [activeTab, setActiveTab] = useState('personal')
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
@@ -65,7 +67,11 @@ export default function StudentDetail() {
   }, [id])
 
   const handleBack = () => {
-    navigate('/students')
+    if (fromClassSectionId) {
+      navigate(`/my-class-sections/${fromClassSectionId}`)
+    } else {
+      navigate('/students')
+    }
   }
 
   const handleEdit = (student: Student) => {

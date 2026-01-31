@@ -635,6 +635,7 @@ const ClassSectionDetail: React.FC = () => {
                   removeStudentMutationPending={removeStudentMutation.isPending}
                   getFullName={getFullName}
                   navigate={navigate}
+                  classSectionId={id!}
                 />
               )}
 

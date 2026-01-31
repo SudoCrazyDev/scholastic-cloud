@@ -104,7 +104,7 @@ export const calculateFinalGrade = (grades: StudentRunningGrade[]): number => {
   if (validGrades.length === 0) return 0
 
   const sum = validGrades.reduce((total, grade) => total + gradeValue(grade), 0)
-  return Math.round((sum / validGrades.length) * 100) / 100
+  return Math.round(sum / validGrades.length)
 }
 
 export const getGradeRemarks = (grade: number): string => {
@@ -125,7 +125,7 @@ export const getQuarterGrade = (grades: StudentRunningGrade[], quarter: '1' | '2
     grade => String(grade.quarter) === q || Number(grade.quarter) === Number(quarter)
   )
   if (!quarterGrade) return 0
-  return gradeValue(quarterGrade)
+  return Math.round(gradeValue(quarterGrade))
 }
 
 export const calculateAge = (birthdate: string): number => {

@@ -13,9 +13,9 @@ const StudentCard: React.FC<{
   getFullName: (student: Student) => string;
   onEditStudent: (student: Student & { assignmentId: string }) => void;
   onRemoveStudent: (student: Student & { assignmentId: string }) => void;
-  navigate: (url: string) => void;
+  goToStudentDetail: (studentId: string) => void;
   removeStudentMutationPending: boolean;
-}> = ({ student, index, getFullName, onEditStudent, onRemoveStudent, navigate, removeStudentMutationPending }) => {
+}> = ({ student, index, getFullName, onEditStudent, onRemoveStudent, goToStudentDetail, removeStudentMutationPending }) => {
   const [imageError, setImageError] = useState(false);
   const hasProfilePicture = student.profile_picture && student.profile_picture.trim() !== '';
 
@@ -26,7 +26,7 @@ const StudentCard: React.FC<{
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
       className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer group"
-      onClick={() => navigate(`/students/${student.id}`)}
+      onClick={() => goToStudentDetail(student.id)}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3 flex-1">
@@ -82,7 +82,7 @@ const StudentCard: React.FC<{
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/students/${student.id}`);
+              goToStudentDetail(student.id);
             }}
             variant="ghost"
             size="sm"
@@ -126,7 +126,8 @@ interface ClassSectionStudentsTabProps {
   studentsError: any;
   removeStudentMutationPending: boolean;
   getFullName: (student: Student) => string;
-  navigate: (url: string) => void;
+  navigate: (to: string, options?: { state?: unknown }) => void;
+  classSectionId: string;
 }
 
 const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
@@ -146,7 +147,11 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   removeStudentMutationPending,
   getFullName,
   navigate,
+  classSectionId,
 }) => {
+  const goToStudentDetail = (studentId: string) => {
+    navigate(`/students/${studentId}`, { state: { fromClassSectionId: classSectionId } })
+  }
   const genderOptions = [
     { value: 'all', label: 'All' },
     { value: 'male', label: 'Male' },
@@ -290,7 +295,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
                     getFullName={getFullName}
                     onEditStudent={onEditStudent}
                     onRemoveStudent={onRemoveStudent}
-                    navigate={navigate}
+                    goToStudentDetail={goToStudentDetail}
                     removeStudentMutationPending={removeStudentMutationPending}
                   />
                 ))}

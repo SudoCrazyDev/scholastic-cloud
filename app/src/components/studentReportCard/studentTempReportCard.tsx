@@ -4,14 +4,14 @@ import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, St
 import { roundGrade, getPassFailRemarks } from '@/utils/gradeUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
 
-/** Final grade = average of quarter grades (only quarters with valid grades). Rounded to 2 decimals. */
+/** Final grade = average of quarter grades (only quarters with valid grades). Rounded to whole number. */
 function computeFinalGradeFromQuarters(q1?: number | string, q2?: number | string, q3?: number | string, q4?: number | string): number {
   const values = [q1, q2, q3, q4]
     .map(v => (v != null && v !== '' ? Number(v) : NaN))
     .filter(n => !Number.isNaN(n) && n > 0);
   if (values.length === 0) return 0;
   const sum = values.reduce((a, b) => a + b, 0);
-  return Math.round((sum / values.length) * 100) / 100;
+  return Math.round(sum / values.length);
 }
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {

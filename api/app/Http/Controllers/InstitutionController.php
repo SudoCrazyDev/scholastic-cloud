@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class InstitutionController extends Controller
@@ -43,11 +44,14 @@ class InstitutionController extends Controller
 
             $data = $validator->validated();
 
-            // Handle logo file upload
+            // Handle logo file upload to R2
             if ($request->hasFile('logo')) {
                 $logo = $request->file('logo');
-                $logoPath = $logo->store('institutions/logos', 'public');
-                $data['logo'] = Storage::url($logoPath);
+                $extension = $logo->getClientOriginalExtension() ?: 'png';
+                $filename = Str::uuid() . '.' . $extension;
+                $r2Path = 'institutions/logos/' . $filename;
+                Storage::disk('r2')->put($r2Path, file_get_contents($logo->getRealPath()));
+                $data['logo'] = $r2Path;
             }
 
             $institution = Institution::create($data);
@@ -114,17 +118,25 @@ class InstitutionController extends Controller
 
             $data = $validator->validated();
 
-            // Handle logo file upload
+            // Handle logo file upload to R2
             if ($request->hasFile('logo')) {
-                // Delete old logo if exists
-                if ($institution->logo) {
-                    $oldLogoPath = str_replace('/storage/', '', $institution->logo);
-                    Storage::disk('public')->delete($oldLogoPath);
+                // Delete old logo from R2 if exists
+                $oldLogoKey = $institution->getRawOriginal('logo');
+                if ($oldLogoKey && str_starts_with($oldLogoKey, 'institutions/')) {
+                    Storage::disk('r2')->delete($oldLogoKey);
                 }
-                
+                // Legacy: remove old public-disk path if stored as URL
+                if ($oldLogoKey && str_contains($oldLogoKey, '/storage/')) {
+                    $legacyPath = str_replace('/storage/', '', $oldLogoKey);
+                    Storage::disk('public')->delete($legacyPath);
+                }
+
                 $logo = $request->file('logo');
-                $logoPath = $logo->store('institutions/logos', 'public');
-                $data['logo'] = Storage::url($logoPath);
+                $extension = $logo->getClientOriginalExtension() ?: 'png';
+                $filename = Str::uuid() . '.' . $extension;
+                $r2Path = 'institutions/logos/' . $filename;
+                Storage::disk('r2')->put($r2Path, file_get_contents($logo->getRealPath()));
+                $data['logo'] = $r2Path;
             }
 
             $institution->update($data);
@@ -158,10 +170,15 @@ class InstitutionController extends Controller
         try {
             $institution = Institution::findOrFail($id);
             
-            // Delete logo file if exists
-            if ($institution->logo) {
-                $logoPath = str_replace('/storage/', '', $institution->logo);
-                Storage::disk('public')->delete($logoPath);
+            // Delete logo from R2 if exists (key stored in logo)
+            $logoKey = $institution->getRawOriginal('logo');
+            if ($logoKey && str_starts_with($logoKey, 'institutions/')) {
+                Storage::disk('r2')->delete($logoKey);
+            }
+            // Legacy: delete from public disk if stored as old URL
+            if ($logoKey && str_contains($logoKey, '/storage/')) {
+                $legacyPath = str_replace('/storage/', '', $logoKey);
+                Storage::disk('public')->delete($legacyPath);
             }
             
             $institution->delete();
@@ -189,7 +206,7 @@ class InstitutionController extends Controller
             $institution = Institution::findOrFail($id);
             
             $validator = Validator::make($request->all(), [
-                'logo' => 'required|file|image|mimes:jpeg,png,jpg,gif|max:2048'
+                'logo' => 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:2048'
             ]);
             
             if ($validator->fails()) {
@@ -200,23 +217,30 @@ class InstitutionController extends Controller
                 ], 422);
             }
 
-            // Delete old logo if exists
-            if ($institution->logo) {
-                $oldLogoPath = str_replace('/storage/', '', $institution->logo);
-                Storage::disk('public')->delete($oldLogoPath);
+            // Delete old logo from R2 if exists
+            $oldLogoKey = $institution->getRawOriginal('logo');
+            if ($oldLogoKey && str_starts_with($oldLogoKey, 'institutions/')) {
+                Storage::disk('r2')->delete($oldLogoKey);
             }
-            
+            if ($oldLogoKey && str_contains($oldLogoKey, '/storage/')) {
+                $legacyPath = str_replace('/storage/', '', $oldLogoKey);
+                Storage::disk('public')->delete($legacyPath);
+            }
+
             $logo = $request->file('logo');
-            $logoPath = $logo->store('institutions/logos', 'public');
-            $logoUrl = Storage::url($logoPath);
-            
-            $institution->update(['logo' => $logoUrl]);
+            $extension = $logo->getClientOriginalExtension() ?: 'png';
+            $filename = Str::uuid() . '.' . $extension;
+            $r2Path = 'institutions/logos/' . $filename;
+            Storage::disk('r2')->put($r2Path, file_get_contents($logo->getRealPath()));
+            $institution->update(['logo' => $r2Path]);
+
+            $institution->refresh();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Logo uploaded successfully',
                 'data' => [
-                    'logo' => $logoUrl
+                    'logo' => $institution->logo
                 ]
             ]);
 

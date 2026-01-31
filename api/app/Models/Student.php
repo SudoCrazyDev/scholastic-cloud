@@ -77,7 +77,7 @@ class Student extends Model
     }
 
     /**
-     * Get the profile picture URL with temporary signed URL if it's an S3 path.
+     * Get the profile picture URL. Tries R2 first (temporary or R2_URL), then S3 for legacy paths.
      */
     public function getProfilePictureAttribute($value)
     {
@@ -85,21 +85,28 @@ class Student extends Model
             return null;
         }
 
-        // If it's already a full URL (starts with http), return as is (for legacy data)
         if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
             return $value;
         }
 
-        // If it's an S3 path, generate a temporary signed URL (valid for 1 hour)
+        // Try R2 first (institution/student profile pictures stored on R2)
         try {
-            return Storage::disk('s3')->temporaryUrl($value, now()->addHours(1));
-        } catch (\Exception $e) {
-            // If temporary URL generation fails, try regular URL as fallback
+            $r2Url = config('filesystems.disks.r2.url');
+            if ($r2Url) {
+                return rtrim($r2Url, '/') . '/' . ltrim($value, '/');
+            }
+            return Storage::disk('r2')->temporaryUrl($value, now()->addHours(24));
+        } catch (\Throwable $e) {
+            // Fall back to S3 for legacy paths
             try {
-                return Storage::disk('s3')->url($value);
+                return Storage::disk('s3')->temporaryUrl($value, now()->addHours(1));
             } catch (\Exception $e2) {
-                Log::warning('Failed to generate profile picture URL for student: ' . $this->id . ' - ' . $e2->getMessage());
-                return null;
+                try {
+                    return Storage::disk('s3')->url($value);
+                } catch (\Exception $e3) {
+                    Log::warning('Failed to generate profile picture URL for student: ' . $this->id . ' - ' . $e3->getMessage());
+                    return null;
+                }
             }
         }
     }

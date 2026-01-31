@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class Institution extends Model
 {
@@ -36,6 +38,32 @@ class Institution extends Model
     protected $casts = [
         'subscription_id' => 'string',
     ];
+
+    /**
+     * Get the logo URL. When logo is stored as an R2 key (institutions/...),
+     * returns a temporary signed URL or the public R2 URL when R2_URL is set.
+     */
+    public function getLogoAttribute($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        // R2 key stored in DB
+        if (str_starts_with($value, 'institutions/')) {
+            try {
+                $url = config('filesystems.disks.r2.url');
+                if ($url) {
+                    return rtrim($url, '/') . '/' . ltrim($value, '/');
+                }
+                return Storage::disk('r2')->temporaryUrl($value, now()->addHours(24));
+            } catch (\Throwable $e) {
+                Log::warning('Institution logo URL failed for ' . $this->id . ': ' . $e->getMessage());
+                return null;
+            }
+        }
+        // Legacy: full URL (e.g. /storage/...) or existing public URL
+        return $value;
+    }
 
     /**
      * Get the subscription that owns the institution.
