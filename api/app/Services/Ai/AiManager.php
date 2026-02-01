@@ -11,10 +11,18 @@ class AiManager
         if ($provider === 'openai') {
             $key = (string)config('ai.openai.api_key');
             if (!empty($key)) {
+                $baseUrl = (string)config('ai.openai.base_url', 'https://api.openai.com/v1');
+                $assistantId = (string)config('ai.openai.assistant_id', '');
+                $assistantsClient = $assistantId !== ''
+                    ? new OpenAiAssistantsClient($key, $baseUrl)
+                    : null;
+
                 return new OpenAiProvider(
                     $key,
                     (string)config('ai.openai.model', 'gpt-4.1-mini'),
-                    (string)config('ai.openai.base_url', 'https://api.openai.com/v1')
+                    $baseUrl,
+                    $assistantId !== '' ? $assistantId : null,
+                    $assistantsClient
                 );
             }
         }

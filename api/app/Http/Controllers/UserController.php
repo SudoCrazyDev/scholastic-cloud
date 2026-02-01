@@ -347,13 +347,24 @@ class UserController extends Controller
     }
 
     /**
-     * Get the current user's advised subjects.
+     * Get the current user's advised subjects (assigned to them as teacher).
+     * Optional query: academic_year — filter by class section's academic year.
      */
     public function getMySubjects(Request $request): \Illuminate\Http\JsonResponse
     {
         try {
             $user = $request->user();
-            $subjects = $user->advisedSubjects()->with(['classSection', 'adviserUser', 'parentSubject'])->orderBy('order', 'asc')->orderBy('created_at', 'desc')->get();
+            $query = $user->advisedSubjects()->with(['classSection', 'adviserUser', 'parentSubject']);
+
+            $academicYear = $request->query('academic_year');
+            if ($academicYear !== null && $academicYear !== '') {
+                $query->whereHas('classSection', function ($q) use ($academicYear) {
+                    $q->where('academic_year', $academicYear);
+                });
+            }
+
+            $subjects = $query->orderBy('order', 'asc')->orderBy('created_at', 'desc')->get();
+
             return response()->json([
                 'success' => true,
                 'data' => $subjects

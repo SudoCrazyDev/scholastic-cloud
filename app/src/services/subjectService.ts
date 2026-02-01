@@ -20,6 +20,11 @@ class SubjectService {
     return response.data
   }
 
+  async getSubjectsByInstitution(): Promise<ApiResponse<Subject[]>> {
+    const response = await api.get('/subjects/by-institution')
+    return response.data
+  }
+
   async getSubject(id: string): Promise<ApiResponse<Subject>> {
     const response = await api.get(`/subjects/${id}`)
     return response.data

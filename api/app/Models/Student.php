@@ -15,6 +15,7 @@ class Student extends Model
 
     protected $fillable = [
         'id',
+        'user_id',
         'lrn',
         'first_name',
         'middle_name',
@@ -74,6 +75,22 @@ class Student extends Model
     public function ecrItemScores()
     {
         return $this->hasMany(StudentEcrItemScore::class);
+    }
+
+    /**
+     * User linked for student portal login (nullable).
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Assessment attempts (quiz/assignment/exam) for live scoring.
+     */
+    public function assessmentAttempts()
+    {
+        return $this->hasMany(StudentAssessmentAttempt::class);
     }
 
     /**

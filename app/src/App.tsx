@@ -29,6 +29,8 @@ import SchoolDays from './pages/SchoolDays';
 import Settings from './pages/Settings/Settings';
 import Finance from './pages/Finance';
 import Login from './pages/Login';
+import MyAssessments from './pages/MyAssessments';
+import { TakeAssessment } from './pages/MyAssessments';
 
 
 function App() {
@@ -62,6 +64,8 @@ function App() {
               <Route path="my-class-sections/:id" element={<ClassSectionDetail />} />
               <Route path="assigned-subjects" element={<AssignedSubjects />} />
               <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
+              <Route path="my-assessments" element={<MyAssessments />} />
+              <Route path="my-assessments/:id/take" element={<TakeAssessment />} />
               <Route path="teacher-attendance" element={<TeacherAttendance />} />
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
               <Route path="consolidated-grades" element={<ConsolidatedGrades />} />

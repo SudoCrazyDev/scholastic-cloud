@@ -124,6 +124,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);
     Route::apiResource('class-sections', ClassSectionController::class);
     // Subject routes
+    Route::get('subjects/by-institution', [SubjectController::class, 'indexByInstitution']);
     Route::apiResource('subjects', SubjectController::class);
     Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
     Route::post('subjects/reorder-children', [SubjectController::class, 'reorderChildren']);
@@ -173,6 +174,11 @@ Route::middleware('auth.token')->group(function () {
     Route::get('student-ecr-item-scores/by-subject-section', [StudentEcrItemScoreController::class, 'getScoresBySubjectAndSection']);
     Route::get('student-ecr-item-scores/by-student-subject', [StudentEcrItemScoreController::class, 'getByStudentAndSubject']);
     Route::apiResource('student-ecr-item-scores', StudentEcrItemScoreController::class);
+    // Student assessments (LMS: list/take quiz, assignment, exam; live score)
+    Route::get('student-assessments', [\App\Http\Controllers\StudentAssessmentController::class, 'index']);
+    Route::get('student-assessments/{id}', [\App\Http\Controllers\StudentAssessmentController::class, 'show']);
+    Route::post('student-assessments/{id}/start', [\App\Http\Controllers\StudentAssessmentController::class, 'start']);
+    Route::post('student-assessments/{id}/submit', [\App\Http\Controllers\StudentAssessmentController::class, 'submit']);
     // StudentRunningGrade routes
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
     Route::post('student-running-grades/bulk-upsert-final-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'bulkUpsertFinalGrades']);

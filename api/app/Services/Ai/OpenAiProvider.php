@@ -11,11 +11,24 @@ class OpenAiProvider implements AiProvider
     private string $model;
     private string $baseUrl;
 
-    public function __construct(string $apiKey, string $model, string $baseUrl)
-    {
+    /** @var string|null When set, generateTopics uses the Assistants API (RAG) instead of the Responses API. */
+    private ?string $assistantId;
+
+    /** @var OpenAiAssistantsClient|null */
+    private ?OpenAiAssistantsClient $assistantsClient;
+
+    public function __construct(
+        string $apiKey,
+        string $model,
+        string $baseUrl,
+        ?string $assistantId = null,
+        ?OpenAiAssistantsClient $assistantsClient = null
+    ) {
         $this->apiKey = $apiKey;
         $this->model = $model;
         $this->baseUrl = rtrim($baseUrl, '/');
+        $this->assistantId = $assistantId;
+        $this->assistantsClient = $assistantsClient;
     }
 
     public function generateTopics(array $input): array
@@ -32,15 +45,21 @@ class OpenAiProvider implements AiProvider
             ],
         ];
 
-        $gradeLevelContext = $gradeLevel ? " for Grade {$gradeLevel}" : '';
+        $gradeLevelText = $gradeLevel ? (string) $gradeLevel : 'not specified';
 
         $prompt = <<<PROMPT
-You are an education planning assistant specializing in the Philippine K-12 curriculum.
-Generate {$count} lesson topics for Quarter {$quarter} for "{$subjectTitle}"{$gradeLevelContext}.
+You are an education planning assistant specializing in the DepEd K–12 MATATAG Curriculum of the Philippines.
+
+Input:
+- Subject: {$subjectTitle}
+- Grade Level: {$gradeLevelText}
+- Quarter: {$quarter}
+
+Generate {$count} lesson topics that are aligned with the MATATAG Curriculum (the official DepEd MATATAG Curriculum Guide). Do not use MELCs or the old K–12 strands; use only MATATAG-aligned competencies and content.
 
 Context:
-- Follow the Philippine Department of Education (DepEd) K-12 curriculum standards
-- Topics should be age-appropriate and aligned with Philippine educational competencies
+- Follow the DepEd K–12 MATATAG Curriculum of the Philippines
+- Topics must be age-appropriate for the grade level and aligned with MATATAG learning competencies
 - Consider the local Philippine context and examples where relevant
 - Ensure progression and scaffolding appropriate for the grade level
 
@@ -55,10 +74,115 @@ Rules:
 - Topics should follow a logical sequence building from foundational to advanced concepts
 PROMPT;
 
+        if ($this->assistantId !== null && $this->assistantsClient !== null) {
+            $reply = $this->assistantsClient->runAndGetResponse($this->assistantId, $prompt, 120);
+            Log::debug('OpenAI Assistant generateTopics reply', [
+                'reply_length' => \strlen($reply),
+                'reply_preview' => \strlen($reply) > 0 ? substr($reply, 0, 600) : '',
+            ]);
+            $json = $this->stripJsonFromReply($reply);
+            $data = $this->safeJsonDecode($json);
+            if (!\is_array($data)) {
+                Log::warning('OpenAI Assistant generateTopics: failed to decode JSON or empty data', [
+                    'json_length' => \strlen($json),
+                    'json_preview' => substr($json, 0, 400),
+                ]);
+                return ['topics' => []];
+            }
+            $topics = $data['topics'] ?? [];
+            if (!\is_array($topics)) {
+                $topics = [];
+            }
+            $topics = $this->normalizeTopicsForValidation($topics, $quarter);
+            return ['topics' => $topics];
+        }
+
         $json = $this->callJson($prompt);
         $data = $this->safeJsonDecode($json);
 
         return is_array($data) ? $data : ['topics' => []];
+    }
+
+    /**
+     * Extract JSON from assistant reply (may be wrapped in markdown code block or extra text).
+     */
+    private function stripJsonFromReply(string $reply): string
+    {
+        $reply = trim($reply);
+        if ($reply === '') {
+            return '';
+        }
+        // Markdown code block: capture content between ``` and ```, then extract JSON
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)```/', $reply, $m)) {
+            $block = trim($m[1]);
+            $start = strpos($block, '{');
+            if ($start !== false) {
+                $depth = 0;
+                $len = strlen($block);
+                for ($i = $start; $i < $len; $i++) {
+                    $c = $block[$i];
+                    if ($c === '{') {
+                        $depth++;
+                    } elseif ($c === '}') {
+                        $depth--;
+                        if ($depth === 0) {
+                            return substr($block, $start, $i - $start + 1);
+                        }
+                    }
+                }
+            }
+            return $block;
+        }
+        // Single line JSON
+        if (preg_match('/^(\{[\s\S]*\})$/m', $reply, $m)) {
+            return trim($m[1]);
+        }
+        // Find outermost { ... } (assistant may add text before/after)
+        $start = strpos($reply, '{');
+        if ($start !== false) {
+            $depth = 0;
+            $end = -1;
+            $len = strlen($reply);
+            for ($i = $start; $i < $len; $i++) {
+                $c = $reply[$i];
+                if ($c === '{') {
+                    $depth++;
+                } elseif ($c === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        $end = $i;
+                        break;
+                    }
+                }
+            }
+            if ($end >= $start) {
+                return substr($reply, $start, $end - $start + 1);
+            }
+        }
+        return $reply;
+    }
+
+    /**
+     * Ensure each topic has title, description, quarter as strings for controller validation.
+     */
+    private function normalizeTopicsForValidation(array $topics, string $quarter): array
+    {
+        $out = [];
+        foreach ($topics as $t) {
+            if (!\is_array($t)) {
+                continue;
+            }
+            $title = isset($t['title']) ? (string) $t['title'] : '';
+            if ($title === '') {
+                continue;
+            }
+            $out[] = [
+                'title' => strlen($title) > 255 ? substr($title, 0, 255) : $title,
+                'description' => isset($t['description']) ? (string) $t['description'] : '',
+                'quarter' => $quarter,
+            ];
+        }
+        return $out;
     }
 
     public function generateLessonPlanContent(array $input): array

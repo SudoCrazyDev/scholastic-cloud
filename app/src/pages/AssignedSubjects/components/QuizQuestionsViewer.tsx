@@ -4,7 +4,7 @@ import { DocumentTextIcon } from '@heroicons/react/24/outline'
 interface Question {
   question: string
   choices?: string[]
-  answer?: string
+  answer?: string | string[]
 }
 
 interface QuizQuestionsViewerProps {
@@ -47,7 +47,9 @@ export const QuizQuestionsViewer: React.FC<QuizQuestionsViewerProps> = ({
             {q.choices && q.choices.length > 0 && (
               <div className="ml-9 space-y-2">
                 {q.choices.map((choice, cIdx) => {
-                  const isCorrect = showAnswers && q.answer && choice.startsWith(q.answer + '.')
+                  const ans = q.answer;
+                  const correctLetters = Array.isArray(ans) ? ans : ans ? [ans] : [];
+                  const isCorrect = showAnswers && correctLetters.some((a) => choice.startsWith(String(a) + '.') || choice.startsWith(String(a) + ')'))
                   return (
                     <div
                       key={cIdx}
@@ -74,7 +76,7 @@ export const QuizQuestionsViewer: React.FC<QuizQuestionsViewerProps> = ({
             
             {showAnswers && q.answer && (!q.choices || q.choices.length === 0) && (
               <p className="text-sm text-green-800 mt-2 ml-9 font-semibold bg-green-50 px-3 py-1 rounded inline-block">
-                ✓ Answer: {q.answer}
+                ✓ Answer: {Array.isArray(q.answer) ? q.answer.join(', ') : q.answer}
               </p>
             )}
           </div>

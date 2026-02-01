@@ -111,10 +111,11 @@ class UserService {
     return response.data
   }
 
-  async getMySubjects() {
-    const response = await api.get<{ data: AssignedSubject[]; success: boolean; message?: string }>(
-      '/users/my/subjects'
-    )
+  async getMySubjects(academicYear?: string) {
+    const params = new URLSearchParams()
+    if (academicYear) params.set('academic_year', academicYear)
+    const url = `/users/my/subjects${params.toString() ? `?${params.toString()}` : ''}`
+    const response = await api.get<{ data: AssignedSubject[]; success: boolean; message?: string }>(url)
     return response.data.data
   }
 }

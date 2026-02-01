@@ -8,9 +8,12 @@ export interface SubjectEcrItem {
   description?: string;
   content?: {
     questions?: Array<{
+      type: 'true_false' | 'single_choice' | 'multiple_choice' | 'fill_in_the_blanks';
       question: string;
       choices?: string[];
-      answer?: string;
+      answer?: string | string[]; // string for single/true_false, string[] or "A,B" for multiple_choice
+      blanks?: string[]; // correct answers in order for fill_in_the_blanks
+      points?: number;
     }>;
   };
   score?: number;

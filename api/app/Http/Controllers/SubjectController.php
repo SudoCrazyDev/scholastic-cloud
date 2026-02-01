@@ -53,6 +53,36 @@ class SubjectController extends Controller
     }
 
     /**
+     * List all subjects for the user's institution (for Curriculum Guide etc.).
+     */
+    public function indexByInstitution(Request $request): JsonResponse
+    {
+        $authenticatedUser = $request->user();
+        $defaultInstitution = $authenticatedUser->userInstitutions()
+            ->where('is_default', true)
+            ->first();
+
+        if (!$defaultInstitution) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No default institution found for authenticated user'
+            ], 403);
+        }
+
+        $subjects = Subject::with(['institution', 'classSection', 'parentSubject', 'childSubjects'])
+            ->where('institution_id', $defaultInstitution->institution_id)
+            ->orderBy('title', 'asc')
+            ->orderBy('variant', 'asc')
+            ->orderBy('order', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $subjects
+        ]);
+    }
+
+    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request): JsonResponse

@@ -26,15 +26,21 @@ class AnthropicProvider implements AiProvider
         $count = max(1, min(50, $count));
         $gradeLevel = $input['grade_level'] ?? null;
 
-        $gradeLevelContext = $gradeLevel ? " for Grade {$gradeLevel}" : '';
+        $gradeLevelText = $gradeLevel ? (string) $gradeLevel : 'not specified';
 
         $prompt = <<<PROMPT
-You are an education planning assistant specializing in the Philippine K-12 curriculum.
-Generate {$count} lesson topics for Quarter {$quarter} for "{$subjectTitle}"{$gradeLevelContext}.
+You are an education planning assistant specializing in the DepEd K–12 MATATAG Curriculum of the Philippines.
+
+Input:
+- Subject: {$subjectTitle}
+- Grade Level: {$gradeLevelText}
+- Quarter: {$quarter}
+
+Generate {$count} lesson topics that are aligned with the MATATAG Curriculum (the official DepEd MATATAG Curriculum Guide). Do not use MELCs or the old K–12 strands; use only MATATAG-aligned competencies and content.
 
 Context:
-- Follow the Philippine Department of Education (DepEd) K-12 curriculum standards
-- Topics should be age-appropriate and aligned with Philippine educational competencies
+- Follow the DepEd K–12 MATATAG Curriculum of the Philippines
+- Topics must be age-appropriate for the grade level and aligned with MATATAG learning competencies
 - Consider the local Philippine context and examples where relevant
 - Ensure progression and scaffolding appropriate for the grade level
 

@@ -43,6 +43,14 @@ class SubjectEcrItem extends Model
     }
 
     /**
+     * Get assessment attempts (for interactive quiz/assignment/exam).
+     */
+    public function assessmentAttempts()
+    {
+        return $this->hasMany(StudentAssessmentAttempt::class, 'subject_ecr_item_id');
+    }
+
+    /**
      * Get the subject ECR that owns this item.
      */
     public function subjectEcr()

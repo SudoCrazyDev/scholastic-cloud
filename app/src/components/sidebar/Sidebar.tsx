@@ -19,7 +19,8 @@ import {
   BarChart3,
   X,
   Calendar,
-  Settings
+  Settings,
+  ClipboardList
 } from 'lucide-react';
 
 interface MenuItem {
@@ -54,6 +55,12 @@ const menuItems: MenuItem[] = [
     icon: <AssignedSubjectsIcon className="w-5 h-5" />,
     path: '/assigned-subjects',
     allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'my-assessments',
+    label: 'My Assessments',
+    icon: <ClipboardList className="w-5 h-5" />,
+    path: '/my-assessments',
   },
   {
     id: 'users',

@@ -22,9 +22,10 @@ import { StudentScoresTab } from './components/StudentScoresTab'
 import { AiPlannerTab } from './components/AiPlannerTab'
 import { LessonPlanCalendarTab } from './components/LessonPlanCalendarTab'
 import SummativeAssessmentTab from './components/SummativeAssessmentTab'
+import { AssessmentBuilderTab } from './components/AssessmentBuilderTab'
 import type { Subject, Student, ClassSection } from '../../types'
 
-type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'ai-planner' | 'lesson-plan-calendar'
+type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'assessment-builder' | 'ai-planner' | 'lesson-plan-calendar'
 
 // Extend types locally to allow students array on class_section
 interface ClassSectionWithStudents extends ClassSection {
@@ -96,6 +97,11 @@ const SubjectDetail: React.FC = () => {
       id: 'summative-assessment' as TabType,
       label: 'Components of Summative Assessment',
       icon: ListBulletIcon,
+    },
+    {
+      id: 'assessment-builder' as TabType,
+      label: 'Quiz / Assignment / Exam Builder',
+      icon: DocumentTextIcon,
     },
     {
       id: 'topics' as TabType,
@@ -219,6 +225,7 @@ const SubjectDetail: React.FC = () => {
             />
           )}
           {activeTab === 'summative-assessment' && <SummativeAssessmentTab subjectId={subject.id} />}
+          {activeTab === 'assessment-builder' && <AssessmentBuilderTab subjectId={subject.id} />}
           {activeTab === 'topics' && <TopicsTab subjectId={subject.id} />}
           {activeTab === 'ai-planner' && <AiPlannerTab subjectId={subject.id} />}
           {activeTab === 'lesson-plan-calendar' && <LessonPlanCalendarTab subjectId={subject.id} />}

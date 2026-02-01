@@ -6,6 +6,7 @@ use App\Models\StudentEcrItemScore;
 use App\Models\Student;
 use App\Models\SubjectEcrItem;
 use App\Services\ParentSubjectGradeService;
+use App\Services\RunningGradeRecalcService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -14,11 +15,13 @@ use Illuminate\Validation\ValidationException;
 
 class StudentEcrItemScoreController extends Controller
 {
-    protected $parentSubjectGradeService;
+    protected ParentSubjectGradeService $parentSubjectGradeService;
+    protected RunningGradeRecalcService $runningGradeRecalcService;
 
-    public function __construct(ParentSubjectGradeService $parentSubjectGradeService)
+    public function __construct(ParentSubjectGradeService $parentSubjectGradeService, RunningGradeRecalcService $runningGradeRecalcService)
     {
         $this->parentSubjectGradeService = $parentSubjectGradeService;
+        $this->runningGradeRecalcService = $runningGradeRecalcService;
     }
 
     /**
@@ -156,7 +159,7 @@ class StudentEcrItemScoreController extends Controller
             }
 
             // --- K-12 Running Grade Calculation ---
-            $this->recalculateRunningGrade($validated['student_id'], $validated['subject_ecr_item_id']);
+            $this->runningGradeRecalcService->recalculate($validated['student_id'], $validated['subject_ecr_item_id']);
             // --- End K-12 Running Grade Calculation ---
 
             DB::commit();
@@ -259,7 +262,7 @@ class StudentEcrItemScoreController extends Controller
             $score->update($validated);
 
             // --- K-12 Running Grade Calculation ---
-            $this->recalculateRunningGrade($score->student_id, $score->subject_ecr_item_id);
+            $this->runningGradeRecalcService->recalculate($score->student_id, $score->subject_ecr_item_id);
             // --- End K-12 Running Grade Calculation ---
 
             DB::commit();
@@ -465,68 +468,5 @@ class StudentEcrItemScoreController extends Controller
             Log::error('Error fetching scores by subject and section: ' . $e->getMessage());
             return response()->json(['success' => false, 'error' => 'Failed to fetch scores'], 500);
         }
-    }
-
-    /**
-     * Recalculate and update the running grade for a student after a score is added or updated.
-     */
-    protected function recalculateRunningGrade($studentId, $subjectEcrItemId)
-    {
-        // Get the ECR item
-        $ecrItem = \App\Models\SubjectEcrItem::with('subjectEcr')->findOrFail($subjectEcrItemId);
-        $subjectEcr = $ecrItem->subjectEcr;
-        $subjectId = $subjectEcr->subject_id;
-        $quarter = $ecrItem->quarter;
-        $academicYear = $ecrItem->academic_year;
-
-        // Get all ECRs for this subject (categories and their percentages)
-        $subjectEcrs = \App\Models\SubjectEcr::where('subject_id', $subjectId)->get();
-
-        $totalGrade = 0;
-        foreach ($subjectEcrs as $categoryEcr) {
-            $category = $categoryEcr->title; // e.g., 'Written Works', 'Performance Tasks', 'Quarterly Assessment'
-            $categoryPercentage = $categoryEcr->percentage;
-
-            // Get all ECR items for this subject, quarter, academic year, and category
-            $categoryItems = \App\Models\SubjectEcrItem::where('subject_ecr_id', $categoryEcr->id)
-                ->where('quarter', $quarter)
-                ->where('academic_year', $academicYear)
-                ->get();
-
-            $totalPossible = $categoryItems->sum('score');
-            if ($totalPossible == 0) {
-                continue; // Avoid division by zero
-            }
-
-            // Get all student scores for these items
-            $studentScores = \App\Models\StudentEcrItemScore::where('student_id', $studentId)
-                ->whereIn('subject_ecr_item_id', $categoryItems->pluck('id'))
-                ->get();
-            $totalStudentScore = $studentScores->sum('score');
-
-            // Raw percentage for this category
-            $rawPercent = ($totalStudentScore / $totalPossible) * 100;
-            // Weighted score for this category
-            $weighted = ($rawPercent * $categoryPercentage) / 100;
-            $totalGrade += $weighted;
-        }
-
-        // Save or update the running grade
-        $runningGrade = \App\Models\StudentRunningGrade::firstOrNew([
-            'student_id' => $studentId,
-            'subject_id' => $subjectId,
-            'quarter' => $quarter,
-            'academic_year' => $academicYear ?? '2025-2026',
-        ]);
-        $runningGrade->grade = round($totalGrade, 2);
-        $runningGrade->save();
-
-        // Calculate parent subject grades if this subject has a parent
-        $this->parentSubjectGradeService->calculateParentSubjectGrades(
-            $studentId,
-            $subjectId,
-            $quarter,
-            $academicYear ?? '2025-2026'
-        );
     }
 }
