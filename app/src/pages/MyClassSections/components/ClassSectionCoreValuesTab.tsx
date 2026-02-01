@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCoreValueMarkings, useCreateCoreValueMarking, useUpdateCoreValueMarking } from '../../../hooks/useCoreValueMarkings';
 import { useStudents } from '../../../hooks/useStudents';
 import { Loader2 } from 'lucide-react';
@@ -79,6 +80,7 @@ const CORE_VALUE_CODE: Record<string, string> = {
 };
 
 const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ classSectionId, classSectionData }) => {
+  const queryClient = useQueryClient();
   const academicYear = classSectionData?.academic_year || '';
   const [selectedQuarter, setSelectedQuarter] = React.useState<string>('1');
   const [studentFilter, setStudentFilter] = React.useState('');
@@ -130,7 +132,17 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
   const createMarking = useCreateCoreValueMarking();
   const updateMarking = useUpdateCoreValueMarking();
 
-  // Handle marking change
+  // Params for the current markings query (used to update cache without refetch)
+  const markingsQueryParams = useMemo(
+    () => ({
+      student_ids: studentIds.join(','),
+      quarter: selectedQuarter,
+      academic_year: academicYear,
+    }),
+    [studentIds, selectedQuarter, academicYear]
+  );
+
+  // Handle marking change — update cache after success so we don't refetch and lose scroll
   const handleMarkingChange = async (studentId: string, coreValue: string, behavior: string, value: string) => {
     const existing = markingMap[studentId]?.[coreValue]?.[behavior];
     const payload = {
@@ -138,14 +150,22 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
       core_value: coreValue,
       behavior_statement: behavior,
       marking: value,
-      quarter: selectedQuarter, // Ensure quarter is a string
+      quarter: selectedQuarter,
       academic_year: academicYear,
     };
     try {
       if (existing) {
-        await updateMarking.mutateAsync({ id: existing.id, data: payload });
+        const result = await updateMarking.mutateAsync({ id: existing.id, data: payload });
+        queryClient.setQueryData(['core-value-markings', markingsQueryParams], (old: any[] | undefined) => {
+          const arr = Array.isArray(old) ? old : [];
+          return arr.map((m: any) => (m.id === result?.id ? { ...m, ...result } : m));
+        });
       } else {
-        await createMarking.mutateAsync(payload);
+        const result = await createMarking.mutateAsync(payload);
+        queryClient.setQueryData(['core-value-markings', markingsQueryParams], (old: any[] | undefined) => {
+          const arr = Array.isArray(old) ? old : [];
+          return [...arr, result].filter(Boolean);
+        });
       }
     } catch (error: any) {
       toast.error('Failed to save marking.');

@@ -14,12 +14,11 @@ export const useCoreValueMarkings = (params: any, options: any = {}) => {
 };
 
 export const useCreateCoreValueMarking = () => {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: any) => coreValueMarkingService.create(data),
-    onSuccess: () => {
+    onSuccess: (_data, _variables, _context) => {
       toast.success('Core value marking saved!', { icon: '✅' });
-      queryClient.invalidateQueries({ queryKey: ['core-value-markings'] });
+      // Don't invalidate — caller can update cache to avoid refetch/scroll jump
     },
     onError: (error: any) => {
       toast.error(`Failed to save: ${error?.response?.data?.message || 'Unknown error'}`);
@@ -28,12 +27,11 @@ export const useCreateCoreValueMarking = () => {
 };
 
 export const useUpdateCoreValueMarking = () => {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => coreValueMarkingService.update(id, data),
-    onSuccess: () => {
+    onSuccess: (_data, _variables, _context) => {
       toast.success('Core value marking updated!', { icon: '✅' });
-      queryClient.invalidateQueries({ queryKey: ['core-value-markings'] });
+      // Don't invalidate — caller can update cache to avoid refetch/scroll jump
     },
     onError: (error: any) => {
       toast.error(`Failed to update: ${error?.response?.data?.message || 'Unknown error'}`);
