@@ -19,8 +19,7 @@ import {
   BarChart3,
   X,
   Calendar,
-  Settings,
-  ClipboardList
+  Settings
 } from 'lucide-react';
 
 interface MenuItem {

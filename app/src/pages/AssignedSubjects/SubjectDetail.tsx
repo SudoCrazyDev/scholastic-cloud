@@ -9,8 +9,7 @@ import {
   AcademicCapIcon,
   BuildingOfficeIcon,
   ListBulletIcon,
-  DocumentTextIcon,
-  CalendarIcon
+  DocumentTextIcon
 } from '@heroicons/react/24/outline'
 import { useSubjectDetail } from '@hooks'
 import { useQuery } from '@tanstack/react-query'
