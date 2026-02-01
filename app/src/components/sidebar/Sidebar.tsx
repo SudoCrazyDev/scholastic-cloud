@@ -56,12 +56,13 @@ const menuItems: MenuItem[] = [
     path: '/assigned-subjects',
     allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
   },
-  {
-    id: 'my-assessments',
-    label: 'My Assessments',
-    icon: <ClipboardList className="w-5 h-5" />,
-    path: '/my-assessments',
-  },
+  // Temporarily hidden:
+  // {
+  //   id: 'my-assessments',
+  //   label: 'My Assessments',
+  //   icon: <ClipboardList className="w-5 h-5" />,
+  //   path: '/my-assessments',
+  // },
   {
     id: 'users',
     label: 'Users',
