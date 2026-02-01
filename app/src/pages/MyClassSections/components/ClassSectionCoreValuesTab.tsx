@@ -142,8 +142,17 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
     [studentIds, selectedQuarter, academicYear]
   );
 
-  // Handle marking change — update cache after success so we don't refetch and lose scroll
-  const handleMarkingChange = async (studentId: string, coreValue: string, behavior: string, value: string) => {
+  // Handle marking change — update cache after success; preserve scroll and focus so page doesn't jump to top
+  const handleMarkingChange = async (
+    studentId: string,
+    coreValue: string,
+    behavior: string,
+    value: string,
+    cellKey: string
+  ) => {
+    // Layout uses <main class="overflow-y-auto"> as scroll container, not window
+    const scrollContainer = document.querySelector('main');
+    const scrollTop = scrollContainer ? scrollContainer.scrollTop : window.scrollY;
     const existing = markingMap[studentId]?.[coreValue]?.[behavior];
     const payload = {
       student_id: studentId,
@@ -167,6 +176,26 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
           return [...arr, result].filter(Boolean);
         });
       }
+      const restoreScroll = () => {
+        if (scrollContainer) {
+          scrollContainer.scrollTop = scrollTop;
+        } else {
+          window.scrollTo(0, scrollTop);
+        }
+      };
+      const refocusCell = () => {
+        const cell = document.querySelector(`[data-marking-cell="${cellKey}"]`);
+        const select = cell?.querySelector('select');
+        if (select instanceof HTMLSelectElement) {
+          select.focus();
+        }
+        restoreScroll();
+      };
+      requestAnimationFrame(() => {
+        requestAnimationFrame(refocusCell);
+      });
+      setTimeout(refocusCell, 150);
+      setTimeout(refocusCell, 350);
     } catch (error: any) {
       toast.error('Failed to save marking.');
     }
@@ -260,15 +289,22 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
                     </td>
                     {flatColumns.map((col) => {
                       const marking = markingMap[student.id]?.[col.coreKey]?.[col.behavior];
+                      const cellKey = `${student.id}-${col.coreKey}-${col.idx}`;
                       return (
-                        <td key={`${student.id}-${col.coreKey}-${col.idx}`} className="border-b border-gray-200 px-3 py-2">
+                        <td
+                          key={cellKey}
+                          data-marking-cell={cellKey}
+                          className="border-b border-gray-200 px-3 py-2"
+                        >
                           <Select
                             options={[
                               { value: '', label: '—' },
                               ...MARKINGS.map((m) => ({ value: m, label: m })),
                             ]}
                             value={marking?.marking || ''}
-                            onChange={(e) => handleMarkingChange(student.id, col.coreKey, col.behavior, e.target.value)}
+                            onChange={(e) =>
+                              handleMarkingChange(student.id, col.coreKey, col.behavior, e.target.value, cellKey)
+                            }
                             disabled={isSaving}
                             className="text-xs min-w-[68px]"
                           />
