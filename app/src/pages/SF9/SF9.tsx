@@ -136,7 +136,7 @@ const SF9: React.FC = () => {
                         selectedStudent === student.id ? 'bg-indigo-50 border-indigo-200' : ''
                       }`}
                     >
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-gray-900 uppercase">
                         {student.last_name}, {student.first_name} {student.middle_name || ''} {student.ext_name || ''}
                       </div>
                       <div className="text-sm text-gray-600">LRN: {student.lrn}</div>

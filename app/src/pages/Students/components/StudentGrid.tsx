@@ -184,7 +184,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
             {/* Student info */}
             <div className="space-y-2">
               <div>
-                <h3 className="font-semibold text-gray-900 text-sm truncate" title={getFullName(student)}>
+                <h3 className="font-semibold text-gray-900 text-sm truncate uppercase" title={getFullName(student)}>
                   {getFullName(student)}
                 </h3>
                 <div className="flex items-center gap-2 mt-1">

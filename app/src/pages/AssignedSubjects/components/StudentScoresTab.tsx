@@ -179,7 +179,7 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm sm:text-base font-medium text-gray-900 truncate">
-                      {student.first_name} {student.last_name}
+                      <span className="uppercase">{student.first_name} {student.last_name}</span>
                     </h4>
                     <p className="text-xs text-gray-500">LRN: {student.lrn || 'N/A'}</p>
                   </div>

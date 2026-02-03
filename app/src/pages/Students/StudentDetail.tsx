@@ -272,7 +272,7 @@ export default function StudentDetail() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
-                <p className="text-gray-900 font-medium text-lg">{getFullName(student)}</p>
+                <p className="text-gray-900 font-medium text-lg uppercase">{getFullName(student)}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-1">Age</label>
@@ -309,19 +309,19 @@ export default function StudentDetail() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">First Name</label>
-            <p className="text-gray-900">{student.first_name}</p>
+            <p className="text-gray-900 uppercase">{student.first_name}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Middle Name</label>
-            <p className="text-gray-900">{student.middle_name || 'N/A'}</p>
+            <p className="text-gray-900 uppercase">{student.middle_name || 'N/A'}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Last Name</label>
-            <p className="text-gray-900">{student.last_name}</p>
+            <p className="text-gray-900 uppercase">{student.last_name}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-1">Extension Name</label>
-            <p className="text-gray-900">{student.ext_name || 'N/A'}</p>
+            <p className="text-gray-900 uppercase">{student.ext_name || 'N/A'}</p>
           </div>
         </div>
       </div>
@@ -416,7 +416,7 @@ export default function StudentDetail() {
                 Back to Students
               </Button>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{getFullName(student)}</h1>
+                <h1 className="text-3xl font-bold text-gray-900 uppercase">{getFullName(student)}</h1>
                 <p className="mt-1 text-gray-600">Student ID: {student.id}</p>
               </div>
             </div>

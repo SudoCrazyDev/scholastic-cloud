@@ -505,7 +505,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
             <div>
               <p className="text-gray-500">Student</p>
-              <p className="font-medium">
+              <p className="font-medium uppercase">
                 {student.first_name} {student.last_name}
               </p>
             </div>

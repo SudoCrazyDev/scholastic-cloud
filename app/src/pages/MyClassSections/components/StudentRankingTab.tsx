@@ -172,7 +172,7 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
           <div className="flex items-center space-x-3">
             <div className={`p-2 rounded-full ${color} text-white`}>{icon}</div>
             <div>
-              <h3 className="font-semibold text-gray-900">{getFullName(student)}</h3>
+              <h3 className="font-semibold text-gray-900 uppercase">{getFullName(student)}</h3>
               <p className="text-sm text-gray-600">LRN: {student.lrn}</p>
             </div>
           </div>

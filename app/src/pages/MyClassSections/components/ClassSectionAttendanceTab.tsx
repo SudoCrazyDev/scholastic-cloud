@@ -303,7 +303,7 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
                                 <User className="w-4 h-4 text-indigo-600" />
                               </div>
                               <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className="text-sm font-medium text-gray-900 uppercase">
                                   {getFullName(student)}
                                 </div>
                                 {student.lrn && (

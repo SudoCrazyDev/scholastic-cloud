@@ -307,7 +307,7 @@ export default function SectionGrades() {
                                 <User className="w-4 h-4 text-blue-600" />
                               </div>
                               <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className="text-sm font-medium text-gray-900 uppercase">
                                   {student.student_name}
                                 </div>
                               </div>
@@ -403,7 +403,7 @@ export default function SectionGrades() {
                                 <User className="w-4 h-4 text-blue-600" />
                               </div>
                               <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className="text-sm font-medium text-gray-900 uppercase">
                                   {student.student_name}
                                 </div>
                               </div>
@@ -502,7 +502,7 @@ export default function SectionGrades() {
                                     <User className="w-4 h-4 text-blue-600" />
                                   </div>
                                   <div className="ml-3">
-                                    <div className="text-sm font-medium text-gray-900">
+                                    <div className="text-sm font-medium text-gray-900 uppercase">
                                       {student.student_name}
                                     </div>
                                   </div>
