@@ -10,8 +10,6 @@ import {
 import { Select } from '../../../components/select';
 import type { Student } from '../../../types';
 import { useConsolidatedGrades } from '../../../hooks/useConsolidatedGrades';
-import { calculateFinalGrade } from '../../../utils/gradeUtils';
-import type { StudentRunningGrade } from '@/services/studentRunningGradeService';
 
 interface StudentRankingTabProps {
   students: (Student & { assignmentId: string })[];
@@ -27,13 +25,77 @@ interface StudentWithRanking extends Student {
   remarks: string;
 }
 
-// Remarks logic from Consolidated Grades
+// Remarks logic from Consolidated Grades (must match ClassSectionConsolidatedGradesTab)
 const getRemarks = (finalGrade: number | null) => {
   if (finalGrade === null) return 'N/A';
   if (finalGrade >= 98) return 'With Highest Honors';
   if (finalGrade >= 95) return 'With High Honor';
   if (finalGrade >= 90) return 'With Honors';
   return '';
+};
+
+// Base title without variant (same as ClassSectionConsolidatedGradesTab)
+const getBaseTitle = (title: string) => title.split(/[-(]/)[0].trim();
+
+// Final grade from grouped subjects: filter out child subjects, average grade (same as Consolidated Grades tab)
+const calculateFinalGradeFromGrouped = (
+  subjects: Array<{ grade: number | string | null; subject_type?: string }>
+): number | null => {
+  const parentAndRegular = subjects.filter((s) => s.subject_type !== 'child');
+  const validGrades = parentAndRegular
+    .map((s) => {
+      const g = typeof s.grade === 'string' ? parseFloat(s.grade) : s.grade;
+      return g != null && !Number.isNaN(g) ? g : null;
+    })
+    .filter((g): g is number => g !== null);
+  if (validGrades.length === 0) return null;
+  return Math.round(
+    validGrades.reduce((a, b) => a + b, 0) / validGrades.length
+  );
+};
+
+// Build per-student grouped subjects (same logic as ClassSectionConsolidatedGradesTab)
+const buildStudentsWithGroupedSubjects = (data: NonNullable<ReturnType<typeof useConsolidatedGrades>['data']>) => {
+  if (!data?.students) return [];
+  return data.students.map((student: any) => {
+    const grouped: Record<string, { grades: (number | string | null)[]; subjects: any[] }> = {};
+    const individualSubjects: any[] = [];
+    student.subjects.forEach((subject: any) => {
+      if (subject.subject_variant && String(subject.subject_variant).trim() !== '') {
+        const base = getBaseTitle(subject.subject_title);
+        if (!grouped[base]) grouped[base] = { grades: [], subjects: [] };
+        grouped[base].grades.push(subject.grade);
+        grouped[base].subjects.push(subject);
+      } else {
+        individualSubjects.push(subject);
+      }
+    });
+    const groupedList = Object.keys(grouped).map((base) => {
+      const grades = grouped[base].grades
+        .map((g) => (g == null ? null : typeof g === 'string' ? parseFloat(g) : g))
+        .filter((g) => g != null && !Number.isNaN(g)) as number[];
+      const avg = grades.length > 0 ? Math.round(grades.reduce((a, b) => a + b, 0) / grades.length) : null;
+      const subjects = grouped[base].subjects;
+      const isChildGroup = subjects.every((s: any) => s.subject_type === 'child');
+      const subjectType = isChildGroup ? 'child' : (subjects[0]?.subject_type || 'regular');
+      return {
+        subject_title: base,
+        grade: avg,
+        subject_type: subjectType,
+        parent_subject_id: subjects[0]?.parent_subject_id ?? null,
+      };
+    });
+    const individualList = individualSubjects.map((s: any) => ({
+      subject_title: s.subject_title,
+      grade: s.grade,
+      subject_type: s.subject_type,
+      parent_subject_id: s.parent_subject_id,
+    }));
+    return {
+      student_id: student.student_id,
+      groupedSubjects: [...groupedList, ...individualList],
+    };
+  });
 };
 
 const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSectionTitle, sectionId, quarter }) => {
@@ -53,12 +115,15 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
     { value: '4', label: '4th Quarter' },
   ];
 
-  // Map consolidated grades to student rankings
+  // Map consolidated grades to student rankings (use same Final Grade logic as Consolidated Grades tab)
+  const studentsWithGrouped = data ? buildStudentsWithGroupedSubjects(data) : [];
   let studentsWithRanking: StudentWithRanking[] = [];
   if (data && data.students) {
     studentsWithRanking = data.students
       .map((student) => {
-        const gpa = calculateFinalGrade(student.subjects as unknown as StudentRunningGrade[]);
+        const entry = studentsWithGrouped.find((e: any) => e.student_id === student.student_id);
+        const groupedSubjects = entry?.groupedSubjects ?? [];
+        const gpa = calculateFinalGradeFromGrouped(groupedSubjects);
         return {
           ...students.find(s => s.id === student.student_id)!,
           assignmentId: students.find(s => s.id === student.student_id)?.assignmentId || '',
