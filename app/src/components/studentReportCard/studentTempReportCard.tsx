@@ -4,6 +4,9 @@ import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, St
 import { roundGrade, getPassFailRemarks } from '@/utils/gradeUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
 
+/** Set to true to temporarily hide the Final Grade column on the Temp Report Card. Set to false to show again. */
+const HIDE_FINAL_GRADES_TEMP = true;
+
 /** Final grade = average of quarter grades (only quarters with valid grades). Rounded to whole number. */
 function computeFinalGradeFromQuarters(q1?: number | string, q2?: number | string, q3?: number | string, q4?: number | string): number {
   const values = [q1, q2, q3, q4]
@@ -106,7 +109,7 @@ export default function PrintTempReportCard({
                             <View style={{width: '30%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Learning Areas</Text>
                             </View>
-                            <View style={{width: '40%', display: 'flex', flexDirection: 'column', borderRight: '1px solid black'}}>
+                            <View style={{width: HIDE_FINAL_GRADES_TEMP ? '50%' : '40%', display: 'flex', flexDirection: 'column', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Quarter</Text>
                                 <View style={{display: 'flex', flexDirection: 'row', borderTop: '1px solid black'}}>
                                     <View style={{width: '25%', borderRight: '1px solid black'}}>
@@ -123,9 +126,11 @@ export default function PrintTempReportCard({
                                     </View>
                                 </View>
                             </View>
+                            {!HIDE_FINAL_GRADES_TEMP && (
                             <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Final Grade</Text>
                             </View>
+                            )}
                             <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Remarks</Text>
                             </View>
@@ -207,7 +212,7 @@ export default function PrintTempReportCard({
                                 <View style={{paddingLeft: '2px', paddingVertical: '2px', width: '30%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'flex-start', borderRight: '1px solid black'}}>
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginLeft: `${subject.subject_type === 'parent' ? '0px' : '10px'}`}}>{subject.title ||  'Subject'}{subject.variant ? ` - ${subject.variant}` : ''}</Text>
                                 </View>
-                                <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black', alignItems: 'center', justifyContent: 'center'}}>
+                                <View style={{width: HIDE_FINAL_GRADES_TEMP ? '50%' : '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black', alignItems: 'center', justifyContent: 'center'}}>
                                   <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
                                     <Text>{quarter1Grade}</Text>
                                   </View>
@@ -221,9 +226,11 @@ export default function PrintTempReportCard({
                                     <Text>{quarter4Grade}</Text>
                                   </View>
                                 </View>
+                                {!HIDE_FINAL_GRADES_TEMP && (
                                 <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{finalGrade}</Text>
                                 </View>
+                                )}
                                 <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{remarks}</Text>
                                 </View>
