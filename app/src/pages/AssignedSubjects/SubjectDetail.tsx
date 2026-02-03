@@ -9,8 +9,7 @@ import {
   AcademicCapIcon,
   BuildingOfficeIcon,
   ListBulletIcon,
-  DocumentTextIcon,
-  CalendarIcon
+  DocumentTextIcon
 } from '@heroicons/react/24/outline'
 import { useSubjectDetail } from '@hooks'
 import { useQuery } from '@tanstack/react-query'
@@ -98,26 +97,27 @@ const SubjectDetail: React.FC = () => {
       label: 'Components of Summative Assessment',
       icon: ListBulletIcon,
     },
-    {
-      id: 'assessment-builder' as TabType,
-      label: 'Quiz / Assignment / Exam Builder',
-      icon: DocumentTextIcon,
-    },
-    {
-      id: 'topics' as TabType,
-      label: 'Topics',
-      icon: ListBulletIcon,
-    },
-    {
-      id: 'ai-planner' as TabType,
-      label: 'AI Planner',
-      icon: ListBulletIcon,
-    },
-    {
-      id: 'lesson-plan-calendar' as TabType,
-      label: 'Lesson Plan Calendar',
-      icon: CalendarIcon,
-    },
+    // Temporarily hidden:
+    // {
+    //   id: 'assessment-builder' as TabType,
+    //   label: 'Quiz / Assignment / Exam Builder',
+    //   icon: DocumentTextIcon,
+    // },
+    // {
+    //   id: 'topics' as TabType,
+    //   label: 'Topics',
+    //   icon: ListBulletIcon,
+    // },
+    // {
+    //   id: 'ai-planner' as TabType,
+    //   label: 'AI Planner',
+    //   icon: ListBulletIcon,
+    // },
+    // {
+    //   id: 'lesson-plan-calendar' as TabType,
+    //   label: 'Lesson Plan Calendar',
+    //   icon: CalendarIcon,
+    // },
     // {
     //   id: 'calendar' as TabType,
     //   label: 'Calendar of Events',
