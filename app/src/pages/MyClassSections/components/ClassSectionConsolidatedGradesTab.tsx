@@ -79,6 +79,24 @@ const getRemarksColor = (finalGrade: number | null) => {
   return 'text-red-600';
 };
 
+/** Get grade for a column (single subject or average of variant group) from student's subject list. */
+const getGradeForColumn = (
+  grouped: Array<{ subject_id: string; grade: number | string | null }>,
+  subjectIds: string[]
+): number | string | null => {
+  const grades = subjectIds
+    .map(id => {
+      const s = grouped.find((g: any) => g.subject_id === id);
+      const g = s?.grade;
+      if (g == null) return null;
+      return typeof g === 'string' ? parseFloat(g) : g;
+    })
+    .filter((g): g is number => g !== null && !Number.isNaN(g));
+  if (grades.length === 0) return null;
+  if (grades.length === 1) return grades[0];
+  return Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
+};
+
 
 const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGradesTabProps> = ({
   sectionId,
@@ -102,162 +120,85 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
     return title.split(/[-(]/)[0].trim();
   };
 
-  // Use subjects with hierarchical sorting and group variants by base title
+  // Use subjects with hierarchical sorting: order by subject order, child subjects beside their parent.
+  // Only group "variant siblings" (same base title, same parent, multiple with variant); never merge parent and child.
   const baseSubjects = React.useMemo(() => {
     if (!subjectsResponse?.data || !data || !data.students.length) return [];
     
     const subjects = subjectsResponse.data as Subject[];
     
-    // Apply the same sorting logic as the report card
-    const sortedSubjects = subjects
-      .sort((a, b) => {
-        // If both are parent subjects, sort by order
-        if (a.subject_type === 'parent' && b.subject_type === 'parent') {
-          return a.order - b.order;
-        }
-        
-        // If both are child subjects, group by parent and then by order
-        if (a.subject_type === 'child' && b.subject_type === 'child') {
-          // First sort by parent order, then by child order
-          const aParentOrder = subjects.find(s => s.id === a.parent_subject_id)?.order || 0;
-          const bParentOrder = subjects.find(s => s.id === b.parent_subject_id)?.order || 0;
-          
-          if (aParentOrder !== bParentOrder) {
-            return aParentOrder - bParentOrder;
-          }
-          // Then by order within the same parent
-          return a.order - b.order;
-        }
-        
-        // If one is parent and one is child
-        if (a.subject_type === 'parent' && b.subject_type === 'child') {
-          // If the child belongs to this parent, child comes after parent
-          if (b.parent_subject_id === a.id) {
-            return -1;
-          }
-          // If the child belongs to a different parent, sort by parent order
-          const aOrder = a.order;
-          const bParentOrder = subjects.find(s => s.id === b.parent_subject_id)?.order || 0;
-          return aOrder - bParentOrder;
-        }
-        
-        if (a.subject_type === 'child' && b.subject_type === 'parent') {
-          // If the child belongs to this parent, child comes after parent
-          if (a.parent_subject_id === b.id) {
-            return 1;
-          }
-          // If the child belongs to a different parent, sort by parent order
-          const aParentOrder = subjects.find(s => s.id === a.parent_subject_id)?.order || 0;
-          const bOrder = b.order;
-          return aParentOrder - bOrder;
-        }
-        
+    // Sort: parent subjects by order, then each parent's children immediately after by their order
+    const sortedSubjects = [...subjects].sort((a, b) => {
+      if (a.subject_type === 'parent' && b.subject_type === 'parent') {
         return a.order - b.order;
-      });
-    
-    // Group subjects by base title only if they have variants
-    const groupedSubjects: Record<string, Subject[]> = {};
-    const individualSubjects: Subject[] = [];
-    
-    sortedSubjects.forEach(subject => {
-      // Check if subject has a variant (not empty and not null)
-      if (subject.variant && subject.variant.trim() !== '') {
-        // Group by base title for subjects with variants
-        const baseTitle = getBaseTitle(subject.title);
-        if (!groupedSubjects[baseTitle]) {
-          groupedSubjects[baseTitle] = [];
-        }
-        groupedSubjects[baseTitle].push(subject);
-      } else {
-        // Treat as individual subject if no variant
-        individualSubjects.push(subject);
       }
+      if (a.subject_type === 'child' && b.subject_type === 'child') {
+        const aParentOrder = subjects.find(s => s.id === a.parent_subject_id)?.order ?? 999;
+        const bParentOrder = subjects.find(s => s.id === b.parent_subject_id)?.order ?? 999;
+        if (aParentOrder !== bParentOrder) return aParentOrder - bParentOrder;
+        return a.order - b.order;
+      }
+      if (a.subject_type === 'parent' && b.subject_type === 'child') {
+        if (b.parent_subject_id === a.id) return -1;
+        return a.order - (subjects.find(s => s.id === b.parent_subject_id)?.order ?? 999);
+      }
+      if (a.subject_type === 'child' && b.subject_type === 'parent') {
+        if (a.parent_subject_id === b.id) return 1;
+        return (subjects.find(s => s.id === a.parent_subject_id)?.order ?? 999) - b.order;
+      }
+      return a.order - b.order;
     });
     
-    // Create combined list with order information for proper sorting
-    const groupedSubjectsList = Object.keys(groupedSubjects).map(baseTitle => {
-      const subjects = groupedSubjects[baseTitle];
-      // Use the minimum order from the grouped subjects to maintain proper sorting
-      const minOrder = Math.min(...subjects.map(s => s.order));
-      return {
-        base: baseTitle,
-        subject_ids: subjects.map(s => s.id),
-        subject_title: baseTitle,
-        order: minOrder,
-      };
-    });
-    
-    const individualSubjectsList = individualSubjects.map(subject => ({
-      base: subject.title,
-      subject_ids: [subject.id],
-      subject_title: subject.title,
-      order: subject.order,
-    }));
-    
-    // Combine and sort by order to maintain proper subject sequence
-    const combinedSubjects = [...groupedSubjectsList, ...individualSubjectsList];
-    return combinedSubjects.sort((a, b) => a.order - b.order);
+    // Build columns in sorted order: one per subject, or one per variant-sibling group (same base + same parent, multiple with variant)
+    const result: Array<{ base: string; subject_ids: string[]; subject_title: string; order: number }> = [];
+    let i = 0;
+    while (i < sortedSubjects.length) {
+      const s = sortedSubjects[i];
+      const baseTitle = getBaseTitle(s.title);
+      const parentId = s.parent_subject_id ?? null;
+      const hasVariant = !!(s.variant && s.variant.trim() !== '');
+      if (hasVariant) {
+        const group = [s];
+        let j = i + 1;
+        while (j < sortedSubjects.length) {
+          const t = sortedSubjects[j];
+          if (!t.variant || t.variant.trim() === '') break;
+          if (getBaseTitle(t.title) !== baseTitle || (t.parent_subject_id ?? null) !== parentId) break;
+          group.push(t);
+          j++;
+        }
+        if (group.length > 1) {
+          result.push({
+            base: baseTitle,
+            subject_ids: group.map(x => x.id),
+            subject_title: baseTitle,
+            order: Math.min(...group.map(x => x.order)),
+          });
+          i = j;
+        } else {
+          result.push({ base: s.title, subject_ids: [s.id], subject_title: s.title, order: s.order });
+          i++;
+        }
+      } else {
+        result.push({ base: s.title, subject_ids: [s.id], subject_title: s.title, order: s.order });
+        i++;
+      }
+    }
+    return result;
   }, [subjectsResponse, data]);
-  // For each student, group grades by base subject title only for subjects with variants
+  // Per-student list of subjects with subject_id for lookup; no merging of parent/child
   const studentsWithGroupedSubjects = React.useMemo(() => {
     if (!data) return [];
-    return data.students.map((student: any) => {
-      const grouped: Record<string, { grades: (number | string | null)[], subjects: any[] }> = {};
-      const individualSubjects: any[] = [];
-      
-      student.subjects.forEach((subject: any) => {
-        // Check if subject has a variant (not empty and not null)
-        if (subject.subject_variant && subject.subject_variant.trim() !== '') {
-          // Group by base title for subjects with variants
-          const base = getBaseTitle(subject.subject_title);
-          if (!grouped[base]) grouped[base] = { grades: [], subjects: [] };
-          grouped[base].grades.push(subject.grade);
-          grouped[base].subjects.push(subject);
-        } else {
-          // Treat as individual subject if no variant
-          individualSubjects.push(subject);
-        }
-      });
-      
-      // Process grouped subjects with variants
-      const groupedSubjectsList = Object.keys(grouped).map(base => {
-        const grades = grouped[base].grades
-          .map(g => (g === null || g === undefined ? null : typeof g === 'string' ? parseFloat(g) : g))
-          .filter(g => g !== null && !isNaN(g as number)) as number[];
-        let avg: number | null = null;
-        if (grades.length > 0) {
-          avg = Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
-        }
-        
-        // Get the subject type from the first subject in the group
-        // If all subjects in the group are child subjects, mark as child
-        // Otherwise, mark as parent or regular
-        const subjects = grouped[base].subjects;
-        const isChildGroup = subjects.every((s: any) => s.subject_type === 'child');
-        const subjectType = isChildGroup ? 'child' : (subjects[0]?.subject_type || 'regular');
-        const parentSubjectId = subjects[0]?.parent_subject_id || null;
-        
-        return {
-          subject_title: base,
-          grade: avg,
-          subject_type: subjectType,
-          parent_subject_id: parentSubjectId,
-        };
-      });
-      
-      // Process individual subjects (without variants)
-      const individualSubjectsList = individualSubjects.map(subject => ({
-        subject_title: subject.subject_title,
-        grade: subject.grade,
-        subject_type: subject.subject_type,
-        parent_subject_id: subject.parent_subject_id,
-      }));
-      
-      return {
-        ...student,
-        groupedSubjects: [...groupedSubjectsList, ...individualSubjectsList],
-      };
-    });
+    return data.students.map((student: any) => ({
+      ...student,
+      groupedSubjects: (student.subjects || []).map((s: any) => ({
+        subject_id: s.subject_id,
+        subject_title: s.subject_title,
+        grade: s.grade,
+        subject_type: s.subject_type,
+        parent_subject_id: s.parent_subject_id,
+      })),
+    }));
   }, [data]);
 
   if (isLoading || subjectsLoading) {
@@ -402,7 +343,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                     </th>
                     {baseSubjects.map((subject) => (
                       <th
-                        key={subject.base}
+                        key={subject.subject_ids.join('-')}
                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[140px]"
                       >
                         <div className="flex flex-col">
@@ -445,12 +386,12 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                           </div>
                         </td>
                         {baseSubjects.map((subject) => {
-                          const subj = grouped.find((g: any) => g.subject_title === subject.subject_title);
+                          const grade = getGradeForColumn(grouped, subject.subject_ids);
                           return (
-                            <td key={subject.base} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+                            <td key={subject.subject_ids.join('-')} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                               <div className="text-center">
-                                <div className={`text-sm font-medium ${getGradeColor(subj?.grade)}`}>
-                                  {formatGrade(subj?.grade)}
+                                <div className={`text-sm font-medium ${getGradeColor(grade)}`}>
+                                  {formatGrade(grade)}
                                 </div>
                               </div>
                             </td>
@@ -498,7 +439,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                     </th>
                     {baseSubjects.map((subject) => (
                       <th
-                        key={subject.base}
+                        key={subject.subject_ids.join('-')}
                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[140px]"
                       >
                         <div className="flex flex-col">
@@ -541,12 +482,12 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                           </div>
                         </td>
                         {baseSubjects.map((subject) => {
-                          const subj = grouped.find((g: any) => g.subject_title === subject.subject_title);
+                          const grade = getGradeForColumn(grouped, subject.subject_ids);
                           return (
-                            <td key={subject.base} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+                            <td key={subject.subject_ids.join('-')} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                               <div className="text-center">
-                                <div className={`text-sm font-medium ${getGradeColor(subj?.grade)}`}>
-                                  {formatGrade(subj?.grade)}
+                                <div className={`text-sm font-medium ${getGradeColor(grade)}`}>
+                                  {formatGrade(grade)}
                                 </div>
                               </div>
                             </td>
@@ -597,7 +538,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                         </th>
                         {baseSubjects.map((subject) => (
                           <th
-                            key={subject.base}
+                            key={subject.subject_ids.join('-')}
                             className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[140px]"
                           >
                             <div className="flex flex-col">
@@ -640,12 +581,12 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                               </div>
                             </td>
                             {baseSubjects.map((subject) => {
-                              const subj = grouped.find((g: any) => g.subject_title === subject.subject_title);
+                              const grade = getGradeForColumn(grouped, subject.subject_ids);
                               return (
-                                <td key={subject.base} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+                                <td key={subject.subject_ids.join('-')} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                                   <div className="text-center">
-                                    <div className={`text-sm font-medium ${getGradeColor(subj?.grade)}`}>
-                                      {formatGrade(subj?.grade)}
+                                    <div className={`text-sm font-medium ${getGradeColor(grade)}`}>
+                                      {formatGrade(grade)}
                                     </div>
                                   </div>
                                 </td>

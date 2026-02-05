@@ -128,10 +128,18 @@ export const exportConsolidatedGradesToExcel = (
       const grouped = studentsWithGroupedSubjects.find((s: any) => s.student_id === student.student_id)?.groupedSubjects || [];
       const row = [student.student_name];
       
-      // Add grades for each subject
+      // Add grades for each subject (by subject_id so parent/child columns are correct)
       baseSubjects.forEach(subject => {
-        const subj = grouped.find((g: any) => g.subject_title === subject.subject_title);
-        row.push(formatGrade(subj?.grade));
+        const grades = subject.subject_ids
+          .map(id => {
+            const s = grouped.find((g: any) => g.subject_id === id);
+            const g = s?.grade;
+            if (g == null) return null;
+            return typeof g === 'string' ? parseFloat(g) : g;
+          })
+          .filter((g): g is number => g !== null && !Number.isNaN(g));
+        const grade = grades.length === 0 ? null : grades.length === 1 ? grades[0] : Math.round(grades.reduce((a, b) => a + b, 0) / grades.length);
+        row.push(formatGrade(grade));
       });
       
       // Add final grade and remarks
