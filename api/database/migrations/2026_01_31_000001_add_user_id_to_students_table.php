@@ -14,7 +14,6 @@ return new class extends Migration
     {
         Schema::table('students', function (Blueprint $table) {
             $table->foreignUuid('user_id')->nullable()->after('id')->constrained('users')->nullOnDelete();
-            $table->unique('user_id');
         });
     }
 
