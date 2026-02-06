@@ -6,7 +6,8 @@ import {
   UserIcon,
   EnvelopeIcon,
   CalendarIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline'
 import { Checkbox } from '../../../components/checkbox'
 import { Badge } from '../../../components/badge'
@@ -20,6 +21,7 @@ interface UserGridProps {
   onSelectionChange: (users: User[]) => void
   onEdit: (user: User) => void
   onDelete: (user: User) => void
+  onAssume?: (user: User) => void
 }
 
 export const UserGrid: React.FC<UserGridProps> = ({
@@ -30,6 +32,7 @@ export const UserGrid: React.FC<UserGridProps> = ({
   onSelectionChange,
   onEdit,
   onDelete,
+  onAssume,
 }) => {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -207,6 +210,15 @@ export const UserGrid: React.FC<UserGridProps> = ({
 
             {/* Actions */}
             <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+              {onAssume && user.role?.slug !== 'super-administrator' && (
+                <button
+                  onClick={() => onAssume(user)}
+                  className="p-1 text-gray-400 hover:text-amber-600 transition-colors"
+                  title="Assume user"
+                >
+                  <UserCircleIcon className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={() => onEdit(user)}
                 className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"

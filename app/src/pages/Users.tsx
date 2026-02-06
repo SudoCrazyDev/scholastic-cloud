@@ -1,8 +1,12 @@
+import toast from 'react-hot-toast'
 import { UserHeader, UserGrid, UserModal } from './Users/components'
 import { ConfirmationModal } from '../components/ConfirmationModal'
 import { useUsers } from '../hooks/useUsers'
+import { useAuth } from '../hooks/useAuth'
 
 export default function Users() {
+  const { user: authUser, assumeUser } = useAuth()
+  const isSuperAdmin = authUser?.role?.slug === 'super-administrator'
 
   const {
     users,
@@ -61,6 +65,13 @@ export default function Users() {
           onSelectionChange={setSelectedRows}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onAssume={isSuperAdmin ? async (user) => {
+          try {
+            await assumeUser(user.id)
+          } catch (e: any) {
+            toast.error(e?.response?.data?.message ?? 'Failed to assume user')
+          }
+        } : undefined}
         />
 
         {/* Pagination */}

@@ -48,6 +48,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile/password', [AuthController::class, 'updatePassword']);
+    Route::post('/assume-user', [AuthController::class, 'assumeUser']);
     
     // Desktop app specific endpoints - for offline data synchronization
     Route::prefix('desktop')->group(function () {

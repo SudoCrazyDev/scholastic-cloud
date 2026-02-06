@@ -148,4 +148,90 @@ class AuthController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Assume another user (super-administrator only).
+     * Issues a token for the target user so the super-admin can act as that user.
+     */
+    public function assumeUser(Request $request)
+    {
+        $authenticatedUser = $request->user();
+        if (!$authenticatedUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $role = $authenticatedUser->getRole();
+        if (!$role || $role->slug !== 'super-administrator') {
+            return response()->json([
+                'message' => 'Only super-administrators can assume another user'
+            ], 403);
+        }
+
+        $request->validate([
+            'user_id' => 'required|uuid|exists:users,id',
+        ]);
+
+        $targetUser = User::find($request->user_id);
+        if (!$targetUser) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        // Prevent assuming another super-administrator
+        $targetRole = $targetUser->getRole();
+        if ($targetRole && $targetRole->slug === 'super-administrator') {
+            return response()->json([
+                'message' => 'Cannot assume another super-administrator'
+            ], 403);
+        }
+
+        $token = Str::random(60);
+        $tokenExpiry = Carbon::now()->addHours(24)->toDateTimeString();
+        $targetUser->update([
+            'token' => $token,
+            'token_expiry' => $tokenExpiry,
+        ]);
+
+        $targetUser->load(['userInstitutions.role', 'userInstitutions.institution', 'directRole']);
+        $targetRole = $targetUser->getRole();
+        $userData = [
+            'id' => $targetUser->id,
+            'first_name' => $targetUser->first_name,
+            'middle_name' => $targetUser->middle_name,
+            'last_name' => $targetUser->last_name,
+            'ext_name' => $targetUser->ext_name,
+            'email' => $targetUser->email,
+            'gender' => $targetUser->gender,
+            'birthdate' => $targetUser->birthdate,
+            'is_new' => $targetUser->is_new,
+            'is_active' => $targetUser->is_active,
+            'role' => $targetRole ? [
+                'title' => $targetRole->title,
+                'slug' => $targetRole->slug,
+            ] : null,
+            'user_institutions' => $targetUser->userInstitutions->map(function ($userInstitution) {
+                return [
+                    'institution_id' => $userInstitution->institution_id,
+                    'role_id' => $userInstitution->role_id,
+                    'is_default' => $userInstitution->is_default,
+                    'is_main' => $userInstitution->is_main,
+                    'role' => $userInstitution->role ? [
+                        'title' => $userInstitution->role->title,
+                        'slug' => $userInstitution->role->slug,
+                    ] : null,
+                    'institution' => $userInstitution->institution ? [
+                        'id' => $userInstitution->institution->id,
+                        'name' => $userInstitution->institution->name,
+                    ] : null,
+                ];
+            }),
+            'created_at' => $targetUser->created_at,
+            'updated_at' => $targetUser->updated_at,
+        ];
+
+        return response()->json([
+            'token' => $token,
+            'token_expiry' => $tokenExpiry,
+            'user' => $userData,
+        ]);
+    }
 } 

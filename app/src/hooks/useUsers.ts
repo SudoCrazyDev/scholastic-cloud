@@ -39,8 +39,18 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     loading: false,
   })
 
-  // Query key for users
-  const queryKey = ['users', options]
+  const [searchValue, setSearchValue] = useState(options.search || '')
+  const [currentPage, setCurrentPage] = useState(options.page || 1)
+
+  // Query params derived from state so search and pagination trigger refetch
+  const queryParams = {
+    ...options,
+    search: searchValue,
+    page: currentPage,
+  }
+
+  // Query key for users - includes search and page so changing them refetches
+  const queryKey = ['users', queryParams]
 
   // Fetch users query
   const {
@@ -50,7 +60,7 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => userService.getUsers(options),
+    queryFn: () => userService.getUsers(queryParams),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   })
@@ -177,21 +187,16 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     },
   })
 
-  const [searchValue, setSearchValue] = useState(options.search || '')
-  const [currentPage, setCurrentPage] = useState(options.page || 1)
-
-  // Handler for search
+  // Handler for search - reset to page 1 when search changes
   const handleSearchChange = useCallback((value: string) => {
     setSearchValue(value)
-    // Optionally, you can debounce this
-    queryClient.invalidateQueries({ queryKey: ['users'] })
-  }, [queryClient])
+    setCurrentPage(1)
+  }, [])
 
   // Handler for pagination
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page)
-    queryClient.invalidateQueries({ queryKey: ['users'] })
-  }, [queryClient])
+  }, [])
 
   const handleCreate = () => {
     setEditingUser(null)

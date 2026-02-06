@@ -34,4 +34,13 @@ export const authService = {
     const response = await api.put('/profile/password', { password });
     return response.data;
   },
+
+  /**
+   * Assume another user (super-administrator only).
+   * Returns token and user for the target user.
+   */
+  async assumeUser(userId: string): Promise<{ token: string; token_expiry: string; user: any }> {
+    const response = await api.post('/assume-user', { user_id: userId });
+    return response.data;
+  },
 }; 
