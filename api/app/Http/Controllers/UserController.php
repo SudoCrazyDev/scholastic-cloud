@@ -19,6 +19,7 @@ class UserController extends Controller
     {
         $perPage = $request->get('per_page', 15);
         $search = $request->get('search', '');
+        $roleId = $request->get('role_id');
 
         $query = User::with(['role', 'userInstitutions.institution', 'userInstitutions.role']);
 
@@ -27,6 +28,22 @@ class UserController extends Controller
                 $q->where('first_name', 'like', "%{$search}%")
                   ->orWhere('middle_name', 'like', "%{$search}%")
                   ->orWhere('last_name', 'like', "%{$search}%");
+            });
+        }
+
+        if ($roleId) {
+            // Filter by effective role: user has this role on default institution, main institution, or direct role_id
+            $query->where(function ($q) use ($roleId) {
+                // Has default user_institution with this role
+                $q->whereHas('userInstitutions', function ($sub) use ($roleId) {
+                    $sub->where('is_default', true)->where('role_id', $roleId);
+                })
+                // Or has main user_institution with this role (and no default with a different role)
+                ->orWhereHas('userInstitutions', function ($sub) use ($roleId) {
+                    $sub->where('is_main', true)->where('role_id', $roleId);
+                })
+                // Or has direct role_id (and no default/main assignment with this role)
+                ->orWhere('role_id', $roleId);
             });
         }
 
