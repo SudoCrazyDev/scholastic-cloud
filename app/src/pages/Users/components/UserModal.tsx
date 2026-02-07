@@ -52,6 +52,18 @@ export function UserModal({
   useEffect(() => {
     if (isOpen) {
       if (user) {
+        // Role: from user.role or first user_institution's role_id
+        const roleId =
+          user.role?.id ||
+          (user.user_institutions?.[0]?.role_id ?? '')
+
+        // Institutions: from user_institutions, default first to match API order
+        const institutionIds = user.user_institutions?.length
+          ? [...user.user_institutions]
+              .sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0))
+              .map((ui) => ui.institution_id)
+          : []
+
         setFormData({
           first_name: user.first_name,
           middle_name: user.middle_name || '',
@@ -60,8 +72,8 @@ export function UserModal({
           gender: user.gender,
           birthdate: user.birthdate.split('T')[0], // Convert to date input format
           email: user.email,
-          role_id: '', // We'll need to fetch this separately
-          institution_ids: [], // We'll need to fetch this separately
+          role_id: roleId,
+          institution_ids: institutionIds,
         })
       } else {
         setFormData({

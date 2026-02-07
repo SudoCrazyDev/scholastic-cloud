@@ -19,7 +19,8 @@ import {
   BarChart3,
   X,
   Calendar,
-  Settings
+  Settings,
+  FileText
 } from 'lucide-react';
 
 interface MenuItem {
@@ -153,12 +154,13 @@ const menuItems: MenuItem[] = [
   //   path: '/sf9',
   //   allowedRoles: ['principal', 'curriculum-head', 'assistant-principal', 'subject-teacher'],
   // },
-  // {
-  //   id: 'certificate-builder',
-  //   label: 'Certificate Builder',
-  //   icon: <FileText className="w-5 h-5" />,
-  //   path: '/certificate-builder',
-  // },
+  {
+    id: 'certificate-builder',
+    label: 'Certificate Builder',
+    icon: <FileText className="w-5 h-5" />,
+    path: '/certificate-builder',
+    allowedRoles: ['principal', 'institution-administrator'],
+  },
 
 ];
 

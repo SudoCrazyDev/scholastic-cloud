@@ -17,6 +17,7 @@ interface UseUsersOptions {
   page?: number
   limit?: number
   search?: string
+  roleId?: string
   sortBy?: string
   sortDirection?: 'asc' | 'desc'
 }
@@ -40,19 +41,13 @@ export const useUsers = (options: UseUsersOptions = {}) => {
   })
 
   const [searchValue, setSearchValue] = useState(options.search || '')
+  const [roleIdFilter, setRoleIdFilter] = useState<string | ''>(options.roleId || '')
   const [currentPage, setCurrentPage] = useState(options.page || 1)
 
-  // Query params derived from state so search and pagination trigger refetch
-  const queryParams = {
-    ...options,
-    search: searchValue,
-    page: currentPage,
-  }
+  // Query key with explicit primitives so TanStack Query refetches when role filter changes
+  const queryKey = ['users', searchValue, roleIdFilter, currentPage]
 
-  // Query key for users - includes search and page so changing them refetches
-  const queryKey = ['users', queryParams]
-
-  // Fetch users query
+  // Fetch users query - build params inside queryFn so role_id is definitely included when set
   const {
     data: usersResponse,
     isLoading: loading,
@@ -60,7 +55,16 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => userService.getUsers(queryParams),
+    queryFn: () => {
+      const params: Parameters<typeof userService.getUsers>[0] = {
+        page: currentPage,
+        search: searchValue || undefined,
+      }
+      if (roleIdFilter) {
+        params.role_id = roleIdFilter
+      }
+      return userService.getUsers(params)
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   })
@@ -193,6 +197,12 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     setCurrentPage(1)
   }, [])
 
+  // Handler for role filter - reset to page 1 when role changes
+  const handleRoleFilterChange = useCallback((roleId: string) => {
+    setRoleIdFilter(roleId)
+    setCurrentPage(1)
+  }, [])
+
   // Handler for pagination
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page)
@@ -287,6 +297,10 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     search: {
       value: searchValue,
       onSearch: handleSearchChange,
+    },
+    roleFilter: {
+      value: roleIdFilter,
+      onRoleFilterChange: handleRoleFilterChange,
     },
     sorting: {
       config: options.sortBy && options.sortDirection ? { key: options.sortBy, direction: options.sortDirection } : null,

@@ -14,6 +14,7 @@ export default function Users() {
     error,
     pagination,
     search,
+    roleFilter,
     selectedRows,
     roles,
     institutions,
@@ -51,6 +52,9 @@ export default function Users() {
         <UserHeader
           search={search.value}
           onSearchChange={search.onSearch}
+          roleFilter={roleFilter.value}
+          onRoleFilterChange={roleFilter.onRoleFilterChange}
+          roles={roles}
           selectedRows={selectedRows}
           onCreate={handleCreate}
           onBulkDelete={handleBulkDelete}
