@@ -4,9 +4,14 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { toast } from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useCertificate } from '@/hooks/useCertificates';
+import { institutionService } from '@/services/institutionService';
+import { studentService } from '@/services/studentService';
 import { nanoid } from 'nanoid';
+import type { Institution, UserInstitution as UserInstitutionType, Student } from '@/types';
+import { designHasStudentVariables } from './certificateDesignUtils';
 
 // Components
 import ElementsPanel from './components/ElementsPanel';
@@ -18,7 +23,10 @@ import CertificateToolbar from './components/CertificateToolbar';
 // UI Components
 import Button from '@/components/ui/Button';
 import Card, { CardBody } from '@/components/ui/Card';
-import { AlertTriangle, Building2 } from 'lucide-react';
+import { AlertTriangle, Building2, PanelLeft, User, X } from 'lucide-react';
+
+const RULER_SIZE = 28;
+const TICK_INTERVAL = 100;
 
 const PAPER_PRESETS = {
 	a4: { 
@@ -38,12 +46,15 @@ const PAPER_PRESETS = {
 type Paper = keyof typeof PAPER_PRESETS;
 type Orientation = 'portrait' | 'landscape';
 
+type BgImageObjectFit = 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
+
 interface DesignData {
 	paper: Paper;
 	orientation: Orientation;
 	zoom: number;
 	bgColor: string;
 	bgImage: string | null;
+	bgImageObjectFit?: BgImageObjectFit;
 	elements: CanvasElement[];
 }
 
@@ -63,8 +74,9 @@ export default function CertificateBuilder() {
 	// State
 	const [elements, setElements] = useState<CanvasElement[]>([]);
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
-	const [showGrid, setShowGrid] = useState(true);
-	const [snapping, setSnapping] = useState(true);
+	const [showGrid, setShowGrid] = useState(false);
+	const [showRuler, setShowRuler] = useState(true);
+	const [snapping, setSnapping] = useState(false);
 	const [history, setHistory] = useState<CanvasElement[][]>([]);
 	const [future, setFuture] = useState<CanvasElement[][]>([]);
 	const [paper, setPaper] = useState<Paper>('a4');
@@ -72,23 +84,61 @@ export default function CertificateBuilder() {
 	const [zoom, setZoom] = useState<number>(1);
 	const [bgColor, setBgColor] = useState<string>('#ffffff');
 	const [bgImage, setBgImage] = useState<string | null>(null);
+	const [bgImageObjectFit, setBgImageObjectFit] = useState<BgImageObjectFit>('cover');
 	const [title, setTitle] = useState<string>('Untitled Certificate');
+	const [elementsPanelOpen, setElementsPanelOpen] = useState(true);
+	const [previewStudent, setPreviewStudent] = useState<Student | null>(null);
+	const [studentSearchQuery, setStudentSearchQuery] = useState('');
+	const [studentSearchFocused, setStudentSearchFocused] = useState(false);
 	
 	// Refs
 	const canvasRef = useRef<HTMLDivElement | null>(null);
 	
-	// Get certificate ID from URL or state
-	const certificateId = searchParams.get('id') ? Number(searchParams.get('id')) : null;
+	// Get certificate ID from URL (API uses UUID string)
+	const certificateId = searchParams.get('id') || null;
 	
 	// TanStack Query hooks
 	const { data: certificate, isLoading: isLoadingCertificate } = useCertificate(certificateId);
 	
-	// Get user's default institution
+	// Get user's default/main institution ID
+	const institutionId = useMemo(() => {
+		const defaultUi = user?.user_institutions?.find((ui: UserInstitution) => ui.is_default) as UserInstitutionType | undefined;
+		const mainUi = user?.user_institutions?.find((ui: UserInstitution) => ui.is_main) as UserInstitutionType | undefined;
+		return defaultUi?.institution_id ?? mainUi?.institution_id ?? '';
+	}, [user?.user_institutions]);
+
+	// Fetch full institution data (for variables: title, gov_id, division, region, address, logo)
+	const { data: institutionResponse } = useQuery({
+		queryKey: ['institution', institutionId],
+		queryFn: () => institutionService.getInstitution(institutionId),
+		enabled: !!institutionId,
+	});
+	const fullInstitution = institutionResponse?.data as Institution | undefined;
+
+	// Student search for sample data (when certificate has student variables)
+	const hasStudentVars = designHasStudentVariables({ elements });
+	const { data: studentsResponse } = useQuery({
+		queryKey: ['students', 'certificate-preview', studentSearchQuery, studentSearchFocused],
+		queryFn: () =>
+			studentSearchQuery.trim()
+				? studentService.getStudents({ search: studentSearchQuery.trim(), per_page: 20 })
+				: studentService.getStudents({ per_page: 20 }),
+		enabled: hasStudentVars && (studentSearchFocused || studentSearchQuery.length >= 1),
+	});
+	const searchStudents = Array.isArray((studentsResponse as { data?: unknown })?.data)
+		? ((studentsResponse as { data: Student[] }).data)
+		: [];
+
+	// Fallback for "Creating certificate for" label (name/title from user_institutions or full fetch)
 	const currentInstitution = useMemo(() => {
 		const defaultInstitution = user?.user_institutions?.find((ui: UserInstitution) => ui.is_default)?.institution;
 		const mainInstitution = user?.user_institutions?.find((ui: UserInstitution) => ui.is_main)?.institution;
-		return defaultInstitution || mainInstitution;
-	}, [user?.user_institutions]);
+		const fromUser = defaultInstitution || mainInstitution;
+		if (fullInstitution?.title) return { name: fullInstitution.title };
+		if (fromUser && typeof fromUser === 'object' && 'name' in fromUser) return { name: (fromUser as { name?: string }).name };
+		if (fullInstitution?.title) return { name: fullInstitution.title };
+		return fromUser ? { name: (fromUser as { name?: string; title?: string }).name ?? (fromUser as { title?: string }).title ?? 'Institution' } : null;
+	}, [user?.user_institutions, fullInstitution]);
 
 	// Computed values
 	const selectedElements = useMemo(() => 
@@ -178,28 +228,31 @@ export default function CertificateBuilder() {
 		zoom,
 		bgColor,
 		bgImage,
+		bgImageObjectFit,
 		elements,
-	}), [paper, orientation, zoom, bgColor, bgImage, elements]);
+	}), [paper, orientation, zoom, bgColor, bgImage, bgImageObjectFit, elements]);
 
-	// Load certificate data
+	// Load certificate data when certificate is fetched (only apply for current certificateId)
 	useEffect(() => {
-		if (certificate && !isLoadingCertificate) {
-			setTitle(certificate.title);
-			const design = certificate.design_json || {};
-			setElements(design.elements || []);
-			if (design.paper) setPaper(design.paper);
-			if (design.orientation) setOrientation(design.orientation);
-			if (design.zoom) setZoom(design.zoom);
-			if (design.bgColor) setBgColor(design.bgColor);
-			setBgImage(design.bgImage || null);
-		}
-	}, [certificate, isLoadingCertificate]);
+		if (!certificate || isLoadingCertificate || !certificateId) return;
+		if (String(certificate.id) !== String(certificateId)) return;
 
-	// Load certificate from URL parameter
+		setTitle(certificate.title);
+		const design = certificate.design_json || {};
+		setElements(Array.isArray(design.elements) ? design.elements : []);
+		if (design.paper) setPaper(design.paper);
+		if (design.orientation) setOrientation(design.orientation);
+		if (design.zoom != null) setZoom(Number(design.zoom));
+		if (design.bgColor) 		setBgColor(design.bgColor);
+		setBgImage(design.bgImage ?? null);
+		if (design.bgImageObjectFit) setBgImageObjectFit(design.bgImageObjectFit);
+	}, [certificate, certificateId, isLoadingCertificate]);
+
+	// Certificate not found (e.g. 404) — redirect back to list
 	useEffect(() => {
 		if (certificateId && !certificate && !isLoadingCertificate) {
 			toast.error('Certificate not found');
-			navigate('/certificates');
+			navigate('/certificate-builder');
 		}
 	}, [certificateId, certificate, isLoadingCertificate, navigate]);
 
@@ -309,14 +362,30 @@ export default function CertificateBuilder() {
 			animate={{ opacity: 1 }}
 			className="flex h-full w-full overflow-hidden bg-gray-50"
 		>
-			{/* Left Sidebar - Elements Only */}
+			{/* Left Sidebar - Elements Panel (collapsible for more canvas space) */}
 			<motion.div
-				initial={{ x: -300 }}
-				animate={{ x: 0 }}
+				initial={false}
+				animate={{ width: elementsPanelOpen ? 224 : 52 }}
 				transition={{ type: "spring", stiffness: 300, damping: 30 }}
-				className="w-64 bg-white border-r border-gray-200"
+				className="flex-shrink-0 flex flex-col bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 shadow-sm overflow-hidden"
 			>
-				<ElementsPanel onAddElement={handleAddElement} />
+				{elementsPanelOpen ? (
+					<ElementsPanel
+						institution={fullInstitution}
+						onAddElement={handleAddElement}
+						onCollapse={() => setElementsPanelOpen(false)}
+					/>
+				) : (
+					<button
+						type="button"
+						onClick={() => setElementsPanelOpen(true)}
+						className="flex flex-col items-center justify-center w-full flex-1 min-h-[120px] py-4 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors"
+						title="Show Elements panel"
+					>
+						<PanelLeft className="w-6 h-6" />
+						<span className="mt-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Elements</span>
+					</button>
+				)}
 			</motion.div>
 
 			{/* Main Content */}
@@ -328,6 +397,7 @@ export default function CertificateBuilder() {
 					zoom={zoom}
 					bgColor={bgColor}
 					bgImage={bgImage}
+					bgImageObjectFit={bgImageObjectFit}
 					title={title}
 					certificateId={certificateId}
 					onPaperChange={(paper: string) => setPaper(paper as Paper)}
@@ -335,64 +405,244 @@ export default function CertificateBuilder() {
 					onZoomChange={setZoom}
 					onBgColorChange={setBgColor}
 					onBgImageChange={setBgImage}
+					onBgImageObjectFitChange={setBgImageObjectFit}
 					onTitleChange={setTitle}
 					onExportPdf={handleExportPdf}
 					onUndo={undo}
 					onRedo={redo}
 					onToggleGrid={() => setShowGrid(!showGrid)}
+					onToggleRuler={() => setShowRuler(!showRuler)}
 					onToggleSnapping={() => setSnapping(!snapping)}
 					showGrid={showGrid}
+					showRuler={showRuler}
 					snapping={snapping}
 					canUndo={canUndo}
 					canRedo={canRedo}
 					designData={buildDesignJson()}
+					onBackToList={() => navigate('/certificate-builder')}
 				/>
 
-				{/* Canvas Area */}
-				<div className="flex-1 overflow-auto p-6">
-					<div 
-						className="mx-auto shadow-2xl relative rounded-lg"
-						style={{
-							width: canvasSize.w,
-							height: canvasSize.h,
-							backgroundColor: '#f8fafc',
-							zIndex: 1
-						}}
-					>
-						<div 
-							key={`canvas-${canvasSize.w}-${canvasSize.h}`}
-							style={{ 
-								transform: `scale(${zoom})`, 
-								transformOrigin: 'top left', 
-								width: canvasSize.w, 
-								height: canvasSize.h, 
-								backgroundColor: bgColor, 
-								backgroundImage: bgImage ? `url(${bgImage})` : undefined, 
-								backgroundSize: 'cover', 
-								backgroundPosition: 'center',
-								position: 'absolute',
-								top: 0,
-								left: 0,
-								zIndex: 3
-							}} 
-							ref={canvasRef}
-						>
-							<CertificateCanvas 
-								width={canvasSize.w} 
-								height={canvasSize.h} 
-								scale={zoom} 
-								elements={elements} 
-								selectedElementIds={selectedIds} 
-								onSelect={setSelectedIds} 
-								onChange={handleUpdateElement} 
-								onInteractionStart={handleInteractionStart} 
-								onChangeEnd={() => {}} 
-								showGrid={showGrid} 
-								snappingEnabled={snapping} 
-								key={`${canvasSize.w}-${canvasSize.h}`}
-							/>
+				{/* Sample data: student search (when certificate has student variables) */}
+				{hasStudentVars && (
+					<div className="px-4 py-2 bg-emerald-50/80 border-b border-emerald-200 flex items-center gap-3 flex-wrap">
+						<div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+							<User className="w-4 h-4" />
+							<span>Sample data</span>
 						</div>
+						<div className="relative flex-1 min-w-[200px] max-w-sm">
+							<input
+								type="text"
+								readOnly={!!previewStudent}
+								value={previewStudent ? `${previewStudent.first_name} ${previewStudent.last_name}${previewStudent.lrn ? ` (${previewStudent.lrn})` : ''}` : studentSearchQuery}
+								onChange={(e) => !previewStudent && setStudentSearchQuery(e.target.value)}
+								onFocus={() => setStudentSearchFocused(true)}
+								onBlur={() => setTimeout(() => setStudentSearchFocused(false), 200)}
+								placeholder="Search by name or LRN..."
+								className="w-full px-3 py-2 text-sm border border-emerald-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+							/>
+							{previewStudent && (
+								<button
+									type="button"
+									onClick={() => { setPreviewStudent(null); setStudentSearchQuery(''); }}
+									className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+									title="Clear sample"
+								>
+									<X className="w-4 h-4" />
+								</button>
+							)}
+							{studentSearchFocused && !previewStudent && (
+								<ul className="absolute z-[100] left-0 right-0 mt-1 py-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+									{searchStudents.length === 0 ? (
+										<li className="px-3 py-2 text-sm text-gray-500">
+											{studentSearchQuery.length >= 1 ? 'No students found. Try name or LRN.' : 'Type to search by name or LRN, or pick one below...'}
+										</li>
+									) : (
+										searchStudents.slice(0, 10).map((s) => (
+											<li key={s.id}>
+												<button
+													type="button"
+													className="w-full px-3 py-2 text-left text-sm hover:bg-emerald-50 flex justify-between items-center"
+													onMouseDown={(e) => {
+														e.preventDefault();
+														e.stopPropagation();
+														setPreviewStudent(s);
+														setStudentSearchQuery('');
+														setStudentSearchFocused(false);
+													}}
+												>
+													<span>{s.first_name} {s.middle_name ?? ''} {s.last_name}{s.ext_name ? ` ${s.ext_name}` : ''}</span>
+													{s.lrn && <span className="text-gray-500 text-xs">{s.lrn}</span>}
+												</button>
+											</li>
+										))
+									)}
+								</ul>
+							)}
+						</div>
+						{previewStudent && (
+							<span className="text-xs text-emerald-700">Previewing with selected student</span>
+						)}
 					</div>
+				)}
+
+				{/* Canvas Area with optional Rulers - canvas centered in viewport */}
+				<div className="flex-1 overflow-auto p-6">
+					{(() => {
+						const rulerOffset = showRuler ? RULER_SIZE : 0;
+						const canvasWidth = (rulerOffset + canvasSize.w) * zoom;
+						const canvasHeight = (rulerOffset + canvasSize.h) * zoom;
+						return (
+							<div
+								className="min-h-full min-w-full flex items-center justify-center"
+								style={{ minHeight: '100%', minWidth: '100%' }}
+							>
+								<div
+									className="relative"
+									style={{
+										width: canvasWidth,
+										height: canvasHeight,
+									}}
+								>
+								<div
+									key={`canvas-${canvasSize.w}-${canvasSize.h}-${showRuler}`}
+									style={{
+										transform: `scale(${zoom})`,
+										transformOrigin: 'top left',
+										width: rulerOffset + canvasSize.w,
+										height: rulerOffset + canvasSize.h,
+										position: 'absolute',
+										top: 0,
+										left: 0,
+									}}
+								>
+									{showRuler && (
+										<>
+											{/* Corner */}
+											<div
+												className="bg-gray-100 border-r border-b border-gray-300 rounded-tl"
+												style={{ position: 'absolute', top: 0, left: 0, width: RULER_SIZE, height: RULER_SIZE }}
+											/>
+											{/* Top ruler */}
+											<div
+												className="bg-gray-100 border-b border-gray-300 relative"
+												style={{ position: 'absolute', top: 0, left: RULER_SIZE, width: canvasSize.w, height: RULER_SIZE }}
+											>
+												{(() => {
+													const centerX = canvasSize.w / 2;
+													const ticks = Array.from({ length: Math.ceil(canvasSize.w / TICK_INTERVAL) + 1 }, (_, i) => i * TICK_INTERVAL).filter((v) => v <= canvasSize.w);
+													if (!ticks.some((v) => Math.abs(v - centerX) < 2)) ticks.push(Math.round(centerX));
+													ticks.sort((a, b) => a - b);
+													return ticks.map((pos) => {
+														const isCenter = Math.abs(pos - centerX) < 2;
+														return (
+															<div
+																key={`h-${pos}`}
+																className="absolute flex flex-col items-center text-gray-500"
+																style={{ left: pos, top: 0 }}
+															>
+																<div
+																	className={`w-px ${isCenter ? 'h-3 bg-indigo-500' : 'h-2 bg-gray-400'}`}
+																	style={{ marginTop: 2 }}
+																/>
+																<span className={`text-[10px] mt-0.5 select-none ${isCenter ? 'text-indigo-600 font-semibold' : ''}`}>
+																	{isCenter ? 'Center' : pos}
+																</span>
+															</div>
+														);
+													});
+												})()}
+											</div>
+											{/* Left ruler */}
+											<div
+												className="bg-gray-100 border-r border-gray-300 relative"
+												style={{ position: 'absolute', top: RULER_SIZE, left: 0, width: RULER_SIZE, height: canvasSize.h }}
+											>
+												{(() => {
+													const centerY = canvasSize.h / 2;
+													const ticks = Array.from({ length: Math.ceil(canvasSize.h / TICK_INTERVAL) + 1 }, (_, i) => i * TICK_INTERVAL).filter((v) => v <= canvasSize.h);
+													if (!ticks.some((v) => Math.abs(v - centerY) < 2)) ticks.push(Math.round(centerY));
+													ticks.sort((a, b) => a - b);
+													return ticks.map((pos) => {
+														const isCenter = Math.abs(pos - centerY) < 2;
+														return (
+															<div
+																key={`v-${pos}`}
+																className="absolute flex items-center gap-0.5 text-gray-500"
+																style={{ left: 0, top: pos }}
+															>
+																<div
+																	className={`h-px flex-shrink-0 ${isCenter ? 'w-3 bg-indigo-500' : 'w-2 bg-gray-400'}`}
+																	style={{ marginLeft: 2 }}
+																/>
+																<span className={`text-[10px] select-none whitespace-nowrap origin-left ${isCenter ? 'text-indigo-600 font-semibold' : ''}`} style={{ transform: 'rotate(-90deg)', marginLeft: 4 }}>
+																	{isCenter ? 'Center' : pos}
+																</span>
+															</div>
+														);
+													});
+												})()}
+											</div>
+										</>
+									)}
+									{/* Paper with canvas and optional center lines */}
+									<div
+										className="shadow-2xl relative rounded-lg overflow-hidden"
+										style={{
+											position: 'absolute',
+											top: rulerOffset,
+											left: rulerOffset,
+											width: canvasSize.w,
+											height: canvasSize.h,
+											backgroundColor: '#f8fafc',
+										}}
+									>
+										{showRuler && (
+											<div className="absolute inset-0 pointer-events-none z-10">
+												<div
+													className="absolute top-0 bottom-0 w-0 border-l border-dashed border-indigo-400/70"
+													style={{ left: '50%' }}
+												/>
+												<div
+													className="absolute left-0 right-0 h-0 border-t border-dashed border-indigo-400/70"
+													style={{ top: '50%' }}
+												/>
+											</div>
+										)}
+										<div
+									ref={canvasRef}
+									style={{
+										width: canvasSize.w,
+										height: canvasSize.h,
+										backgroundColor: bgColor,
+										backgroundImage: bgImage ? `url(${bgImage})` : undefined,
+										backgroundSize: bgImage ? (bgImageObjectFit === 'fill' ? '100% 100%' : bgImageObjectFit) : undefined,
+										backgroundPosition: 'center',
+										position: 'relative',
+										zIndex: 3,
+									}}
+								>
+									<CertificateCanvas
+										width={canvasSize.w}
+										height={canvasSize.h}
+										scale={zoom}
+										elements={elements}
+										selectedElementIds={selectedIds}
+										onSelect={setSelectedIds}
+										onChange={handleUpdateElement}
+										onInteractionStart={handleInteractionStart}
+										onChangeEnd={() => {}}
+										showGrid={showGrid}
+										snappingEnabled={snapping}
+										previewStudent={previewStudent}
+										key={`${canvasSize.w}-${canvasSize.h}`}
+									/>
+								</div>
+							</div>
+						</div>
+							</div>
+					</div>
+					);
+					})()}
 				</div>
 
 				{/* Institution Info */}

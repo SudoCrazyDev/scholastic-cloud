@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
 	Move, 
 	RotateCw
 } from 'lucide-react';
+import type { Student } from '@/types';
 
 export interface CanvasElement {
 	id: string;
@@ -26,6 +28,7 @@ export interface CanvasElement {
 	fontStyle?: string;
 	color?: string;
 	textAlign?: string;
+	textDecoration?: string;
 	
 	// Image properties
 	src?: string;
@@ -38,6 +41,12 @@ export interface CanvasElement {
 	strokeWidth?: number;
 	cornerRadius?: number;
 	points?: number;
+
+	// Variable placeholders (for institution, student, or future variable sections)
+	/** e.g. 'institution' | 'student' – certificate is "student certificate" if any element has variableType === 'student' */
+	variableType?: 'institution' | 'student';
+	/** Key used when binding data (e.g. 'middle_name', 'lrn', 'institution_title') */
+	variableKey?: string;
 }
 
 interface CertificateCanvasProps {
@@ -52,6 +61,15 @@ interface CertificateCanvasProps {
 	onChangeEnd: () => void;
 	showGrid: boolean;
 	snappingEnabled: boolean;
+	/** When set, student variable elements show this student's data as sample preview */
+	previewStudent?: Student | null;
+}
+
+/** Map certificate variableKey to Student field (extension → ext_name) */
+function getStudentVariableValue(student: Student, variableKey: string): string {
+	const key = variableKey === 'extension' ? 'ext_name' : variableKey;
+	const value = (student as unknown as Record<string, unknown>)[key];
+	return value != null ? String(value) : '';
 }
 
 const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
@@ -65,7 +83,8 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 	onInteractionStart,
 	onChangeEnd,
 	showGrid,
-	snappingEnabled
+	snappingEnabled,
+	previewStudent
 }) => {
 	const canvasRef = useRef<HTMLDivElement>(null);
 	const [draggedElement, setDraggedElement] = useState<string | null>(null);
@@ -160,6 +179,10 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 			}),
 		};
 		
+		const isStudentVar = element.variableType === 'student' && element.variableKey && previewStudent;
+		const studentTextValue = isStudentVar ? getStudentVariableValue(previewStudent, element.variableKey!) : null;
+		const displayText = studentTextValue !== null ? studentTextValue : (element.content || (element.type === 'text' ? 'Sample Text' : 'This is a sample paragraph with rich text content. You can edit this text with formatting options.'));
+		
 		let elementContent: React.ReactNode;
 		
 		switch (element.type) {
@@ -171,8 +194,10 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 							fontFamily: element.fontFamily || 'Arial',
 							fontSize: element.fontSize || 16,
 							fontWeight: element.fontWeight || 'normal',
+							fontStyle: element.fontStyle || 'normal',
 							color: element.color || '#000000',
 							textAlign: (element.textAlign as 'left' | 'center' | 'right' | 'justify') || 'left',
+							textDecoration: element.textDecoration || 'none',
 							display: 'flex',
 							alignItems: 'center',
 							justifyContent: element.textAlign === 'center' ? 'center' : 'flex-start',
@@ -180,7 +205,7 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 							userSelect: 'none',
 						}}
 					>
-						{element.content || 'Sample Text'}
+						{displayText}
 					</div>
 				);
 				break;
@@ -193,8 +218,10 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 							fontFamily: element.fontFamily || 'Arial',
 							fontSize: element.fontSize || 14,
 							fontWeight: element.fontWeight || 'normal',
+							fontStyle: element.fontStyle || 'normal',
 							color: element.color || '#000000',
 							textAlign: (element.textAlign as 'left' | 'center' | 'right' | 'justify') || 'left',
+							textDecoration: element.textDecoration || 'none',
 							lineHeight: '1.4',
 							padding: '8px',
 							userSelect: 'none',
@@ -202,7 +229,7 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 							overflowWrap: 'break-word',
 						}}
 					>
-						{element.content || 'This is a sample paragraph with rich text content. You can edit this text with formatting options.'}
+						{displayText}
 					</div>
 				);
 				break;
@@ -246,6 +273,34 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 							userSelect: 'none',
 						}}
 					/>
+				);
+				break;
+
+			case 'qr':
+				// QR code encodes element.content (e.g. placeholder '{lrn}' or actual LRN when bound to student / preview)
+				const qrStudentVar = element.variableType === 'student' && element.variableKey && previewStudent;
+				const qrValue = qrStudentVar ? getStudentVariableValue(previewStudent, element.variableKey ?? '') : null;
+				const qrDisplayValue = (qrValue != null && qrValue !== '') ? qrValue : (element.content || '{lrn}');
+				elementContent = (
+					<div
+						style={{
+							...elementStyle,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							backgroundColor: '#fff',
+							userSelect: 'none',
+						}}
+					>
+						<QRCodeSVG
+							value={qrDisplayValue}
+							size={Math.min(element.width, element.height)}
+							level="M"
+							includeMargin={false}
+							bgColor="#ffffff"
+							fgColor="#000000"
+						/>
+					</div>
 				);
 				break;
 				
@@ -306,6 +361,27 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 							zIndex: 10,
 							backgroundColor: 'rgba(59, 130, 246, 0.1)',
 						}}
+					/>
+				)}
+
+				{/* Center point - show when selected so user knows where center is */}
+				{isSelected && !element.locked && (
+					<div
+						style={{
+							position: 'absolute',
+							left: '50%',
+							top: '50%',
+							transform: 'translate(-50%, -50%)',
+							width: 8,
+							height: 8,
+							borderRadius: '50%',
+							backgroundColor: '#3b82f6',
+							border: '2px solid white',
+							boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.8)',
+							pointerEvents: 'none',
+							zIndex: 11,
+						}}
+						title="Center"
 					/>
 				)}
 				

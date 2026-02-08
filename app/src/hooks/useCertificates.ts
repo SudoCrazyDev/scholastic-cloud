@@ -17,7 +17,7 @@ export const certificateKeys = {
 	lists: () => [...certificateKeys.all, 'list'] as const,
 	list: (params?: CertificateListParams) => [...certificateKeys.lists(), params] as const,
 	details: () => [...certificateKeys.all, 'detail'] as const,
-	detail: (id: number) => [...certificateKeys.details(), id] as const,
+	detail: (id: number | string) => [...certificateKeys.details(), id] as const,
 };
 
 // List certificates
@@ -29,8 +29,8 @@ export function useCertificates(params?: CertificateListParams) {
 	});
 }
 
-// Get single certificate
-export function useCertificate(id: number | null) {
+// Get single certificate (id is UUID string or number)
+export function useCertificate(id: number | string | null) {
 	return useQuery({
 		queryKey: certificateKeys.detail(id!),
 		queryFn: () => getCertificate(id!),
@@ -62,7 +62,7 @@ export function useUpdateCertificate() {
 	const queryClient = useQueryClient();
 	
 	return useMutation({
-		mutationFn: ({ id, payload }: { id: number; payload: CertificateUpdatePayload }) =>
+		mutationFn: ({ id, payload }: { id: number | string; payload: CertificateUpdatePayload }) =>
 			updateCertificate(id, payload),
 		onSuccess: (data) => {
 			toast.success('Certificate updated successfully!');

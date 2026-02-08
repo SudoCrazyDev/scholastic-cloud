@@ -4,6 +4,7 @@ import { listCertificates, type CertificateRecord } from '@/services/certificate
 import Button from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { designHasStudentVariables } from './certificateDesignUtils';
 import { 
   PlusIcon, 
   DocumentTextIcon, 
@@ -19,14 +20,15 @@ export default function CertificateList() {
 	const navigate = useNavigate();
 	const { user } = useAuth();
 
-	// Get user's default institution
-	const defaultInstitution = user?.user_institutions?.find((ui: any) => ui.is_default)?.institution;
-	const mainInstitution = user?.user_institutions?.find((ui: any) => ui.is_main)?.institution;
-	const currentInstitution = defaultInstitution || mainInstitution;
+	// Get user's default/main institution (for display and for API)
+	const defaultUi = user?.user_institutions?.find((ui: any) => ui.is_default);
+	const mainUi = user?.user_institutions?.find((ui: any) => ui.is_main);
+	const currentInstitution = defaultUi?.institution || mainUi?.institution;
+	const institutionId = defaultUi?.institution_id || mainUi?.institution_id || currentInstitution?.id;
 
 	useEffect(() => {
 		async function load() {
-			if (!currentInstitution) {
+			if (!institutionId) {
 				setItems([]);
 				setLoading(false);
 				return;
@@ -34,15 +36,15 @@ export default function CertificateList() {
 
 			setLoading(true);
 			try {
-				const resp = await listCertificates({ institution_id: currentInstitution.id });
-				const data = Array.isArray(resp) ? resp : resp.data;
+				const resp = await listCertificates({ institution_id: institutionId });
+				const data = Array.isArray(resp) ? resp : (resp as { data?: CertificateRecord[] }).data ?? [];
 				setItems(data);
 			} finally {
 				setLoading(false);
 			}
 		}
 		load();
-	}, [currentInstitution]);
+	}, [institutionId]);
 
 	// Animation variants
 	const containerVariants = {
@@ -146,15 +148,15 @@ export default function CertificateList() {
 			</div>
 			<h3 className="text-xl font-semibold text-gray-900 mb-2">No certificates yet</h3>
 			<p className="text-gray-600 mb-8 max-w-md mx-auto">
-				Get started by creating your first certificate for {currentInstitution?.name || 'your institution'}.
+				Get started by creating your first certificate for {currentInstitution?.name ?? currentInstitution?.title ?? 'your institution'}.
 			</p>
 			<Button
 				variant="primary"
-				onClick={() => navigate('/certificate-builder')}
+				onClick={() => navigate('/certificate-builder/new')}
 				className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
 			>
 				<PlusIcon className="w-5 h-5 mr-2" />
-				Create Your First Certificate
+				Create New Certificate
 			</Button>
 		</motion.div>
 	);
@@ -204,7 +206,7 @@ export default function CertificateList() {
 								transition={{ delay: 0.2, duration: 0.5 }}
 								className="text-gray-600 text-lg"
 							>
-								Manage and create professional certificates for {currentInstitution.name}
+								Manage and create professional certificates for {currentInstitution?.name ?? currentInstitution?.title ?? 'your institution'}
 							</motion.p>
 						</div>
 						<motion.div
@@ -214,11 +216,11 @@ export default function CertificateList() {
 						>
 							<Button
 								variant="primary"
-								onClick={() => navigate('/certificate-builder')}
+								onClick={() => navigate('/certificate-builder/new')}
 								className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 px-6 py-3"
 							>
 								<PlusIcon className="w-5 h-5 mr-2" />
-								New Certificate
+								Create New Certificate
 							</Button>
 						</motion.div>
 					</div>
@@ -252,9 +254,16 @@ export default function CertificateList() {
 												<DocumentTextIcon className="w-6 h-6 text-indigo-600" />
 											</div>
 											<div className="flex-1 min-w-0">
-												<h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors duration-200 truncate">
-													{item.title}
-												</h3>
+												<div className="flex items-center gap-2 flex-wrap">
+													<h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors duration-200 truncate">
+														{item.title}
+													</h3>
+													{designHasStudentVariables(item.design_json) && (
+														<span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800" title="Contains student variables – for student certificates only">
+															Student
+														</span>
+													)}
+												</div>
 												<p className="text-sm text-gray-500 mt-1">ID: {item.id}</p>
 											</div>
 										</div>
@@ -272,7 +281,7 @@ export default function CertificateList() {
 											{/* Institution Info */}
 											<div className="flex items-center space-x-2 text-sm text-gray-600">
 												<BuildingOfficeIcon className="w-4 h-4 text-gray-400" />
-												<span>{currentInstitution.name}</span>
+												<span>{currentInstitution?.name ?? currentInstitution?.title ?? '—'}</span>
 											</div>
 										</div>
 

@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
 
 export type CertificateRecord = {
-	id: number;
+	id: number | string;
 	title: string;
 	design_json: any;
 	institution_id: string;
@@ -45,7 +45,7 @@ export async function listCertificates(params?: CertificateListParams): Promise<
 	return data as CertificateListResponse;
 }
 
-export async function getCertificate(id: number): Promise<CertificateRecord> {
+export async function getCertificate(id: number | string): Promise<CertificateRecord> {
 	const { data } = await api.get(`/certificates/${id}`);
 	return data as CertificateRecord;
 }
@@ -55,7 +55,7 @@ export async function createCertificate(payload: CertificatePayload): Promise<Ce
 	return data as CertificateRecord;
 }
 
-export async function updateCertificate(id: number, payload: CertificateUpdatePayload): Promise<CertificateRecord> {
+export async function updateCertificate(id: number | string, payload: CertificateUpdatePayload): Promise<CertificateRecord> {
 	const { data } = await api.put(`/certificates/${id}`, payload);
 	return data as CertificateRecord;
 }

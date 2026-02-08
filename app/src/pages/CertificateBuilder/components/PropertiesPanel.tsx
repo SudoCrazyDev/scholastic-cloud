@@ -76,62 +76,62 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 			className="h-full overflow-y-auto"
 		>
 			{/* Header */}
-			<div className="p-4 border-b border-gray-200 bg-gray-50">
-				<div className="flex items-center gap-3 mb-3">
-					<div className="p-2 bg-white rounded-lg shadow-sm">
-						<ElementIcon className="w-5 h-5 text-gray-600" />
+			<div className="p-3 border-b border-gray-200 bg-gray-50">
+				<div className="flex items-center gap-2 mb-2">
+					<div className="p-1.5 bg-white rounded-md shadow-sm flex-shrink-0">
+						<ElementIcon className="w-4 h-4 text-gray-600" />
 					</div>
-					<div>
-						<h3 className="font-medium text-gray-900 capitalize">
+					<div className="min-w-0 flex-1">
+						<h3 className="font-medium text-gray-900 capitalize text-sm truncate">
 							{element.type} Properties
 						</h3>
-						<p className="text-sm text-gray-500">ID: {element.id.slice(0, 8)}...</p>
+						<p className="text-xs text-gray-500 truncate">ID: {element.id.slice(0, 8)}...</p>
 					</div>
 				</div>
 
-				{/* Action Buttons */}
-				<div className="flex gap-2">
+				{/* Action Buttons - compact icon-only */}
+				<div className="flex flex-wrap gap-1">
 					<Button
 						onClick={() => updateElement({ hidden: !element.hidden })}
 						variant="ghost"
-						
-						icon={element.hidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-					>
-						{element.hidden ? 'Show' : 'Hide'}
-					</Button>
+						size="sm"
+						className="!p-1.5 !h-7 !min-w-0"
+						title={element.hidden ? 'Show' : 'Hide'}
+						icon={element.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+					/>
 					<Button
 						onClick={() => updateElement({ locked: !element.locked })}
 						variant="ghost"
-						
-						icon={element.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-					>
-						{element.locked ? 'Unlock' : 'Lock'}
-					</Button>
+						size="sm"
+						className="!p-1.5 !h-7 !min-w-0"
+						title={element.locked ? 'Unlock' : 'Lock'}
+						icon={element.locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+					/>
 					{onDuplicate && (
 						<Button
 							onClick={() => onDuplicate(element)}
 							variant="ghost"
-							
-							icon={<Copy className="w-4 h-4" />}
-						>
-							Copy
-						</Button>
+							size="sm"
+							className="!p-1.5 !h-7 !min-w-0"
+							title="Copy"
+							icon={<Copy className="w-3.5 h-3.5" />}
+						/>
 					)}
 					{onDelete && (
 						<Button
 							onClick={() => onDelete(element.id)}
 							variant="danger"
-							
-							icon={<Trash2 className="w-4 h-4" />}
-						>
-							Delete
-						</Button>
+							size="sm"
+							className="!p-1.5 !h-7 !min-w-0"
+							title="Delete"
+							icon={<Trash2 className="w-3.5 h-3.5" />}
+						/>
 					)}
 				</div>
 			</div>
 
 			{/* Properties */}
-			<div className="p-4 space-y-6">
+			<div className="p-3 space-y-4">
 				{/* Position & Size */}
 				<div>
 					<h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
@@ -223,6 +223,8 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									<option value="Georgia">Georgia</option>
 									<option value="Verdana">Verdana</option>
 									<option value="Courier New">Courier New</option>
+									<option value="UnifrakturMaguntia">Old English</option>
+									<option value="Old English Text MT">Old English Text MT (system)</option>
 								</Select>
 								<div className="grid grid-cols-2 gap-3">
 									<Input
@@ -269,7 +271,43 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									<option value="right">Right</option>
 									<option value="justify">Justify</option>
 								</Select>
+								<Select
+									label="Font Style"
+									value={element.fontStyle || 'normal'}
+									onChange={(e) => updateElement({ fontStyle: e.target.value })}
+									
+								>
+									<option value="normal">Normal</option>
+									<option value="italic">Italic</option>
+									<option value="oblique">Oblique</option>
+								</Select>
+								<Select
+									label="Text Decoration"
+									value={element.textDecoration || 'none'}
+									onChange={(e) => updateElement({ textDecoration: e.target.value })}
+									
+								>
+									<option value="none">None</option>
+									<option value="underline">Underline</option>
+									<option value="overline">Overline</option>
+									<option value="line-through">Line through</option>
+									<option value="underline line-through">Underline + Line through</option>
+								</Select>
 							</div>
+						</motion.div>
+					)}
+
+					{element.type === 'qr' && (
+						<motion.div
+							key="qr-properties"
+							initial={{ opacity: 0, height: 0 }}
+							animate={{ opacity: 1, height: 'auto' }}
+							exit={{ opacity: 0, height: 0 }}
+						>
+							<h4 className="text-sm font-medium text-gray-700 mb-3">QR Code</h4>
+							<p className="text-xs text-gray-500">
+								Encodes LRN (Learner Reference Number). When generating certificates for students, this QR will contain the student&apos;s LRN. Resize with the canvas handles.
+							</p>
 						</motion.div>
 					)}
 
@@ -282,12 +320,28 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 						>
 							<h4 className="text-sm font-medium text-gray-700 mb-3">Image Properties</h4>
 							<div className="space-y-3">
-								<Input
-									label="Source URL"
-									value={element.src || ''}
-									onChange={(e) => updateElement({ src: e.target.value })}
-									
-								/>
+								{/* Image file upload (images only) */}
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1.5">Upload Image</label>
+									<label className="flex items-center justify-center gap-2 w-full px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm text-gray-600 cursor-pointer transition-colors">
+										<Image className="w-4 h-4 text-gray-500 flex-shrink-0" />
+										<span>Choose image...</span>
+										<input
+											type="file"
+											accept="image/*"
+											className="hidden"
+											onChange={(e) => {
+												const file = e.target.files?.[0];
+												if (!file) return;
+												const reader = new FileReader();
+												reader.onload = () => updateElement({ src: reader.result as string });
+												reader.readAsDataURL(file);
+												e.target.value = '';
+											}}
+										/>
+									</label>
+									<p className="mt-1 text-xs text-gray-500">PNG, JPG, GIF, WebP</p>
+								</div>
 								<Input
 									label="Alt Text"
 									value={element.alt || ''}

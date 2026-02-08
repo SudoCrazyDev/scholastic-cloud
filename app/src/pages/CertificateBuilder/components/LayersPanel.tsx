@@ -39,6 +39,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 		switch (element.type) {
 			case 'text': return 'T';
 			case 'image': return '🖼️';
+			case 'qr': return 'QR';
 			case 'rectangle': case 'square': return '⬜';
 			case 'circle': case 'ellipse': return '⭕';
 			case 'triangle': return '🔺';
@@ -51,6 +52,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 		switch (element.type) {
 			case 'text': return 'text-blue-600';
 			case 'image': return 'text-green-600';
+			case 'qr': return 'text-teal-600';
 			case 'rectangle': case 'square': return 'text-purple-600';
 			case 'circle': case 'ellipse': return 'text-orange-600';
 			case 'triangle': return 'text-red-600';
@@ -82,9 +84,9 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 		<motion.div
 			initial={{ opacity: 0, y: 20 }}
 			animate={{ opacity: 1, y: 0 }}
-			className="p-4"
+			className="p-4 flex flex-col min-h-0 h-full"
 		>
-			<div className="mb-4">
+			<div className="flex-shrink-0 mb-4">
 				<h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
 					<Layers className="w-5 h-5" />
 					Layers
@@ -98,14 +100,14 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 				<motion.div
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					className="text-center py-8 text-gray-500"
+					className="text-center py-8 text-gray-500 flex-shrink-0"
 				>
 					<Layers className="w-12 h-12 mx-auto mb-3 text-gray-300" />
 					<p className="text-sm">No elements yet</p>
 					<p className="text-xs text-gray-400">Add elements from the left panel</p>
 				</motion.div>
 			) : (
-				<div className="space-y-1">
+				<div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
 					{elements.map((element, index) => {
 						const isSelected = selectedIds.includes(element.id);
 						const isFirst = index === 0;
@@ -168,7 +170,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 										</p>
 									</div>
 
-									{/* Actions */}
+									{/* Actions - show on hover: Hide, Lock, Duplicate, Delete */}
 									<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
 										<Button
 											onClick={(e) => {
@@ -177,7 +179,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 											}}
 											variant="ghost"
 											size="sm"
-											className="p-1 h-6 w-6"
+											className="p-1 h-6 w-6 !min-w-0"
+											title={element.hidden ? 'Show' : 'Hide'}
 											icon={element.hidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
 										/>
 										<Button
@@ -187,8 +190,31 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 											}}
 											variant="ghost"
 											size="sm"
-											className="p-1 h-6 w-6"
+											className="p-1 h-6 w-6 !min-w-0"
+											title={element.locked ? 'Unlock' : 'Lock'}
 											icon={element.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+										/>
+										<Button
+											onClick={(e) => {
+												e.stopPropagation();
+												onDuplicate(element);
+											}}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-6 w-6 !min-w-0"
+											title="Duplicate"
+											icon={<Copy className="w-3 h-3" />}
+										/>
+										<Button
+											onClick={(e) => {
+												e.stopPropagation();
+												onDelete(element.id);
+											}}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-6 w-6 !min-w-0 text-red-600 hover:text-red-700 hover:!bg-transparent"
+											title="Delete"
+											icon={<Trash2 className="w-3 h-3" />}
 										/>
 									</div>
 								</div>
@@ -220,36 +246,6 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 										/>
 									</div>
 								</div>
-
-								{/* Context menu (appears on right-click) */}
-								{isSelected && (
-									<motion.div
-										initial={{ opacity: 0, scale: 0.9 }}
-										animate={{ opacity: 1, scale: 1 }}
-										className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10"
-									>
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												onDuplicate(element);
-											}}
-											className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-										>
-											<Copy className="w-4 h-4" />
-											Duplicate
-										</button>
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												onDelete(element.id);
-											}}
-											className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-										>
-											<Trash2 className="w-4 h-4" />
-											Delete
-										</button>
-									</motion.div>
-								)}
 							</motion.div>
 						);
 					})}
@@ -261,7 +257,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 				<motion.div
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					className="mt-4 pt-4 border-t border-gray-200"
+					className="flex-shrink-0 mt-4 pt-4 border-t border-gray-200"
 				>
 					<div className="flex gap-2">
 						<Button

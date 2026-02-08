@@ -1,15 +1,18 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Sidebar from '../sidebar/Sidebar';
 import Topbar from '../topbar/Topbar';
-import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { LogOut } from 'lucide-react';
 
 const DashboardLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const location = useLocation();
-  const isCertificateBuilder = location.pathname.startsWith('/certificate-builder');
+  const [searchParams] = useSearchParams();
+  // Hide main sidebar only when editing or creating a certificate (not on the list)
+  const isCertificateBuilder =
+    location.pathname === '/certificate-builder/new' ||
+    (location.pathname === '/certificate-builder' && searchParams.has('id'));
   const { isImpersonating, user, stopImpersonating } = useAuth();
 
   // Close mobile sidebar when screen size changes to desktop
@@ -27,17 +30,19 @@ const DashboardLayout = () => {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Mobile Overlay */}
-      {isMobileSidebarOpen && (
+      {!isCertificateBuilder && isMobileSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={() => setIsMobileSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <div className={`fixed lg:relative z-50 ${isMobileSidebarOpen ? 'block' : 'hidden lg:block'}`}>
-        <Sidebar onMobileClose={() => setIsMobileSidebarOpen(false)} />
-      </div>
+      {/* Sidebar - hidden on certificate builder for more canvas space */}
+      {!isCertificateBuilder && (
+        <div className={`fixed lg:relative z-50 ${isMobileSidebarOpen ? 'block' : 'hidden lg:block'}`}>
+          <Sidebar onMobileClose={() => setIsMobileSidebarOpen(false)} />
+        </div>
+      )}
       
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -58,8 +63,8 @@ const DashboardLayout = () => {
             </button>
           </div>
         )}
-        {/* Topbar */}
-        <Topbar onMobileMenuClick={() => setIsMobileSidebarOpen(true)} />
+        {/* Topbar - no mobile menu button on certificate builder (sidebar is hidden) */}
+        <Topbar onMobileMenuClick={isCertificateBuilder ? undefined : () => setIsMobileSidebarOpen(true)} />
         
         {/* Page Content */}
         {isCertificateBuilder ? (

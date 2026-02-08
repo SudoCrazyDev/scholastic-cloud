@@ -159,7 +159,7 @@ const menuItems: MenuItem[] = [
     label: 'Certificate Builder',
     icon: <FileText className="w-5 h-5" />,
     path: '/certificate-builder',
-    allowedRoles: ['principal', 'institution-administrator'],
+    allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
   },
 
 ];

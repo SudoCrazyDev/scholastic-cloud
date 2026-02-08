@@ -46,17 +46,28 @@ class StudentController extends Controller
             $q->where('institution_id', $defaultInstitutionId);
         });
 
-        if ($request->filled('first_name')) {
-            $query->where('first_name', 'like', '%' . $request->first_name . '%');
-        }
-        if ($request->filled('middle_name')) {
-            $query->where('middle_name', 'like', '%' . $request->middle_name . '%');
-        }
-        if ($request->filled('last_name')) {
-            $query->where('last_name', 'like', '%' . $request->last_name . '%');
-        }
-        if ($request->filled('lrn')) {
-            $query->where('lrn', 'like', '%' . $request->lrn . '%');
+        // Single "search" param: match first_name, middle_name, last_name, or lrn (OR)
+        if ($request->filled('search')) {
+            $term = $request->search;
+            $query->where(function ($q) use ($term) {
+                $q->where('first_name', 'like', '%' . $term . '%')
+                    ->orWhere('middle_name', 'like', '%' . $term . '%')
+                    ->orWhere('last_name', 'like', '%' . $term . '%')
+                    ->orWhere('lrn', 'like', '%' . $term . '%');
+            });
+        } else {
+            if ($request->filled('first_name')) {
+                $query->where('first_name', 'like', '%' . $request->first_name . '%');
+            }
+            if ($request->filled('middle_name')) {
+                $query->where('middle_name', 'like', '%' . $request->middle_name . '%');
+            }
+            if ($request->filled('last_name')) {
+                $query->where('last_name', 'like', '%' . $request->last_name . '%');
+            }
+            if ($request->filled('lrn')) {
+                $query->where('lrn', 'like', '%' . $request->lrn . '%');
+            }
         }
 
         $students = $query->orderBy('created_at', 'desc')->paginate($perPage);

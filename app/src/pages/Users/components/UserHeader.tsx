@@ -2,6 +2,7 @@ import React from 'react'
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
+import { Select } from '../../../components/select'
 import type { User, Role } from '../../../types'
 
 interface UserHeaderProps {
@@ -26,12 +27,16 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
   onBulkDelete,
 }) => {
   const roleValue = roleFilter ?? ''
+  const roleOptions = [
+    { value: '', label: 'All roles' },
+    ...roles.map((r) => ({ value: String(r.id), label: r.title })),
+  ]
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         {/* Left side - Search and filters */}
-        <div className="flex flex-col sm:flex-row gap-4 flex-1">
+        <div className="flex flex-col sm:flex-row gap-4 flex-1 items-stretch sm:items-center">
           {/* Search */}
           <div className="flex-1 min-w-0">
             <Input
@@ -40,23 +45,18 @@ export const UserHeader: React.FC<UserHeaderProps> = ({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full"
+              size="md"
             />
           </div>
-          {/* Role filter - native select so value/onChange are reliable */}
-          <div className="w-full sm:w-48 shrink-0">
-            <select
+          {/* Role filter - reusable Select, height aligned with Input */}
+          <div className="w-full sm:w-48 shrink-0 flex">
+            <Select
               value={roleValue}
               onChange={(e) => onRoleFilterChange(e.target.value)}
-              className="block w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 shadow-sm focus:border-black focus:ring-2 focus:ring-black focus:ring-offset-0"
+              options={roleOptions}
               aria-label="Filter by role"
-            >
-              <option value="">All roles</option>
-              {roles.map((r) => (
-                <option key={r.id} value={String(r.id)}>
-                  {r.title}
-                </option>
-              ))}
-            </select>
+              className="h-[42px] [&_select]:h-full [&_select]:min-h-0 [&_select]:py-2.5"
+            />
           </div>
         </div>
 

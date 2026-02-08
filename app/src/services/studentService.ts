@@ -11,12 +11,15 @@ class StudentService {
     middle_name?: string
     last_name?: string
     lrn?: string
+    /** Single search: matches first_name, middle_name, last_name, or lrn (backend OR) */
+    search?: string
     class_section_id?: string
   }) {
     const queryParams = new URLSearchParams()
     
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.per_page) queryParams.append('per_page', params.per_page.toString())
+    if (params?.search?.trim()) queryParams.append('search', params.search.trim())
     if (params?.first_name) queryParams.append('first_name', params.first_name)
     if (params?.middle_name) queryParams.append('middle_name', params.middle_name)
     if (params?.last_name) queryParams.append('last_name', params.last_name)
@@ -34,6 +37,7 @@ class StudentService {
     const response = await api.get<{ success: boolean; data: any[] }>(`/student-sections?section_id=${sectionId}`)
     return response.data
   }
+
 
   async getStudent(id: string) {
     const response = await api.get<{ success: boolean; data: Student }>(`${this.baseUrl}/${id}`)
