@@ -109,19 +109,19 @@ export default function PrintReportCard({
             }
         });
 
-        // Fill in attendance data (days present from API)
+        // Fill in attendance data (days absent from API — we only store/edit days absent in the UI)
         (attendances || []).forEach((attendance: any) => {
             const month = Number(attendance.month);
             if (month >= 1 && month <= 12 && map[month] !== undefined) {
-                map[month].present = Number(attendance.days_present) || 0;
+                map[month].absent = Number(attendance.days_absent) || 0;
             }
         });
 
-        // Auto-calculate No. of days absent = school days - days present (per month)
+        // Auto-calculate No. of days present = school days - days absent (per month)
         academicYearMonths.forEach(month => {
             const school = map[month].schoolDays;
-            const present = map[month].present;
-            map[month].absent = Math.max(0, school - present);
+            const absent = map[month].absent;
+            map[month].present = Math.max(0, school - absent);
         });
 
         return map;

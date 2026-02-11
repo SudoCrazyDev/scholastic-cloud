@@ -19,6 +19,7 @@ import PropertiesPanel from './components/PropertiesPanel';
 import CertificateCanvas, { type CanvasElement } from './components/CertificateCanvas';
 import LayersPanel from './components/LayersPanel';
 import CertificateToolbar from './components/CertificateToolbar';
+import PublishOptionsPanel, { type PublishOptions } from './components/PublishOptionsPanel';
 
 // UI Components
 import Button from '@/components/ui/Button';
@@ -56,6 +57,7 @@ interface DesignData {
 	bgImage: string | null;
 	bgImageObjectFit?: BgImageObjectFit;
 	elements: CanvasElement[];
+	publish_options?: PublishOptions;
 }
 
 interface UserInstitution {
@@ -90,6 +92,11 @@ export default function CertificateBuilder() {
 	const [previewStudent, setPreviewStudent] = useState<Student | null>(null);
 	const [studentSearchQuery, setStudentSearchQuery] = useState('');
 	const [studentSearchFocused, setStudentSearchFocused] = useState(false);
+	const [publishOptions, setPublishOptions] = useState<PublishOptions>({
+		scopeGradeLevelsOnly: false,
+		gradeLevels: [],
+		studentScope: 'all',
+	});
 	
 	// Refs
 	const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -221,16 +228,22 @@ export default function CertificateBuilder() {
 		pushHistory(elements);
 	}, [elements, pushHistory]);
 
-	// Serialize current design
-	const buildDesignJson = useCallback((): DesignData => ({
-		paper,
-		orientation,
-		zoom,
-		bgColor,
-		bgImage,
-		bgImageObjectFit,
-		elements,
-	}), [paper, orientation, zoom, bgColor, bgImage, bgImageObjectFit, elements]);
+	// Serialize current design (include publish_options when editing)
+	const buildDesignJson = useCallback((): DesignData => {
+		const base: DesignData = {
+			paper,
+			orientation,
+			zoom,
+			bgColor,
+			bgImage,
+			bgImageObjectFit,
+			elements,
+		};
+		if (certificateId) {
+			base.publish_options = publishOptions;
+		}
+		return base;
+	}, [paper, orientation, zoom, bgColor, bgImage, bgImageObjectFit, elements, certificateId, publishOptions]);
 
 	// Load certificate data when certificate is fetched (only apply for current certificateId)
 	useEffect(() => {
@@ -246,6 +259,14 @@ export default function CertificateBuilder() {
 		if (design.bgColor) 		setBgColor(design.bgColor);
 		setBgImage(design.bgImage ?? null);
 		if (design.bgImageObjectFit) setBgImageObjectFit(design.bgImageObjectFit);
+		const po = design.publish_options;
+		if (po && typeof po === 'object') {
+			setPublishOptions({
+				scopeGradeLevelsOnly: Boolean(po.scopeGradeLevelsOnly),
+				gradeLevels: Array.isArray(po.gradeLevels) ? (po.gradeLevels as unknown[]).filter((g: unknown): g is string => typeof g === 'string') : [],
+				studentScope: po.studentScope === 'limited' ? 'limited' : 'all',
+			});
+		}
 	}, [certificate, certificateId, isLoadingCertificate]);
 
 	// Certificate not found (e.g. 404) — redirect back to list
@@ -658,13 +679,17 @@ export default function CertificateBuilder() {
 				</motion.div>
 			</div>
 
-			{/* Right Sidebar - Properties & Layers */}
+			{/* Right Sidebar - Publish options (when editing), Properties & Layers */}
 			<motion.div
 				initial={{ x: 300 }}
 				animate={{ x: 0 }}
 				transition={{ type: "spring", stiffness: 300, damping: 30 }}
 				className="w-80 border-l border-gray-200 bg-white flex flex-col"
 			>
+				{/* Publish options – only when editing (certificate has id) */}
+				{certificateId && (
+					<PublishOptionsPanel options={publishOptions} onChange={setPublishOptions} />
+				)}
 				{/* Properties Panel */}
 				<div className="flex-1 overflow-hidden">
 					<PropertiesPanel 

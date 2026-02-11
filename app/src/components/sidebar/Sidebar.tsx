@@ -17,6 +17,7 @@ import {
   BookOpen,
   BookOpen as AssignedSubjectsIcon,
   BarChart3,
+  TrendingUp,
   X,
   Calendar,
   Settings,
@@ -131,6 +132,13 @@ const menuItems: MenuItem[] = [
     label: 'Consolidated Grades',
     icon: <BarChart3 className="w-5 h-5" />,
     path: '/consolidated-grades',
+    allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
+  },
+  {
+    id: 'proficiency',
+    label: 'Proficiency',
+    icon: <TrendingUp className="w-5 h-5" />,
+    path: '/proficiency',
     allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
   },
   {

@@ -278,9 +278,6 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
                           Student Name
                         </div>
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[150px]">
-                        Days Present
-                      </th>
                       <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px]">
                         Days Absent
                       </th>
@@ -310,19 +307,6 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
                                   <div className="text-xs text-gray-500">LRN: {student.lrn}</div>
                                 )}
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center justify-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={attendance.days_present}
-                                onChange={(e) =>
-                                  handleAttendanceChange(student.id, 'days_present', parseInt(e.target.value) || 0)
-                                }
-                                className="w-24 text-center"
-                              />
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

@@ -212,6 +212,8 @@ Route::middleware('auth.token')->group(function () {
     
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
+    Route::get('proficiency', [\App\Http\Controllers\ProficiencyController::class, 'index']);
+    Route::get('proficiency/by-section', [\App\Http\Controllers\ProficiencyController::class, 'bySection']);
     // RealtimeAttendance GET route
     Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
     // Core Value Marking routes

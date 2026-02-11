@@ -21,6 +21,7 @@ import TeacherAttendanceDemo from './pages/TeacherAttendanceDemo';
 import UserProfile from './pages/Users/UserProfile';
 import ConsolidatedGrades from './pages/ConsolidatedGrades/ConsolidatedGrades';
 import SectionGrades from './pages/ConsolidatedGrades/SectionGrades';
+import Proficiency from './pages/Proficiency/Proficiency';
 import SF9 from './pages/SF9';
 import SetNewPassword from './pages/SetNewPassword';
 import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
@@ -71,6 +72,7 @@ function App() {
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
               <Route path="consolidated-grades" element={<ConsolidatedGrades />} />
               <Route path="consolidated-grades/:sectionId/:quarter" element={<SectionGrades />} />
+              <Route path="proficiency" element={<Proficiency />} />
               <Route path="sf9" element={<SF9 />} />
               <Route path="certificate-builder/new" element={<CertificateBuilder />} />
               <Route path="certificate-builder" element={<CertificateBuilderPage />} />
