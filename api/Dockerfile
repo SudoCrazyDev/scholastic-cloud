@@ -1,7 +1,8 @@
 FROM php:8.2-fpm
 
-# Install system dependencies
+# Install system dependencies (gosu for entrypoint user switch)
 RUN apt-get update && apt-get install -y \
+    gosu \
     git \
     curl \
     libpng-dev \
@@ -36,10 +37,11 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage \
     && chmod -R 775 /var/www/html/bootstrap/cache
 
-# Change current user to www-data
-USER www-data
+# Entrypoint ensures vendor/ exists when volume-mounted and fixes permissions, then runs CMD as www-data
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-# Expose port 8000 and start php-fpm server
+# Expose port 8000 and start Laravel
 EXPOSE 8000
-
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"] 

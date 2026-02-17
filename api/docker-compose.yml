@@ -1,0 +1,55 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: schoolmate-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=schoolmate
+      - DB_USERNAME=schoolmate_user
+      - DB_PASSWORD=schoolmate_password
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - schoolmate_api_network
+
+  mariadb:
+    image: mariadb:11
+    container_name: schoolmate-mariadb
+    restart: unless-stopped
+    environment:
+      - MARIADB_DATABASE=schoolmate
+      - MARIADB_USER=schoolmate_user
+      - MARIADB_PASSWORD=schoolmate_password
+      - MARIADB_ROOT_PASSWORD=root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      # --su-mysql must be first (re-execs as mysql user); then connect + innodb ready
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - schoolmate_api_network
+
+volumes:
+  mariadb_data:
+    driver: local
+
+networks:
+  schoolmate_api_network:
+    driver: bridge
