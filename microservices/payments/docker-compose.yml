@@ -1,0 +1,54 @@
+services:
+  payments:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: schoolmate-payments
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=payments
+      - DB_USERNAME=payments_user
+      - DB_PASSWORD=payments_password
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - payments_network
+
+  mariadb:
+    image: mariadb:11
+    container_name: schoolmate-payments-mariadb
+    restart: unless-stopped
+    environment:
+      - MARIADB_DATABASE=payments
+      - MARIADB_USER=payments_user
+      - MARIADB_PASSWORD=payments_password
+      - MARIADB_ROOT_PASSWORD=root_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - payments_mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - payments_network
+
+volumes:
+  payments_mariadb_data:
+    driver: local
+
+networks:
+  payments_network:
+    driver: bridge
