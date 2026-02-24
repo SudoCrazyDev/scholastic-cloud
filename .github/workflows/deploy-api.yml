@@ -1,3 +1,7 @@
+# Deploy API to Production and VIP/self-hosting clients.
+# Build runs once; the same package is deployed to every target in the matrix.
+# To add a new client: add a GitHub Environment with secrets (see docs), then add its slug below.
+
 name: Deploy API to Production
 
 on:
@@ -7,25 +11,22 @@ on:
       - 'api/**'
   workflow_dispatch:
 
+env:
+  ZIP_NAME: api-deployment-${{ github.run_id }}-${{ github.sha }}.zip
+
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment: prod
-    env:
-      ZIP_NAME: api-deployment-${{ github.run_id }}-${{ github.sha }}.zip
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Setup PHP
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, iconv, json, mbstring, pdo
 
-      # Step 3: Cache Composer dependencies
       - name: Cache Composer dependencies
         uses: actions/cache@v3
         with:
@@ -34,13 +35,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-php-
 
-      # Step 4: Install Composer dependencies
       - name: Install Composer dependencies
         run: |
           cd api
           composer install --optimize-autoloader --no-dev
 
-      # Step 7: Clear and cache Laravel configurations
       - name: Optimize Laravel
         run: |
           cd api
@@ -48,13 +47,9 @@ jobs:
           php artisan route:cache
           php artisan view:cache
 
-      # Step 8: Create deployment package (excluding node_modules and vendor)
       - name: Create deployment package
         run: |
-          # Create a temporary directory for deployment files
           mkdir -p deploy-temp
-          
-          # Copy API files excluding node_modules, vendor, and other unwanted files
           rsync -av --exclude='node_modules' \
                    --exclude='.git' \
                    --exclude='.env.example' \
@@ -63,26 +58,33 @@ jobs:
                    --exclude='Dockerfile' \
                    --exclude='README.md' \
                    api/ deploy-temp/
-          
-          # Create deployment zip file
           cd deploy-temp
           zip -r ../${ZIP_NAME} .
           cd ..
-          
-          # Move zip to a dedicated upload directory
           mkdir -p deploy-out
           mv -f ${ZIP_NAME} deploy-out/
 
-      # Step 8.5: Verify zip exists
-      - name: Verify deployment zip exists
-        run: |
-          echo "Runner working directory: $(pwd)"
-          ls -lah
-          echo "Contents of deploy-out/"
-          ls -lah deploy-out
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-deployment-package
+          path: deploy-out/${{ env.ZIP_NAME }}
 
-      # Step 9: Upload zip file to server via SFTP
-      - name: Upload deployment zip (SFTP)
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        deployment_target: [prod, maranatha]
+    environment: ${{ matrix.deployment_target }}
+    steps:
+      - name: Download deployment artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-deployment-package
+
+      - name: Upload deployment zip (SFTP) to ${{ matrix.deployment_target }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
@@ -90,10 +92,9 @@ jobs:
           password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           source: "deploy-out/${{ env.ZIP_NAME }}"
-          target: "~/domains/scholastic.cloud/public_html/v2/"
+          target: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
 
-      # Step 10: Extract on server (extract zip from deploy-out/ into parent directory)
-      - name: Extract deployment package on server
+      - name: Extract and setup on server (${{ matrix.deployment_target }})
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
@@ -102,17 +103,14 @@ jobs:
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           script: |
             set -e
-            cd ~/domains/scholastic.cloud/public_html/v2/
-            echo "Current dir: $(pwd)"
-            echo "Looking for zip inside deploy-out/"
-            ls -lah deploy-out || true
-            ZIP_FILE=$(ls -1 deploy-out/*.zip 2>/dev/null | tail -n 1)
-            if [ -z "$ZIP_FILE" ]; then
-              echo "No zip file found in deploy-out/" && exit 1
+            REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
+            ZIP_FILE="${{ env.ZIP_NAME }}"
+            cd "$REMOTE_DIR"
+            if [ ! -f "$ZIP_FILE" ]; then
+              echo "Zip not found: $ZIP_FILE" && exit 1
             fi
             echo "Found zip: $ZIP_FILE"
 
-            # Backup existing api directory
             BACKUP_DIR=""
             if [ -d "api" ]; then
               BACKUP_DIR="api-backup-$(date +%Y%m%d-%H%M%S)"
@@ -120,106 +118,36 @@ jobs:
               echo "Backup created: $BACKUP_DIR"
             fi
 
-            # Extract into parent (v2) under api/
             unzip -o "$ZIP_FILE" -d api/
-            
-            # Restore .env file from backup if it exists
-            if [ -n "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/.env" ]; then
-              echo "Restoring .env file from backup..."
-              cp "$BACKUP_DIR/.env" api/.env
-              echo "✓ .env file restored from backup"
-            else
-              echo "⚠ No .env file found in backup or backup not created"
-            fi
-            
-            # Ensure required Laravel directories exist
-            mkdir -p api/storage/logs
-            mkdir -p api/storage/framework/cache
-            mkdir -p api/storage/framework/sessions
-            mkdir -p api/storage/framework/views
-            mkdir -p api/bootstrap/cache
 
-            # Set proper permissions for Laravel (shared hosting)
-            # Main directories - readable by web server
+            if [ -n "$BACKUP_DIR" ] && [ -f "$BACKUP_DIR/.env" ]; then
+              cp "$BACKUP_DIR/.env" api/.env
+              echo "✓ .env restored from backup"
+            fi
+
+            mkdir -p api/storage/logs api/storage/framework/cache api/storage/framework/sessions api/storage/framework/views api/bootstrap/cache
             find api/ -type d -exec chmod 755 {} \;
             find api/ -type f -exec chmod 644 {} \;
-            
-            # Storage and cache directories - writable by web server
-            chmod -R 775 api/storage
-            chmod -R 775 api/bootstrap/cache
-            
-            # Specific storage subdirectories
-            chmod -R 775 api/storage/logs
-            chmod -R 775 api/storage/framework
-            chmod -R 775 api/storage/app
-            chmod -R 775 api/storage/framework/cache
-            chmod -R 775 api/storage/framework/sessions
-            chmod -R 775 api/storage/framework/views
-            
-            # Ensure .env file has correct permissions (if it exists)
-            if [ -f api/.env ]; then
-              chmod 644 api/.env
-            fi
-            
-            # Set ownership if possible (may fail on shared hosting)
+            chmod -R 775 api/storage api/bootstrap/cache
+            chmod -R 775 api/storage/logs api/storage/framework api/storage/app
+            [ -f api/.env ] && chmod 644 api/.env
             chown -R $USER:$USER api/ 2>/dev/null || true
-            
-            # Clear any existing cached files that might have wrong permissions
-            rm -rf api/bootstrap/cache/* 2>/dev/null || true
-            rm -rf api/storage/framework/cache/* 2>/dev/null || true
-            rm -rf api/storage/framework/views/* 2>/dev/null || true
-            rm -rf api/storage/framework/sessions/* 2>/dev/null || true
-            rm -rf api/storage/logs/* 2>/dev/null || true
-            
-            # Re-apply permissions after clearing cache
-            chmod -R 775 api/storage
-            chmod -R 775 api/bootstrap/cache
+            rm -rf api/bootstrap/cache/* api/storage/framework/cache/* api/storage/framework/views/* api/storage/framework/sessions/* api/storage/logs/* 2>/dev/null || true
+            chmod -R 775 api/storage api/bootstrap/cache
 
-            # Run Laravel migrations
             echo "=== Running Laravel migrations ==="
-            cd api
-            php artisan migrate --force
-            cd ..
+            cd api && php artisan migrate --force && cd ..
             echo "✓ Migrations completed"
 
-            # Place web entry files into the public web root (v2)
-            # Copy .htaccess and index.php from Laravel's public/ to the web root
-            if [ -f api/public/.htaccess ]; then
-              cp -f api/public/.htaccess ./.htaccess
-            fi
+            if [ -f api/public/.htaccess ]; then cp -f api/public/.htaccess ./.htaccess; fi
             if [ -f api/public/index.php ]; then
               cp -f api/public/index.php ./index.php
-              # Rewrite index.php paths to point into api/
               sed -i "s#__DIR__.'/../vendor/autoload.php'#__DIR__.'/api/vendor/autoload.php'#" ./index.php || true
               sed -i "s#__DIR__.'/../bootstrap/app.php'#__DIR__.'/api/bootstrap/app.php'#" ./index.php || true
             fi
 
-            # Remove uploaded zip after extraction
             rm -f "$ZIP_FILE"
-            
-            # Verify permissions and show directory structure
-            echo "=== Final permission verification ==="
-            echo "API directory permissions:"
-            ls -la api/ | head -10
-            echo "Storage permissions:"
-            ls -la api/storage/ 2>/dev/null || echo "Storage directory not accessible"
-            echo "Bootstrap cache permissions:"
-            ls -la api/bootstrap/cache/ 2>/dev/null || echo "Bootstrap cache not accessible"
-            
-            # Test if key Laravel files are accessible
-            if [ -f api/vendor/autoload.php ]; then
-              echo "✓ Vendor autoload.php exists and accessible"
-            else
-              echo "✗ Vendor autoload.php missing or inaccessible"
-            fi
-            
-            if [ -f api/bootstrap/app.php ]; then
-              echo "✓ Bootstrap app.php exists and accessible"
-            else
-              echo "✗ Bootstrap app.php missing or inaccessible"
-            fi
-
-      # Step 10: Post-deployment cleanup
-      - name: Cleanup deployment files
-        run: |
-          rm -rf deploy-temp deploy-out
+            echo "=== Deploy complete ==="
+            ls -la api/ | head -5
+            [ -f api/vendor/autoload.php ] && echo "✓ autoload.php OK" || echo "✗ autoload.php missing"
+            [ -f api/bootstrap/app.php ] && echo "✓ app.php OK" || echo "✗ app.php missing"

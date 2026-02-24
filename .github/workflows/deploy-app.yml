@@ -1,3 +1,8 @@
+# Deploy APP to Production and VIP/self-hosting clients.
+# Each push to master (app/**) builds and deploys to every target in the matrix.
+# To add a new client: add a GitHub Environment (Settings → Environments) with the same
+# secret names, then add its slug to the deployment_targets matrix below.
+
 name: Deploy APP to Production
 
 on:
@@ -10,19 +15,21 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: prod
+    strategy:
+      fail-fast: false  # Deploy to other targets even if one fails
+      matrix:
+        # Your production + each VIP/self-hosting client. Add new clients here.
+        deployment_target: [prod, maranatha]
+    environment: ${{ matrix.deployment_target }}
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      # Step 3: Create .env file from secret (before building)
       - name: Create .env file
         run: |
           cd app
@@ -30,15 +37,13 @@ jobs:
         env:
           ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
 
-      # Step 4: Install dependencies and build the project
       - name: Install dependencies and build
         run: |
           cd app
           npm ci
-          npm run build  # This builds your Vite project into the 'dist' folder
+          npm run build
 
-      # Step 5: Deploy the dist folder to Hostinger using FTP
-      - name: Deploy to FTP server
+      - name: Deploy to FTP server (${{ matrix.deployment_target }})
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.DEPLOYMENT_SERVER }}
