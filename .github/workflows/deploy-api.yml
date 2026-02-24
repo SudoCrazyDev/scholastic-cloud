@@ -84,6 +84,15 @@ jobs:
         with:
           name: api-deployment-package
 
+      - name: Prepare zip for upload
+        run: |
+          if [ -f "deploy-out/${{ env.ZIP_NAME }}" ]; then
+            cp "deploy-out/${{ env.ZIP_NAME }}" ./api-deploy.zip
+          else
+            cp "$(find . -name '*.zip' -type f | head -1)" ./api-deploy.zip
+          fi
+          ls -la api-deploy.zip
+
       - name: Upload deployment zip (SFTP) to ${{ matrix.deployment_target }}
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -91,7 +100,7 @@ jobs:
           username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
           password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
-          source: "deploy-out/${{ env.ZIP_NAME }}"
+          source: "api-deploy.zip"
           target: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
 
       - name: Extract and setup on server (${{ matrix.deployment_target }})
@@ -104,7 +113,7 @@ jobs:
           script: |
             set -e
             REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
-            ZIP_FILE="${{ env.ZIP_NAME }}"
+            ZIP_FILE="api-deploy.zip"
             cd "$REMOTE_DIR"
             if [ ! -f "$ZIP_FILE" ]; then
               echo "Zip not found: $ZIP_FILE" && exit 1
