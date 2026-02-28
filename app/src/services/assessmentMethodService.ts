@@ -100,9 +100,16 @@ const normalizeChoiceAnswers = (value: unknown): string[] => {
   return Array.from(new Set(values.map(normalizeChoiceAnswer).filter(Boolean))).sort()
 }
 
-const mapQuestionFromItem = (
-  question: NonNullable<SubjectEcrItem['content']>['questions'][number]
-): AssessmentMethodQuestion => {
+interface RawAssessmentQuestion {
+  type?: string
+  question?: string
+  choices?: string[]
+  answer?: string | string[]
+  blanks?: string[]
+  points?: number
+}
+
+const mapQuestionFromItem = (question: RawAssessmentQuestion): AssessmentMethodQuestion => {
   const type = QUESTION_TYPE_SET.has(question.type as AssessmentQuestionType)
     ? (question.type as AssessmentQuestionType)
     : 'single_choice'
