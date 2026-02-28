@@ -23,6 +23,7 @@ class SubjectEcrItemController extends Controller
             // Accepts subject_ecr_id as string or array (same behavior as before)
             'subject_ecr_id' => ['nullable'],
             'type' => ['nullable', 'string', Rule::in(['quiz', 'assignment', 'activity', 'project', 'exam', 'other'])],
+            'status' => ['nullable', 'string', Rule::in(['draft', 'published'])],
             'quarter' => ['nullable', 'string', Rule::in(['1', '2', '3', '4'])],
             'scheduled_date' => ['nullable', 'date_format:Y-m-d'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
@@ -76,6 +77,10 @@ class SubjectEcrItemController extends Controller
             $query->where('type', $validated['type']);
         }
 
+        if (!empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
         if (!empty($validated['quarter'])) {
             $query->where('quarter', $validated['quarter']);
         }
@@ -107,20 +112,31 @@ class SubjectEcrItemController extends Controller
             $validatedData = $request->validate([
                 'subject_ecr_id' => 'required|uuid',
                 'type' => 'nullable|string|max:255',
+                'status' => ['nullable', 'string', Rule::in(['draft', 'published'])],
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'content' => 'nullable|array',
+                'settings' => 'nullable|array',
+                'settings.max_attempts' => 'nullable|integer|min:1|max:50',
+                'settings.time_limit_minutes' => 'nullable|integer|min:1|max:1440',
+                'settings.pass_mark' => 'nullable|numeric|min:0|max:100',
+                'settings.randomize_questions' => 'nullable|boolean',
                 'content.questions' => 'nullable|array',
-                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks'])],
+                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
                 'content.questions.*.choices.*' => 'string',
+                'content.questions.*.allow_multiple' => 'nullable|boolean',
                 'content.questions.*.answer' => 'nullable', // string or array for multiple_choice
                 'content.questions.*.blanks' => 'nullable|array', // for fill_in_the_blanks: correct answers in order
                 'content.questions.*.blanks.*' => 'string',
                 'content.questions.*.points' => 'nullable|numeric|min:0',
                 'quarter' => 'nullable|string',
                 'scheduled_date' => 'nullable|date_format:Y-m-d',
+                'open_at' => 'nullable|date',
+                'close_at' => 'nullable|date|after_or_equal:open_at',
+                'due_at' => 'nullable|date',
+                'allow_late_submission' => 'nullable|boolean',
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 
@@ -177,19 +193,32 @@ class SubjectEcrItemController extends Controller
             $validatedData = $request->validate([
                 'subject_ecr_id' => 'sometimes|required|uuid',
                 'type' => 'nullable|string|max:255',
+                'status' => ['nullable', 'string', Rule::in(['draft', 'published'])],
                 'title' => 'sometimes|required|string|max:255',
                 'description' => 'nullable|string',
                 'content' => 'nullable|array',
+                'settings' => 'nullable|array',
+                'settings.max_attempts' => 'nullable|integer|min:1|max:50',
+                'settings.time_limit_minutes' => 'nullable|integer|min:1|max:1440',
+                'settings.pass_mark' => 'nullable|numeric|min:0|max:100',
+                'settings.randomize_questions' => 'nullable|boolean',
                 'content.questions' => 'nullable|array',
-                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks'])],
+                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
                 'content.questions.*.choices.*' => 'string',
+                'content.questions.*.allow_multiple' => 'nullable|boolean',
                 'content.questions.*.answer' => 'nullable',
                 'content.questions.*.blanks' => 'nullable|array',
                 'content.questions.*.blanks.*' => 'string',
                 'content.questions.*.points' => 'nullable|numeric|min:0',
+                'quarter' => 'nullable|string',
+                'academic_year' => 'nullable|string',
                 'scheduled_date' => 'nullable|date_format:Y-m-d',
+                'open_at' => 'nullable|date',
+                'close_at' => 'nullable|date|after_or_equal:open_at',
+                'due_at' => 'nullable|date',
+                'allow_late_submission' => 'nullable|boolean',
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 

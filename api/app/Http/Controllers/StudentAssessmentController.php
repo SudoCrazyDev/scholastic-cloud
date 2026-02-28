@@ -66,6 +66,7 @@ class StudentAssessmentController extends Controller
         $items = SubjectEcrItem::with(['subjectEcr.subject'])
             ->whereIn('subject_ecr_id', $ecrIds)
             ->whereIn('type', ['quiz', 'assignment', 'exam'])
+            ->where('status', 'published')
             ->orderBy('scheduled_date')
             ->orderBy('created_at')
             ->get();
@@ -76,42 +77,57 @@ class StudentAssessmentController extends Controller
             ->orderByRaw('submitted_at IS NULL, submitted_at DESC')
             ->orderByDesc('id')
             ->get();
-        $attempts = $attemptsCollection->groupBy('subject_ecr_item_id')->map(fn ($group) => $group->first());
+        $attempts = $attemptsCollection->groupBy('subject_ecr_item_id');
 
-        $data = $items->map(function (SubjectEcrItem $item) use ($attempts, $student) {
-            $attempt = $attempts->get($item->id);
+        $data = $items->map(function (SubjectEcrItem $item) use ($attempts) {
+            $group = $attempts->get($item->id) ?? collect();
+            $attempt = $group->first();
+            $rules = $this->assessmentRules($item);
+            $submittedCount = $group->whereNotNull('submitted_at')->count();
+            $inProgress = $group->first(fn (StudentAssessmentAttempt $a) => $a->submitted_at === null);
+            $canRetake = $submittedCount < $rules['max_attempts'];
             $hasQuestions = !empty($item->content['questions'] ?? []);
             $status = 'not_started';
             $score = null;
             $maxScore = null;
             $submittedAt = null;
 
-            if ($attempt) {
-                if ($attempt->submitted_at) {
-                    $status = 'submitted';
-                    $score = $attempt->score;
-                    $maxScore = $attempt->max_score;
-                    $submittedAt = $attempt->submitted_at?->toIso8601String();
-                } else {
-                    $status = 'in_progress';
-                }
+            if ($inProgress) {
+                $status = 'in_progress';
+            } elseif ($attempt && $attempt->submitted_at && !$canRetake) {
+                $status = 'submitted';
+                $score = $attempt->score;
+                $maxScore = $attempt->max_score;
+                $submittedAt = $attempt->submitted_at?->toIso8601String();
+            } elseif ($attempt && $attempt->submitted_at) {
+                $score = $attempt->score;
+                $maxScore = $attempt->max_score;
+                $submittedAt = $attempt->submitted_at?->toIso8601String();
             }
 
             return [
                 'id' => $item->id,
                 'type' => $item->type,
+                'status' => $item->status,
                 'title' => $item->title,
                 'description' => $item->description,
                 'quarter' => $item->quarter,
                 'academic_year' => $item->academic_year,
                 'max_score' => (float) $item->score,
                 'scheduled_date' => $item->scheduled_date?->format('Y-m-d'),
+                'open_at' => $item->open_at?->toIso8601String(),
+                'close_at' => $item->close_at?->toIso8601String(),
+                'due_at' => $item->due_at?->toIso8601String(),
+                'allow_late_submission' => (bool) $item->allow_late_submission,
                 'subject_title' => $item->subjectEcr?->subject?->title ?? '',
                 'has_questions' => $hasQuestions,
                 'attempt_status' => $status,
                 'attempt_score' => $score,
                 'attempt_max_score' => $maxScore,
                 'attempt_submitted_at' => $submittedAt,
+                'attempts_used' => $submittedCount,
+                'attempts_allowed' => $rules['max_attempts'],
+                'can_retake' => $canRetake,
             ];
         });
 
@@ -130,7 +146,7 @@ class StudentAssessmentController extends Controller
         }
 
         $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($id);
-        if (!$item || !in_array($item->type, ['quiz', 'assignment', 'exam'], true)) {
+        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
@@ -144,14 +160,28 @@ class StudentAssessmentController extends Controller
             ->latest('updated_at')
             ->first();
 
+        $rules = $this->assessmentRules($item);
+        $submittedCount = StudentAssessmentAttempt::where('student_id', $student->id)
+            ->where('subject_ecr_item_id', $item->id)
+            ->whereNotNull('submitted_at')
+            ->count();
+
         $payload = [
             'id' => $item->id,
             'type' => $item->type,
+            'status' => $item->status,
             'title' => $item->title,
             'description' => $item->description,
             'quarter' => $item->quarter,
             'max_score' => (float) $item->score,
             'subject_title' => $item->subjectEcr?->subject?->title ?? '',
+            'settings' => $rules,
+            'open_at' => $item->open_at?->toIso8601String(),
+            'close_at' => $item->close_at?->toIso8601String(),
+            'due_at' => $item->due_at?->toIso8601String(),
+            'allow_late_submission' => (bool) $item->allow_late_submission,
+            'attempts_used' => $submittedCount,
+            'attempts_allowed' => $rules['max_attempts'],
         ];
 
         $questions = $item->content['questions'] ?? [];
@@ -198,13 +228,21 @@ class StudentAssessmentController extends Controller
         }
 
         $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($id);
-        if (!$item || !in_array($item->type, ['quiz', 'assignment', 'exam'], true)) {
+        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
         if (!$subjectId || !$student->subjects()->where('subjects.id', $subjectId)->exists()) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
+        }
+
+        $availabilityError = $this->availabilityError($item);
+        if ($availabilityError !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => $availabilityError,
+            ], 422);
         }
 
         $questions = $item->content['questions'] ?? [];
@@ -227,14 +265,15 @@ class StudentAssessmentController extends Controller
             ]);
         }
 
-        $alreadySubmitted = StudentAssessmentAttempt::where('student_id', $student->id)
+        $rules = $this->assessmentRules($item);
+        $submittedCount = StudentAssessmentAttempt::where('student_id', $student->id)
             ->where('subject_ecr_item_id', $item->id)
             ->whereNotNull('submitted_at')
-            ->exists();
-        if ($alreadySubmitted) {
+            ->count();
+        if ($submittedCount >= $rules['max_attempts']) {
             return response()->json([
                 'success' => false,
-                'message' => 'You have already submitted this assessment.',
+                'message' => 'You have reached the maximum number of attempts for this assessment.',
             ], 422);
         }
 
@@ -272,13 +311,21 @@ class StudentAssessmentController extends Controller
         ]);
 
         $item = SubjectEcrItem::find($id);
-        if (!$item || !in_array($item->type, ['quiz', 'assignment', 'exam'], true)) {
+        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
         if (!$subjectId || !$student->subjects()->where('subjects.id', $subjectId)->exists()) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
+        }
+
+        $availabilityError = $this->availabilityError($item);
+        if ($availabilityError !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => $availabilityError,
+            ], 422);
         }
 
         $attempt = StudentAssessmentAttempt::where('student_id', $student->id)
@@ -347,6 +394,11 @@ class StudentAssessmentController extends Controller
             if ($type === 'fill_in_the_blanks') {
                 $blanks = $q['blanks'] ?? [];
                 $entry['num_blanks'] = count($blanks);
+            }
+            if (in_array($type, ['short_answer', 'essay'], true)) {
+                $entry['placeholder'] = $type === 'essay'
+                    ? 'Write your detailed answer here...'
+                    : 'Write your answer here...';
             }
             $out[] = $entry;
         }
@@ -434,6 +486,26 @@ class StudentAssessmentController extends Controller
             }
             return true;
         }
+        if (in_array($type, ['short_answer', 'essay'], true)) {
+            $correctRaw = $q['answer'] ?? '';
+            $correctValues = is_array($correctRaw)
+                ? $correctRaw
+                : explode('|', (string) $correctRaw);
+            $correctValues = array_values(array_filter(array_map(fn ($v) => trim((string) $v), $correctValues)));
+            if (empty($correctValues)) {
+                // No answer key means this should be manually graded.
+                return false;
+            }
+            $given = is_array($givenRaw)
+                ? trim((string) ($givenRaw[0] ?? ''))
+                : trim((string) $givenRaw);
+            foreach ($correctValues as $correct) {
+                if (strcasecmp($correct, $given) === 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
         return false;
     }
 
@@ -449,17 +521,98 @@ class StudentAssessmentController extends Controller
         return $normalize($correct) === $normalize($given);
     }
 
+    private function isSupportedAssessmentItem(?SubjectEcrItem $item): bool
+    {
+        return $item !== null && in_array($item->type, ['quiz', 'assignment', 'exam'], true);
+    }
+
+    private function isPublishedForStudents(SubjectEcrItem $item): bool
+    {
+        return ($item->status ?? 'published') === 'published';
+    }
+
+    private function assessmentRules(SubjectEcrItem $item): array
+    {
+        $defaults = $this->defaultRulesForType((string) $item->type);
+        $content = is_array($item->content) ? $item->content : [];
+        $contentSettings = is_array($content['settings'] ?? null) ? $content['settings'] : [];
+        $settings = is_array($item->settings) ? $item->settings : [];
+        $merged = array_merge($defaults, $contentSettings, $settings);
+
+        return [
+            'max_attempts' => max(1, (int) ($merged['max_attempts'] ?? $defaults['max_attempts'])),
+            'time_limit_minutes' => isset($merged['time_limit_minutes']) && $merged['time_limit_minutes'] !== null && $merged['time_limit_minutes'] !== ''
+                ? max(1, (int) $merged['time_limit_minutes'])
+                : null,
+            'pass_mark' => isset($merged['pass_mark']) && $merged['pass_mark'] !== null && $merged['pass_mark'] !== ''
+                ? max(0, min(100, (float) $merged['pass_mark']))
+                : null,
+            'randomize_questions' => (bool) ($merged['randomize_questions'] ?? false),
+        ];
+    }
+
+    private function defaultRulesForType(string $type): array
+    {
+        return match ($type) {
+            'quiz' => [
+                'max_attempts' => 3,
+                'time_limit_minutes' => 30,
+                'pass_mark' => 60,
+                'randomize_questions' => false,
+            ],
+            'exam' => [
+                'max_attempts' => 1,
+                'time_limit_minutes' => 90,
+                'pass_mark' => 70,
+                'randomize_questions' => false,
+            ],
+            default => [
+                'max_attempts' => 1,
+                'time_limit_minutes' => null,
+                'pass_mark' => null,
+                'randomize_questions' => false,
+            ],
+        };
+    }
+
+    private function availabilityError(SubjectEcrItem $item): ?string
+    {
+        if (!$this->isPublishedForStudents($item)) {
+            return 'This assessment is still in draft mode.';
+        }
+
+        $now = now();
+        if ($item->open_at && $now->lt($item->open_at)) {
+            return 'This assessment is not open yet.';
+        }
+        if ($item->close_at && $now->gt($item->close_at)) {
+            return 'This assessment is already closed.';
+        }
+        if ($item->due_at && !$item->allow_late_submission && $now->gt($item->due_at)) {
+            return 'The due date for this assessment has passed.';
+        }
+
+        return null;
+    }
+
     private function buildTakePayload(SubjectEcrItem $item, StudentAssessmentAttempt $attempt): array
     {
         $questions = $item->content['questions'] ?? [];
+        $rules = $this->assessmentRules($item);
         return [
             'id' => $item->id,
             'type' => $item->type,
+            'status' => $item->status,
             'title' => $item->title,
             'description' => $item->description,
             'quarter' => $item->quarter,
             'max_score' => (float) $this->computeMaxScoreFromQuestions($questions),
             'subject_title' => $item->subjectEcr?->subject?->title ?? '',
+            'settings' => $rules,
+            'open_at' => $item->open_at?->toIso8601String(),
+            'close_at' => $item->close_at?->toIso8601String(),
+            'due_at' => $item->due_at?->toIso8601String(),
+            'allow_late_submission' => (bool) $item->allow_late_submission,
             'questions' => $this->stripAnswersFromQuestions($questions),
             'attempt_id' => $attempt->id,
             'answers' => $attempt->answers ?? [],

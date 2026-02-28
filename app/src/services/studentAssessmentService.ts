@@ -3,21 +3,29 @@ import { api } from '@/lib/api';
 export interface StudentAssessmentItem {
   id: string;
   type: string;
+  status?: 'draft' | 'published';
   title: string;
   description?: string;
   quarter?: string;
   academic_year?: string;
   max_score?: number;
   scheduled_date?: string;
+  open_at?: string | null;
+  close_at?: string | null;
+  due_at?: string | null;
+  allow_late_submission?: boolean;
   subject_title?: string;
   has_questions: boolean;
   attempt_status: 'not_started' | 'in_progress' | 'submitted';
   attempt_score?: number | null;
   attempt_max_score?: number | null;
   attempt_submitted_at?: string | null;
+  attempts_used?: number;
+  attempts_allowed?: number;
+  can_retake?: boolean;
 }
 
-export type QuestionType = 'true_false' | 'single_choice' | 'multiple_choice' | 'fill_in_the_blanks';
+export type QuestionType = 'true_false' | 'single_choice' | 'multiple_choice' | 'fill_in_the_blanks' | 'short_answer' | 'essay';
 
 export interface AssessmentQuestion {
   index: number;
@@ -26,19 +34,33 @@ export interface AssessmentQuestion {
   choices?: string[];
   points: number;
   num_blanks?: number; // for fill_in_the_blanks
+  placeholder?: string;
 }
 
 export interface TakeAssessmentPayload {
   id: string;
   type: string;
+  status?: 'draft' | 'published';
   title: string;
   description?: string;
   quarter?: string;
   max_score: number;
   subject_title?: string;
+  open_at?: string | null;
+  close_at?: string | null;
+  due_at?: string | null;
+  allow_late_submission?: boolean;
+  settings?: {
+    max_attempts?: number;
+    time_limit_minutes?: number | null;
+    pass_mark?: number | null;
+    randomize_questions?: boolean;
+  };
+  attempts_used?: number;
+  attempts_allowed?: number;
   questions: AssessmentQuestion[];
   attempt_id: string;
-  answers: Record<string, string>;
+  answers: Record<string, string | string[]>;
 }
 
 export interface SubmitResult {

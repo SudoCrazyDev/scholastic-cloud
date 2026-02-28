@@ -19,19 +19,30 @@ class SubjectEcrItem extends Model
     protected $fillable = [
         'subject_ecr_id',
         'type',
+        'status',
         'title',
         'description',
         'content',
+        'settings',
         'quarter',
         'academic_year',
         'scheduled_date',
+        'open_at',
+        'close_at',
+        'due_at',
+        'allow_late_submission',
         'score',
     ];
 
     protected $casts = [
         'content' => 'array',
+        'settings' => 'array',
         'score' => 'decimal:2',
         'scheduled_date' => 'date:Y-m-d',
+        'open_at' => 'datetime',
+        'close_at' => 'datetime',
+        'due_at' => 'datetime',
+        'allow_late_submission' => 'boolean',
     ];
 
     /**

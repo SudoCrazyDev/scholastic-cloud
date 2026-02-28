@@ -4,13 +4,27 @@ export interface SubjectEcrItem {
   id?: string;
   subject_ecr_id: string;
   type?: string;
+  status?: 'draft' | 'published';
   title: string;
   description?: string;
+  settings?: {
+    max_attempts?: number;
+    time_limit_minutes?: number | null;
+    pass_mark?: number | null;
+    randomize_questions?: boolean;
+  };
   content?: {
+    settings?: {
+      max_attempts?: number;
+      time_limit_minutes?: number | null;
+      pass_mark?: number | null;
+      randomize_questions?: boolean;
+    };
     questions?: Array<{
-      type: 'true_false' | 'single_choice' | 'multiple_choice' | 'fill_in_the_blanks';
+      type: 'true_false' | 'single_choice' | 'multiple_choice' | 'fill_in_the_blanks' | 'short_answer' | 'essay';
       question: string;
       choices?: string[];
+      allow_multiple?: boolean;
       answer?: string | string[]; // string for single/true_false, string[] or "A,B" for multiple_choice
       blanks?: string[]; // correct answers in order for fill_in_the_blanks
       points?: number;
@@ -20,6 +34,10 @@ export interface SubjectEcrItem {
   quarter?: string;
   academic_year?: string;
   scheduled_date?: string | null; // YYYY-MM-DD
+  open_at?: string | null;
+  close_at?: string | null;
+  due_at?: string | null;
+  allow_late_submission?: boolean;
 }
 
 class SubjectEcrItemService {
