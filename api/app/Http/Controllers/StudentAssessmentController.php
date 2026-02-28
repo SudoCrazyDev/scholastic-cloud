@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Auth\StudentPortalUser;
 use App\Models\Student;
 use App\Models\StudentAssessmentAttempt;
 use App\Models\StudentEcrItemScore;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * LMS-style: student lists/takes quizzes, assignments, exams; live scoring.
- * Requires the authenticated user to be linked to a Student (students.user_id).
+ * Supports both User linked to Student (students.user_id) and StudentPortalUser (student_auth login).
  */
 class StudentAssessmentController extends Controller
 {
@@ -31,6 +32,9 @@ class StudentAssessmentController extends Controller
         $user = $request->user();
         if (!$user) {
             return null;
+        }
+        if ($user instanceof StudentPortalUser) {
+            return $user->student;
         }
         return Student::where('user_id', $user->id)->first();
     }

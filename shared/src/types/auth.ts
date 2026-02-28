@@ -6,6 +6,19 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string;
   token_expiry: string;
+  /** Set when logging in as a student; allows frontend to set role to student immediately */
+  user?: {
+    id: string;
+    first_name: string;
+    middle_name?: string;
+    last_name: string;
+    ext_name?: string;
+    email: string;
+    role: { title: string; slug: string };
+    student_id: string;
+    is_new?: boolean;
+    [key: string]: unknown;
+  };
 }
 
 export interface RegisterRequest {

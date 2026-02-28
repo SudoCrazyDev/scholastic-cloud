@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Building2, 
-  Shield, 
+import { institutionService } from '../../services/institutionService';
+import {
+  LayoutDashboard,
+  Users,
+  UserCircle,
+  Building2,
+  Shield,
   CreditCard,
   Wallet,
   Menu,
-  Lock,
   GraduationCap,
   UserCheck,
   GraduationCap as StudentsIcon,
@@ -21,7 +23,7 @@ import {
   X,
   Calendar,
   Settings,
-  FileText
+  FileText,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -42,6 +44,20 @@ const menuItems: MenuItem[] = [
     label: 'Dashboard',
     icon: <LayoutDashboard className="w-5 h-5" />,
     path: '/dashboard',
+  },
+  {
+    id: 'my-personal-info',
+    label: 'My Personal Info',
+    icon: <UserCircle className="w-5 h-5" />,
+    path: '/my-personal-info',
+    allowedRoles: ['student'],
+  },
+  {
+    id: 'my-subjects',
+    label: 'My Subject',
+    icon: <BookOpen className="w-5 h-5" />,
+    path: '/my-subjects',
+    allowedRoles: ['student'],
   },
   {
     id: 'my-class-sections',
@@ -177,6 +193,24 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   const { user } = useAuth();
   const userRoleSlug = user?.role?.slug;
 
+  const institutionId = user?.user_institutions?.[0]?.institution_id;
+  const institutionFromUser = user?.user_institutions?.find((ui: { is_default?: boolean }) => ui.is_default)?.institution
+    ?? user?.user_institutions?.[0]?.institution;
+
+  const { data: institutionResponse } = useQuery({
+    queryKey: ['institution', institutionId],
+    queryFn: () => institutionService.getInstitution(institutionId!),
+    enabled: !!institutionId && !institutionFromUser,
+  });
+
+  const institution = useMemo(
+    () => institutionFromUser ?? institutionResponse?.data,
+    [institutionFromUser, institutionResponse?.data],
+  );
+
+  const sidebarLabel = institution?.title ?? 'ScholasticCloud';
+  const sidebarLogo = institution?.logo;
+
   // Filter menu items by allowedRoles
   const filteredMenuItems = menuItems.filter((item) => {
     if (!item.allowedRoles) return true; // visible to all
@@ -195,19 +229,31 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
     >
       {/* Logo Section */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        {!isCollapsed && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center space-x-2"
-          >
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <Lock className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">ScholasticCloud</span>
-          </motion.div>
-        )}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center space-x-2 min-w-0"
+        >
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100">
+            {sidebarLogo ? (
+              <img
+                src={sidebarLogo}
+                alt=""
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span className="text-sm font-bold text-indigo-600">
+                {sidebarLabel.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+          {!isCollapsed && (
+            <span className="text-xl font-bold text-gray-900 truncate">
+              {sidebarLabel}
+            </span>
+          )}
+        </motion.div>
         <div className="flex items-center space-x-2">
           {/* Mobile close button */}
           {onMobileClose && (

@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Auth\StudentPortalUser;
 use App\Models\User;
+use App\Models\Student;
+use App\Models\StudentAuth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -13,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 class AuthController extends Controller
 {
     /**
-     * Login user and return token
+     * Login: try User (staff) first, then StudentAuth (student) if email not found in users.
      */
     public function login(Request $request)
     {
@@ -22,38 +25,100 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'message' => 'Invalid credentials'
-            ], 401);
-        }
-
-        // Generate token and set expiry to 24 hours
         $token = Str::random(60);
         $tokenExpiry = Carbon::now()->addHours(24)->toDateTimeString();
 
-        // Update user with new token and expiry
-        $user->update([
-            'token' => $token,
-            'token_expiry' => $tokenExpiry,
-        ]);
+        // 1. Try User (staff/admin)
+        $user = User::where('email', $request->email)->first();
+
+        if ($user && Hash::check($request->password, $user->password)) {
+            $user->update([
+                'token' => $token,
+                'token_expiry' => $tokenExpiry,
+            ]);
+            return response()->json([
+                'token' => $token,
+                'token_expiry' => $tokenExpiry,
+            ]);
+        }
+
+        // 2. Try StudentAuth (student portal)
+        $studentAuth = StudentAuth::with(['student.studentInstitutions.institution'])
+            ->where('email', $request->email)->first();
+
+        if ($studentAuth && Hash::check($request->password, $studentAuth->password)) {
+            $student = $studentAuth->student;
+
+            // Check student's institutions: must belong to at least one
+            $student->loadMissing('studentInstitutions.institution');
+            $institutions = $student->studentInstitutions->map(function ($si) {
+                $inst = $si->institution;
+                return [
+                    'institution_id' => $si->institution_id,
+                    'institution' => $inst ? [
+                        'id' => $inst->id,
+                        'name' => $inst->title ?? $inst->name ?? null,
+                    ] : null,
+                ];
+            })->filter(fn ($i) => $i['institution'] !== null)->values()->all();
+
+            if (empty($institutions)) {
+                return response()->json([
+                    'message' => 'Student is not assigned to any institution. Please contact your school.',
+                ], 403);
+            }
+
+            $studentAuth->update([
+                'token' => $token,
+                'token_expiry' => $tokenExpiry,
+            ]);
+
+            // Return user with role student and institutions
+            $userData = [
+                'id' => $student->id,
+                'first_name' => $student->first_name,
+                'middle_name' => $student->middle_name,
+                'last_name' => $student->last_name,
+                'ext_name' => $student->ext_name,
+                'email' => $studentAuth->email,
+                'gender' => $student->gender,
+                'birthdate' => $student->birthdate,
+                'is_new' => $studentAuth->is_new,
+                'is_active' => $student->is_active,
+                'role' => [
+                    'title' => 'Student',
+                    'slug' => 'student',
+                ],
+                'user_institutions' => $institutions,
+                'created_at' => $student->created_at,
+                'updated_at' => $student->updated_at,
+                'student_id' => $student->id,
+            ];
+            return response()->json([
+                'token' => $token,
+                'token_expiry' => $tokenExpiry,
+                'user' => $userData,
+            ]);
+        }
 
         return response()->json([
-            'token' => $token,
-            'token_expiry' => $tokenExpiry,
-        ]);
+            'message' => 'Invalid credentials'
+        ], 401);
     }
 
     /**
-     * Logout user by clearing token
+     * Logout: clear token for User or StudentAuth
      */
     public function logout(Request $request)
     {
         $user = $request->user();
-        
-        if ($user) {
+
+        if ($user instanceof StudentPortalUser) {
+            $user->studentAuth->update([
+                'token' => null,
+                'token_expiry' => null,
+            ]);
+        } elseif ($user) {
             $user->update([
                 'token' => null,
                 'token_expiry' => null,
@@ -66,7 +131,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Update user password
+     * Update password (User or StudentAuth)
      */
     public function updatePassword(Request $request)
     {
@@ -75,18 +140,24 @@ class AuthController extends Controller
         ]);
 
         $user = $request->user();
-        
+
         if (!$user) {
             return response()->json([
                 'message' => 'User not found'
             ], 404);
         }
 
-        // Update password and set is_new to false
-        $user->update([
-            'password' => Hash::make($request->password),
-            'is_new' => false,
-        ]);
+        if ($user instanceof StudentPortalUser) {
+            $user->studentAuth->update([
+                'password' => Hash::make($request->password),
+                'is_new' => false,
+            ]);
+        } else {
+            $user->update([
+                'password' => Hash::make($request->password),
+                'is_new' => false,
+            ]);
+        }
 
         return response()->json([
             'message' => 'Password updated successfully'
@@ -94,59 +165,101 @@ class AuthController extends Controller
     }
 
     /**
-     * Get current user profile
+     * Get current user profile (staff User or student via StudentPortalUser)
      */
     public function profile(Request $request)
     {
         $user = $request->user();
-        
+
         if (!$user) {
             return response()->json([
                 'message' => 'User not found'
             ], 404);
         }
 
-        // Load the user with all necessary relationships
-        $user->load(['userInstitutions.role', 'userInstitutions.institution', 'directRole']);
-        // Use the getRole method which checks for default/main institutions first, then falls back to direct role
-        $role = $user->getRole();
-        
-        return response()->json([
-            'data' => [
-                'id' => $user->id,
-                'first_name' => $user->first_name,
-                'middle_name' => $user->middle_name,
-                'last_name' => $user->last_name,
-                'ext_name' => $user->ext_name,
-                'email' => $user->email,
-                'gender' => $user->gender,
-                'birthdate' => $user->birthdate,
-                'is_new' => $user->is_new,
-                'is_active' => $user->is_active,
-                'role' => $role ? [
+        // Student logged in via student_auth
+        if ($user instanceof StudentPortalUser) {
+            $student = $user->student;
+            $auth = $user->studentAuth;
+            $role = $user->getRole();
+            $student->loadMissing('studentInstitutions.institution');
+            $userInstitutions = $student->studentInstitutions->map(function ($si) {
+                $inst = $si->institution;
+                return [
+                    'institution_id' => $si->institution_id,
+                    'institution' => $inst ? [
+                        'id' => $inst->id,
+                        'name' => $inst->title ?? ($inst->name ?? null),
+                    ] : null,
+                ];
+            })->filter(fn ($i) => $i['institution'] !== null)->values()->all();
+
+            $data = [
+                'id' => $student->id,
+                'first_name' => $student->first_name,
+                'middle_name' => $student->middle_name,
+                'last_name' => $student->last_name,
+                'ext_name' => $student->ext_name,
+                'email' => $auth->email,
+                'gender' => $student->gender,
+                'birthdate' => $student->birthdate,
+                'is_new' => $auth->is_new,
+                'is_active' => $student->is_active,
+                'role' => [
                     'title' => $role->title,
                     'slug' => $role->slug,
-                ] : null,
-                'user_institutions' => $user->userInstitutions->map(function ($userInstitution) {
-                    return [
-                        'institution_id' => $userInstitution->institution_id,
-                        'role_id' => $userInstitution->role_id,
-                        'is_default' => $userInstitution->is_default,
-                        'is_main' => $userInstitution->is_main,
-                        'role' => $userInstitution->role ? [
-                            'title' => $userInstitution->role->title,
-                            'slug' => $userInstitution->role->slug,
-                        ] : null,
-                        'institution' => $userInstitution->institution ? [
-                            'id' => $userInstitution->institution->id,
-                            'name' => $userInstitution->institution->name,
-                        ] : null,
-                    ];
-                }),
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
-            ]
-        ]);
+                ],
+                'user_institutions' => $userInstitutions,
+                'created_at' => $student->created_at,
+                'updated_at' => $student->updated_at,
+                'student_id' => $student->id,
+            ];
+            return response()->json(['data' => $data]);
+        }
+
+        // Staff User
+        $user->load(['userInstitutions.role', 'userInstitutions.institution', 'directRole']);
+        $role = $user->getRole();
+        $student = Student::where('user_id', $user->id)->first();
+
+        $data = [
+            'id' => $user->id,
+            'first_name' => $user->first_name,
+            'middle_name' => $user->middle_name,
+            'last_name' => $user->last_name,
+            'ext_name' => $user->ext_name,
+            'email' => $user->email,
+            'gender' => $user->gender,
+            'birthdate' => $user->birthdate,
+            'is_new' => $user->is_new,
+            'is_active' => $user->is_active,
+            'role' => $role ? [
+                'title' => $role->title,
+                'slug' => $role->slug,
+            ] : null,
+            'user_institutions' => $user->userInstitutions->map(function ($userInstitution) {
+                return [
+                    'institution_id' => $userInstitution->institution_id,
+                    'role_id' => $userInstitution->role_id,
+                    'is_default' => $userInstitution->is_default,
+                    'is_main' => $userInstitution->is_main,
+                    'role' => $userInstitution->role ? [
+                        'title' => $userInstitution->role->title,
+                        'slug' => $userInstitution->role->slug,
+                    ] : null,
+                    'institution' => $userInstitution->institution ? [
+                        'id' => $userInstitution->institution->id,
+                        'name' => $userInstitution->institution->name,
+                    ] : null,
+                ];
+            }),
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+        ];
+        if ($student) {
+            $data['student_id'] = $student->id;
+        }
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -156,7 +269,7 @@ class AuthController extends Controller
     public function assumeUser(Request $request)
     {
         $authenticatedUser = $request->user();
-        if (!$authenticatedUser) {
+        if (!$authenticatedUser || $authenticatedUser instanceof StudentPortalUser) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 

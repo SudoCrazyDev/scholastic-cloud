@@ -33,6 +33,8 @@ import Finance from './pages/Finance';
 import Login from './pages/Login';
 import MyAssessments from './pages/MyAssessments';
 import { TakeAssessment } from './pages/MyAssessments';
+import MyPersonalInfo from './pages/MyPersonalInfo';
+import MySubjects from './pages/MySubjects';
 
 
 function App() {
@@ -68,6 +70,8 @@ function App() {
               <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
               <Route path="my-assessments" element={<MyAssessments />} />
               <Route path="my-assessments/:id/take" element={<TakeAssessment />} />
+              <Route path="my-personal-info" element={<MyPersonalInfo />} />
+              <Route path="my-subjects" element={<MySubjects />} />
               <Route path="teacher-attendance" element={<TeacherAttendance />} />
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
               <Route path="consolidated-grades" element={<ConsolidatedGrades />} />

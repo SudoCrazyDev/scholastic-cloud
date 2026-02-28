@@ -1,4 +1,5 @@
 export { StudentGrid } from './StudentGrid'
 export { StudentHeader } from './StudentHeader'
-export { StudentModal } from './StudentModal' 
+export { StudentModal } from './StudentModal'
+export { StudentPasswordResetModal } from './StudentPasswordResetModal'
 export { StudentFinanceTab } from './StudentFinanceTab'

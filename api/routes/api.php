@@ -111,6 +111,8 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'destroy']);
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
+    Route::post('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'store']);
+    Route::get('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'show']);
     Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger']);
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);

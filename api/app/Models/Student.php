@@ -86,6 +86,14 @@ class Student extends Model
     }
 
     /**
+     * Student auth credentials for direct student portal login (email/password).
+     */
+    public function studentAuth()
+    {
+        return $this->hasOne(StudentAuth::class);
+    }
+
+    /**
      * Assessment attempts (quiz/assignment/exam) for live scoring.
      */
     public function assessmentAttempts()

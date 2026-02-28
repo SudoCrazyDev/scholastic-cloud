@@ -64,23 +64,31 @@ export const useAuthState = () => {
     localStorage.setItem('auth_token', loginData.token);
     localStorage.setItem('token_expiry', loginData.token_expiry);
 
+    // If login response includes user (e.g. student login), set role as student directly
+    if (loginData.user) {
+      setUser(loginData.user);
+      localStorage.setItem('auth_user', JSON.stringify(loginData.user));
+    }
+
     try {
-      // Fetch user data separately
+      // Fetch full profile (for staff; for students this refreshes with same role)
       const userData = await authService.getProfile();
       setUser(userData);
       localStorage.setItem('auth_user', JSON.stringify(userData));
     } catch (error) {
       console.error('Failed to fetch user profile after login:', error);
-      // Create a fallback user object with basic info
-      const fallbackUser = {
-        id: 'unknown',
-        first_name: 'User',
-        last_name: '',
-        email: 'user@example.com',
-        role: { title: 'User', slug: 'user' }
-      };
-      setUser(fallbackUser);
-      localStorage.setItem('auth_user', JSON.stringify(fallbackUser));
+      // If we already set user from login response (e.g. student), keep it; otherwise fallback
+      if (!loginData.user) {
+        const fallbackUser = {
+          id: 'unknown',
+          first_name: 'User',
+          last_name: '',
+          email: 'user@example.com',
+          role: { title: 'User', slug: 'user' }
+        };
+        setUser(fallbackUser);
+        localStorage.setItem('auth_user', JSON.stringify(fallbackUser));
+      }
     }
   };
 

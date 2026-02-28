@@ -1,4 +1,4 @@
-import { StudentHeader, StudentGrid, StudentModal } from './components'
+import { StudentHeader, StudentGrid, StudentModal, StudentPasswordResetModal } from './components'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { useStudents } from '../../hooks/useStudents'
 import { Toaster } from 'react-hot-toast'
@@ -19,6 +19,9 @@ export default function Students() {
     handleCreate,
     handleView,
     handleEdit,
+    handlePasswordReset,
+    handlePasswordResetClose,
+    passwordResetStudent,
     handleDelete,
     handleBulkDelete,
     handleModalSubmit,
@@ -81,6 +84,7 @@ export default function Students() {
           onSelectionChange={setSelectedRows}
           onView={handleView}
           onEdit={handleEdit}
+          onPasswordReset={handlePasswordReset}
           onDelete={handleDelete}
         />
 
@@ -117,6 +121,13 @@ export default function Students() {
           student={editingStudent}
           loading={modalLoading}
           error={modalError}
+        />
+
+        {/* Password Reset Modal */}
+        <StudentPasswordResetModal
+          isOpen={Boolean(passwordResetStudent)}
+          onClose={handlePasswordResetClose}
+          student={passwordResetStudent}
         />
 
         {/* Delete Confirmation Modal */}

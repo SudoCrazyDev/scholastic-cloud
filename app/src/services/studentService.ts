@@ -159,6 +159,28 @@ class StudentService {
     const response = await api.delete<{ success: boolean; message: string }>(`/student-sections/${studentSectionId}`)
     return response.data
   }
+
+  /** Get student auth (portal login) — 404 if none. */
+  async getStudentAuth(studentId: string) {
+    const response = await api.get<{
+      success: boolean
+      data: { student_id: string; email: string; is_new: boolean }
+    }>(`${this.baseUrl}/${studentId}/auth`)
+    return response.data
+  }
+
+  /** Create or update student auth (email, hashed password, is_new). */
+  async createOrUpdateStudentAuth(
+    studentId: string,
+    payload: { email: string; password: string; is_new?: boolean }
+  ) {
+    const response = await api.post<{
+      success: boolean
+      message: string
+      data: { student_id: string; email: string; is_new: boolean }
+    }>(`${this.baseUrl}/${studentId}/auth`, payload)
+    return response.data
+  }
 }
 
 export const studentService = new StudentService() 

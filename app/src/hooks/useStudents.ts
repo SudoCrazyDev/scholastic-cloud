@@ -15,6 +15,7 @@ export function useStudents(options?: { class_section_id?: string }) {
   const [selectedRows, setSelectedRows] = useState<Student[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
+  const [passwordResetStudent, setPasswordResetStudent] = useState<Student | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState({
     isOpen: false,
     student: null as Student | null,
@@ -225,6 +226,14 @@ export function useStudents(options?: { class_section_id?: string }) {
     setIsModalOpen(true)
   }, [])
 
+  const handlePasswordReset = useCallback((student: Student) => {
+    setPasswordResetStudent(student)
+  }, [])
+
+  const handlePasswordResetClose = useCallback(() => {
+    setPasswordResetStudent(null)
+  }, [])
+
   return {
     students,
     loading,
@@ -240,6 +249,9 @@ export function useStudents(options?: { class_section_id?: string }) {
     handleCreate,
     handleView,
     handleEdit,
+    handlePasswordReset,
+    handlePasswordResetClose,
+    passwordResetStudent,
     handleDelete,
     handleBulkDelete,
     handleModalSubmit,

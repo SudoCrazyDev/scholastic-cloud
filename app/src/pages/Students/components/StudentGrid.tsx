@@ -6,7 +6,8 @@ import {
   UserIcon,
   CalendarIcon,
   AcademicCapIcon,
-  PencilIcon
+  PencilIcon,
+  KeyIcon
 } from '@heroicons/react/24/outline'
 import { Checkbox } from '../../../components/checkbox'
 import { Badge } from '../../../components/badge'
@@ -20,6 +21,7 @@ interface StudentGridProps {
   onSelectionChange: (students: Student[]) => void
   onView: (student: Student) => void
   onEdit: (student: Student) => void
+  onPasswordReset: (student: Student) => void
   onDelete: (student: Student) => void
 }
 
@@ -31,6 +33,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
   onSelectionChange,
   onView,
   onEdit,
+  onPasswordReset,
   onDelete,
 }) => {
   const handleSelectAll = (checked: boolean) => {
@@ -226,6 +229,13 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 title="Edit student"
               >
                 <PencilIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onPasswordReset(student)}
+                className="p-1 text-gray-400 hover:text-amber-600 transition-colors"
+                title="Reset portal password"
+              >
+                <KeyIcon className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onDelete(student)}
