@@ -10,6 +10,13 @@ import {
   DocumentTextIcon,
   CalendarDaysIcon,
   ClockIcon,
+  AcademicCapIcon,
+  PencilSquareIcon,
+  BookOpenIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  LightBulbIcon,
+  ListBulletIcon,
 } from '@heroicons/react/24/outline'
 import {
   DndContext,
@@ -69,26 +76,86 @@ interface BuilderDraft {
   questions: AssessmentMethodQuestion[]
 }
 
+type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>
+
 const CANVAS_DROP_ID = 'assessment-method-question-canvas'
 const PALETTE_PREFIX = 'assessment-palette::'
 
-const TYPE_OPTIONS: Array<{ id: AssessmentMethodType; label: string }> = [
-  { id: 'quiz', label: 'Quiz' },
-  { id: 'assignment', label: 'Assignment' },
-  { id: 'exam', label: 'Exam' },
+const TYPE_OPTIONS: Array<{
+  id: AssessmentMethodType
+  label: string
+  icon: IconType
+  accentClass: string
+}> = [
+  {
+    id: 'quiz',
+    label: 'Quiz',
+    icon: AcademicCapIcon,
+    accentClass: 'text-indigo-700 bg-indigo-100 border-indigo-200',
+  },
+  {
+    id: 'assignment',
+    label: 'Assignment',
+    icon: PencilSquareIcon,
+    accentClass: 'text-emerald-700 bg-emerald-100 border-emerald-200',
+  },
+  {
+    id: 'exam',
+    label: 'Exam',
+    icon: BookOpenIcon,
+    accentClass: 'text-violet-700 bg-violet-100 border-violet-200',
+  },
 ]
 
 const QUESTION_TYPE_OPTIONS: Array<{
   type: AssessmentQuestionType
   label: string
   hint: string
+  icon: IconType
+  accentClass: string
 }> = [
-  { type: 'single_choice', label: 'Multiple Choice', hint: 'One correct option' },
-  { type: 'multiple_choice', label: 'Multiple Response', hint: 'Many correct options' },
-  { type: 'true_false', label: 'True / False', hint: 'Binary answer' },
-  { type: 'fill_in_the_blanks', label: 'Fill in the Blanks', hint: 'Ordered blank answers' },
-  { type: 'short_answer', label: 'Short Answer', hint: 'Short text response' },
-  { type: 'essay', label: 'Essay', hint: 'Long-form response' },
+  {
+    type: 'single_choice',
+    label: 'Multiple Choice',
+    hint: 'One correct option',
+    icon: ListBulletIcon,
+    accentClass: 'text-indigo-700 bg-indigo-100 border-indigo-200',
+  },
+  {
+    type: 'multiple_choice',
+    label: 'Multiple Response',
+    hint: 'Many correct options',
+    icon: CheckCircleIcon,
+    accentClass: 'text-sky-700 bg-sky-100 border-sky-200',
+  },
+  {
+    type: 'true_false',
+    label: 'True / False',
+    hint: 'Binary answer',
+    icon: ExclamationTriangleIcon,
+    accentClass: 'text-amber-700 bg-amber-100 border-amber-200',
+  },
+  {
+    type: 'fill_in_the_blanks',
+    label: 'Fill in the Blanks',
+    hint: 'Ordered blank answers',
+    icon: DocumentTextIcon,
+    accentClass: 'text-violet-700 bg-violet-100 border-violet-200',
+  },
+  {
+    type: 'short_answer',
+    label: 'Short Answer',
+    hint: 'Short text response',
+    icon: PencilSquareIcon,
+    accentClass: 'text-emerald-700 bg-emerald-100 border-emerald-200',
+  },
+  {
+    type: 'essay',
+    label: 'Essay',
+    hint: 'Long-form response',
+    icon: BookOpenIcon,
+    accentClass: 'text-rose-700 bg-rose-100 border-rose-200',
+  },
 ]
 
 const QUESTION_TYPE_LABELS: Record<AssessmentQuestionType, string> = {
@@ -99,6 +166,12 @@ const QUESTION_TYPE_LABELS: Record<AssessmentQuestionType, string> = {
   short_answer: 'Short Answer',
   essay: 'Essay',
 }
+
+const getTypeOption = (type: AssessmentMethodType) =>
+  TYPE_OPTIONS.find((option) => option.id === type) ?? TYPE_OPTIONS[0]
+
+const getQuestionTypeOption = (type: AssessmentQuestionType) =>
+  QUESTION_TYPE_OPTIONS.find((option) => option.type === type) ?? QUESTION_TYPE_OPTIONS[0]
 
 const toDateTimeLocal = (value: string | null | undefined): string => {
   if (!value) return ''
@@ -215,7 +288,9 @@ const PaletteCard: React.FC<{
   type: AssessmentQuestionType
   label: string
   hint: string
-}> = ({ type, label, hint }) => {
+  icon: IconType
+  accentClass: string
+}> = ({ type, label, hint, icon: Icon, accentClass }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: paletteCardId(type),
   })
@@ -232,8 +307,20 @@ const PaletteCard: React.FC<{
       {...attributes}
       {...listeners}
     >
-      <p className="text-sm font-semibold text-gray-900">{label}</p>
-      <p className="mt-1 text-xs text-gray-500">{hint}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3">
+          <div className={clsx('mt-0.5 rounded-lg border p-1.5', accentClass)}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{label}</p>
+            <p className="mt-1 text-xs text-gray-500">{hint}</p>
+          </div>
+        </div>
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-1 text-gray-400">
+          <Bars3Icon className="h-3.5 w-3.5" />
+        </div>
+      </div>
     </button>
   )
 }
@@ -276,6 +363,8 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: question.id,
   })
+  const questionMeta = getQuestionTypeOption(question.type)
+  const QuestionIcon = questionMeta.icon
 
   return (
     <div
@@ -301,7 +390,10 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
             <Bars3Icon className="h-4 w-4" />
           </button>
           <span className="text-sm font-semibold text-gray-900">Question {index + 1}</span>
-          <Badge color="indigo">{QUESTION_TYPE_LABELS[question.type]}</Badge>
+          <Badge color="indigo">
+            <QuestionIcon className="h-3.5 w-3.5" />
+            {QUESTION_TYPE_LABELS[question.type]}
+          </Badge>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-40">
@@ -687,7 +779,13 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
     <div className="space-y-4">
       {!firstEcrId && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+          <div className="mb-1 inline-flex items-center gap-1 font-semibold">
+            <ExclamationTriangleIcon className="h-4 w-4" />
+            Setup required
+          </div>
+          <div>
           Create your <strong>Components of Summative Assessment</strong> first so assessment methods can be attached to an ECR component.
+          </div>
         </div>
       )}
 
@@ -699,12 +797,13 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
               type="button"
               onClick={() => setActiveType(option.id)}
               className={clsx(
-                'rounded-lg px-4 py-2 text-sm font-medium transition',
+                'inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition',
                 activeType === option.id
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-transparent bg-gray-100 text-gray-700 hover:bg-gray-200'
               )}
             >
+              <option.icon className="h-4 w-4" />
               {option.label}
             </button>
           ))}
@@ -721,15 +820,21 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
       </div>
 
       {isLoading ? (
-        <div className="py-10 text-center text-sm text-gray-500">Loading assessment methods...</div>
+        <div className="py-10 text-center text-sm text-gray-500">
+          <ClockIcon className="mx-auto mb-2 h-5 w-5 animate-pulse text-gray-400" />
+          Loading assessment methods...
+        </div>
       ) : methods.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-10 text-center text-sm text-gray-500">
+          {React.createElement(getTypeOption(activeType).icon, { className: 'mx-auto mb-2 h-6 w-6 text-gray-400' })}
           No {activeType}s yet. Create one and build questions with drag and drop.
         </div>
       ) : (
         <ul className="space-y-3">
           {methods.map((method) => {
             const points = method.questions.reduce((sum, question) => sum + question.points, 0)
+            const typeMeta = getTypeOption(method.type)
+            const TypeIcon = typeMeta.icon
             return (
               <li
                 key={method.id}
@@ -738,9 +843,21 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      <div className={clsx('rounded-lg border p-1.5', typeMeta.accentClass)}>
+                        <TypeIcon className="h-4 w-4" />
+                      </div>
                       <h4 className="truncate font-semibold text-gray-900">{method.title}</h4>
                       <Badge color={method.status === 'published' ? 'green' : 'amber'}>
+                        {method.status === 'published' ? (
+                          <CheckCircleIcon className="h-3.5 w-3.5" />
+                        ) : (
+                          <PencilSquareIcon className="h-3.5 w-3.5" />
+                        )}
                         {method.status === 'published' ? 'Published' : 'Draft'}
+                      </Badge>
+                      <Badge color="blue">
+                        <TypeIcon className="h-3.5 w-3.5" />
+                        {typeMeta.label}
                       </Badge>
                       <Badge color="zinc">Q{method.quarter}</Badge>
                     </div>
@@ -795,14 +912,41 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
       {builderOpen && draft && (
         <div className="fixed inset-0 z-50 bg-black/50">
           <div className="absolute inset-0 flex flex-col bg-white">
-            <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-indigo-50 via-white to-white px-6 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {draft.id ? 'Edit' : 'Create'} {draft.type.charAt(0).toUpperCase() + draft.type.slice(1)}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Tutor-style builder: drag question types into canvas, then configure details.
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className={clsx('rounded-lg border p-1.5', getTypeOption(draft.type).accentClass)}>
+                    {React.createElement(getTypeOption(draft.type).icon, { className: 'h-4 w-4' })}
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {draft.id ? 'Edit' : 'Create'} {draft.type.charAt(0).toUpperCase() + draft.type.slice(1)}
+                  </h3>
+                  <Badge color={draft.status === 'published' ? 'green' : 'amber'}>
+                    {draft.status === 'published' ? (
+                      <CheckCircleIcon className="h-3.5 w-3.5" />
+                    ) : (
+                      <PencilSquareIcon className="h-3.5 w-3.5" />
+                    )}
+                    {draft.status === 'published' ? 'Published' : 'Draft'}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  Drag question types into the canvas, then configure scoring and assessment rules.
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                    <DocumentTextIcon className="h-3.5 w-3.5" />
+                    {draft.questions.length} question(s)
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+                    <ClockIcon className="h-3.5 w-3.5" />
+                    {totalPoints} point(s)
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                    <CheckCircleIcon className="h-3.5 w-3.5" />
+                    {validationErrors.length === 0 ? 'Ready to save' : `${validationErrors.length} issue(s)`}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button type="button" variant="outline" onClick={closeBuilder}>
@@ -829,7 +973,12 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
             >
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 bg-gray-50 p-4 lg:grid-cols-[18rem_minmax(0,1fr)_22rem]">
                 <aside className="min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
-                  <h4 className="text-sm font-semibold text-gray-900">Question Types</h4>
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-1.5 text-indigo-700">
+                      <LightBulbIcon className="h-4 w-4" />
+                    </div>
+                    <h4 className="text-sm font-semibold text-gray-900">Question Types</h4>
+                  </div>
                   <p className="mt-1 text-xs text-gray-500">
                     Drag any block into the canvas.
                   </p>
@@ -840,6 +989,8 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                         type={option.type}
                         label={option.label}
                         hint={option.hint}
+                        icon={option.icon}
+                        accentClass={option.accentClass}
                       />
                     ))}
                   </div>
@@ -932,7 +1083,12 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                 />
 
                 <aside className="min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
-                  <h4 className="text-sm font-semibold text-gray-900">Assessment Settings</h4>
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-700">
+                      <PencilSquareIcon className="h-4 w-4" />
+                    </div>
+                    <h4 className="text-sm font-semibold text-gray-900">Assessment Settings</h4>
+                  </div>
                   <div className="mt-4 space-y-4">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-gray-600">Assessment Type</label>
@@ -1013,7 +1169,10 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     </div>
 
                     <div className="rounded-lg border border-gray-200 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Schedule</p>
+                      <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <CalendarDaysIcon className="h-3.5 w-3.5" />
+                        Schedule
+                      </p>
                       <div className="mt-3 space-y-2">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-gray-600">Scheduled Date</label>
@@ -1072,7 +1231,10 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     </div>
 
                     <div className="rounded-lg border border-gray-200 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Rules</p>
+                      <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <ClockIcon className="h-3.5 w-3.5" />
+                        Rules
+                      </p>
                       <div className="mt-3 space-y-2">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-gray-600">Max Attempts</label>
@@ -1149,7 +1311,10 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     </div>
 
                     <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Summary</p>
+                      <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                        <DocumentTextIcon className="h-3.5 w-3.5" />
+                        Summary
+                      </p>
                       <p className="mt-1 text-sm text-indigo-800">{draft.questions.length} question(s)</p>
                       <p className="text-sm text-indigo-800">{totalPoints} total point(s)</p>
                     </div>
@@ -1159,7 +1324,8 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
 
               <DragOverlay>
                 {currentDragType ? (
-                  <div className="rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 shadow">
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 shadow">
+                    {React.createElement(getQuestionTypeOption(currentDragType).icon, { className: 'h-4 w-4' })}
                     {QUESTION_TYPE_LABELS[currentDragType]}
                   </div>
                 ) : null}
@@ -1168,6 +1334,10 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
 
             {validationErrors.length > 0 && (
               <div className="border-t border-red-100 bg-red-50 px-6 py-3">
+                <div className="mb-1 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-red-700">
+                  <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                  Validation Issues
+                </div>
                 <ul className="list-disc space-y-1 pl-5 text-xs text-red-700">
                   {validationErrors.slice(0, 4).map((error) => (
                     <li key={error}>{error}</li>
@@ -1226,13 +1396,19 @@ const CanvasPanel: React.FC<{
     >
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-gray-900">Question Canvas</h4>
+          <h4 className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
+            <div className="rounded-lg border border-sky-200 bg-sky-50 p-1 text-sky-700">
+              <DocumentTextIcon className="h-3.5 w-3.5" />
+            </div>
+            Question Canvas
+          </h4>
           <p className="text-xs text-gray-500">Drop blocks here, then reorder and configure.</p>
         </div>
       </div>
 
       {draft.questions.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-10 text-center text-sm text-gray-500">
+          <DocumentTextIcon className="mx-auto mb-2 h-6 w-6 text-gray-400" />
           Drag question types from the left panel into this canvas.
         </div>
       ) : (
