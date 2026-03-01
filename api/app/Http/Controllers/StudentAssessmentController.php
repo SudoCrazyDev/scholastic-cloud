@@ -6,6 +6,9 @@ use App\Auth\StudentPortalUser;
 use App\Models\Student;
 use App\Models\StudentAssessmentAttempt;
 use App\Models\StudentEcrItemScore;
+use App\Models\StudentSection;
+use App\Models\StudentSubject;
+use App\Models\Subject;
 use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
 use App\Services\RunningGradeRecalcService;
@@ -53,7 +56,7 @@ class StudentAssessmentController extends Controller
             ], 403);
         }
 
-        $subjectIds = $student->subjects()->pluck('subjects.id')->toArray();
+        $subjectIds = $this->eligibleSubjectIds($student);
         if (empty($subjectIds)) {
             return response()->json(['success' => true, 'data' => []]);
         }
@@ -66,7 +69,11 @@ class StudentAssessmentController extends Controller
         $items = SubjectEcrItem::with(['subjectEcr.subject'])
             ->whereIn('subject_ecr_id', $ecrIds)
             ->whereIn('type', ['quiz', 'assignment', 'exam'])
-            ->where('status', 'published')
+            ->where(function ($q) {
+                // Backward-compatible: legacy rows may have NULL status but should behave as published.
+                $q->where('status', 'published')
+                    ->orWhereNull('status');
+            })
             ->orderBy('scheduled_date')
             ->orderBy('created_at')
             ->get();
@@ -151,7 +158,8 @@ class StudentAssessmentController extends Controller
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
-        if (!$subjectId || !$student->subjects()->where('subjects.id', $subjectId)->exists()) {
+        $eligibleSubjectIds = $this->eligibleSubjectIds($student);
+        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -233,7 +241,8 @@ class StudentAssessmentController extends Controller
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
-        if (!$subjectId || !$student->subjects()->where('subjects.id', $subjectId)->exists()) {
+        $eligibleSubjectIds = $this->eligibleSubjectIds($student);
+        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -316,7 +325,8 @@ class StudentAssessmentController extends Controller
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
-        if (!$subjectId || !$student->subjects()->where('subjects.id', $subjectId)->exists()) {
+        $eligibleSubjectIds = $this->eligibleSubjectIds($student);
+        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -519,6 +529,49 @@ class StudentAssessmentController extends Controller
             return strtoupper(substr($v, 0, 1));
         };
         return $normalize($correct) === $normalize($given);
+    }
+
+    /**
+     * Resolve subjects a student can access:
+     * - non-limited subjects from active class sections
+     * - limited subjects only when explicitly assigned via student_subjects
+     * - plus explicit active assignments as fallback for migrated/legacy data.
+     */
+    private function eligibleSubjectIds(Student $student): array
+    {
+        $activeSectionIds = StudentSection::where('student_id', $student->id)
+            ->where('is_active', true)
+            ->pluck('section_id')
+            ->toArray();
+
+        $explicitAssignedSubjectIds = StudentSubject::where('student_id', $student->id)
+            ->where('is_active', true)
+            ->pluck('subject_id')
+            ->toArray();
+
+        if (empty($activeSectionIds)) {
+            return array_values(array_unique($explicitAssignedSubjectIds));
+        }
+
+        $sectionSubjectIds = Subject::whereIn('class_section_id', $activeSectionIds)
+            ->where(function ($query) use ($student) {
+                $query
+                    ->where(function ($q) {
+                        $q->where('is_limited_student', false)
+                            ->orWhereNull('is_limited_student');
+                    })
+                    ->orWhere(function ($q) use ($student) {
+                        $q->where('is_limited_student', true)
+                            ->whereHas('studentSubjects', function ($sq) use ($student) {
+                                $sq->where('student_id', $student->id)
+                                    ->where('is_active', true);
+                            });
+                    });
+            })
+            ->pluck('id')
+            ->toArray();
+
+        return array_values(array_unique(array_merge($sectionSubjectIds, $explicitAssignedSubjectIds)));
     }
 
     private function isSupportedAssessmentItem(?SubjectEcrItem $item): bool
