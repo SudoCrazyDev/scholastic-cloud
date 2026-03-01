@@ -4,6 +4,7 @@ import { QueryProvider } from './providers/QueryProvider';
 import { AuthProvider } from './providers/AuthProvider';
 import PublicLayout from './components/layouts/PublicLayout';
 import PrivateLayout from './components/layouts/PrivateLayout';
+import StudentOnlyRoute from './components/StudentOnlyRoute';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Institutions from './pages/Institutions';
@@ -68,8 +69,22 @@ function App() {
               <Route path="my-class-sections/:id" element={<ClassSectionDetail />} />
               <Route path="assigned-subjects" element={<AssignedSubjects />} />
               <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
-              <Route path="my-assessments" element={<MyAssessments />} />
-              <Route path="my-assessments/:id/take" element={<TakeAssessment />} />
+              <Route
+                path="my-assessments"
+                element={(
+                  <StudentOnlyRoute>
+                    <MyAssessments />
+                  </StudentOnlyRoute>
+                )}
+              />
+              <Route
+                path="my-assessments/:id/take"
+                element={(
+                  <StudentOnlyRoute>
+                    <TakeAssessment />
+                  </StudentOnlyRoute>
+                )}
+              />
               <Route path="my-personal-info" element={<MyPersonalInfo />} />
               <Route path="my-subjects" element={<MySubjects />} />
               <Route path="teacher-attendance" element={<TeacherAttendance />} />
