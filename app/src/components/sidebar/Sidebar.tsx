@@ -81,6 +81,13 @@ const menuItems: MenuItem[] = [
     allowedRoles: ['student'],
   },
   {
+    id: 'my-finance',
+    label: 'My Finance',
+    icon: <Wallet className="w-5 h-5" />,
+    path: '/my-finance',
+    allowedRoles: ['student'],
+  },
+  {
     id: 'users',
     label: 'Users',
     icon: <Users className="w-5 h-5" />,

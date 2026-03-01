@@ -36,6 +36,7 @@ import MyAssessments from './pages/MyAssessments';
 import { TakeAssessment } from './pages/MyAssessments';
 import MyPersonalInfo from './pages/MyPersonalInfo';
 import MySubjects from './pages/MySubjects';
+import MyFinance from './pages/MyFinance';
 
 
 function App() {
@@ -87,6 +88,14 @@ function App() {
               />
               <Route path="my-personal-info" element={<MyPersonalInfo />} />
               <Route path="my-subjects" element={<MySubjects />} />
+              <Route
+                path="my-finance"
+                element={(
+                  <StudentOnlyRoute>
+                    <MyFinance />
+                  </StudentOnlyRoute>
+                )}
+              />
               <Route path="teacher-attendance" element={<TeacherAttendance />} />
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
               <Route path="consolidated-grades" element={<ConsolidatedGrades />} />
