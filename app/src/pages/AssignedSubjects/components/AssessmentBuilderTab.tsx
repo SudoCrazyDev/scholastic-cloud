@@ -18,6 +18,7 @@ import {
   LightBulbIcon,
   ListBulletIcon,
 } from '@heroicons/react/24/outline'
+import { toast } from 'react-hot-toast'
 import {
   DndContext,
   DragOverlay,
@@ -54,6 +55,7 @@ import { Button } from '@/components/button'
 import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
 import { Switch } from '@/components/switch'
+import { Select } from '@/components/select'
 
 interface AssessmentBuilderTabProps {
   subjectId: string
@@ -166,6 +168,26 @@ const QUESTION_TYPE_LABELS: Record<AssessmentQuestionType, string> = {
   short_answer: 'Short Answer',
   essay: 'Essay',
 }
+
+const QUESTION_TYPE_SELECT_OPTIONS = QUESTION_TYPE_OPTIONS.map((option) => ({
+  value: option.type,
+  label: option.label,
+}))
+
+const ASSESSMENT_TYPE_SELECT_OPTIONS = TYPE_OPTIONS.map((option) => ({
+  value: option.id,
+  label: option.label,
+}))
+
+const QUARTER_SELECT_OPTIONS = ['1', '2', '3', '4'].map((quarter) => ({
+  value: quarter,
+  label: `Q${quarter}`,
+}))
+
+const STATUS_SELECT_OPTIONS: Array<{ value: AssessmentPublishStatus; label: string }> = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'published', label: 'Published' },
+]
 
 const getTypeOption = (type: AssessmentMethodType) =>
   TYPE_OPTIONS.find((option) => option.id === type) ?? TYPE_OPTIONS[0]
@@ -398,17 +420,12 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
         <div className="flex items-center gap-2">
           <div className="w-40">
             <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
-            <select
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            <Select
               value={question.type}
               onChange={(event) => onTypeChange(question.id, event.target.value as AssessmentQuestionType)}
-            >
-              {QUESTION_TYPE_OPTIONS.map((option) => (
-                <option key={option.type} value={option.type}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={QUESTION_TYPE_SELECT_OPTIONS}
+              className="w-full"
+            />
           </div>
           <div className="w-24">
             <label className="mb-1 block text-xs font-medium text-gray-600">Points</label>
@@ -587,22 +604,37 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
     enabled: !!subjectId,
   })
 
+  const labelForType = (type: AssessmentMethodType) =>
+    TYPE_OPTIONS.find((option) => option.id === type)?.label ?? 'Assessment'
+  const messageFromError = (error: unknown, fallback: string) =>
+    (error as any)?.response?.data?.message ||
+    (error as any)?.message ||
+    fallback
+
   const saveCreateMutation = useMutation({
     mutationFn: (payload: AssessmentMethodInput) => assessmentMethodService.create(payload),
-    onSuccess: () => {
+    onSuccess: (_, payload) => {
+      toast.success(`${labelForType(payload.type)} saved successfully!`)
       queryClient.invalidateQueries({ queryKey: ['assessment-methods', subjectId] })
       setBuilderOpen(false)
       setDraft(null)
+    },
+    onError: (error, payload) => {
+      toast.error(messageFromError(error, `Failed to save ${labelForType(payload.type)}.`))
     },
   })
 
   const saveUpdateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AssessmentMethodInput }) =>
       assessmentMethodService.update(id, payload),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success(`${labelForType(variables.payload.type)} updated successfully!`)
       queryClient.invalidateQueries({ queryKey: ['assessment-methods', subjectId] })
       setBuilderOpen(false)
       setDraft(null)
+    },
+    onError: (error, variables) => {
+      toast.error(messageFromError(error, `Failed to update ${labelForType(variables.payload.type)}.`))
     },
   })
 
@@ -1092,8 +1124,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                   <div className="mt-4 space-y-4">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-gray-600">Assessment Type</label>
-                      <select
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      <Select
                         value={draft.type}
                         onChange={(event) => {
                           const nextType = event.target.value as AssessmentMethodType
@@ -1103,13 +1134,9 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                             rules: { ...DEFAULT_RULES_BY_TYPE[nextType] },
                           }))
                         }}
-                      >
-                        {TYPE_OPTIONS.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        options={ASSESSMENT_TYPE_SELECT_OPTIONS}
+                        className="w-full"
+                      />
                     </div>
 
                     <Input
@@ -1136,24 +1163,18 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="mb-1 block text-xs font-medium text-gray-600">Quarter</label>
-                        <select
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        <Select
                           value={draft.quarter}
                           onChange={(event) =>
                             updateDraft((current) => ({ ...current, quarter: event.target.value }))
                           }
-                        >
-                          {['1', '2', '3', '4'].map((quarter) => (
-                            <option key={quarter} value={quarter}>
-                              Q{quarter}
-                            </option>
-                          ))}
-                        </select>
+                          options={QUARTER_SELECT_OPTIONS}
+                          className="w-full"
+                        />
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-gray-600">Status</label>
-                        <select
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        <Select
                           value={draft.status}
                           onChange={(event) =>
                             updateDraft((current) => ({
@@ -1161,10 +1182,9 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                               status: event.target.value as AssessmentPublishStatus,
                             }))
                           }
-                        >
-                          <option value="draft">Draft</option>
-                          <option value="published">Published</option>
-                        </select>
+                          options={STATUS_SELECT_OPTIONS}
+                          className="w-full"
+                        />
                       </div>
                     </div>
 
