@@ -88,11 +88,12 @@ class StudentAssessmentController extends Controller
 
         $data = $items->map(function (SubjectEcrItem $item) use ($attempts) {
             $group = $attempts->get($item->id) ?? collect();
-            $attempt = $group->first();
+            $latestSubmitted = $group->first(fn (StudentAssessmentAttempt $a) => $a->submitted_at !== null);
             $rules = $this->assessmentRules($item);
             $submittedCount = $group->whereNotNull('submitted_at')->count();
             $inProgress = $group->first(fn (StudentAssessmentAttempt $a) => $a->submitted_at === null);
-            $canRetake = $submittedCount < $rules['max_attempts'];
+            $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
+            $canRetake = $submittedCount < $attemptsAllowed;
             $hasQuestions = !empty($item->content['questions'] ?? []);
             $status = 'not_started';
             $score = null;
@@ -101,15 +102,15 @@ class StudentAssessmentController extends Controller
 
             if ($inProgress) {
                 $status = 'in_progress';
-            } elseif ($attempt && $attempt->submitted_at && !$canRetake) {
+            } elseif ($latestSubmitted && !$canRetake) {
                 $status = 'submitted';
-                $score = $attempt->score;
-                $maxScore = $attempt->max_score;
-                $submittedAt = $attempt->submitted_at?->toIso8601String();
-            } elseif ($attempt && $attempt->submitted_at) {
-                $score = $attempt->score;
-                $maxScore = $attempt->max_score;
-                $submittedAt = $attempt->submitted_at?->toIso8601String();
+                $score = $latestSubmitted->score;
+                $maxScore = $latestSubmitted->max_score;
+                $submittedAt = $latestSubmitted->submitted_at?->toIso8601String();
+            } elseif ($latestSubmitted) {
+                $score = $latestSubmitted->score;
+                $maxScore = $latestSubmitted->max_score;
+                $submittedAt = $latestSubmitted->submitted_at?->toIso8601String();
             }
 
             return [
@@ -133,7 +134,7 @@ class StudentAssessmentController extends Controller
                 'attempt_max_score' => $maxScore,
                 'attempt_submitted_at' => $submittedAt,
                 'attempts_used' => $submittedCount,
-                'attempts_allowed' => $rules['max_attempts'],
+                'attempts_allowed' => $attemptsAllowed,
                 'can_retake' => $canRetake,
             ];
         });
@@ -163,16 +164,25 @@ class StudentAssessmentController extends Controller
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
-        $attempt = StudentAssessmentAttempt::where('student_id', $student->id)
-            ->where('subject_ecr_item_id', $item->id)
-            ->latest('updated_at')
-            ->first();
-
         $rules = $this->assessmentRules($item);
+        $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
         $submittedCount = StudentAssessmentAttempt::where('student_id', $student->id)
             ->where('subject_ecr_item_id', $item->id)
             ->whereNotNull('submitted_at')
             ->count();
+        $canRetake = $submittedCount < $attemptsAllowed;
+
+        $inProgressAttempt = StudentAssessmentAttempt::where('student_id', $student->id)
+            ->where('subject_ecr_item_id', $item->id)
+            ->whereNull('submitted_at')
+            ->latest('updated_at')
+            ->first();
+
+        $latestSubmittedAttempt = StudentAssessmentAttempt::where('student_id', $student->id)
+            ->where('subject_ecr_item_id', $item->id)
+            ->whereNotNull('submitted_at')
+            ->latest('submitted_at')
+            ->first();
 
         $payload = [
             'id' => $item->id,
@@ -189,7 +199,7 @@ class StudentAssessmentController extends Controller
             'due_at' => $item->due_at?->toIso8601String(),
             'allow_late_submission' => (bool) $item->allow_late_submission,
             'attempts_used' => $submittedCount,
-            'attempts_allowed' => $rules['max_attempts'],
+            'attempts_allowed' => $attemptsAllowed,
         ];
 
         $questions = $item->content['questions'] ?? [];
@@ -201,24 +211,37 @@ class StudentAssessmentController extends Controller
             $payload['max_score_possible'] = (float) $item->score;
         }
 
-        if ($attempt) {
+        if ($inProgressAttempt) {
             $payload['attempt'] = [
-                'id' => $attempt->id,
-                'started_at' => $attempt->started_at?->toIso8601String(),
-                'submitted_at' => $attempt->submitted_at?->toIso8601String(),
-                'score' => $attempt->score,
-                'max_score' => $attempt->max_score,
-                'answers' => $attempt->answers,
+                'id' => $inProgressAttempt->id,
+                'started_at' => $inProgressAttempt->started_at?->toIso8601String(),
+                'submitted_at' => $inProgressAttempt->submitted_at?->toIso8601String(),
+                'score' => $inProgressAttempt->score,
+                'max_score' => $inProgressAttempt->max_score,
+                'answers' => $inProgressAttempt->answers,
             ];
-            if ($attempt->submitted_at) {
-                $payload['attempt_status'] = 'submitted';
-            } else {
-                $payload['attempt_status'] = 'in_progress';
-                $payload['answers'] = $attempt->answers ?? [];
-            }
+            $payload['attempt_status'] = 'in_progress';
+            $payload['answers'] = $inProgressAttempt->answers ?? [];
+        } elseif ($latestSubmittedAttempt && !$canRetake) {
+            $payload['attempt'] = [
+                'id' => $latestSubmittedAttempt->id,
+                'started_at' => $latestSubmittedAttempt->started_at?->toIso8601String(),
+                'submitted_at' => $latestSubmittedAttempt->submitted_at?->toIso8601String(),
+                'score' => $latestSubmittedAttempt->score,
+                'max_score' => $latestSubmittedAttempt->max_score,
+                'answers' => $latestSubmittedAttempt->answers,
+            ];
+            $payload['attempt_status'] = 'submitted';
+            $payload['answers'] = [];
         } else {
             $payload['attempt_status'] = 'not_started';
-            $payload['attempt'] = null;
+            $payload['attempt'] = $latestSubmittedAttempt ? [
+                'id' => $latestSubmittedAttempt->id,
+                'started_at' => $latestSubmittedAttempt->started_at?->toIso8601String(),
+                'submitted_at' => $latestSubmittedAttempt->submitted_at?->toIso8601String(),
+                'score' => $latestSubmittedAttempt->score,
+                'max_score' => $latestSubmittedAttempt->max_score,
+            ] : null;
             $payload['answers'] = [];
         }
 
@@ -279,10 +302,14 @@ class StudentAssessmentController extends Controller
             ->where('subject_ecr_item_id', $item->id)
             ->whereNotNull('submitted_at')
             ->count();
-        if ($submittedCount >= $rules['max_attempts']) {
+        $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
+        if ($submittedCount >= $attemptsAllowed) {
+            $message = in_array($item->type, ['quiz', 'exam'], true)
+                ? 'You have already submitted this assessment. Answers can no longer be changed.'
+                : 'You have reached the maximum number of attempts for this assessment.';
             return response()->json([
                 'success' => false,
-                'message' => 'You have reached the maximum number of attempts for this assessment.',
+                'message' => $message,
             ], 422);
         }
 
@@ -335,6 +362,22 @@ class StudentAssessmentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $availabilityError,
+            ], 422);
+        }
+
+        $rules = $this->assessmentRules($item);
+        $submittedCount = StudentAssessmentAttempt::where('student_id', $student->id)
+            ->where('subject_ecr_item_id', $item->id)
+            ->whereNotNull('submitted_at')
+            ->count();
+        $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
+        if ($submittedCount >= $attemptsAllowed) {
+            $message = in_array($item->type, ['quiz', 'exam'], true)
+                ? 'You have already submitted this assessment. Answers can no longer be changed.'
+                : 'You have reached the maximum number of attempts for this assessment.';
+            return response()->json([
+                'success' => false,
+                'message' => $message,
             ], 422);
         }
 
@@ -602,6 +645,16 @@ class StudentAssessmentController extends Controller
                 : null,
             'randomize_questions' => (bool) ($merged['randomize_questions'] ?? false),
         ];
+    }
+
+    private function effectiveMaxAttempts(SubjectEcrItem $item, array $rules): int
+    {
+        // Business rule: quiz/exam answers are final after first submission.
+        if (in_array($item->type, ['quiz', 'exam'], true)) {
+            return 1;
+        }
+
+        return max(1, (int) ($rules['max_attempts'] ?? 1));
     }
 
     private function defaultRulesForType(string $type): array
