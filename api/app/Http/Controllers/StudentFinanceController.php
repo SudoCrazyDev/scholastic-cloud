@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Auth\StudentPortalUser;
 use App\Models\Student;
 use App\Models\StudentSection;
 use App\Models\SchoolFeeDefault;
@@ -17,6 +18,13 @@ class StudentFinanceController extends Controller
      */
     public function ledger(Request $request, string $studentId): JsonResponse
     {
+        if ($this->isStudentActor($request) && !$this->isSelfStudent($request, $studentId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students can only access their own ledger'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -193,6 +201,13 @@ class StudentFinanceController extends Controller
      */
     public function noticeOfAccount(Request $request, string $studentId): JsonResponse
     {
+        if ($this->isStudentActor($request) && !$this->isSelfStudent($request, $studentId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students can only access their own notice of account'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -323,6 +338,14 @@ class StudentFinanceController extends Controller
             return null;
         }
 
+        if ($user instanceof StudentPortalUser) {
+            return $user->student
+                ->studentInstitutions()
+                ->where('is_active', true)
+                ->value('institution_id')
+                ?? $user->student->studentInstitutions()->value('institution_id');
+        }
+
         $institutionId = $user->getDefaultInstitutionId();
         if (!$institutionId) {
             $firstUserInstitution = $user->userInstitutions()->first();
@@ -331,7 +354,49 @@ class StudentFinanceController extends Controller
             }
         }
 
+        if (!$institutionId && $this->isStudentActor($request)) {
+            $selfStudentId = $this->resolveSelfStudentId($request);
+            if ($selfStudentId) {
+                $selfStudent = Student::find($selfStudentId);
+                $institutionId = $selfStudent?->studentInstitutions()->value('institution_id');
+            }
+        }
+
         return $institutionId;
+    }
+
+    private function isStudentActor(Request $request): bool
+    {
+        $user = $request->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return true;
+        }
+
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+        return (string) ($role->slug ?? '') === 'student';
+    }
+
+    private function isSelfStudent(Request $request, string $studentId): bool
+    {
+        return $this->resolveSelfStudentId($request) === $studentId;
+    }
+
+    private function resolveSelfStudentId(Request $request): ?string
+    {
+        $user = $request->user();
+        if (!$user) {
+            return null;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return $user->student->id;
+        }
+
+        return Student::where('user_id', $user->id)->value('id');
     }
 
     private function getAvailableAcademicYears($studentSections)

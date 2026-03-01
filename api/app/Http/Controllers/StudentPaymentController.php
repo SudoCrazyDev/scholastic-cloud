@@ -5,10 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\SchoolFee;
 use App\Models\StudentPayment;
+use App\Auth\StudentPortalUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class StudentPaymentController extends Controller
 {
@@ -17,6 +17,13 @@ class StudentPaymentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to access cashier payment endpoints'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -73,6 +80,13 @@ class StudentPaymentController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to record payments manually'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -125,7 +139,7 @@ class StudentPaymentController extends Controller
             'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
             'payment_method' => $validated['payment_method'] ?? null,
             'reference_number' => $validated['reference_number'] ?? null,
-            'receipt_number' => $this->generateReceiptNumber(),
+            'receipt_number' => StudentPayment::generateUniqueReceiptNumber(),
             'remarks' => $validated['remarks'] ?? null,
             'received_by' => $request->user()?->id,
         ]);
@@ -144,6 +158,13 @@ class StudentPaymentController extends Controller
      */
     public function show(Request $request, string $id): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to access cashier payment endpoints'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -174,6 +195,13 @@ class StudentPaymentController extends Controller
      */
     public function receipt(Request $request, string $id): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to access cashier payment endpoints'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -204,16 +232,19 @@ class StudentPaymentController extends Controller
         ]);
     }
 
-    private function generateReceiptNumber(): string
+    private function isStudentUser(Request $request): bool
     {
-        $prefix = 'RCPT-' . now()->format('Ymd');
+        $user = $request->user();
+        if (!$user) {
+            return false;
+        }
 
-        do {
-            $receiptNumber = $prefix . '-' . Str::upper(Str::random(6));
-            $exists = StudentPayment::where('receipt_number', $receiptNumber)->exists();
-        } while ($exists);
+        if ($user instanceof StudentPortalUser) {
+            return true;
+        }
 
-        return $receiptNumber;
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+        return (string) ($role->slug ?? '') === 'student';
     }
 
     private function resolveInstitutionId(Request $request): ?string

@@ -5,12 +5,20 @@ import { CreditCardIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
+import { useAuth } from '../../../hooks/useAuth'
 import { schoolFeeService } from '../../../services/schoolFeeService'
 import { studentFinanceService } from '../../../services/studentFinanceService'
 import { studentDiscountService } from '../../../services/studentDiscountService'
 import { studentPaymentService } from '../../../services/studentPaymentService'
+import { studentOnlinePaymentService } from '../../../services/studentOnlinePaymentService'
 import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
-import type { CreateStudentDiscountData, CreateStudentPaymentData, Student, StudentPayment } from '../../../types'
+import type {
+  CreateStudentDiscountData,
+  CreateStudentPaymentData,
+  CreateStudentOnlinePaymentCheckoutData,
+  Student,
+  StudentPayment,
+} from '../../../types'
 
 interface StudentFinanceTabProps {
   student: Student
@@ -19,8 +27,11 @@ interface StudentFinanceTabProps {
 
 export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, studentId }) => {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const currentYear = new Date().getFullYear()
   const fallbackAcademicYear = `${currentYear}-${currentYear + 1}`
+  const roleSlug = user?.role?.slug
+  const isStudentUser = roleSlug === 'student'
 
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('')
   const [paymentForm, setPaymentForm] = useState({
@@ -33,6 +44,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   })
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [receipt, setReceipt] = useState<StudentPayment | null>(null)
+  const [onlinePaymentAmount, setOnlinePaymentAmount] = useState('')
+  const [onlinePaymentError, setOnlinePaymentError] = useState<string | null>(null)
+  const [onlinePaymentMessage, setOnlinePaymentMessage] = useState<string | null>(null)
   const [discountForm, setDiscountForm] = useState({
     discount_type: 'fixed',
     value: '',
@@ -44,6 +58,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const feesQuery = useQuery({
     queryKey: ['school-fees'],
     queryFn: () => schoolFeeService.getSchoolFees({ is_active: true }),
+    enabled: Boolean(roleSlug && !isStudentUser),
   })
 
   const ledgerQuery = useQuery({
@@ -62,11 +77,51 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     enabled: Boolean(studentId && resolvedAcademicYear),
   })
 
+  const onlinePaymentsQuery = useQuery({
+    queryKey: ['student-online-payments', studentId, resolvedAcademicYear],
+    queryFn: () =>
+      studentOnlinePaymentService.getTransactions({
+        academic_year: resolvedAcademicYear,
+      }),
+    enabled: Boolean(studentId && resolvedAcademicYear && isStudentUser),
+  })
+
   useEffect(() => {
     if (!selectedAcademicYear && ledgerData?.academic_year) {
       setSelectedAcademicYear(ledgerData.academic_year)
     }
   }, [ledgerData?.academic_year, selectedAcademicYear])
+
+  useEffect(() => {
+    if (!isStudentUser) return
+
+    const params = new URLSearchParams(window.location.search)
+    const paymentResult = params.get('payment_result')
+
+    if (paymentResult === 'success') {
+      setOnlinePaymentMessage('Payment completed. We are syncing your ledger now.')
+      setOnlinePaymentError(null)
+      queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+    } else if (paymentResult === 'failure') {
+      setOnlinePaymentError('Payment failed. You may retry the checkout.')
+      setOnlinePaymentMessage(null)
+    } else if (paymentResult === 'cancel') {
+      setOnlinePaymentMessage('Payment was cancelled.')
+      setOnlinePaymentError(null)
+    }
+  }, [isStudentUser, queryClient, studentId])
+
+  useEffect(() => {
+    if (!isStudentUser) return
+    if (onlinePaymentAmount) return
+
+    const balance = Number(ledgerData?.totals?.balance ?? 0)
+    if (balance > 0) {
+      setOnlinePaymentAmount(balance.toFixed(2))
+    }
+  }, [isStudentUser, ledgerData?.totals?.balance, onlinePaymentAmount])
 
   const academicYearOptions = useMemo(() => {
     const years = ledgerData?.available_academic_years?.length
@@ -93,6 +148,25 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     },
     onError: (error: any) => {
       setPaymentError(error.response?.data?.message || 'Failed to record payment.')
+    },
+  })
+
+  const createOnlinePaymentMutation = useMutation({
+    mutationFn: (payload: CreateStudentOnlinePaymentCheckoutData) =>
+      studentOnlinePaymentService.createCheckout(payload),
+    onSuccess: (response) => {
+      setOnlinePaymentError(null)
+      setOnlinePaymentMessage('Redirecting to Maya Checkout...')
+      const redirectUrl = response.data.redirect_url || response.data.checkout_url
+      if (redirectUrl) {
+        window.location.href = redirectUrl
+      } else {
+        setOnlinePaymentError('Checkout created but no redirect URL was returned.')
+      }
+    },
+    onError: (error: any) => {
+      setOnlinePaymentError(error.response?.data?.message || 'Failed to create online checkout.')
+      setOnlinePaymentMessage(null)
     },
   })
 
@@ -144,6 +218,41 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     createPaymentMutation.mutate(payload)
   }
 
+  const handleOnlinePaymentSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setOnlinePaymentError(null)
+    setOnlinePaymentMessage(null)
+
+    const amountValue = Number(onlinePaymentAmount)
+    if (!amountValue || amountValue <= 0) {
+      setOnlinePaymentError('Online payment amount must be greater than zero.')
+      return
+    }
+
+    const currentBalance = Number(ledgerData?.totals?.balance ?? 0)
+    if (currentBalance > 0 && amountValue > currentBalance) {
+      setOnlinePaymentError('Amount cannot be greater than your current balance.')
+      return
+    }
+
+    const basePath = `${window.location.origin}${window.location.pathname}`
+    const successUrl = `${basePath}?payment_result=success`
+    const failureUrl = `${basePath}?payment_result=failure`
+    const cancelUrl = `${basePath}?payment_result=cancel`
+
+    const payload: CreateStudentOnlinePaymentCheckoutData = {
+      academic_year: resolvedAcademicYear,
+      amount: amountValue,
+      redirect_url: {
+        success: successUrl,
+        failure: failureUrl,
+        cancel: cancelUrl,
+      },
+    }
+
+    createOnlinePaymentMutation.mutate(payload)
+  }
+
   const handleDiscountSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     setDiscountError(null)
@@ -172,6 +281,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
   const totals = ledgerData?.totals
   const noaData = noaQuery.data?.data
+  const onlineTransactions = onlinePaymentsQuery.data?.data || []
 
   return (
     <div className="space-y-8">
@@ -223,108 +333,191 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <CreditCardIcon className="w-5 h-5 text-indigo-600" />
-            Record Payment
-          </h4>
-          <form className="space-y-4" onSubmit={handlePaymentSubmit}>
-            <Input
-              label="Amount"
-              type="number"
-              min="0"
-              step="0.01"
-              value={paymentForm.amount}
-              onChange={(event) => setPaymentForm(prev => ({ ...prev, amount: event.target.value }))}
-            />
-            <Input
-              label="Payment Date"
-              type="date"
-              value={paymentForm.payment_date}
-              onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_date: event.target.value }))}
-            />
-            <Select
-              value={paymentForm.school_fee_id}
-              onChange={(event) => setPaymentForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
-              options={(feesQuery.data?.data || []).map((fee) => ({
-                value: fee.id,
-                label: fee.name,
-              }))}
-              placeholder="Applied fee (optional)"
-              className="w-full"
-            />
-            <Input
-              label="Payment Method"
-              value={paymentForm.payment_method}
-              onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_method: event.target.value }))}
-              placeholder="Cash, Bank Transfer, etc."
-            />
-            <Input
-              label="Reference Number"
-              value={paymentForm.reference_number}
-              onChange={(event) => setPaymentForm(prev => ({ ...prev, reference_number: event.target.value }))}
-              placeholder="Optional reference"
-            />
-            <Input
-              label="Remarks"
-              value={paymentForm.remarks}
-              onChange={(event) => setPaymentForm(prev => ({ ...prev, remarks: event.target.value }))}
-              placeholder="Optional note"
-            />
-            {paymentError && <p className="text-sm text-red-600">{paymentError}</p>}
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-              Record Payment
-            </Button>
-          </form>
-        </div>
+      {isStudentUser ? (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <CreditCardIcon className="w-5 h-5 text-indigo-600" />
+              Pay Online (Maya Checkout)
+            </h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Use Maya Checkout to pay your balance online. Your ledger updates automatically after confirmation.
+            </p>
+            <form className="space-y-4" onSubmit={handleOnlinePaymentSubmit}>
+              <Input
+                label="Payment Amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={onlinePaymentAmount}
+                onChange={(event) => setOnlinePaymentAmount(event.target.value)}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-gray-500">
+                Current balance: <span className="font-medium">{formatAmount(ledgerData?.totals?.balance)}</span>
+              </p>
+              {onlinePaymentError && <p className="text-sm text-red-600">{onlinePaymentError}</p>}
+              {onlinePaymentMessage && <p className="text-sm text-indigo-700">{onlinePaymentMessage}</p>}
+              <Button
+                type="submit"
+                loading={createOnlinePaymentMutation.isPending}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {createOnlinePaymentMutation.isPending ? 'Creating Checkout...' : 'Proceed to Maya Checkout'}
+              </Button>
+            </form>
+          </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
-            Apply Discount
-          </h4>
-          <form className="space-y-4" onSubmit={handleDiscountSubmit}>
-            <Select
-              value={discountForm.discount_type}
-              onChange={(event) => setDiscountForm(prev => ({ ...prev, discount_type: event.target.value }))}
-              options={[
-                { value: 'fixed', label: 'Fixed Amount' },
-                { value: 'percentage', label: 'Percentage' },
-              ]}
-              className="w-full"
-            />
-            <Input
-              label={discountForm.discount_type === 'percentage' ? 'Percentage (%)' : 'Discount Amount'}
-              type="number"
-              min="0"
-              step="0.01"
-              value={discountForm.value}
-              onChange={(event) => setDiscountForm(prev => ({ ...prev, value: event.target.value }))}
-            />
-            <Select
-              value={discountForm.school_fee_id}
-              onChange={(event) => setDiscountForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
-              options={(feesQuery.data?.data || []).map((fee) => ({
-                value: fee.id,
-                label: fee.name,
-              }))}
-              placeholder="Apply to specific fee (optional)"
-              className="w-full"
-            />
-            <Input
-              label="Description"
-              value={discountForm.description}
-              onChange={(event) => setDiscountForm(prev => ({ ...prev, description: event.target.value }))}
-              placeholder="Optional note or reason"
-            />
-            {discountError && <p className="text-sm text-red-600">{discountError}</p>}
-            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-              Save Discount
-            </Button>
-          </form>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4">Recent Online Payments</h4>
+            {onlinePaymentsQuery.isLoading ? (
+              <p className="text-gray-500">Loading online payments...</p>
+            ) : !onlineTransactions.length ? (
+              <p className="text-sm text-gray-500">No online payment transactions yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {onlineTransactions.map((tx) => (
+                      <tr key={tx.id}>
+                        <td className="px-4 py-2 text-sm text-gray-700">{tx.request_reference_number}</td>
+                        <td className="px-4 py-2 text-sm text-gray-600">
+                          {new Date(tx.created_at).toLocaleString('en-PH')}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right text-gray-900">{formatAmount(tx.amount)}</td>
+                        <td className="px-4 py-2 text-sm text-right">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                              tx.status === 'completed'
+                                ? 'bg-green-100 text-green-700'
+                                : tx.status === 'pending' || tx.status === 'authorized'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {tx.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <CreditCardIcon className="w-5 h-5 text-indigo-600" />
+              Record Payment
+            </h4>
+            <form className="space-y-4" onSubmit={handlePaymentSubmit}>
+              <Input
+                label="Amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={paymentForm.amount}
+                onChange={(event) => setPaymentForm(prev => ({ ...prev, amount: event.target.value }))}
+              />
+              <Input
+                label="Payment Date"
+                type="date"
+                value={paymentForm.payment_date}
+                onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_date: event.target.value }))}
+              />
+              <Select
+                value={paymentForm.school_fee_id}
+                onChange={(event) => setPaymentForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
+                options={(feesQuery.data?.data || []).map((fee) => ({
+                  value: fee.id,
+                  label: fee.name,
+                }))}
+                placeholder="Applied fee (optional)"
+                className="w-full"
+              />
+              <Input
+                label="Payment Method"
+                value={paymentForm.payment_method}
+                onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_method: event.target.value }))}
+                placeholder="Cash, Bank Transfer, etc."
+              />
+              <Input
+                label="Reference Number"
+                value={paymentForm.reference_number}
+                onChange={(event) => setPaymentForm(prev => ({ ...prev, reference_number: event.target.value }))}
+                placeholder="Optional reference"
+              />
+              <Input
+                label="Remarks"
+                value={paymentForm.remarks}
+                onChange={(event) => setPaymentForm(prev => ({ ...prev, remarks: event.target.value }))}
+                placeholder="Optional note"
+              />
+              {paymentError && <p className="text-sm text-red-600">{paymentError}</p>}
+              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                Record Payment
+              </Button>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
+              Apply Discount
+            </h4>
+            <form className="space-y-4" onSubmit={handleDiscountSubmit}>
+              <Select
+                value={discountForm.discount_type}
+                onChange={(event) => setDiscountForm(prev => ({ ...prev, discount_type: event.target.value }))}
+                options={[
+                  { value: 'fixed', label: 'Fixed Amount' },
+                  { value: 'percentage', label: 'Percentage' },
+                ]}
+                className="w-full"
+              />
+              <Input
+                label={discountForm.discount_type === 'percentage' ? 'Percentage (%)' : 'Discount Amount'}
+                type="number"
+                min="0"
+                step="0.01"
+                value={discountForm.value}
+                onChange={(event) => setDiscountForm(prev => ({ ...prev, value: event.target.value }))}
+              />
+              <Select
+                value={discountForm.school_fee_id}
+                onChange={(event) => setDiscountForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
+                options={(feesQuery.data?.data || []).map((fee) => ({
+                  value: fee.id,
+                  label: fee.name,
+                }))}
+                placeholder="Apply to specific fee (optional)"
+                className="w-full"
+              />
+              <Input
+                label="Description"
+                value={discountForm.description}
+                onChange={(event) => setDiscountForm(prev => ({ ...prev, description: event.target.value }))}
+                placeholder="Optional note or reason"
+              />
+              {discountError && <p className="text-sm text-red-600">{discountError}</p>}
+              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                Save Discount
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">

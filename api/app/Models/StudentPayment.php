@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class StudentPayment extends Model
 {
@@ -47,5 +48,22 @@ class StudentPayment extends Model
     public function receivedBy()
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function onlineTransaction()
+    {
+        return $this->hasOne(StudentOnlinePaymentTransaction::class, 'completed_payment_id');
+    }
+
+    public static function generateUniqueReceiptNumber(): string
+    {
+        $prefix = 'RCPT-' . now()->format('Ymd');
+
+        do {
+            $receiptNumber = $prefix . '-' . Str::upper(Str::random(6));
+            $exists = self::where('receipt_number', $receiptNumber)->exists();
+        } while ($exists);
+
+        return $receiptNumber;
     }
 }
