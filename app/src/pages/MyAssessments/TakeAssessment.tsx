@@ -52,6 +52,13 @@ export const TakeAssessment: React.FC = () => {
     }
   }, [status, questions.length, startMutation.isPending, startMutation.data]);
 
+  useEffect(() => {
+    if (alreadySubmitted && payload?.attempt) {
+      setResult({ score: payload.attempt.score ?? 0, max_score: payload.attempt.max_score ?? 0 });
+      setSubmitted(true);
+    }
+  }, [alreadySubmitted, payload?.attempt]);
+
   const handleAnswer = (index: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [String(index)]: value }));
   };
@@ -79,6 +86,10 @@ export const TakeAssessment: React.FC = () => {
     });
   };
 
+  const handleTextAnswer = (index: number, value: string) => {
+    setAnswers((prev) => ({ ...prev, [String(index)]: value }));
+  };
+
   const handleSubmit = () => {
     submitMutation.mutate(answers);
   };
@@ -96,13 +107,6 @@ export const TakeAssessment: React.FC = () => {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (alreadySubmitted && payload?.attempt) {
-      setResult({ score: payload.attempt.score ?? 0, max_score: payload.attempt.max_score ?? 0 });
-      setSubmitted(true);
-    }
-  }, [alreadySubmitted, payload?.attempt]);
 
   if (submitted && result) {
     return (
@@ -182,7 +186,7 @@ export const TakeAssessment: React.FC = () => {
                 )}
                 {type === 'single_choice' &&
                   q.choices?.map((choice, cIdx) => {
-                    const letter = choice.charAt(0).toUpperCase();
+                    const letter = String.fromCharCode(65 + cIdx);
                     const isSelected = answerVal === letter || answerVal === choice;
                     return (
                       <label
@@ -205,7 +209,7 @@ export const TakeAssessment: React.FC = () => {
                   })}
                 {type === 'multiple_choice' && (
                   q.choices?.map((choice, cIdx) => {
-                    const letter = choice.charAt(0).toUpperCase();
+                    const letter = String.fromCharCode(65 + cIdx);
                     const selectedArr = Array.isArray(answerVal) ? answerVal : answerVal ? [answerVal] : [];
                     const isSelected = selectedArr.includes(letter);
                     return (
@@ -240,6 +244,29 @@ export const TakeAssessment: React.FC = () => {
                         />
                       </div>
                     ))}
+                  </div>
+                )}
+                {type === 'short_answer' && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Your answer</label>
+                    <input
+                      type="text"
+                      value={typeof answerVal === 'string' ? answerVal : ''}
+                      onChange={(e) => handleTextAnswer(q.index, e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      placeholder={q.placeholder ?? 'Write your answer'}
+                    />
+                  </div>
+                )}
+                {type === 'essay' && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Your answer</label>
+                    <textarea
+                      value={typeof answerVal === 'string' ? answerVal : ''}
+                      onChange={(e) => handleTextAnswer(q.index, e.target.value)}
+                      className="w-full min-h-32 border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      placeholder={q.placeholder ?? 'Write your detailed response'}
+                    />
                   </div>
                 )}
               </div>
