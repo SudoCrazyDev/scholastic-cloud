@@ -8,10 +8,29 @@ import { studentService } from '../services/studentService'
 import { useAuth } from '../hooks/useAuth'
 import type { Student } from '../types'
 
+const buildFallbackStudent = (user: any, studentId: string): Student => ({
+  id: studentId,
+  lrn: user?.lrn,
+  first_name: user?.first_name ?? 'Student',
+  middle_name: user?.middle_name ?? '',
+  last_name: user?.last_name ?? '',
+  ext_name: user?.ext_name ?? '',
+  gender: user?.gender,
+  religion: user?.religion,
+  birthdate: user?.birthdate ?? '2000-01-01',
+  profile_picture: user?.profile_picture,
+  is_active: true,
+  created_at: user?.created_at,
+  updated_at: user?.updated_at,
+  student_section_id: user?.student_section_id ?? '',
+})
+
 export default function MyFinance() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const studentId = (user as { student_id?: string })?.student_id
+  const studentId =
+    (user as { student_id?: string })?.student_id ||
+    (user?.role?.slug === 'student' ? user?.id : undefined)
 
   const [student, setStudent] = useState<Student | null>(null)
   const [loading, setLoading] = useState(true)
@@ -31,18 +50,27 @@ export default function MyFinance() {
         if (response.success) {
           setStudent(response.data)
         } else {
-          setError('Failed to load your finance profile')
+          setStudent(buildFallbackStudent(user, studentId))
         }
       } catch (err) {
         console.error('Error fetching student finance profile:', err)
-        setError('Failed to load your finance profile')
+        // Fallback to auth profile payload so finance can still load for student users.
+        if (user?.role?.slug === 'student') {
+          setStudent(buildFallbackStudent(user, studentId))
+        } else {
+          const apiMessage =
+            (err as any)?.response?.data?.message ||
+            (err as any)?.response?.data?.error ||
+            'Failed to load your finance profile'
+          setError(apiMessage)
+        }
       } finally {
         setLoading(false)
       }
     }
 
     fetchStudent()
-  }, [studentId])
+  }, [studentId, user])
 
   if (loading) {
     return (
