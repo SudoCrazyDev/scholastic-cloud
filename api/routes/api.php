@@ -44,6 +44,8 @@ use App\Http\Controllers\InternalPaymentCallbackController;
 
 // Public routes (no authentication required)
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/payments/webhooks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
+// Backward-compatible alias.
 Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
 
 // Protected routes (authentication required)
