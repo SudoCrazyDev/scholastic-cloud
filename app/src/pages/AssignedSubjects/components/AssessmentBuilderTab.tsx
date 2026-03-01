@@ -613,11 +613,18 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
 
   const saveCreateMutation = useMutation({
     mutationFn: (payload: AssessmentMethodInput) => assessmentMethodService.create(payload),
-    onSuccess: (_, payload) => {
-      toast.success(`${labelForType(payload.type)} saved successfully!`)
+    onSuccess: (response, payload) => {
+      const createdId = (response as any)?.data?.id ?? (response as any)?.id
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              id: createdId ?? current.id,
+            }
+          : current
+      )
+      toast.success(`${labelForType(payload.type)} saved successfully! You can continue editing.`)
       queryClient.invalidateQueries({ queryKey: ['assessment-methods', subjectId] })
-      setBuilderOpen(false)
-      setDraft(null)
     },
     onError: (error, payload) => {
       toast.error(messageFromError(error, `Failed to save ${labelForType(payload.type)}.`))
@@ -628,10 +635,8 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
     mutationFn: ({ id, payload }: { id: string; payload: AssessmentMethodInput }) =>
       assessmentMethodService.update(id, payload),
     onSuccess: (_, variables) => {
-      toast.success(`${labelForType(variables.payload.type)} updated successfully!`)
+      toast.success(`${labelForType(variables.payload.type)} updated successfully! You can continue editing.`)
       queryClient.invalidateQueries({ queryKey: ['assessment-methods', subjectId] })
-      setBuilderOpen(false)
-      setDraft(null)
     },
     onError: (error, variables) => {
       toast.error(messageFromError(error, `Failed to update ${labelForType(variables.payload.type)}.`))
