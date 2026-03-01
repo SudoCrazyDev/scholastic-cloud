@@ -52,6 +52,13 @@ export const TakeAssessment: React.FC = () => {
     }
   }, [status, questions.length, startMutation.isPending, startMutation.data]);
 
+  useEffect(() => {
+    if (alreadySubmitted && payload?.attempt) {
+      setResult({ score: payload.attempt.score ?? 0, max_score: payload.attempt.max_score ?? 0 });
+      setSubmitted(true);
+    }
+  }, [alreadySubmitted, payload?.attempt]);
+
   const handleAnswer = (index: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [String(index)]: value }));
   };
@@ -100,13 +107,6 @@ export const TakeAssessment: React.FC = () => {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (alreadySubmitted && payload?.attempt) {
-      setResult({ score: payload.attempt.score ?? 0, max_score: payload.attempt.max_score ?? 0 });
-      setSubmitted(true);
-    }
-  }, [alreadySubmitted, payload?.attempt]);
 
   if (submitted && result) {
     return (
