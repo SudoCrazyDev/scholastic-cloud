@@ -26,17 +26,39 @@ After first run:
 docker compose exec payments php artisan key:generate
 ```
 
-## API routes (for main API to call)
+## API routes
 
-- `POST /api/v1/charges` – create charge (TODO: Stripe/provider)
-- `GET /api/v1/charges/{id}` – get charge status
-- `POST /api/v1/webhooks/stripe` – Stripe webhook (TODO: verify signature)
+### Internal routes (main API -> payments service)
+
+These routes require `X-Internal-Token` when `PAYMENTS_INTERNAL_TOKEN` is configured.
+
+- `POST /api/v1/charges` – create Maya Checkout transaction
+- `GET /api/v1/charges/{id}` – get Maya payment status
+
+### Public webhook routes (Maya -> payments service)
+
+- `POST /api/v1/webhooks/maya` – Maya webhook endpoint
+- `POST /api/v1/webhooks/stripe` – alias to Maya webhook handler (backward compatibility)
+
+## Environment variables
+
+Set in `.env`:
+
+- `PAYMENTS_INTERNAL_TOKEN` – shared token for main API internal calls
+- `PAYMENTS_CALLBACK_URL` – main API callback endpoint (e.g. `/api/internal/payment-callbacks/maya`)
+- `PAYMENTS_CALLBACK_TOKEN` – shared callback token header
+- `MAYA_BASE_URL` – `https://pg-sandbox.paymaya.com` (sandbox) or production host
+- `MAYA_PUBLIC_KEY` – Maya public API key
+- `MAYA_SECRET_KEY` – Maya secret API key
+- `MAYA_WEBHOOK_SIGNATURE_KEY` – webhook signature key (optional but recommended)
+- `MAYA_TIMEOUT` – timeout in seconds for Maya API calls
 
 ## Flow
 
 1. App → main API (api folder) for all requests.
-2. Main API → Payment Service (this) when it needs to create a charge or handle payment logic.
-3. Payment provider webhooks → Payment Service; then Payment Service can notify main API if needed.
+2. Main API → Payment Service (this) for checkout creation and status polling.
+3. Maya webhooks → Payment Service webhook endpoint.
+4. Payment Service → Main API callback endpoint to reconcile status and post ledger payment.
 
 ## Edit code
 

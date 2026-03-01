@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Auth\StudentPortalUser;
 use App\Models\SchoolFee;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +15,13 @@ class SchoolFeeController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to access school fee management endpoints'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -49,6 +57,13 @@ class SchoolFeeController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to manage school fees'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -90,6 +105,13 @@ class SchoolFeeController extends Controller
      */
     public function show(Request $request, string $id): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to access school fee management endpoints'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -117,6 +139,13 @@ class SchoolFeeController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to manage school fees'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -161,6 +190,13 @@ class SchoolFeeController extends Controller
      */
     public function destroy(Request $request, string $id): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to manage school fees'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -201,5 +237,20 @@ class SchoolFeeController extends Controller
         }
 
         return $institutionId;
+    }
+
+    private function isStudentUser(Request $request): bool
+    {
+        $user = $request->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return true;
+        }
+
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+        return (string) ($role->slug ?? '') === 'student';
     }
 }

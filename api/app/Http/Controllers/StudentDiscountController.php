@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\SchoolFee;
 use App\Models\StudentDiscount;
+use App\Auth\StudentPortalUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
@@ -16,6 +17,13 @@ class StudentDiscountController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to access discount management endpoints'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -61,6 +69,13 @@ class StudentDiscountController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to apply discounts'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -134,6 +149,13 @@ class StudentDiscountController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to update discounts'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -196,6 +218,13 @@ class StudentDiscountController extends Controller
      */
     public function destroy(Request $request, string $id): JsonResponse
     {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to delete discounts'
+            ], 403);
+        }
+
         $institutionId = $this->resolveInstitutionId($request);
         if (!$institutionId) {
             return response()->json([
@@ -236,5 +265,20 @@ class StudentDiscountController extends Controller
         }
 
         return $institutionId;
+    }
+
+    private function isStudentUser(Request $request): bool
+    {
+        $user = $request->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return true;
+        }
+
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+        return (string) ($role->slug ?? '') === 'student';
     }
 }

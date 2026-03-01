@@ -9,7 +9,13 @@ Route::get('/', function () {
 
 // Payment service routes (main API will call these internally)
 Route::prefix('v1')->group(function () {
-    Route::post('/charges', [PaymentController::class, 'createCharge']);
-    Route::get('/charges/{id}', [PaymentController::class, 'showCharge']);
+    Route::middleware('internal.token')->group(function () {
+        Route::post('/charges', [PaymentController::class, 'createCharge']);
+        Route::get('/charges/{id}', [PaymentController::class, 'showCharge']);
+    });
+
+    // Public webhook endpoint called by Maya.
+    Route::post('/webhooks/maya', [PaymentController::class, 'mayaWebhook']);
+    // Backward compatible alias.
     Route::post('/webhooks/stripe', [PaymentController::class, 'stripeWebhook']);
 });

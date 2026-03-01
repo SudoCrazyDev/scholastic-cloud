@@ -28,6 +28,8 @@ use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\StudentFinanceController;
+use App\Http\Controllers\StudentOnlinePaymentController;
+use App\Http\Controllers\InternalPaymentCallbackController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,6 +44,7 @@ use App\Http\Controllers\StudentFinanceController;
 
 // Public routes (no authentication required)
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
 
 // Protected routes (authentication required)
 Route::middleware('auth.token')->group(function () {
@@ -206,6 +209,9 @@ Route::middleware('auth.token')->group(function () {
     Route::post('student-payments', [StudentPaymentController::class, 'store']);
     Route::get('student-payments/{id}', [StudentPaymentController::class, 'show']);
     Route::get('student-payments/{id}/receipt', [StudentPaymentController::class, 'receipt']);
+    Route::get('student-online-payments', [StudentOnlinePaymentController::class, 'index']);
+    Route::post('student-online-payments/checkout', [StudentOnlinePaymentController::class, 'createCheckout']);
+    Route::get('student-online-payments/{id}', [StudentOnlinePaymentController::class, 'show']);
     Route::get('student-discounts', [StudentDiscountController::class, 'index']);
     Route::post('student-discounts', [StudentDiscountController::class, 'store']);
     Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update']);

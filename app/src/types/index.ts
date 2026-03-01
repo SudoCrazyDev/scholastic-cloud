@@ -157,6 +157,48 @@ export interface StudentPayment {
   student?: Student;
 }
 
+export interface StudentOnlinePaymentTransaction {
+  id: string;
+  institution_id: string;
+  student_id: string;
+  school_fee_id?: string | null;
+  completed_payment_id?: string | null;
+  created_by?: string | null;
+  provider: string;
+  status: 'pending' | 'authorized' | 'completed' | 'failed' | 'expired' | 'cancelled';
+  academic_year: string;
+  amount: number;
+  currency: string;
+  request_reference_number: string;
+  provider_payment_id?: string | null;
+  provider_charge_id?: string | null;
+  checkout_url?: string | null;
+  expires_at?: string | null;
+  paid_at?: string | null;
+  failure_reason?: string | null;
+  provider_payload?: Record<string, any> | null;
+  provider_response?: Record<string, any> | null;
+  metadata?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+  school_fee?: SchoolFee;
+  completed_payment?: StudentPayment;
+  redirect_url?: string;
+}
+
+export interface CreateStudentOnlinePaymentCheckoutData {
+  student_id?: string;
+  academic_year: string;
+  amount: number;
+  currency?: string;
+  school_fee_id?: string;
+  redirect_url: {
+    success: string;
+    failure: string;
+    cancel: string;
+  };
+}
+
 export interface CreateStudentPaymentData {
   student_id: string;
   academic_year: string;
