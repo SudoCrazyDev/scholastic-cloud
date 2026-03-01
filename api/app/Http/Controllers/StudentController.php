@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Auth\StudentPortalUser;
 use App\Models\Student;
 use App\Models\StudentInstitution;
 use Illuminate\Http\Request;
@@ -177,23 +178,22 @@ class StudentController extends Controller
      */
     public function show(Request $request, $id): JsonResponse
     {
-        // Get the authenticated user's institution
-        $user = $request->user();
-        $defaultInstitutionId = $user->getDefaultInstitutionId();
-
-        // If no default institution, try to get the first available institution
-        if (!$defaultInstitutionId) {
-            $firstUserInstitution = $user->userInstitutions()->first();
-            if ($firstUserInstitution) {
-                $defaultInstitutionId = $firstUserInstitution->institution_id;
-            }
-        }
-        
+        $defaultInstitutionId = $this->resolveInstitutionId($request);
         if (!$defaultInstitutionId) {
             return response()->json([
                 'success' => false, 
                 'error' => 'User does not have any institution assigned'
             ], 400);
+        }
+
+        if ($this->isStudentActor($request)) {
+            $selfStudentId = $this->resolveSelfStudentId($request);
+            if (!$selfStudentId || (string) $id !== (string) $selfStudentId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Students can only access their own profile'
+                ], 403);
+            }
         }
 
         $student = Student::with('studentInstitutions')
@@ -206,6 +206,69 @@ class StudentController extends Controller
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
         return response()->json(['success' => true, 'data' => $student]);
+    }
+
+    private function resolveInstitutionId(Request $request): ?string
+    {
+        $user = $request->user();
+        if (!$user) {
+            return null;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return $user->student
+                ->studentInstitutions()
+                ->where('is_active', true)
+                ->value('institution_id')
+                ?? $user->student->studentInstitutions()->value('institution_id');
+        }
+
+        $defaultInstitutionId = $user->getDefaultInstitutionId();
+        if (!$defaultInstitutionId) {
+            $firstUserInstitution = $user->userInstitutions()->first();
+            if ($firstUserInstitution) {
+                $defaultInstitutionId = $firstUserInstitution->institution_id;
+            }
+        }
+
+        if (!$defaultInstitutionId && $this->isStudentActor($request)) {
+            $selfStudentId = $this->resolveSelfStudentId($request);
+            if ($selfStudentId) {
+                $selfStudent = Student::find($selfStudentId);
+                $defaultInstitutionId = $selfStudent?->studentInstitutions()->value('institution_id');
+            }
+        }
+
+        return $defaultInstitutionId;
+    }
+
+    private function isStudentActor(Request $request): bool
+    {
+        $user = $request->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return true;
+        }
+
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+        return (string) ($role->slug ?? '') === 'student';
+    }
+
+    private function resolveSelfStudentId(Request $request): ?string
+    {
+        $user = $request->user();
+        if (!$user) {
+            return null;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return $user->student->id;
+        }
+
+        return Student::where('user_id', $user->id)->value('id');
     }
 
     /**
