@@ -1,6 +1,6 @@
 
 import { useMemo } from 'react';
-import { Page, Text, View, Document, PDFViewer, StyleSheet } from '@react-pdf/renderer';
+import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAge } from '../../utils/gradeUtils';
 
@@ -90,13 +90,11 @@ export default function PrintReportCard({
         return coreValueMap?.[coreValue]?.[behaviorStatement]?.[quarter] || '';
     };
 
-    // Organize attendance data by month (academic year order: Jul=7, Aug=8, ..., Jun=6)
-    // Map database months (1-12) to academic year order (7,8,9,10,11,12,1,2,3,4,5,6)
+    const academicYearMonths = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
+
     const attendanceByMonth = useMemo(() => {
         const map: Record<number, { schoolDays: number; present: number; absent: number }> = {};
         
-        // Initialize all months
-        const academicYearMonths = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
         academicYearMonths.forEach(month => {
             map[month] = { schoolDays: 0, present: 0, absent: 0 };
         });
@@ -138,10 +136,7 @@ export default function PrintReportCard({
         return totals;
     }, [attendanceByMonth]);
 
-    // Helper to get attendance for a specific month (in academic year order)
     const getAttendanceForMonth = (academicYearMonthIndex: number) => {
-        // academicYearMonthIndex: 0=Jul, 1=Aug, ..., 11=Jun
-        const academicYearMonths = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
         const month = academicYearMonths[academicYearMonthIndex];
         return attendanceByMonth[month] || { schoolDays: 0, present: 0, absent: 0 };
     };
@@ -167,7 +162,7 @@ export default function PrintReportCard({
     const studentAge = calculateAge(student.birthdate);
     const teacher = (classSection as any)?.adviser
     const teacherName = teacher
-      ? `${teacher.last_name || ''}, ${teacher.first_name || ''}${teacher.middle_name ? `, ${String(teacher.middle_name).trim().charAt(0)}.` : ''}${teacher.ext_name ? `, ${teacher.ext_name}` : ''}`.toUpperCase()
+      ? `${teacher.first_name || ''}${teacher.middle_name ? ` ${String(teacher.middle_name).trim().charAt(0)}.` : ''} ${teacher.last_name || ''}${teacher.ext_name ? ` ${teacher.ext_name}` : ''}`.trim().toUpperCase()
       : ''
     const principalDisplay = (principalName || '').trim() ? principalName : ' '
 
@@ -184,6 +179,9 @@ export default function PrintReportCard({
                                 <View style={{width: '100%', display: 'flex', flexDirection: 'row', borderBottom: '1px solid black'}}>
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}></Text>
+                                    </View>
+                                    <View style={styles.attendanceMonthContainer}>
+                                        <Text style={styles.attendanceMonthText}>Jun</Text>
                                     </View>
                                     <View style={styles.attendanceMonthContainer}>
                                         <Text style={styles.attendanceMonthText}>Jul</Text>
@@ -217,9 +215,6 @@ export default function PrintReportCard({
                                     </View>
                                     <View style={styles.attendanceMonthContainer}>
                                         <Text style={styles.attendanceMonthText}>May</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Jun</Text>
                                     </View>
                                     <View style={styles.attendanceMonthContainerLast}>
                                         <Text style={styles.attendanceMonthText}>Total</Text>
@@ -291,15 +286,22 @@ export default function PrintReportCard({
                                 <Text style={{fontSize: '6px', fontFamily:'Helvetica', marginLeft: 'auto'}}>School ID: {institution.gov_id || 'N/A'}</Text>
                             </View>
                             <View style={{display: 'flex', flexDirection: 'row', marginBottom: '3px'}}>
-                                {/* NOTE: temporarily removed logo images to prevent PDFViewer blanking if remote assets fail */}
-                                <View style={{height: 49, width: 49}} />
+                                {institution.logo ? (
+                                    <Image src={institution.logo} style={{height: 49, width: 49, objectFit: 'contain'}} />
+                                ) : (
+                                    <View style={{height: 49, width: 49}} />
+                                )}
                                 <View style={{display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '10px', marginHorizontal: '10px'}}>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica'}}>Republic of the Philippines</Text>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica'}}>Department of Education</Text>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica-Bold'}}>Region XII-SOCCSKSARGEN</Text>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica'}}>Division of General Santos City</Text>
                                 </View>
-                                <View style={{height: 49, width: 49}} />
+                                {institution.logo ? (
+                                    <Image src={institution.logo} style={{height: 49, width: 49, objectFit: 'contain'}} />
+                                ) : (
+                                    <View style={{height: 49, width: 49}} />
+                                )}
                             </View>
                             <Text style={{fontSize: '6px', fontFamily:'Helvetica-Bold', alignSelf:'center'}}>{institution.title}</Text>
                             <Text style={{fontSize: '6px', fontFamily:'Helvetica-Bold', alignSelf:'center'}}>{institution.address || 'Address not available'}</Text>
@@ -433,21 +435,55 @@ export default function PrintReportCard({
                         </View>
 
                         {/* ===== SUBJECTS START =====*/}
-                        {subjects.map((subject) => {
+                        {subjects
+                            .filter(subject => {
+                                if (subject.variant) {
+                                    const subjectGrades = grades.filter(grade => grade.subject_id === subject.id);
+                                    return subjectGrades.some(g => {
+                                        const q = Number((g as any).quarter_grade || (g as any).grade || 0);
+                                        return q > 0;
+                                    }) || subjectGrades.length > 0;
+                                }
+                                return true;
+                            })
+                            .sort((a, b) => {
+                                if (a.subject_type === 'parent' && b.subject_type === 'parent') return a.order - b.order;
+                                if (a.subject_type === 'child' && b.subject_type === 'child') {
+                                    if (a.parent_subject_id !== b.parent_subject_id) {
+                                        const aParentOrder = subjects.find(s => s.id === a.parent_subject_id)?.order || 0;
+                                        const bParentOrder = subjects.find(s => s.id === b.parent_subject_id)?.order || 0;
+                                        return aParentOrder - bParentOrder;
+                                    }
+                                    return a.order - b.order;
+                                }
+                                if (a.subject_type === 'parent' && b.subject_type === 'child') {
+                                    if (b.parent_subject_id === a.id) return -1;
+                                    const bParentOrder = subjects.find(s => s.id === b.parent_subject_id)?.order || 0;
+                                    return a.order - bParentOrder;
+                                }
+                                if (a.subject_type === 'child' && b.subject_type === 'parent') {
+                                    if (a.parent_subject_id === b.id) return 1;
+                                    const aParentOrder = subjects.find(s => s.id === a.parent_subject_id)?.order || 0;
+                                    return aParentOrder - b.order;
+                                }
+                                return a.order - b.order;
+                            })
+                            .map((subject) => {
                             const subjectGrades = grades.filter(grade => grade.subject_id === subject.id);
                             const quarter1Grade = getQuarterGrade(subjectGrades, '1');
                             const quarter2Grade = getQuarterGrade(subjectGrades, '2');
                             const quarter3Grade = getQuarterGrade(subjectGrades, '3');
                             const quarter4Grade = getQuarterGrade(subjectGrades, '4');
                             
-                            // Calculate final grade for this subject
                             const subjectFinalGrade = calculateFinalGrade(subjectGrades);
                             const subjectRemarks = getPassFailRemarks(subjectFinalGrade);
+                            const displayTitle = subject.variant ? `${subject.title} - ${subject.variant}` : subject.title;
+                            const isChild = subject.subject_type === 'child';
                             
                             return (
                                 <View key={subject.id} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                                    <View style={{width: '30%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black', padding: '2px'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>{subject.title}</Text>
+                                    <View style={{width: '30%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'flex-start', borderRight: '1px solid black', padding: '2px'}}>
+                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center', marginLeft: isChild ? '10px' : '0px'}}>{displayTitle}</Text>
                                     </View>
                                     <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black'}}>
                                         <View style={{width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '2px'}}>
@@ -495,9 +531,7 @@ export default function PrintReportCard({
                                 </Text>
                             </View>
                             <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                    {finalGrade > 0 ? finalGradeRemarks : ''}
-                                </Text>
+                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}></Text>
                             </View>
                         </View>
 

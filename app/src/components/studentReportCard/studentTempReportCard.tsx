@@ -340,7 +340,7 @@ export default function PrintTempReportCard({
                         <View style={{ display: 'flex', flexDirection: 'column', marginTop: '10px', marginBottom: '5px'}}>
                             <Text style={{ textTransform: 'uppercase', fontSize: '10px', fontFamily: 'Helvetica-Bold' }}>
                               {classSection?.adviser?.first_name && classSection?.adviser?.last_name 
-                                ? `${classSection.adviser.first_name} ${classSection.adviser.last_name}` 
+                                ? `${classSection.adviser.first_name}${classSection.adviser.middle_name ? ` ${String(classSection.adviser.middle_name).trim().charAt(0)}.` : ''} ${classSection.adviser.last_name}${classSection.adviser.ext_name ? ` ${classSection.adviser.ext_name}` : ''}`.trim()
                                 : 'TEACHER NAME'}
                             </Text>
                             <Text style={{ fontSize: '8px'}}>ADVISER</Text>
