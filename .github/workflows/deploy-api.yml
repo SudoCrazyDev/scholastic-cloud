@@ -95,12 +95,23 @@ jobs:
 
       - name: Validate deployment secrets
         run: |
-          if [ -z "$REMOTE_DIR" ]; then
-            echo "::error::DEPLOYMENT_REMOTE_DIR is not set for environment '${{ matrix.deployment_target }}'. Add it in Settings → Environments → ${{ matrix.deployment_target }} → Environment secrets."
+          missing=""
+          [ -z "$SSH_SERVER" ]   && missing="$missing DEPLOYMENT_SSH_SERVER"
+          [ -z "$SSH_USERNAME" ] && missing="$missing DEPLOYMENT_SSH_USERNAME"
+          [ -z "$SSH_PASSWORD" ] && missing="$missing DEPLOYMENT_SSH_PASSWORD"
+          [ -z "$SSH_PORT" ]     && missing="$missing DEPLOYMENT_SSH_PORT"
+          [ -z "$REMOTE_DIR" ]   && missing="$missing DEPLOYMENT_REMOTE_DIR"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing or empty secrets for '${{ matrix.deployment_target }}':$missing"
+            echo "Add them in Settings → Environments → ${{ matrix.deployment_target }} → Environment secrets."
             exit 1
           fi
-          echo "Deployment secrets present for ${{ matrix.deployment_target }}"
+          echo "All deployment secrets are set for ${{ matrix.deployment_target }} (host length=${#SSH_SERVER}, user length=${#SSH_USERNAME}, port=$SSH_PORT)"
         env:
+          SSH_SERVER: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
+          SSH_USERNAME: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
+          SSH_PASSWORD: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
+          SSH_PORT: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           REMOTE_DIR: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
 
       # SCP/drone-scp require the target directory to exist; it does not create it.
@@ -109,7 +120,7 @@ jobs:
         with:
           host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
           username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
-          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}2
+          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           timeout: "120s"
           script: |
