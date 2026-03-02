@@ -69,6 +69,25 @@ Commit and push. The next run (on push to `master` or manual dispatch) will depl
 - Both workflows use `fail-fast: false`, so a failure for one client does not stop deployments to the others.
 - Check the Actions run and open the failed job for that client to see logs and fix that client’s credentials or paths.
 
+### "dial tcp ... i/o timeout" on API (SFTP) deploy
+
+This means the GitHub Actions runner **cannot reach your server** on the SSH port. The TCP connection times out before it is established.
+
+**Common causes:**
+
+1. **Firewall / security group**  
+   The server only allows SSH from certain IPs. GitHub-hosted runners use **dynamic IPs** that change. You must either:
+   - Allow inbound SSH (port 22 or your `DEPLOYMENT_SSH_PORT`) from a range that includes GitHub's IPs (see [GitHub's IP ranges](https://api.github.com/meta), keys `actions` and `hooks`), or
+   - Use a **self-hosted runner** in a network that can reach the server (e.g. same VPC or behind your firewall).
+
+2. **Wrong host or port**  
+   Double-check `DEPLOYMENT_SSH_SERVER` and `DEPLOYMENT_SSH_PORT` in the environment secrets. Ensure the server is up and SSH is listening on that port.
+
+3. **Network / hosting restrictions**  
+   Some hosts block or throttle SSH from cloud IPs. Confirm with your provider that outbound SSH from GitHub's runners is allowed to your server.
+
+The workflow uses a 120s connection timeout; if the problem is firewall, increasing it will not help until the server is reachable.
+
 ## First-time setup for a client
 
 1. Create the environment and secrets (steps 1–2 above).

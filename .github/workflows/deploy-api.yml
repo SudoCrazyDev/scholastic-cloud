@@ -102,6 +102,9 @@ jobs:
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           source: "api-deploy.zip"
           target: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
+          # If you see "dial tcp ... i/o timeout": server is unreachable from GitHub.
+          # Allow inbound SSH from GitHub IPs (https://api.github.com/meta) or use a self-hosted runner.
+          timeout: "120s"
 
       - name: Extract and setup on server (${{ matrix.deployment_target }})
         uses: appleboy/ssh-action@v1.0.3
@@ -110,6 +113,8 @@ jobs:
           username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
           password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
+          command_timeout: "10m"
+          timeout: "120s"
           script: |
             set -e
             REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
