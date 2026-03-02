@@ -115,6 +115,7 @@ jobs:
           script: |
             set -e
             REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
+            case "$REMOTE_DIR" in ~*) REMOTE_DIR="$HOME${REMOTE_DIR#~}";; esac
             mkdir -p "$REMOTE_DIR"
             echo "Target directory ready: $REMOTE_DIR"
 
@@ -142,8 +143,11 @@ jobs:
           script: |
             set -e
             REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
-            ZIP_FILE="api-deploy.zip"
+            case "$REMOTE_DIR" in ~*) REMOTE_DIR="$HOME${REMOTE_DIR#~}";; esac
             cd "$REMOTE_DIR"
+            echo "Working in: $REMOTE_DIR ($(pwd))"
+            ls -la
+            ZIP_FILE="api-deploy.zip"
             if [ ! -f "$ZIP_FILE" ]; then
               echo "Zip not found: $ZIP_FILE" && exit 1
             fi
