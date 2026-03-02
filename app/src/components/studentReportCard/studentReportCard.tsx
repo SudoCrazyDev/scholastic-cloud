@@ -158,7 +158,6 @@ export default function PrintReportCard({
     }
 
     const finalGrade = calculateFinalGrade(grades);
-    const finalGradeRemarks = getPassFailRemarks(finalGrade);
     const studentAge = calculateAge(student.birthdate);
     const teacher = (classSection as any)?.adviser
     const teacherName = teacher
