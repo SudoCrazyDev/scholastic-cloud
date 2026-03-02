@@ -93,6 +93,21 @@ jobs:
           fi
           ls -la api-deploy.zip
 
+      # SCP/drone-scp require the target directory to exist; it does not create it.
+      - name: Ensure remote directory exists
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
+          username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
+          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
+          port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
+          timeout: "120s"
+          script: |
+            set -e
+            REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
+            mkdir -p "$REMOTE_DIR"
+            echo "Target directory ready: $REMOTE_DIR"
+
       - name: Upload deployment zip (SFTP) to ${{ matrix.deployment_target }}
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -102,9 +117,8 @@ jobs:
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           source: "api-deploy.zip"
           target: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
-          # If you see "dial tcp ... i/o timeout": server is unreachable from GitHub.
-          # Allow inbound SSH from GitHub IPs (https://api.github.com/meta) or use a self-hosted runner.
           timeout: "120s"
+          debug: true
 
       - name: Extract and setup on server (${{ matrix.deployment_target }})
         uses: appleboy/ssh-action@v1.0.3
