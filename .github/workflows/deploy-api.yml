@@ -109,7 +109,7 @@ jobs:
         with:
           host: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
           username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
-          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
+          password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}2
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           timeout: "120s"
           script: |
