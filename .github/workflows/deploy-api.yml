@@ -93,6 +93,16 @@ jobs:
           fi
           ls -la api-deploy.zip
 
+      - name: Validate deployment secrets
+        run: |
+          if [ -z "$REMOTE_DIR" ]; then
+            echo "::error::DEPLOYMENT_REMOTE_DIR is not set for environment '${{ matrix.deployment_target }}'. Add it in Settings → Environments → ${{ matrix.deployment_target }} → Environment secrets."
+            exit 1
+          fi
+          echo "Deployment secrets present for ${{ matrix.deployment_target }}"
+        env:
+          REMOTE_DIR: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
+
       # SCP/drone-scp require the target directory to exist; it does not create it.
       - name: Ensure remote directory exists
         uses: appleboy/ssh-action@v1.0.3
