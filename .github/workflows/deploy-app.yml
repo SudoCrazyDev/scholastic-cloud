@@ -38,7 +38,7 @@ jobs:
           [ -z "$SSH_USERNAME" ]     && missing="$missing DEPLOYMENT_SSH_USERNAME"
           [ -z "$SSH_PASSWORD" ]     && missing="$missing DEPLOYMENT_SSH_PASSWORD"
           [ -z "$SSH_PORT" ]         && missing="$missing DEPLOYMENT_SSH_PORT"
-          [ -z "$REMOTE_DIR" ]       && missing="$missing DEPLOYMENT_DIRECTORY"
+          [ -z "$REMOTE_DIR" ]       && missing="$missing DEPLOYMENT_REMOTE_DIR"
           if [ -n "$missing" ]; then
             echo "::error::Missing or empty secrets for '${{ matrix.deployment_target }}':$missing"
             echo "Add them in Settings -> Environments -> ${{ matrix.deployment_target }} -> Environment secrets."
@@ -51,7 +51,7 @@ jobs:
           SSH_USERNAME: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
           SSH_PASSWORD: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           SSH_PORT: ${{ secrets.DEPLOYMENT_SSH_PORT }}
-          REMOTE_DIR: ${{ secrets.DEPLOYMENT_DIRECTORY }}
+          REMOTE_DIR: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
 
       - name: Check SSH reachability
         run: |
@@ -94,7 +94,7 @@ jobs:
           timeout: "120s"
           script: |
             set -e
-            REMOTE_DIR="${{ secrets.DEPLOYMENT_DIRECTORY }}"
+            REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
             case "$REMOTE_DIR" in
               "~") REMOTE_DIR="$HOME" ;;
               "~/"*) REMOTE_DIR="$HOME/${REMOTE_DIR#~/}" ;;
@@ -102,7 +102,7 @@ jobs:
             if [ -d "$REMOTE_DIR" ]; then
               echo "Target directory already exists: $REMOTE_DIR"
             elif ! mkdir -p "$REMOTE_DIR"; then
-              echo "::error::Cannot create DEPLOYMENT_DIRECTORY='$REMOTE_DIR' as user $(whoami). Use a writable absolute path."
+              echo "::error::Cannot create DEPLOYMENT_REMOTE_DIR='$REMOTE_DIR' as user $(whoami). Use a writable absolute path."
               exit 1
             fi
             echo "Target directory ready: $REMOTE_DIR"
@@ -131,7 +131,7 @@ jobs:
           command_timeout: "10m"
           script: |
             set -e
-            REMOTE_DIR="${{ secrets.DEPLOYMENT_DIRECTORY }}"
+            REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
             case "$REMOTE_DIR" in
               "~") REMOTE_DIR="$HOME" ;;
               "~/"*) REMOTE_DIR="$HOME/${REMOTE_DIR#~/}" ;;
