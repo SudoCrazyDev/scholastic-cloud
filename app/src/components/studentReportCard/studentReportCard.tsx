@@ -22,6 +22,48 @@ const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
     ],
 };
 
+const ACADEMIC_YEAR_MONTHS = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
+const ATTENDANCE_MONTH_LABELS = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
+const DEPED_LOGO_URL = 'https://upload.wikimedia.org/wikipedia/en/thumb/c/c9/Department_of_Education.svg/512px-Department_of_Education.svg.png';
+
+const toAbsoluteUrl = (value?: string) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) return raw;
+
+    if (raw.startsWith('/')) {
+        const apiBase = (import.meta.env.VITE_API_URL || '').trim();
+        if (apiBase) {
+            try {
+                const origin = new URL(apiBase).origin;
+                return `${origin}${raw}`;
+            } catch {
+                // Fall back to current origin if VITE_API_URL is malformed.
+            }
+        }
+        return `${window.location.origin}${raw}`;
+    }
+
+    return raw;
+};
+
+const formatGradeLevel = (value: unknown) => {
+    const asText = String(value ?? '').trim();
+    if (!asText) return '';
+    return asText.replace(/^grade\s*/i, '').trim();
+};
+
+const formatTeacherName = (teacher: any) => {
+    if (!teacher) return '';
+    const first = String(teacher.first_name || '').trim();
+    const middle = String(teacher.middle_name || '').trim();
+    const last = String(teacher.last_name || '').trim();
+    const middleInitial = middle ? `${middle.charAt(0)}.` : '';
+
+    return [first, middleInitial, last].filter(Boolean).join(' ').trim();
+};
+
 const styles = StyleSheet.create({
     // Attendance table:
     // - 1 label column + 13 month/total columns
@@ -90,12 +132,10 @@ export default function PrintReportCard({
         return coreValueMap?.[coreValue]?.[behaviorStatement]?.[quarter] || '';
     };
 
-    const academicYearMonths = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
-
     const attendanceByMonth = useMemo(() => {
         const map: Record<number, { schoolDays: number; present: number; absent: number }> = {};
         
-        academicYearMonths.forEach(month => {
+        ACADEMIC_YEAR_MONTHS.forEach(month => {
             map[month] = { schoolDays: 0, present: 0, absent: 0 };
         });
 
@@ -116,7 +156,7 @@ export default function PrintReportCard({
         });
 
         // Auto-calculate No. of days present = school days - days absent (per month)
-        academicYearMonths.forEach(month => {
+        ACADEMIC_YEAR_MONTHS.forEach(month => {
             const school = map[month].schoolDays;
             const absent = map[month].absent;
             map[month].present = Math.max(0, school - absent);
@@ -137,7 +177,7 @@ export default function PrintReportCard({
     }, [attendanceByMonth]);
 
     const getAttendanceForMonth = (academicYearMonthIndex: number) => {
-        const month = academicYearMonths[academicYearMonthIndex];
+        const month = ACADEMIC_YEAR_MONTHS[academicYearMonthIndex];
         return attendanceByMonth[month] || { schoolDays: 0, present: 0, absent: 0 };
     };
 
@@ -160,9 +200,10 @@ export default function PrintReportCard({
     const finalGrade = calculateFinalGrade(grades);
     const studentAge = calculateAge(student.birthdate);
     const teacher = (classSection as any)?.adviser
-    const teacherName = teacher
-      ? `${teacher.first_name || ''}${teacher.middle_name ? ` ${String(teacher.middle_name).trim().charAt(0)}.` : ''} ${teacher.last_name || ''}${teacher.ext_name ? ` ${teacher.ext_name}` : ''}`.trim().toUpperCase()
-      : ''
+    const teacherName = formatTeacherName(teacher)
+    const schoolLogoUrl = toAbsoluteUrl(institution.logo)
+    const leftHeaderLogo = DEPED_LOGO_URL
+    const rightHeaderLogo = schoolLogoUrl || DEPED_LOGO_URL
     const principalDisplay = (principalName || '').trim() ? principalName : ' '
 
     const pdfKey = viewerKey || `${studentId}|${classSectionId}|${institutionId}|${academicYear}`
@@ -179,42 +220,11 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}></Text>
                                     </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Jun</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Jul</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Aug</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Sep</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Oct</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Nov</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Dec</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Jan</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Feb</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Mar</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>Apr</Text>
-                                    </View>
-                                    <View style={styles.attendanceMonthContainer}>
-                                        <Text style={styles.attendanceMonthText}>May</Text>
-                                    </View>
+                                    {ATTENDANCE_MONTH_LABELS.map((monthLabel) => (
+                                        <View key={monthLabel} style={styles.attendanceMonthContainer}>
+                                            <Text style={styles.attendanceMonthText}>{monthLabel}</Text>
+                                        </View>
+                                    ))}
                                     <View style={styles.attendanceMonthContainerLast}>
                                         <Text style={styles.attendanceMonthText}>Total</Text>
                                     </View>
@@ -285,8 +295,8 @@ export default function PrintReportCard({
                                 <Text style={{fontSize: '6px', fontFamily:'Helvetica', marginLeft: 'auto'}}>School ID: {institution.gov_id || 'N/A'}</Text>
                             </View>
                             <View style={{display: 'flex', flexDirection: 'row', marginBottom: '3px'}}>
-                                {institution.logo ? (
-                                    <Image src={institution.logo} style={{height: 49, width: 49, objectFit: 'contain'}} />
+                                {leftHeaderLogo ? (
+                                    <Image src={leftHeaderLogo} style={{height: 49, width: 49, objectFit: 'contain'}} />
                                 ) : (
                                     <View style={{height: 49, width: 49}} />
                                 )}
@@ -296,8 +306,8 @@ export default function PrintReportCard({
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica-Bold'}}>Region XII-SOCCSKSARGEN</Text>
                                     <Text style={{fontSize: '8px', fontFamily:'Helvetica'}}>Division of General Santos City</Text>
                                 </View>
-                                {institution.logo ? (
-                                    <Image src={institution.logo} style={{height: 49, width: 49, objectFit: 'contain'}} />
+                                {rightHeaderLogo ? (
+                                    <Image src={rightHeaderLogo} style={{height: 49, width: 49, objectFit: 'contain'}} />
                                 ) : (
                                     <View style={{height: 49, width: 49}} />
                                 )}
@@ -330,7 +340,7 @@ export default function PrintReportCard({
                             </View>
                             
                             <View style={{marginTop: '3px', display: 'flex', flexDirection: 'row', alignSelf: 'flex-start'}}>
-                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px', marginRight: 8}}>Grade: <Text style={{textDecoration: 'underline'}}>{classSection.grade_level}</Text></Text>
+                                <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px', marginRight: 8}}>Grade: <Text style={{textDecoration: 'underline'}}>{formatGradeLevel(classSection.grade_level)}</Text></Text>
                                 <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px'}}>Section: <Text style={{textDecoration: 'underline'}}>{classSection.title}</Text></Text>
                             </View>
                             
@@ -352,7 +362,7 @@ export default function PrintReportCard({
                                     <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Principal</Text>
                                 </View>
                                 <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                    <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
+                                    <Text style={{fontSize: '8px', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
                                     <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Teacher</Text>
                                 </View>
                             </View>
@@ -374,7 +384,7 @@ export default function PrintReportCard({
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Principal</Text>
                                     </View>
                                     <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                        <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
+                                        <Text style={{fontSize: '8px', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Teacher</Text>
                                     </View>
                                 </View>
@@ -521,16 +531,13 @@ export default function PrintReportCard({
                         })}
                         {/* ===== SUBJECTS END =====*/}
                         <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{width: '70%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                            <View style={{width: '90%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>GENERAL AVERAGE</Text>
                             </View>
-                            <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                            <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
                                     {finalGrade > 0 ? finalGrade : ''}
                                 </Text>
-                            </View>
-                            <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}></Text>
                             </View>
                         </View>
 
