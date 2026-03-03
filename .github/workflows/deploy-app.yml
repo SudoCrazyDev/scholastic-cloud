@@ -115,7 +115,8 @@ jobs:
           password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           source: "app-deploy.zip"
-          target: ${{ secrets.DEPLOYMENT_DIRECTORY }}
+          # Upload to a deterministic location first, then move/extract via SSH.
+          target: "/tmp/"
           timeout: "120s"
           debug: true
 
@@ -137,6 +138,9 @@ jobs:
             esac
             cd "$REMOTE_DIR"
             ZIP_FILE="app-deploy.zip"
+            if [ -f "/tmp/$ZIP_FILE" ]; then
+              mv -f "/tmp/$ZIP_FILE" "./$ZIP_FILE"
+            fi
             if [ ! -f "$ZIP_FILE" ]; then
               echo "Zip not found: $ZIP_FILE" && exit 1
             fi
