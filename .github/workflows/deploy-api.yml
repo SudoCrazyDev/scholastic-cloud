@@ -114,6 +114,17 @@ jobs:
           SSH_PORT: ${{ secrets.DEPLOYMENT_SSH_PORT }}
           REMOTE_DIR: ${{ secrets.DEPLOYMENT_REMOTE_DIR }}
 
+      - name: Check SSH reachability
+        run: |
+          if ! timeout 25 bash -c "exec 3<>/dev/tcp/$SSH_HOST/$SSH_PORT" 2>/dev/null; then
+            echo "::error::Cannot reach server (connection timed out). The deployment host must allow inbound TCP on the SSH port from GitHub Actions runners (dynamic IPs). Allow GitHub IPs (https://api.github.com/meta) or use a self-hosted runner. See .github/VIP-DEPLOYMENTS.md#dial-tcp--io-timeout-on-api-sftp-deploy"
+            exit 1
+          fi
+          echo "Server is reachable"
+        env:
+          SSH_HOST: ${{ secrets.DEPLOYMENT_SSH_SERVER }}
+          SSH_PORT: ${{ secrets.DEPLOYMENT_SSH_PORT }}
+
       # SCP/drone-scp require the target directory to exist; it does not create it.
       - name: Ensure remote directory exists
         uses: appleboy/ssh-action@v1.0.3
