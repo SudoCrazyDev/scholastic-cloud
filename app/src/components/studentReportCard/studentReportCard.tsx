@@ -24,7 +24,7 @@ const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
 
 const ACADEMIC_YEAR_MONTHS = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
 const ATTENDANCE_MONTH_LABELS = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
-const DEPED_LOGO_URL = 'https://upload.wikimedia.org/wikipedia/en/thumb/c/c9/Department_of_Education.svg/512px-Department_of_Education.svg.png';
+const DEPED_LOGO_URL = 'https://depedrizal.ph/wp-content/uploads/2018/08/deped-logo.png';
 
 const toAbsoluteUrl = (value?: string) => {
     const raw = String(value || '').trim();
