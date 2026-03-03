@@ -138,12 +138,26 @@ jobs:
             esac
             cd "$REMOTE_DIR"
             ZIP_FILE="app-deploy.zip"
+            STAGE_DIR="/tmp/app-deploy-${{ github.run_id }}-${{ matrix.deployment_target }}"
             if [ -f "/tmp/$ZIP_FILE" ]; then
               mv -f "/tmp/$ZIP_FILE" "./$ZIP_FILE"
             fi
             if [ ! -f "$ZIP_FILE" ]; then
               echo "Zip not found: $ZIP_FILE" && exit 1
             fi
-            unzip -o "$ZIP_FILE"
+            rm -rf "$STAGE_DIR"
+            mkdir -p "$STAGE_DIR"
+            unzip -o "$ZIP_FILE" -d "$STAGE_DIR"
+
+            # Sync staged build into target dir to avoid host-panel "conflict" behavior.
+            if command -v rsync >/dev/null 2>&1; then
+              rsync -a --delete "$STAGE_DIR"/ "$REMOTE_DIR"/
+            else
+              # Fallback when rsync is unavailable.
+              find "$REMOTE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+              cp -a "$STAGE_DIR"/. "$REMOTE_DIR"/
+            fi
+
+            rm -rf "$STAGE_DIR"
             rm -f "$ZIP_FILE"
             echo "App deploy complete in $REMOTE_DIR"
