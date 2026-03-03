@@ -30,6 +30,37 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Validate deployment secrets
+        run: |
+          missing=""
+          [ -z "$ENV_FILE_CONTENT" ]      && missing="$missing ENV_FILE_CONTENT"
+          [ -z "$FTP_SERVER" ]            && missing="$missing DEPLOYMENT_SERVER"
+          [ -z "$FTP_USERNAME" ]          && missing="$missing DEPLOYMENT_USERNAME"
+          [ -z "$FTP_PASSWORD" ]          && missing="$missing DEPLOYMENT_PASSWORD"
+          [ -z "$FTP_REMOTE_DIRECTORY" ]  && missing="$missing DEPLOYMENT_DIRECTORY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing or empty secrets for '${{ matrix.deployment_target }}':$missing"
+            echo "Add them in Settings -> Environments -> ${{ matrix.deployment_target }} -> Environment secrets."
+            exit 1
+          fi
+          echo "All deployment secrets are set for ${{ matrix.deployment_target }} (server length=${#FTP_SERVER}, user length=${#FTP_USERNAME})"
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
+          FTP_SERVER: ${{ secrets.DEPLOYMENT_SERVER }}
+          FTP_USERNAME: ${{ secrets.DEPLOYMENT_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.DEPLOYMENT_PASSWORD }}
+          FTP_REMOTE_DIRECTORY: ${{ secrets.DEPLOYMENT_DIRECTORY }}
+
+      - name: Check FTP reachability
+        run: |
+          if timeout 20 bash -c "exec 3<>/dev/tcp/$FTP_SERVER/21" 2>/dev/null; then
+            echo "FTP server is reachable on port 21"
+          else
+            echo "::warning::Cannot verify FTP on port 21 for $FTP_SERVER. If your host uses a custom FTP/FTPS port, this check may fail while deploy still works. Confirm DEPLOYMENT_SERVER and provider firewall rules."
+          fi
+        env:
+          FTP_SERVER: ${{ secrets.DEPLOYMENT_SERVER }}
+
       - name: Create .env file
         run: |
           cd app

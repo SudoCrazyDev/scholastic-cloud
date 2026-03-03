@@ -137,8 +137,17 @@ jobs:
           script: |
             set -e
             REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
-            case "$REMOTE_DIR" in ~*) REMOTE_DIR="$HOME${REMOTE_DIR#~}";; esac
-            mkdir -p "$REMOTE_DIR"
+            case "$REMOTE_DIR" in
+              "~") REMOTE_DIR="$HOME" ;;
+              "~/"*) REMOTE_DIR="$HOME/${REMOTE_DIR#~/}" ;;
+            esac
+
+            if [ -d "$REMOTE_DIR" ]; then
+              echo "Target directory already exists: $REMOTE_DIR"
+            elif ! mkdir -p "$REMOTE_DIR"; then
+              echo "::error::Cannot create DEPLOYMENT_REMOTE_DIR='$REMOTE_DIR' as user $(whoami). Use a writable absolute path (example: /home/<user>/domains/<site>/public_html/v2/)."
+              exit 1
+            fi
             echo "Target directory ready: $REMOTE_DIR"
 
       - name: Upload deployment zip (SFTP) to ${{ matrix.deployment_target }}
@@ -165,7 +174,14 @@ jobs:
           script: |
             set -e
             REMOTE_DIR="${{ secrets.DEPLOYMENT_REMOTE_DIR }}"
-            case "$REMOTE_DIR" in ~*) REMOTE_DIR="$HOME${REMOTE_DIR#~}";; esac
+            case "$REMOTE_DIR" in
+              "~") REMOTE_DIR="$HOME" ;;
+              "~/"*) REMOTE_DIR="$HOME/${REMOTE_DIR#~/}" ;;
+            esac
+            if [ ! -d "$REMOTE_DIR" ]; then
+              echo "::error::Deployment directory does not exist or is not accessible: $REMOTE_DIR"
+              exit 1
+            fi
             cd "$REMOTE_DIR"
             echo "Working in: $REMOTE_DIR ($(pwd))"
             ls -la
