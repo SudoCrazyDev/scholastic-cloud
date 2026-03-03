@@ -99,13 +99,20 @@ jobs:
               "~") REMOTE_DIR="$HOME" ;;
               "~/"*) REMOTE_DIR="$HOME/${REMOTE_DIR#~/}" ;;
             esac
-            if [ -d "$REMOTE_DIR" ]; then
-              echo "Target directory already exists: $REMOTE_DIR"
-            elif ! mkdir -p "$REMOTE_DIR"; then
-              echo "::error::Cannot create DEPLOYMENT_REMOTE_DIR='$REMOTE_DIR' as user $(whoami). Use a writable absolute path."
+            case "$REMOTE_DIR" in
+              ""|"/"|"$HOME"|"."|"./")
+                echo "::error::Unsafe DEPLOYMENT_REMOTE_DIR='$REMOTE_DIR'. Use a dedicated app directory (example: /home/<user>/domains/<site>/public_html/app/)."
+                exit 1
+                ;;
+            esac
+            APP_DIR="$REMOTE_DIR/app"
+            if [ -d "$APP_DIR" ]; then
+              echo "Target app directory already exists: $APP_DIR"
+            elif ! mkdir -p "$APP_DIR"; then
+              echo "::error::Cannot create target app directory '$APP_DIR' as user $(whoami). Use a writable absolute path."
               exit 1
             fi
-            echo "Target directory ready: $REMOTE_DIR"
+            echo "Target app directory ready: $APP_DIR"
 
       - name: Upload app package (SFTP) to ${{ matrix.deployment_target }}
         uses: appleboy/scp-action@v0.1.7
@@ -136,7 +143,15 @@ jobs:
               "~") REMOTE_DIR="$HOME" ;;
               "~/"*) REMOTE_DIR="$HOME/${REMOTE_DIR#~/}" ;;
             esac
-            cd "$REMOTE_DIR"
+            case "$REMOTE_DIR" in
+              ""|"/"|"$HOME"|"."|"./")
+                echo "::error::Unsafe DEPLOYMENT_REMOTE_DIR='$REMOTE_DIR'. Aborting deploy."
+                exit 1
+                ;;
+            esac
+            APP_DIR="$REMOTE_DIR/app"
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
             ZIP_FILE="app-deploy.zip"
             STAGE_DIR="/tmp/app-deploy-${{ github.run_id }}-${{ matrix.deployment_target }}"
             if [ -f "/tmp/$ZIP_FILE" ]; then
@@ -149,15 +164,14 @@ jobs:
             mkdir -p "$STAGE_DIR"
             unzip -o "$ZIP_FILE" -d "$STAGE_DIR"
 
-            # Sync staged build into target dir to avoid host-panel "conflict" behavior.
+            # Sync staged build into app subdirectory only.
             if command -v rsync >/dev/null 2>&1; then
-              rsync -a --delete "$STAGE_DIR"/ "$REMOTE_DIR"/
+              rsync -a "$STAGE_DIR"/ "$APP_DIR"/
             else
               # Fallback when rsync is unavailable.
-              find "$REMOTE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-              cp -a "$STAGE_DIR"/. "$REMOTE_DIR"/
+              cp -a "$STAGE_DIR"/. "$APP_DIR"/
             fi
 
             rm -rf "$STAGE_DIR"
             rm -f "$ZIP_FILE"
-            echo "App deploy complete in $REMOTE_DIR"
+            echo "App deploy complete in $APP_DIR"
