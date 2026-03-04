@@ -37,6 +37,8 @@ import { TakeAssessment } from './pages/MyAssessments';
 import MyPersonalInfo from './pages/MyPersonalInfo';
 import MySubjects from './pages/MySubjects';
 import MyFinance from './pages/MyFinance';
+import GateEnter from './pages/Gate/GateEnter';
+import GateExit from './pages/Gate/GateExit';
 
 
 function App() {
@@ -53,6 +55,10 @@ function App() {
 
             {/* Set New Password Route - Separate from PrivateLayout */}
             <Route path="set-new-password" element={<SetNewPassword />} />
+
+            {/* Public Kiosk Gate Pages */}
+            <Route path="gate-enter" element={<GateEnter />} />
+            <Route path="gate-exit" element={<GateExit />} />
 
             {/* Private Routes */}
             <Route element={<PrivateLayout />}>

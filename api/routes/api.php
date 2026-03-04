@@ -50,6 +50,9 @@ Route::post('/payments/webhooks/maya', [InternalPaymentCallbackController::class
 // Backward-compatible alias.
 Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
 
+// Public kiosk endpoint for RFID gate scanners
+Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan']);
+
 // Protected routes (authentication required)
 Route::middleware('auth.token')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

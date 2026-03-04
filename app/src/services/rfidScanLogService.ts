@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { RfidScanLog, CreateRfidScanLogData, RfidScanRequest } from '../types'
+import type { RfidScanLog, CreateRfidScanLogData, RfidScanRequest, KioskScanRequest, KioskScanResponse } from '../types'
 
 class RfidScanLogService {
   private baseUrl = '/rfid-scan-logs'
@@ -57,6 +57,14 @@ class RfidScanLogService {
 
   async deleteLog(id: string) {
     const response = await api.delete<{ success: boolean; message: string }>(`${this.baseUrl}/${id}`)
+    return response.data
+  }
+
+  async kioskScan(data: KioskScanRequest) {
+    const response = await api.post<{ success: boolean; message: string; data: KioskScanResponse }>(
+      '/kiosk/scan',
+      data
+    )
     return response.data
   }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\RfidScanLog;
 use App\Models\StudentRfidTag;
+use App\Models\StudentSection;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -118,6 +119,74 @@ class RfidScanLogController extends Controller
                 'success' => true,
                 'message' => 'Scan recorded — ' . $type,
                 'data' => $log,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to record scan',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Public kiosk scan endpoint — no auth required.
+     * Used by gate-enter / gate-exit kiosk pages.
+     * Accepts a forced type so each gate always records the correct direction.
+     */
+    public function kioskScan(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'rfid_uid' => 'required|string|max:255',
+            'institution_id' => 'required|uuid|exists:institutions,id',
+            'type' => 'required|in:enter,exit',
+            'device_name' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $tag = StudentRfidTag::where('rfid_uid', $request->rfid_uid)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$tag) {
+            return response()->json([
+                'success' => false,
+                'message' => 'RFID tag not recognized or inactive',
+            ], 404);
+        }
+
+        try {
+            $log = RfidScanLog::create([
+                'student_rfid_tag_id' => $tag->id,
+                'student_id' => $tag->student_id,
+                'institution_id' => $request->institution_id,
+                'scanned_at' => now(),
+                'type' => $request->type,
+                'device_name' => $request->device_name,
+            ]);
+
+            $log->load(['student', 'studentRfidTag', 'institution']);
+
+            $activeSection = StudentSection::with('classSection')
+                ->where('student_id', $tag->student_id)
+                ->where('is_active', true)
+                ->latest()
+                ->first();
+
+            $response = $log->toArray();
+            $response['class_section'] = $activeSection?->classSection;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Scan recorded — ' . $request->type,
+                'data' => $response,
             ], 201);
         } catch (\Exception $e) {
             return response()->json([

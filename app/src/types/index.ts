@@ -962,6 +962,17 @@ export interface RfidScanRequest {
   device_name?: string;
 }
 
+export interface KioskScanRequest {
+  rfid_uid: string;
+  institution_id: string;
+  type: 'enter' | 'exit';
+  device_name?: string;
+}
+
+export interface KioskScanResponse extends RfidScanLog {
+  class_section?: ClassSection;
+}
+
 // School Days types
 export interface SchoolDay {
   id: string;
