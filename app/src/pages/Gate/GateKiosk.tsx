@@ -132,11 +132,13 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
     : null;
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center ${
-      isEnter
-        ? 'bg-gradient-to-br from-emerald-950 via-gray-950 to-emerald-950'
-        : 'bg-gradient-to-br from-rose-950 via-gray-950 to-rose-950'
-    } text-white select-none overflow-hidden relative`}>
+    <div
+      className={`min-h-screen flex flex-col items-center justify-between text-white select-none overflow-hidden relative ${
+        isEnter
+          ? 'bg-gradient-to-b from-gray-950 via-gray-950 to-emerald-950/40'
+          : 'bg-gradient-to-b from-gray-950 via-gray-950 to-rose-950/40'
+      }`}
+    >
       {/* Hidden RFID input */}
       <input
         ref={inputRef}
@@ -148,221 +150,274 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
         aria-hidden="true"
       />
 
-      {/* Gate label */}
-      <div className="absolute top-8 left-1/2 -translate-x-1/2">
-        <div className={`px-6 py-2 rounded-full border ${
-          isEnter
-            ? 'border-emerald-500/30 bg-emerald-500/10'
-            : 'border-rose-500/30 bg-rose-500/10'
-        }`}>
-          <span className={`text-sm font-bold tracking-[0.3em] ${
-            isEnter ? 'text-emerald-400' : 'text-rose-400'
-          }`}>
+      {/* ───── Header ───── */}
+      <header className="w-full flex items-center justify-between px-8 pt-6 pb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+              isEnter ? 'bg-emerald-400' : 'bg-rose-400'
+            }`}
+          />
+          <span className="text-sm text-gray-500 font-medium">{deviceName}</span>
+        </div>
+
+        <div
+          className={`px-5 py-1.5 rounded-full border ${
+            isEnter
+              ? 'border-emerald-500/25 bg-emerald-500/8'
+              : 'border-rose-500/25 bg-rose-500/8'
+          }`}
+        >
+          <span
+            className={`text-xs font-bold tracking-[0.25em] ${
+              isEnter ? 'text-emerald-400' : 'text-rose-400'
+            }`}
+          >
             {label}
           </span>
         </div>
-      </div>
 
-      {/* Clock */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-12"
-      >
-        <div className="text-8xl font-extralight tracking-wider tabular-nums">
+        <span className="text-sm text-gray-500 tabular-nums font-medium">
           {formattedTime}
-        </div>
-        <div className="text-xl text-gray-400 mt-3 tracking-wide">
-          {formattedDate}
-        </div>
-      </motion.div>
+        </span>
+      </header>
 
-      {/* Scan area */}
-      <div className="w-full max-w-xl px-8">
-        <AnimatePresence mode="wait">
-          {scanResult ? (
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-              className={`rounded-3xl border p-8 text-center ${
-                isEnter
-                  ? 'border-emerald-500/30 bg-emerald-500/5 shadow-[0_0_60px_rgba(16,185,129,0.15)]'
-                  : 'border-rose-500/30 bg-rose-500/5 shadow-[0_0_60px_rgba(244,63,94,0.15)]'
-              }`}
-            >
-              {/* Status badge */}
+      {/* ───── Main Content ───── */}
+      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-xl px-8">
+        {/* Clock */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-14"
+        >
+          <div className="text-[6.5rem] leading-none font-extralight tracking-wider tabular-nums">
+            {formattedTime}
+          </div>
+          <div className="text-lg text-gray-500 mt-4 tracking-wide font-light">
+            {formattedDate}
+          </div>
+        </motion.div>
+
+        {/* Scan Area */}
+        <div className="w-full">
+          <AnimatePresence mode="wait">
+            {scanResult ? (
+              /* ── Scan Result Card ── */
               <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.15, type: 'spring', stiffness: 300, damping: 20 }}
-                className={`inline-flex items-center gap-2 px-5 py-2 rounded-full mb-6 ${
+                key="result"
+                initial={{ opacity: 0, scale: 0.92, y: 24 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: -24 }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className={`rounded-3xl border backdrop-blur-sm p-10 text-center ${
                   isEnter
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/20 text-rose-300'
+                    ? 'border-emerald-500/20 bg-emerald-500/[0.04] shadow-[0_0_80px_-12px_rgba(16,185,129,0.2)]'
+                    : 'border-rose-500/20 bg-rose-500/[0.04] shadow-[0_0_80px_-12px_rgba(244,63,94,0.2)]'
                 }`}
               >
-                {isEnter ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
-                )}
-                <span className="font-semibold text-sm tracking-wider uppercase">
-                  {isEnter ? 'Welcome' : 'Goodbye'}
-                </span>
-              </motion.div>
-
-              {/* Profile picture */}
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 20 }}
-                className="flex justify-center mb-6"
-              >
-                <div className={`w-32 h-32 rounded-full border-4 overflow-hidden ${
-                  isEnter ? 'border-emerald-500/50' : 'border-rose-500/50'
-                } bg-gray-800`}>
-                  {scanResult.student?.profile_picture ? (
-                    <img
-                      src={scanResult.student.profile_picture}
-                      alt={studentName}
-                      className="w-full h-full object-cover"
-                    />
+                {/* Status badge */}
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 22 }}
+                  className={`inline-flex items-center gap-2.5 px-5 py-2 rounded-full mb-8 ${
+                    isEnter
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : 'bg-rose-500/15 text-rose-300'
+                  }`}
+                >
+                  {isEnter ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                      <polyline points="10 17 15 12 10 7" />
+                      <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                      </svg>
-                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
                   )}
+                  <span className="font-semibold text-sm tracking-wider uppercase">
+                    {isEnter ? 'Welcome' : 'Goodbye'}
+                  </span>
+                </motion.div>
+
+                {/* Profile picture */}
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 20 }}
+                  className="flex justify-center mb-6"
+                >
+                  <div
+                    className={`w-28 h-28 rounded-full border-[3px] overflow-hidden ${
+                      isEnter ? 'border-emerald-500/40' : 'border-rose-500/40'
+                    } bg-gray-800/60`}
+                  >
+                    {scanResult.student?.profile_picture ? (
+                      <img
+                        src={scanResult.student.profile_picture}
+                        alt={studentName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-14 h-14 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Student name */}
+                <motion.h2
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                  className="text-3xl font-bold mb-1.5"
+                >
+                  {studentName}
+                </motion.h2>
+
+                {/* Grade level and section */}
+                {gradeAndSection && (
+                  <motion.p
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35 }}
+                    className="text-base text-gray-400"
+                  >
+                    {gradeAndSection}
+                  </motion.p>
+                )}
+
+                {/* Timestamp */}
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.45 }}
+                  className="text-sm text-gray-600 mt-5"
+                >
+                  Scanned at{' '}
+                  {new Date(scanResult.scanned_at).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true,
+                  })}
+                </motion.p>
+
+                {/* Auto-dismiss progress bar */}
+                <div className="mt-8 mx-auto max-w-[12rem]">
+                  <div className="h-px bg-gray-800 rounded-full overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full ${
+                        isEnter ? 'bg-emerald-500/60' : 'bg-rose-500/60'
+                      }`}
+                      initial={{ width: '100%' }}
+                      animate={{ width: '0%' }}
+                      transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
+                    />
+                  </div>
                 </div>
               </motion.div>
-
-              {/* Student name */}
-              <motion.h2
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-3xl font-bold mb-2"
+            ) : error ? (
+              /* ── Error Card ── */
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, scale: 0.92, y: 24 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: -24 }}
+                transition={{ duration: 0.3 }}
+                className="rounded-3xl border border-red-500/20 bg-red-500/[0.04] backdrop-blur-sm p-10 text-center shadow-[0_0_80px_-12px_rgba(239,68,68,0.15)]"
               >
-                {studentName}
-              </motion.h2>
-
-              {/* Grade level and section */}
-              {gradeAndSection && (
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="text-lg text-gray-400"
-                >
-                  {gradeAndSection}
-                </motion.p>
-              )}
-
-              {/* Timestamp */}
-              <motion.p
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-500/15 mb-5">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                </div>
+                <p className="text-xl font-semibold text-red-300 mb-1">{error}</p>
+                <p className="text-sm text-gray-600">Please try again</p>
+                <div className="mt-8 mx-auto max-w-[12rem]">
+                  <div className="h-px bg-gray-800 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-red-500/60"
+                      initial={{ width: '100%' }}
+                      animate={{ width: '0%' }}
+                      transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              /* ── Idle / Waiting for scan ── */
+              <motion.div
+                key="idle"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="text-sm text-gray-500 mt-4"
+                exit={{ opacity: 0 }}
+                className="text-center"
               >
-                Scanned at{' '}
-                {new Date(scanResult.scanned_at).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: true,
-                })}
-              </motion.p>
-
-              {/* Auto-dismiss progress bar */}
-              <div className="mt-6 mx-auto max-w-xs">
-                <motion.div
-                  className={`h-1 rounded-full ${
-                    isEnter ? 'bg-emerald-500/40' : 'bg-rose-500/40'
-                  }`}
-                  initial={{ width: '100%' }}
-                  animate={{ width: '0%' }}
-                  transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
-                />
-              </div>
-            </motion.div>
-          ) : error ? (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="rounded-3xl border border-red-500/30 bg-red-500/5 p-8 text-center shadow-[0_0_60px_rgba(239,68,68,0.15)]"
-            >
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                </svg>
-              </div>
-              <p className="text-xl font-semibold text-red-300">{error}</p>
-              <div className="mt-6 mx-auto max-w-xs">
-                <motion.div
-                  className="h-1 rounded-full bg-red-500/40"
-                  initial={{ width: '100%' }}
-                  animate={{ width: '0%' }}
-                  transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
-                />
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="idle"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="text-center"
-            >
-              {/* Pulsing scan indicator */}
-              <div className="relative inline-flex items-center justify-center mb-6">
-                <motion.div
-                  className={`absolute w-28 h-28 rounded-full ${
-                    isEnter ? 'bg-emerald-500/10' : 'bg-rose-500/10'
-                  }`}
-                  animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                />
-                <motion.div
-                  className={`absolute w-28 h-28 rounded-full ${
-                    isEnter ? 'bg-emerald-500/10' : 'bg-rose-500/10'
-                  }`}
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0, 0.2] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-                />
-                <div className={`relative w-20 h-20 rounded-full flex items-center justify-center ${
-                  isEnter ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
-                }`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
-                  </svg>
+                {/* Pulsing scan indicator */}
+                <div className="relative inline-flex items-center justify-center mb-8">
+                  <motion.div
+                    className={`absolute w-32 h-32 rounded-full ${
+                      isEnter ? 'bg-emerald-500/8' : 'bg-rose-500/8'
+                    }`}
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.4, 0, 0.4] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                  <motion.div
+                    className={`absolute w-32 h-32 rounded-full ${
+                      isEnter ? 'bg-emerald-500/6' : 'bg-rose-500/6'
+                    }`}
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0, 0.3] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
+                  />
+                  <div
+                    className={`relative w-24 h-24 rounded-full flex items-center justify-center border ${
+                      isEnter
+                        ? 'bg-emerald-500/8 text-emerald-400 border-emerald-500/15'
+                        : 'bg-rose-500/8 text-rose-400 border-rose-500/15'
+                    }`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="5" width="20" height="14" rx="2" />
+                      <line x1="2" y1="10" x2="22" y2="10" />
+                    </svg>
+                  </div>
                 </div>
-              </div>
 
-              <p className={`text-2xl font-light ${
-                isEnter ? 'text-emerald-300/70' : 'text-rose-300/70'
-              }`}>
-                Scan your ID to {isEnter ? 'enter' : 'exit'}
-              </p>
-              <p className="text-sm text-gray-600 mt-2">
-                Place your ID card on the scanner
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                <p
+                  className={`text-2xl font-light ${
+                    isEnter ? 'text-emerald-300/70' : 'text-rose-300/70'
+                  }`}
+                >
+                  Scan your ID to {isEnter ? 'enter' : 'exit'}
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Place your ID card on the scanner
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </main>
+
+      {/* ───── Footer ───── */}
+      <footer className="w-full px-8 pb-5 pt-4">
+        <div className="flex items-center justify-center gap-2 text-gray-700 text-xs">
+          <span>ScholasticCloud</span>
+          <span>·</span>
+          <span className="capitalize">{type} Kiosk</span>
+        </div>
+      </footer>
     </div>
   );
 };
