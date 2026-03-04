@@ -488,6 +488,7 @@ export default function PrintReportCard({
                             const subjectRemarks = getPassFailRemarks(subjectFinalGrade);
                             const displayTitle = subject.variant ? `${subject.title} - ${subject.variant}` : subject.title;
                             const isChild = subject.subject_type === 'child';
+                            const showFinalAndRemarks = !isChild && subjectFinalGrade > 0;
                             
                             return (
                                 <View key={subject.id} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
@@ -518,12 +519,12 @@ export default function PrintReportCard({
                                     </View>
                                     <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                            {subjectFinalGrade > 0 ? subjectFinalGrade : ''}
+                                            {showFinalAndRemarks ? subjectFinalGrade : ''}
                                         </Text>
                                     </View>
                                     <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', padding: '2px'}}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                            {subjectFinalGrade > 0 ? subjectRemarks : ''}
+                                            {showFinalAndRemarks ? subjectRemarks : ''}
                                         </Text>
                                     </View>
                                 </View>

@@ -204,6 +204,8 @@ export default function PrintTempReportCard({
                             const finalGradeNum = computeFinalGradeFromQuarters(q1, q2, q3, q4);
                             const finalGrade = finalGradeNum > 0 ? String(finalGradeNum) : '';
                             const remarks = finalGradeNum > 0 ? getPassFailRemarks(finalGradeNum) : '';
+                            const isChild = subject.subject_type === 'child';
+                            const showFinalAndRemarks = SHOW_FINAL_GRADE_AND_REMARKS_VALUES && !isChild;
 
                             return (
                               <View key={index} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
@@ -225,10 +227,10 @@ export default function PrintTempReportCard({
                                   </View>
                                 </View>
                                 <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{SHOW_FINAL_GRADE_AND_REMARKS_VALUES ? finalGrade : ''}</Text>
+                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{showFinalAndRemarks ? finalGrade : ''}</Text>
                                 </View>
                                 <View style={{width: '20%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center'}}>
-                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{SHOW_FINAL_GRADE_AND_REMARKS_VALUES ? remarks : ''}</Text>
+                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{showFinalAndRemarks ? remarks : ''}</Text>
                                 </View>
                               </View>
                             );
