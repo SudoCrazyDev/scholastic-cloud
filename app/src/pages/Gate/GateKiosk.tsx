@@ -133,10 +133,10 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
 
   return (
     <div
-      className={`min-h-screen flex flex-col items-center justify-between text-white select-none overflow-hidden relative ${
+      className={`min-h-screen flex flex-col items-center justify-between select-none overflow-hidden relative ${
         isEnter
-          ? 'bg-gradient-to-b from-gray-950 via-gray-950 to-emerald-950/40'
-          : 'bg-gradient-to-b from-gray-950 via-gray-950 to-rose-950/40'
+          ? 'bg-gradient-to-b from-white via-emerald-50/40 to-emerald-100/50 text-gray-900'
+          : 'bg-gradient-to-b from-white via-rose-50/40 to-rose-100/50 text-gray-900'
       }`}
     >
       {/* Hidden RFID input */}
@@ -155,29 +155,29 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
         <div className="flex items-center gap-3">
           <div
             className={`w-2.5 h-2.5 rounded-full animate-pulse ${
-              isEnter ? 'bg-emerald-400' : 'bg-rose-400'
+              isEnter ? 'bg-emerald-500' : 'bg-rose-500'
             }`}
           />
-          <span className="text-sm text-gray-500 font-medium">{deviceName}</span>
+          <span className="text-sm text-gray-400 font-medium">{deviceName}</span>
         </div>
 
         <div
           className={`px-5 py-1.5 rounded-full border ${
             isEnter
-              ? 'border-emerald-500/25 bg-emerald-500/8'
-              : 'border-rose-500/25 bg-rose-500/8'
+              ? 'border-emerald-300 bg-emerald-50'
+              : 'border-rose-300 bg-rose-50'
           }`}
         >
           <span
             className={`text-xs font-bold tracking-[0.25em] ${
-              isEnter ? 'text-emerald-400' : 'text-rose-400'
+              isEnter ? 'text-emerald-700' : 'text-rose-700'
             }`}
           >
             {label}
           </span>
         </div>
 
-        <span className="text-sm text-gray-500 tabular-nums font-medium">
+        <span className="text-sm text-gray-400 tabular-nums font-medium">
           {formattedTime}
         </span>
       </header>
@@ -190,10 +190,10 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-14"
         >
-          <div className="text-[6.5rem] leading-none font-extralight tracking-wider tabular-nums">
+          <div className="text-[6.5rem] leading-none font-extralight tracking-wider tabular-nums text-gray-800">
             {formattedTime}
           </div>
-          <div className="text-lg text-gray-500 mt-4 tracking-wide font-light">
+          <div className="text-lg text-gray-400 mt-4 tracking-wide font-light">
             {formattedDate}
           </div>
         </motion.div>
@@ -211,8 +211,8 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                 transition={{ duration: 0.35, ease: 'easeOut' }}
                 className={`rounded-3xl border backdrop-blur-sm p-10 text-center ${
                   isEnter
-                    ? 'border-emerald-500/20 bg-emerald-500/[0.04] shadow-[0_0_80px_-12px_rgba(16,185,129,0.2)]'
-                    : 'border-rose-500/20 bg-rose-500/[0.04] shadow-[0_0_80px_-12px_rgba(244,63,94,0.2)]'
+                    ? 'border-emerald-200 bg-white/80 shadow-[0_4px_40px_-8px_rgba(16,185,129,0.15)]'
+                    : 'border-rose-200 bg-white/80 shadow-[0_4px_40px_-8px_rgba(244,63,94,0.15)]'
                 }`}
               >
                 {/* Status badge */}
@@ -222,8 +222,8 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 22 }}
                   className={`inline-flex items-center gap-2.5 px-5 py-2 rounded-full mb-8 ${
                     isEnter
-                      ? 'bg-emerald-500/15 text-emerald-300'
-                      : 'bg-rose-500/15 text-rose-300'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200'
                   }`}
                 >
                   {isEnter ? (
@@ -253,8 +253,8 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                 >
                   <div
                     className={`w-28 h-28 rounded-full border-[3px] overflow-hidden ${
-                      isEnter ? 'border-emerald-500/40' : 'border-rose-500/40'
-                    } bg-gray-800/60`}
+                      isEnter ? 'border-emerald-300' : 'border-rose-300'
+                    } bg-gray-100`}
                   >
                     {scanResult.student?.profile_picture ? (
                       <img
@@ -264,7 +264,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-14 h-14 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-14 h-14 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                           <circle cx="12" cy="7" r="4" />
                         </svg>
@@ -278,7 +278,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.25 }}
-                  className="text-3xl font-bold mb-1.5"
+                  className="text-3xl font-bold text-gray-900 mb-1.5"
                 >
                   {studentName}
                 </motion.h2>
@@ -289,7 +289,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.35 }}
-                    className="text-base text-gray-400"
+                    className="text-base text-gray-500"
                   >
                     {gradeAndSection}
                   </motion.p>
@@ -300,7 +300,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.45 }}
-                  className="text-sm text-gray-600 mt-5"
+                  className="text-sm text-gray-400 mt-5"
                 >
                   Scanned at{' '}
                   {new Date(scanResult.scanned_at).toLocaleTimeString('en-US', {
@@ -313,10 +313,10 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
 
                 {/* Auto-dismiss progress bar */}
                 <div className="mt-8 mx-auto max-w-[12rem]">
-                  <div className="h-px bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-px bg-gray-200 rounded-full overflow-hidden">
                     <motion.div
                       className={`h-full rounded-full ${
-                        isEnter ? 'bg-emerald-500/60' : 'bg-rose-500/60'
+                        isEnter ? 'bg-emerald-500' : 'bg-rose-500'
                       }`}
                       initial={{ width: '100%' }}
                       animate={{ width: '0%' }}
@@ -333,21 +333,21 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.92, y: -24 }}
                 transition={{ duration: 0.3 }}
-                className="rounded-3xl border border-red-500/20 bg-red-500/[0.04] backdrop-blur-sm p-10 text-center shadow-[0_0_80px_-12px_rgba(239,68,68,0.15)]"
+                className="rounded-3xl border border-red-200 bg-white/80 backdrop-blur-sm p-10 text-center shadow-[0_4px_40px_-8px_rgba(239,68,68,0.12)]"
               >
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-500/15 mb-5">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-50 border border-red-200 mb-5">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="15" y1="9" x2="9" y2="15" />
                     <line x1="9" y1="9" x2="15" y2="15" />
                   </svg>
                 </div>
-                <p className="text-xl font-semibold text-red-300 mb-1">{error}</p>
-                <p className="text-sm text-gray-600">Please try again</p>
+                <p className="text-xl font-semibold text-red-600 mb-1">{error}</p>
+                <p className="text-sm text-gray-400">Please try again</p>
                 <div className="mt-8 mx-auto max-w-[12rem]">
-                  <div className="h-px bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-px bg-gray-200 rounded-full overflow-hidden">
                     <motion.div
-                      className="h-full rounded-full bg-red-500/60"
+                      className="h-full rounded-full bg-red-500"
                       initial={{ width: '100%' }}
                       animate={{ width: '0%' }}
                       transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
@@ -368,23 +368,23 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                 <div className="relative inline-flex items-center justify-center mb-8">
                   <motion.div
                     className={`absolute w-32 h-32 rounded-full ${
-                      isEnter ? 'bg-emerald-500/8' : 'bg-rose-500/8'
+                      isEnter ? 'bg-emerald-200/40' : 'bg-rose-200/40'
                     }`}
-                    animate={{ scale: [1, 1.5, 1], opacity: [0.4, 0, 0.4] }}
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
                     transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                   />
                   <motion.div
                     className={`absolute w-32 h-32 rounded-full ${
-                      isEnter ? 'bg-emerald-500/6' : 'bg-rose-500/6'
+                      isEnter ? 'bg-emerald-200/30' : 'bg-rose-200/30'
                     }`}
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0, 0.3] }}
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
                     transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
                   />
                   <div
                     className={`relative w-24 h-24 rounded-full flex items-center justify-center border ${
                       isEnter
-                        ? 'bg-emerald-500/8 text-emerald-400 border-emerald-500/15'
-                        : 'bg-rose-500/8 text-rose-400 border-rose-500/15'
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                        : 'bg-rose-50 text-rose-600 border-rose-200'
                     }`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -396,12 +396,12 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
 
                 <p
                   className={`text-2xl font-light ${
-                    isEnter ? 'text-emerald-300/70' : 'text-rose-300/70'
+                    isEnter ? 'text-emerald-700' : 'text-rose-700'
                   }`}
                 >
                   Scan your ID to {isEnter ? 'enter' : 'exit'}
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-gray-400 mt-2">
                   Place your ID card on the scanner
                 </p>
               </motion.div>
@@ -412,7 +412,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
 
       {/* ───── Footer ───── */}
       <footer className="w-full px-8 pb-5 pt-4">
-        <div className="flex items-center justify-center gap-2 text-gray-700 text-xs">
+        <div className="flex items-center justify-center gap-2 text-gray-300 text-xs">
           <span>ScholasticCloud</span>
           <span>·</span>
           <span className="capitalize">{type} Kiosk</span>
