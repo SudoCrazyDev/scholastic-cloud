@@ -1,0 +1,36 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('rfid_scan_logs', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('student_rfid_tag_id')->constrained('student_rfid_tags')->onDelete('cascade');
+            $table->foreignUuid('student_id')->constrained('students')->onDelete('cascade');
+            $table->foreignUuid('institution_id')->constrained('institutions')->onDelete('cascade');
+            $table->dateTime('scanned_at');
+            $table->string('type'); // 'enter' or 'exit'
+            $table->string('device_name')->nullable();
+            $table->timestamps();
+
+            $table->index(['student_id', 'scanned_at']);
+            $table->index(['institution_id', 'scanned_at']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('rfid_scan_logs');
+    }
+};
