@@ -909,6 +909,59 @@ export interface TeacherAttendanceSummary {
   total_hours?: number;
 }
 
+// Student RFID Tag types
+export interface StudentRfidTag {
+  id: string;
+  student_id: string;
+  rfid_uid: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  student?: Student;
+}
+
+export interface CreateStudentRfidTagData {
+  student_id: string;
+  rfid_uid: string;
+  is_active?: boolean;
+}
+
+export interface UpdateStudentRfidTagData {
+  rfid_uid?: string;
+  is_active?: boolean;
+}
+
+// RFID Scan Log types
+export interface RfidScanLog {
+  id: string;
+  student_rfid_tag_id: string;
+  student_id: string;
+  institution_id: string;
+  scanned_at: string;
+  type: 'enter' | 'exit';
+  device_name?: string;
+  created_at: string;
+  updated_at: string;
+  student?: Student;
+  student_rfid_tag?: StudentRfidTag;
+  institution?: Institution;
+}
+
+export interface CreateRfidScanLogData {
+  student_rfid_tag_id: string;
+  student_id: string;
+  institution_id: string;
+  scanned_at: string;
+  type: 'enter' | 'exit';
+  device_name?: string;
+}
+
+export interface RfidScanRequest {
+  rfid_uid: string;
+  institution_id: string;
+  device_name?: string;
+}
+
 // School Days types
 export interface SchoolDay {
   id: string;
