@@ -101,9 +101,26 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     if (paymentResult === 'success') {
       setOnlinePaymentMessage('Payment completed. We are syncing your ledger now.')
       setOnlinePaymentError(null)
-      queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
-      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
-      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+      const pendingId = sessionStorage.getItem('pendingMayaTransactionId')
+      if (pendingId) {
+        sessionStorage.removeItem('pendingMayaTransactionId')
+        studentOnlinePaymentService
+          .getTransaction(pendingId)
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
+            queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+            queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+          })
+          .catch(() => {
+            queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
+            queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+            queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+          })
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
+        queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+        queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+      }
     } else if (paymentResult === 'failure') {
       setOnlinePaymentError('Payment failed. You may retry the checkout.')
       setOnlinePaymentMessage(null)
@@ -159,6 +176,10 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       setOnlinePaymentMessage('Redirecting to Maya Checkout...')
       const redirectUrl = response.data.redirect_url || response.data.checkout_url
       if (redirectUrl) {
+        const transactionId = response.data?.id
+        if (transactionId) {
+          sessionStorage.setItem('pendingMayaTransactionId', transactionId)
+        }
         window.location.href = redirectUrl
       } else {
         setOnlinePaymentError('Checkout created but no redirect URL was returned.')

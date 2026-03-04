@@ -6,6 +6,7 @@ use App\Models\StudentOnlinePaymentTransaction;
 use App\Services\Payments\OnlinePaymentTransactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class InternalPaymentCallbackController extends Controller
 {
@@ -18,7 +19,13 @@ class InternalPaymentCallbackController extends Controller
      */
     public function mayaStatus(Request $request): JsonResponse
     {
+        Log::info('Maya webhook received', [
+            'url' => $request->fullUrl(),
+            'method' => $request->method(),
+        ]);
+
         if (!$this->verifyWebhookSignature($request)) {
+            Log::warning('Maya webhook signature verification failed');
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid webhook signature'
@@ -27,11 +34,25 @@ class InternalPaymentCallbackController extends Controller
 
         $payload = $request->all();
         $requestReferenceNumber = (string) ($payload['requestReferenceNumber'] ?? '');
-        $providerPaymentId = (string) ($payload['id'] ?? '');
+        // Pay With Maya (Single Payment) sends paymentId; Checkout may send id
+        $providerPaymentId = (string) ($payload['paymentId'] ?? $payload['id'] ?? '');
         $status = $this->mapMayaStatus($payload);
         $paymentStatus = (string) ($payload['paymentStatus'] ?? '');
 
+        // Log full payload (sanitized) to debug why status may be pending – Maya may use different keys per event
+        $payloadForLog = $payload;
+        unset($payloadForLog['paymentDetails'], $payloadForLog['card'], $payloadForLog['metadata']);
+        Log::info('Maya webhook payload', [
+            'request_reference_number' => $requestReferenceNumber,
+            'provider_payment_id' => $providerPaymentId,
+            'status' => $status,
+            'payment_status' => $paymentStatus,
+            'payload_keys' => array_keys($payload),
+            'payload_sanitized' => $payloadForLog,
+        ]);
+
         if ($requestReferenceNumber === '' && $providerPaymentId === '') {
+            Log::warning('Maya webhook payload missing identifiers');
             return response()->json([
                 'success' => false,
                 'message' => 'Webhook payload missing identifiers'
@@ -58,6 +79,10 @@ class InternalPaymentCallbackController extends Controller
         }
 
         if (!$transaction) {
+            Log::info('Maya webhook: no matching transaction found', [
+                'request_reference_number' => $requestReferenceNumber,
+                'provider_payment_id' => $providerPaymentId,
+            ]);
             return response()->json([
                 'success' => true,
                 'message' => 'No matching transaction found; webhook acknowledged'
@@ -78,6 +103,12 @@ class InternalPaymentCallbackController extends Controller
         ];
 
         $updatedTransaction = $this->transactionService->applyGatewayUpdate($transaction, $normalized);
+
+        Log::info('Maya webhook processed successfully', [
+            'transaction_id' => $updatedTransaction->id,
+            'status' => $updatedTransaction->status,
+            'completed_payment_id' => $updatedTransaction->completed_payment_id,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -118,10 +149,12 @@ class InternalPaymentCallbackController extends Controller
     {
         $status = strtoupper((string) ($payload['status'] ?? ''));
         $paymentStatus = strtoupper((string) ($payload['paymentStatus'] ?? ''));
+        $event = strtoupper((string) ($payload['event'] ?? $payload['type'] ?? ''));
 
         if (
-            in_array($status, ['COMPLETED', 'CAPTURED', 'SUCCESS', 'PAID'], true) ||
-            $paymentStatus === 'PAYMENT_SUCCESS'
+            in_array($status, ['COMPLETED', 'CAPTURED', 'SUCCESS', 'PAID', 'PAYMENT_SUCCESS'], true) ||
+            $paymentStatus === 'PAYMENT_SUCCESS' ||
+            $event === 'PAYMENT_SUCCESS'
         ) {
             return 'completed';
         }
@@ -132,18 +165,20 @@ class InternalPaymentCallbackController extends Controller
 
         if (
             in_array($status, ['FAILED', 'DECLINED'], true) ||
-            $paymentStatus === 'PAYMENT_FAILED'
+            $paymentStatus === 'PAYMENT_FAILED' ||
+            $event === 'PAYMENT_FAILED'
         ) {
             return 'failed';
         }
 
-        if ($status === 'EXPIRED' || $paymentStatus === 'PAYMENT_EXPIRED') {
+        if ($status === 'EXPIRED' || $paymentStatus === 'PAYMENT_EXPIRED' || $event === 'PAYMENT_EXPIRED') {
             return 'expired';
         }
 
         if (
             in_array($status, ['CANCELLED', 'VOIDED'], true) ||
-            $paymentStatus === 'PAYMENT_CANCELLED'
+            $paymentStatus === 'PAYMENT_CANCELLED' ||
+            $event === 'PAYMENT_CANCELLED'
         ) {
             return 'cancelled';
         }

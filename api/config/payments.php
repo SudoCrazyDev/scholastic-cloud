@@ -7,5 +7,7 @@ return [
         'secret_key' => env('MAYA_SECRET_KEY'),
         'webhook_signature_key' => env('MAYA_WEBHOOK_SIGNATURE_KEY'),
         'timeout' => (int) env('MAYA_TIMEOUT', 20),
+        // 'checkout' = Maya Checkout (/checkout/v1/checkouts), 'payby' = Pay With Maya Single Payment (/payby/v2/paymaya/payments)
+        'product' => env('MAYA_PRODUCT', 'payby'),
     ],
 ];

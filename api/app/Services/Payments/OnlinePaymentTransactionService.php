@@ -95,7 +95,7 @@ class OnlinePaymentTransactionService
         $paymentStatus = strtoupper((string) (data_get($payload, 'payment_status') ?? data_get($payload, 'paymentStatus') ?? ''));
 
         if (
-            in_array($status, ['COMPLETED', 'CAPTURED', 'SUCCESS', 'PAID'], true) ||
+            in_array($status, ['COMPLETED', 'CAPTURED', 'SUCCESS', 'PAID', 'PAYMENT_SUCCESS'], true) ||
             $paymentStatus === 'PAYMENT_SUCCESS'
         ) {
             return 'completed';

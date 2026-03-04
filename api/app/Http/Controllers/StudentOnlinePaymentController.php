@@ -10,6 +10,7 @@ use App\Services\Payments\OnlinePaymentTransactionService;
 use App\Services\Payments\PaymentGatewayClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class StudentOnlinePaymentController extends Controller
@@ -211,15 +212,25 @@ class StudentOnlinePaymentController extends Controller
         try {
             $gatewayResponse = $this->gatewayClient->createCharge($gatewayPayload);
         } catch (\Throwable $e) {
+            Log::warning('Maya checkout createCharge failed', [
+                'transaction_id' => $transaction->id,
+                'message' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
             $transaction->update([
                 'status' => 'failed',
                 'failure_reason' => $e->getMessage(),
             ]);
 
-            return response()->json([
+            $message = 'Unable to create online payment checkout at the moment';
+            $detail = config('app.debug') ? $e->getMessage() : null;
+
+            return response()->json(array_filter([
                 'success' => false,
-                'message' => 'Unable to create online payment checkout at the moment',
-            ], 502);
+                'message' => $message,
+                'detail' => $detail,
+            ]), 502);
         }
 
         $providerChargeId = (string) (

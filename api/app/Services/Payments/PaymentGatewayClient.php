@@ -11,6 +11,79 @@ class PaymentGatewayClient
 {
     public function createCharge(array $payload): array
     {
+        $product = (string) config('payments.maya.product', 'payby');
+
+        if ($product === 'payby') {
+            return $this->createPayByCharge($payload);
+        }
+
+        return $this->createCheckoutCharge($payload);
+    }
+
+    /**
+     * Pay With Maya – Single Payment API (POST /payby/v2/paymaya/payments).
+     * Uses PUBLIC key; use MAYA_PRODUCT=payby with Pay With Maya keys.
+     */
+    private function createPayByCharge(array $payload): array
+    {
+        $requestReferenceNumber = (string) ($payload['request_reference_number'] ?? '');
+        if ($requestReferenceNumber === '') {
+            throw new RuntimeException('request_reference_number is required');
+        }
+
+        $currency = strtoupper((string) ($payload['currency'] ?? 'PHP'));
+        $amountValue = round((float) ($payload['amount'] ?? 0), 2);
+
+        $mayaPayload = [
+            'totalAmount' => [
+                'value' => $amountValue,
+                'currency' => $currency,
+            ],
+            'requestReferenceNumber' => $requestReferenceNumber,
+            'redirectUrl' => [
+                'success' => (string) ($payload['success_url'] ?? ''),
+                'failure' => (string) ($payload['failure_url'] ?? ''),
+                'cancel' => (string) ($payload['cancel_url'] ?? ''),
+            ],
+        ];
+
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : null;
+        if (!empty($metadata)) {
+            $mayaPayload['metadata'] = $metadata;
+        }
+
+        $userId = (string) ($payload['user_id'] ?? '');
+        if ($userId !== '') {
+            $mayaPayload['userId'] = $userId;
+        }
+
+        $response = $this->mayaRequestWithPublicKey()
+            ->post('/payby/v2/paymaya/payments', $mayaPayload);
+
+        $decoded = $this->decodeResponse($response, 'create Pay With Maya payment');
+        $paymentId = (string) ($decoded['paymentId'] ?? '');
+        $redirectUrl = (string) ($decoded['redirectUrl'] ?? '');
+
+        return [
+            'success' => true,
+            'provider' => 'maya_payby',
+            'id' => $paymentId,
+            'charge_id' => $paymentId,
+            'checkout_id' => $paymentId,
+            'redirect_url' => $redirectUrl,
+            'request_reference_number' => $requestReferenceNumber,
+            'status' => $this->mapMayaStatus($decoded),
+            'provider_response' => $decoded,
+            'raw' => $decoded,
+        ];
+    }
+
+    /**
+     * Maya Checkout API (POST /checkout/v1/checkouts).
+     * Use MAYA_PRODUCT=checkout with Maya Checkout keys.
+     */
+    private function createCheckoutCharge(array $payload): array
+    {
         $requestReferenceNumber = (string) ($payload['request_reference_number'] ?? '');
         if ($requestReferenceNumber === '') {
             throw new RuntimeException('request_reference_number is required');
@@ -153,7 +226,7 @@ class PaymentGatewayClient
         $paymentStatus = strtoupper((string) ($payload['paymentStatus'] ?? ''));
 
         if (
-            in_array($status, ['COMPLETED', 'CAPTURED', 'SUCCESS', 'PAID'], true) ||
+            in_array($status, ['COMPLETED', 'CAPTURED', 'SUCCESS', 'PAID', 'PAYMENT_SUCCESS'], true) ||
             $paymentStatus === 'PAYMENT_SUCCESS'
         ) {
             return 'completed';
