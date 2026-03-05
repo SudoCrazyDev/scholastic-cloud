@@ -30,6 +30,8 @@ use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\StudentFinanceController;
 use App\Http\Controllers\StudentOnlinePaymentController;
 use App\Http\Controllers\InternalPaymentCallbackController;
+use App\Http\Controllers\StudentRfidTagController;
+use App\Http\Controllers\RfidScanLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,6 +49,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/payments/webhooks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
 // Backward-compatible alias.
 Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
+
+// Public kiosk endpoint for RFID gate scanners
+Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan']);
 
 // Protected routes (authentication required)
 Route::middleware('auth.token')->group(function () {
@@ -226,6 +231,11 @@ Route::middleware('auth.token')->group(function () {
     Route::get('proficiency/by-section', [\App\Http\Controllers\ProficiencyController::class, 'bySection']);
     // RealtimeAttendance GET route
     Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
+    // Student RFID Tag routes
+    Route::apiResource('student-rfid-tags', StudentRfidTagController::class);
+    // RFID Scan Log routes
+    Route::post('rfid-scan-logs/scan', [RfidScanLogController::class, 'scan']);
+    Route::apiResource('rfid-scan-logs', RfidScanLogController::class)->only(['index', 'store', 'show', 'destroy']);
     // Core Value Marking routes
     Route::apiResource('core-value-markings', CoreValueMarkingController::class);
     // SF9 routes

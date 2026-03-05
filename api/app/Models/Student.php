@@ -101,6 +101,16 @@ class Student extends Model
         return $this->hasMany(StudentAssessmentAttempt::class);
     }
 
+    public function rfidTag()
+    {
+        return $this->hasOne(StudentRfidTag::class);
+    }
+
+    public function rfidScanLogs()
+    {
+        return $this->hasMany(RfidScanLog::class);
+    }
+
     /**
      * Get the profile picture URL. Tries R2 first (temporary or R2_URL), then S3 for legacy paths.
      */
