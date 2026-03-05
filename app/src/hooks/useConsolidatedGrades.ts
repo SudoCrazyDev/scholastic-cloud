@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { consolidatedGradesService } from '../services/consolidatedGradesService'
 
-export const useConsolidatedGrades = (sectionId: string, quarter: number) => {
+export const useConsolidatedGrades = (sectionId: string, quarter: number | string) => {
   const {
     data: consolidatedGradesResponse,
     isLoading,

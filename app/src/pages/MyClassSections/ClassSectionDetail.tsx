@@ -45,6 +45,7 @@ const QUARTER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '2', label: 'Second Quarter' },
   { value: '3', label: 'Third Quarter' },
   { value: '4', label: 'Fourth Quarter' },
+  { value: 'final', label: 'Final Quarter' },
 ]
 
 const ERROR_TIMEOUT = 5000
@@ -674,7 +675,7 @@ const ClassSectionDetail: React.FC = () => {
                     students={students}
                     classSectionTitle={classSectionData?.title || 'Class Section'}
                     sectionId={id!}
-                    quarter={Number(selectedQuarter)}
+                    quarter={selectedQuarter === 'final' ? 1 : Number(selectedQuarter)}
                   />
                 </motion.div>
               )}
@@ -717,7 +718,7 @@ const ClassSectionDetail: React.FC = () => {
                 >
                   <ClassSectionConsolidatedGradesTab
                     sectionId={id!}
-                    selectedQuarter={Number(selectedQuarter)}
+                    selectedQuarter={selectedQuarter === 'final' ? 'final' : Number(selectedQuarter)}
                   />
                 </motion.div>
               )}

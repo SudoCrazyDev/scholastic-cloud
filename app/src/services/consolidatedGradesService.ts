@@ -31,7 +31,7 @@ export interface ConsolidatedGradesResponse {
 class ConsolidatedGradesService {
   private baseUrl = '/section-consolidated-grades'
 
-  async getSectionConsolidatedGrades(sectionId: string, quarter: number) {
+  async getSectionConsolidatedGrades(sectionId: string, quarter: number | string) {
     const queryParams = new URLSearchParams()
     queryParams.append('section_id', sectionId)
     queryParams.append('quarter', quarter.toString())

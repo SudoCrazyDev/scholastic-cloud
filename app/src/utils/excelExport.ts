@@ -65,19 +65,19 @@ export const exportConsolidatedGradesToExcel = (
   baseSubjects: BaseSubject[],
   studentsWithGroupedSubjects: any[],
   institutionName: string,
-  selectedQuarter: number
+  selectedQuarter: number | string
 ) => {
   const workbook = XLSX.utils.book_new();
   
-  // Helper function to get quarter label
-  const getQuarterLabel = (quarter: number) => {
-    const quarters = {
+  const getQuarterLabel = (quarter: number | string) => {
+    if (quarter === 'final') return 'Final Quarter';
+    const quarters: Record<number, string> = {
       1: 'First Quarter',
       2: 'Second Quarter',
       3: 'Third Quarter',
       4: 'Fourth Quarter',
     };
-    return quarters[quarter as keyof typeof quarters] || `Quarter ${quarter}`;
+    return quarters[quarter as number] || `Quarter ${quarter}`;
   };
 
   // Group students by gender
