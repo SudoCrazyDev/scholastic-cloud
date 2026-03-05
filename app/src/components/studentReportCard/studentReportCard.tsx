@@ -197,7 +197,29 @@ export default function PrintReportCard({
         );
     }
 
-    const finalGrade = calculateFinalGrade(grades);
+    // General average: one entry per parent subject; subjects with variants count as one (average of parent + variant grades).
+    const generalAverage = useMemo(() => {
+        const parentSubjects = subjects.filter((s: any) => s.subject_type === 'parent');
+        let sum = 0;
+        let count = 0;
+        for (const parent of parentSubjects) {
+            const subjectIdsInArea = [
+                parent.id,
+                ...subjects.filter((s: any) => s.parent_subject_id === parent.id).map((s: any) => s.id),
+            ];
+            const gradesInArea = subjectIdsInArea
+                .map((sid: string) => calculateFinalGrade(grades.filter((g: any) => g.subject_id === sid)))
+                .filter((g: number) => g > 0);
+            if (gradesInArea.length === 0) continue;
+            const areaGrade = Math.round(
+                gradesInArea.reduce((a: number, b: number) => a + b, 0) / gradesInArea.length
+            );
+            sum += areaGrade;
+            count += 1;
+        }
+        return count === 0 ? 0 : Math.round(sum / count);
+    }, [subjects, grades]);
+
     const studentAge = calculateAge(student.birthdate);
     const teacher = (classSection as any)?.adviser
     const teacherName = formatTeacherName(teacher)
@@ -537,7 +559,7 @@ export default function PrintReportCard({
                             </View>
                             <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                    {finalGrade > 0 ? finalGrade : ''}
+                                    {generalAverage > 0 ? generalAverage : ''}
                                 </Text>
                             </View>
                         </View>
