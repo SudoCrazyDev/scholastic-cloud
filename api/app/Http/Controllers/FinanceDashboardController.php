@@ -3,13 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Models\GradeLevelDiscount;
 use App\Models\SchoolFee;
 use App\Models\SchoolFeeDefault;
+use App\Models\StudentAdditionalFee;
 use App\Models\StudentDiscount;
 use App\Models\StudentPayment;
 use App\Models\StudentSection;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class FinanceDashboardController extends Controller
@@ -249,6 +251,119 @@ class FinanceDashboardController extends Controller
                 'fees' => $fees,
                 'grades' => $grades,
             ]
+        ]);
+    }
+
+    /**
+     * Monthly/quarterly payment collection breakdown for the school year (June–March).
+     */
+    public function collections(Request $request): JsonResponse
+    {
+        if ($this->isStudentUser($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (! $institutionId) {
+            return response()->json(['success' => false, 'message' => 'No institution assigned'], 400);
+        }
+
+        $validated = $request->validate([
+            'academic_year' => 'required|string|max:255',
+        ]);
+
+        $academicYear = $validated['academic_year'];
+        $startYear = $this->extractStartYear($academicYear);
+        if (! $startYear) {
+            return response()->json(['success' => false, 'message' => 'Invalid academic year format'], 422);
+        }
+
+        $schoolMonths = [
+            ['month' => 6, 'year' => $startYear, 'label' => 'June'],
+            ['month' => 7, 'year' => $startYear, 'label' => 'July'],
+            ['month' => 8, 'year' => $startYear, 'label' => 'August'],
+            ['month' => 9, 'year' => $startYear, 'label' => 'September'],
+            ['month' => 10, 'year' => $startYear, 'label' => 'October'],
+            ['month' => 11, 'year' => $startYear, 'label' => 'November'],
+            ['month' => 12, 'year' => $startYear, 'label' => 'December'],
+            ['month' => 1, 'year' => $startYear + 1, 'label' => 'January'],
+            ['month' => 2, 'year' => $startYear + 1, 'label' => 'February'],
+            ['month' => 3, 'year' => $startYear + 1, 'label' => 'March'],
+        ];
+
+        $payments = StudentPayment::where('institution_id', $institutionId)
+            ->where('academic_year', $academicYear)
+            ->get();
+
+        $monthlyTotals = [];
+        foreach ($schoolMonths as $sm) {
+            $monthlyTotals[$sm['month'] . '-' . $sm['year']] = [
+                'month' => $sm['month'],
+                'year' => $sm['year'],
+                'label' => $sm['label'] . ' ' . $sm['year'],
+                'total' => 0.0,
+                'count' => 0,
+                'by_method' => [],
+            ];
+        }
+
+        foreach ($payments as $payment) {
+            $paymentDate = $payment->payment_date;
+            if (! $paymentDate) {
+                continue;
+            }
+            $m = (int) $paymentDate->format('n');
+            $y = (int) $paymentDate->format('Y');
+            $key = $m . '-' . $y;
+
+            if (isset($monthlyTotals[$key])) {
+                $amount = (float) $payment->amount;
+                $monthlyTotals[$key]['total'] = round($monthlyTotals[$key]['total'] + $amount, 2);
+                $monthlyTotals[$key]['count']++;
+                $method = $payment->payment_method ?: 'Unspecified';
+                $monthlyTotals[$key]['by_method'][$method] =
+                    round(($monthlyTotals[$key]['by_method'][$method] ?? 0) + $amount, 2);
+            }
+        }
+
+        $monthly = array_values($monthlyTotals);
+        $grandTotal = array_sum(array_column($monthly, 'total'));
+
+        $quarters = [
+            ['label' => 'Q1 (Jun–Aug)', 'months' => [0, 1, 2]],
+            ['label' => 'Q2 (Sep–Nov)', 'months' => [3, 4, 5]],
+            ['label' => 'Q3 (Dec–Feb)', 'months' => [6, 7, 8]],
+            ['label' => 'Q4 (Mar)', 'months' => [9]],
+        ];
+
+        $quarterly = [];
+        foreach ($quarters as $q) {
+            $total = 0.0;
+            $count = 0;
+            $byMethod = [];
+            foreach ($q['months'] as $idx) {
+                $total += $monthly[$idx]['total'];
+                $count += $monthly[$idx]['count'];
+                foreach ($monthly[$idx]['by_method'] as $method => $amt) {
+                    $byMethod[$method] = round(($byMethod[$method] ?? 0) + $amt, 2);
+                }
+            }
+            $quarterly[] = [
+                'label' => $q['label'],
+                'total' => round($total, 2),
+                'count' => $count,
+                'by_method' => $byMethod,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'academic_year' => $academicYear,
+                'grand_total' => round($grandTotal, 2),
+                'monthly' => $monthly,
+                'quarterly' => $quarterly,
+            ],
         ]);
     }
 

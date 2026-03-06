@@ -335,6 +335,102 @@ export interface FinanceDashboardSummary {
   grades: FinanceGradeSummary[];
 }
 
+// Grade-level discount types
+export interface GradeLevelDiscount {
+  id: string;
+  institution_id: string;
+  school_fee_id?: string | null;
+  grade_level: string;
+  academic_year: string;
+  discount_type: 'fixed' | 'percentage';
+  value: number;
+  description?: string | null;
+  created_at: string;
+  updated_at: string;
+  school_fee?: SchoolFee;
+}
+
+export interface CreateGradeLevelDiscountData {
+  grade_level: string;
+  academic_year: string;
+  discount_type: 'fixed' | 'percentage';
+  value: number;
+  school_fee_id?: string;
+  description?: string;
+}
+
+// Student additional fee types
+export interface StudentAdditionalFee {
+  id: string;
+  institution_id: string;
+  student_id: string;
+  academic_year: string;
+  name: string;
+  description?: string | null;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStudentAdditionalFeeData {
+  student_id: string;
+  academic_year: string;
+  name: string;
+  description?: string;
+  amount: number;
+}
+
+// Receipt template types
+export interface ReceiptTemplateElement {
+  id: string;
+  type: 'institution_name' | 'institution_address' | 'institution_logo' | 'student_name' | 'student_lrn' | 'grade_level' | 'receipt_number' | 'payment_date' | 'payment_amount' | 'payment_method' | 'fee_name' | 'academic_year' | 'received_by' | 'divider' | 'custom_text' | 'signature_line' | 'spacer';
+  label: string;
+  content?: string;
+  style?: Record<string, string>;
+}
+
+export interface ReceiptTemplate {
+  id: string;
+  institution_id: string;
+  name: string;
+  is_default: boolean;
+  paper_size: string;
+  layout: ReceiptTemplateElement[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateReceiptTemplateData {
+  name: string;
+  is_default?: boolean;
+  paper_size?: string;
+  layout: ReceiptTemplateElement[];
+}
+
+// Finance collection types
+export interface MonthlyCollection {
+  month: number;
+  year: number;
+  label: string;
+  total: number;
+  count: number;
+  by_method: Record<string, number>;
+}
+
+export interface QuarterlyCollection {
+  label: string;
+  total: number;
+  count: number;
+  by_method: Record<string, number>;
+}
+
+export interface FinanceCollectionsResponse {
+  academic_year: string;
+  grand_total: number;
+  monthly: MonthlyCollection[];
+  quarterly: QuarterlyCollection[];
+}
+
 // Institution types
 export interface Institution {
   id: string;

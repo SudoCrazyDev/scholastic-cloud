@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PDFDownloadLink } from '@react-pdf/renderer'
-import { CreditCardIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
+import { CreditCardIcon, DocumentTextIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
@@ -11,11 +12,13 @@ import { studentFinanceService } from '../../../services/studentFinanceService'
 import { studentDiscountService } from '../../../services/studentDiscountService'
 import { studentPaymentService } from '../../../services/studentPaymentService'
 import { studentOnlinePaymentService } from '../../../services/studentOnlinePaymentService'
+import { studentAdditionalFeeService } from '../../../services/studentAdditionalFeeService'
 import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
 import type {
   CreateStudentDiscountData,
   CreateStudentPaymentData,
   CreateStudentOnlinePaymentCheckoutData,
+  CreateStudentAdditionalFeeData,
   Student,
   StudentPayment,
 } from '../../../types'
@@ -54,6 +57,12 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     description: '',
   })
   const [discountError, setDiscountError] = useState<string | null>(null)
+  const [additionalFeeForm, setAdditionalFeeForm] = useState({
+    name: '',
+    description: '',
+    amount: '',
+  })
+  const [additionalFeeError, setAdditionalFeeError] = useState<string | null>(null)
 
   const feesQuery = useQuery({
     queryKey: ['school-fees'],
@@ -203,9 +212,50 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       setDiscountError(null)
       queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
       queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-additional-fees', studentId] })
     },
     onError: (error: any) => {
       setDiscountError(error.response?.data?.message || 'Failed to save discount.')
+    },
+  })
+
+  const additionalFeesQuery = useQuery({
+    queryKey: ['student-additional-fees', studentId, resolvedAcademicYear],
+    queryFn: () =>
+      studentAdditionalFeeService.getFees({
+        student_id: studentId,
+        academic_year: resolvedAcademicYear,
+      }),
+    enabled: Boolean(studentId && resolvedAcademicYear && !isStudentUser),
+  })
+
+  const createAdditionalFeeMutation = useMutation({
+    mutationFn: (payload: CreateStudentAdditionalFeeData) =>
+      studentAdditionalFeeService.createFee(payload),
+    onSuccess: () => {
+      setAdditionalFeeForm({ name: '', description: '', amount: '' })
+      setAdditionalFeeError(null)
+      queryClient.invalidateQueries({ queryKey: ['student-additional-fees', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+      toast.success('Additional fee added.')
+    },
+    onError: (error: any) => {
+      setAdditionalFeeError(error.response?.data?.message || 'Failed to add fee.')
+      toast.error(error.response?.data?.message || 'Failed to add fee.')
+    },
+  })
+
+  const deleteAdditionalFeeMutation = useMutation({
+    mutationFn: (id: string) => studentAdditionalFeeService.deleteFee(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-additional-fees', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+      toast.success('Additional fee removed.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to remove fee.')
     },
   })
 
@@ -300,6 +350,30 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     createDiscountMutation.mutate(payload)
   }
 
+  const handleAdditionalFeeSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setAdditionalFeeError(null)
+
+    if (!additionalFeeForm.name.trim()) {
+      setAdditionalFeeError('Fee name is required.')
+      return
+    }
+    const amount = Number(additionalFeeForm.amount)
+    if (!amount || amount <= 0) {
+      setAdditionalFeeError('Amount must be greater than zero.')
+      return
+    }
+
+    createAdditionalFeeMutation.mutate({
+      student_id: studentId,
+      academic_year: resolvedAcademicYear,
+      name: additionalFeeForm.name,
+      description: additionalFeeForm.description || undefined,
+      amount,
+    })
+  }
+
+  const additionalFees = additionalFeesQuery.data?.data || []
   const totals = ledgerData?.totals
   const noaData = noaQuery.data?.data
   const onlineTransactions = onlinePaymentsQuery.data?.data || []
@@ -467,12 +541,27 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                 placeholder="Applied fee (optional)"
                 className="w-full"
               />
-              <Input
-                label="Payment Method"
-                value={paymentForm.payment_method}
-                onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_method: event.target.value }))}
-                placeholder="Cash, Bank Transfer, etc."
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Mode of Payment</label>
+                <Select
+                  value={paymentForm.payment_method}
+                  onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_method: event.target.value }))}
+                  options={[
+                    { value: '', label: '— Select payment mode' },
+                    { value: 'Cash', label: 'Cash' },
+                    { value: 'Check', label: 'Check' },
+                    { value: 'Bank Transfer', label: 'Bank Transfer' },
+                    { value: 'GCash', label: 'GCash' },
+                    { value: 'Maya', label: 'Maya' },
+                    { value: 'Credit Card', label: 'Credit Card' },
+                    { value: 'Debit Card', label: 'Debit Card' },
+                    { value: 'Online Banking', label: 'Online Banking' },
+                    { value: 'Money Order', label: 'Money Order' },
+                    { value: 'Other', label: 'Other' },
+                  ]}
+                  className="w-full"
+                />
+              </div>
               <Input
                 label="Reference Number"
                 value={paymentForm.reference_number}
@@ -537,6 +626,106 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               </Button>
             </form>
           </div>
+        </div>
+      )}
+
+      {!isStudentUser && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <PlusIcon className="w-5 h-5 text-indigo-600" />
+            Additional Fees
+          </h4>
+          <p className="text-sm text-gray-600 mb-4">
+            Add extra fees specific to this student beyond the standard grade-level fees.
+          </p>
+          <form className="space-y-4" onSubmit={handleAdditionalFeeSubmit}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Input
+                label="Fee Name"
+                value={additionalFeeForm.name}
+                onChange={(e) => setAdditionalFeeForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Lab Fee, Field Trip"
+              />
+              <Input
+                label="Amount (PHP)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={additionalFeeForm.amount}
+                onChange={(e) =>
+                  setAdditionalFeeForm((prev) => ({ ...prev, amount: e.target.value }))
+                }
+                placeholder="0.00"
+              />
+              <Input
+                label="Description (optional)"
+                value={additionalFeeForm.description}
+                onChange={(e) =>
+                  setAdditionalFeeForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+                placeholder="Optional note"
+              />
+            </div>
+            {additionalFeeError && <p className="text-sm text-red-600">{additionalFeeError}</p>}
+            <Button
+              type="submit"
+              loading={createAdditionalFeeMutation.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              Add Additional Fee
+            </Button>
+          </form>
+          {additionalFees.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Name
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                      Amount
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Description
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-20">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {additionalFees.map((fee) => (
+                    <tr key={fee.id}>
+                      <td className="px-4 py-2 text-sm font-medium text-gray-900">{fee.name}</td>
+                      <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
+                        {formatAmount(fee.amount)}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-600">
+                        {fee.description || '—'}
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (window.confirm('Remove this additional fee?')) {
+                                deleteAdditionalFeeMutation.mutate(fee.id)
+                              }
+                            }}
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

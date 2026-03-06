@@ -30,6 +30,9 @@ use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\StudentFinanceController;
 use App\Http\Controllers\StudentOnlinePaymentController;
 use App\Http\Controllers\InternalPaymentCallbackController;
+use App\Http\Controllers\GradeLevelDiscountController;
+use App\Http\Controllers\StudentAdditionalFeeController;
+use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\StudentRfidTagController;
 use App\Http\Controllers\RfidScanLogController;
 
@@ -224,6 +227,26 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update']);
     Route::patch('student-discounts/{id}', [StudentDiscountController::class, 'update']);
     Route::delete('student-discounts/{id}', [StudentDiscountController::class, 'destroy']);
+
+    // Grade-level discounts
+    Route::get('grade-level-discounts', [GradeLevelDiscountController::class, 'index']);
+    Route::post('grade-level-discounts', [GradeLevelDiscountController::class, 'store']);
+    Route::put('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
+    Route::patch('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
+    Route::delete('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'destroy']);
+
+    // Student additional fees
+    Route::get('student-additional-fees', [StudentAdditionalFeeController::class, 'index']);
+    Route::post('student-additional-fees', [StudentAdditionalFeeController::class, 'store']);
+    Route::put('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
+    Route::patch('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
+    Route::delete('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'destroy']);
+
+    // Receipt templates
+    Route::apiResource('receipt-templates', ReceiptTemplateController::class);
+
+    // Finance collections (monthly/quarterly breakdown)
+    Route::get('finance/collections', [FinanceDashboardController::class, 'collections']);
     
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);

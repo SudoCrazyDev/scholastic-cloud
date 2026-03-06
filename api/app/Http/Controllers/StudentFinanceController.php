@@ -3,13 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Models\GradeLevelDiscount;
 use App\Models\Student;
+use App\Models\StudentAdditionalFee;
 use App\Models\StudentSection;
 use App\Models\SchoolFeeDefault;
 use App\Models\StudentDiscount;
 use App\Models\StudentPayment;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class StudentFinanceController extends Controller
 {
@@ -83,13 +85,31 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        $gradeLevelDiscounts = collect();
+        if ($gradeLevel) {
+            $gradeLevelDiscounts = GradeLevelDiscount::with('schoolFee')
+                ->where('institution_id', $institutionId)
+                ->where('grade_level', $gradeLevel)
+                ->where('academic_year', $academicYear)
+                ->orderBy('created_at')
+                ->get();
+        }
+
+        $additionalFees = StudentAdditionalFee::where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->orderBy('created_at')
+            ->get();
+
         $feeAmountMap = $feeDefaults->keyBy('school_fee_id')->map(function ($default) {
             return (float) $default->amount;
         });
 
-        $chargesTotal = (float) $feeDefaults->sum('amount');
-        $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $chargesTotal);
-        $discountsTotal = (float) $discountsWithAmount->sum('amount');
+        $chargesTotal = (float) $feeDefaults->sum('amount') + (float) $additionalFees->sum('amount');
+        $standardCharges = (float) $feeDefaults->sum('amount');
+        $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
+        $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
+        $discountsTotal = (float) $discountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $payments->sum('amount');
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
@@ -119,10 +139,40 @@ class StudentFinanceController extends Controller
             ];
         });
 
+        $additionalFeeEntries = $additionalFees->map(function ($af) {
+            return [
+                'type' => 'charge',
+                'description' => 'Additional: ' . $af->name,
+                'amount' => (float) $af->amount,
+                'date' => $af->created_at?->toDateString(),
+                'fee_id' => $af->id,
+                'fee_name' => $af->name,
+            ];
+        });
+
         $discountEntries = $discountsWithAmount->map(function ($payload) {
             $discount = $payload['discount'];
             $feeName = $discount->schoolFee?->name;
             $label = $feeName ? 'Discount - ' . $feeName : 'Discount';
+            $description = $discount->description ? $label . ' (' . $discount->description . ')' : $label;
+
+            return [
+                'type' => 'discount',
+                'description' => $description,
+                'amount' => -1 * (float) $payload['amount'],
+                'date' => $discount->created_at?->toDateString(),
+                'discount_id' => $discount->id,
+                'discount_type' => $discount->discount_type,
+                'discount_value' => (float) $discount->value,
+                'fee_id' => $discount->school_fee_id,
+                'fee_name' => $feeName,
+            ];
+        });
+
+        $gradeLevelDiscountEntries = $gradeLevelDiscountsWithAmount->map(function ($payload) {
+            $discount = $payload['discount'];
+            $feeName = $discount->schoolFee?->name;
+            $label = $feeName ? 'Grade Discount - ' . $feeName : 'Grade Discount';
             $description = $discount->description ? $label . ' (' . $discount->description . ')' : $label;
 
             return [
@@ -154,7 +204,12 @@ class StudentFinanceController extends Controller
             ];
         });
 
-        $entries = $entries->merge($chargeEntries)->merge($discountEntries)->merge($paymentEntries);
+        $entries = $entries
+            ->merge($chargeEntries)
+            ->merge($additionalFeeEntries)
+            ->merge($discountEntries)
+            ->merge($gradeLevelDiscountEntries)
+            ->merge($paymentEntries);
 
         $entries = $entries->sortBy(function ($entry) {
             $typeOrder = [
@@ -258,6 +313,22 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        $gradeLevelDiscounts = collect();
+        if ($gradeLevel) {
+            $gradeLevelDiscounts = GradeLevelDiscount::with('schoolFee')
+                ->where('institution_id', $institutionId)
+                ->where('grade_level', $gradeLevel)
+                ->where('academic_year', $academicYear)
+                ->orderBy('created_at')
+                ->get();
+        }
+
+        $additionalFees = StudentAdditionalFee::where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->orderBy('created_at')
+            ->get();
+
         $payments = StudentPayment::with('schoolFee')
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
@@ -270,9 +341,11 @@ class StudentFinanceController extends Controller
             return (float) $default->amount;
         });
 
-        $chargesTotal = (float) $feeDefaults->sum('amount');
-        $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $chargesTotal);
-        $discountsTotal = (float) $discountsWithAmount->sum('amount');
+        $standardCharges = (float) $feeDefaults->sum('amount');
+        $chargesTotal = $standardCharges + (float) $additionalFees->sum('amount');
+        $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
+        $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
+        $discountsTotal = (float) $discountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $payments->sum('amount');
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
@@ -283,32 +356,60 @@ class StudentFinanceController extends Controller
 
         $balance = $balanceForward + $chargesTotal - $discountsTotal - $paymentsTotal;
 
+        $allDiscountsMapped = $discountsWithAmount->map(function ($payload) {
+            $discount = $payload['discount'];
+
+            return [
+                'discount_id' => $discount->id,
+                'discount_type' => $discount->discount_type,
+                'discount_value' => (float) $discount->value,
+                'amount' => (float) $payload['amount'],
+                'description' => $discount->description,
+                'fee_id' => $discount->school_fee_id,
+                'fee_name' => $discount->schoolFee?->name,
+                'scope' => 'student',
+                'created_at' => $discount->created_at?->toDateString(),
+            ];
+        })->merge($gradeLevelDiscountsWithAmount->map(function ($payload) {
+            $discount = $payload['discount'];
+
+            return [
+                'discount_id' => $discount->id,
+                'discount_type' => $discount->discount_type,
+                'discount_value' => (float) $discount->value,
+                'amount' => (float) $payload['amount'],
+                'description' => $discount->description ?? ('Grade Level Discount - ' . $discount->grade_level),
+                'fee_id' => $discount->school_fee_id,
+                'fee_name' => $discount->schoolFee?->name,
+                'scope' => 'grade_level',
+                'created_at' => $discount->created_at?->toDateString(),
+            ];
+        }));
+
+        $allFees = $feeDefaults->map(function ($default) {
+            return [
+                'fee_id' => $default->school_fee_id,
+                'fee_name' => $default->schoolFee?->name ?? 'School Fee',
+                'amount' => (float) $default->amount,
+                'is_additional' => false,
+            ];
+        })->merge($additionalFees->map(function ($af) {
+            return [
+                'fee_id' => $af->id,
+                'fee_name' => $af->name,
+                'amount' => (float) $af->amount,
+                'is_additional' => true,
+            ];
+        }));
+
         return response()->json([
             'success' => true,
             'data' => [
                 'student' => $student,
                 'academic_year' => $academicYear,
                 'grade_level' => $gradeLevel,
-                'fees' => $feeDefaults->map(function ($default) {
-                    return [
-                        'fee_id' => $default->school_fee_id,
-                        'fee_name' => $default->schoolFee?->name ?? 'School Fee',
-                        'amount' => (float) $default->amount,
-                    ];
-                }),
-                'discounts' => $discountsWithAmount->map(function ($payload) {
-                    $discount = $payload['discount'];
-                    return [
-                        'discount_id' => $discount->id,
-                        'discount_type' => $discount->discount_type,
-                        'discount_value' => (float) $discount->value,
-                        'amount' => (float) $payload['amount'],
-                        'description' => $discount->description,
-                        'fee_id' => $discount->school_fee_id,
-                        'fee_name' => $discount->schoolFee?->name,
-                        'created_at' => $discount->created_at?->toDateString(),
-                    ];
-                }),
+                'fees' => $allFees,
+                'discounts' => $allDiscountsMapped,
                 'payments' => $payments->map(function ($payment) {
                     return [
                         'payment_id' => $payment->id,
