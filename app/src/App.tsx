@@ -117,6 +117,9 @@ function App() {
               <Route path="finance/default-amounts" element={<Finance />} />
               <Route path="finance/cashiering" element={<Finance />} />
               <Route path="finance/ledger" element={<Finance />} />
+              <Route path="finance/collections" element={<Finance />} />
+              <Route path="finance/discounts" element={<Finance />} />
+              <Route path="finance/receipt-builder" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
 
             </Route>

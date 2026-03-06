@@ -15,6 +15,9 @@ import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
+import CollectionsView from './CollectionsView'
+import DiscountsView from './DiscountsView'
+import ReceiptBuilderView from './ReceiptBuilderView'
 import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentPaymentData, StudentPayment } from '../../types'
 
 const Finance: React.FC = () => {
@@ -26,6 +29,9 @@ const Finance: React.FC = () => {
     if (pathname.endsWith('/default-amounts')) return 'default-amounts'
     if (pathname.endsWith('/cashiering')) return 'cashiering'
     if (pathname.endsWith('/ledger')) return 'ledger'
+    if (pathname.endsWith('/collections')) return 'collections'
+    if (pathname.endsWith('/discounts')) return 'discounts'
+    if (pathname.endsWith('/receipt-builder')) return 'receipt-builder'
     return 'dashboard'
   }, [location.pathname])
 
@@ -504,6 +510,36 @@ const Finance: React.FC = () => {
             }
           >
             Ledger
+          </NavLink>
+          <NavLink
+            to="/finance/collections"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Collections
+          </NavLink>
+          <NavLink
+            to="/finance/discounts"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Discounts
+          </NavLink>
+          <NavLink
+            to="/finance/receipt-builder"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Receipt Builder
           </NavLink>
         </div>
       </div>
@@ -1109,7 +1145,7 @@ const Finance: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Payment method (optional)
+                    Mode of Payment
                   </label>
                   <Select
                     value={cashierPaymentForm.payment_method}
@@ -1117,11 +1153,16 @@ const Finance: React.FC = () => {
                       setCashierPaymentForm((prev) => ({ ...prev, payment_method: e.target.value }))
                     }
                     options={[
-                      { value: '', label: '— Select' },
+                      { value: '', label: '— Select payment mode' },
                       { value: 'Cash', label: 'Cash' },
                       { value: 'Check', label: 'Check' },
                       { value: 'Bank Transfer', label: 'Bank Transfer' },
-                      { value: 'Online', label: 'Online' },
+                      { value: 'GCash', label: 'GCash' },
+                      { value: 'Maya', label: 'Maya' },
+                      { value: 'Credit Card', label: 'Credit Card' },
+                      { value: 'Debit Card', label: 'Debit Card' },
+                      { value: 'Online Banking', label: 'Online Banking' },
+                      { value: 'Money Order', label: 'Money Order' },
                       { value: 'Other', label: 'Other' },
                     ]}
                     className="w-full"
@@ -1420,6 +1461,23 @@ const Finance: React.FC = () => {
           </div>
         </div>
       )}
+      {view === 'collections' && (
+        <CollectionsView
+          academicYearOptions={academicYearOptions}
+          defaultAcademicYear={defaultAcademicYear}
+        />
+      )}
+
+      {view === 'discounts' && (
+        <DiscountsView
+          academicYearOptions={academicYearOptions}
+          defaultAcademicYear={defaultAcademicYear}
+          gradeLevelOptions={gradeLevelOptions}
+          fees={fees}
+        />
+      )}
+
+      {view === 'receipt-builder' && <ReceiptBuilderView />}
     </motion.div>
   )
 }
