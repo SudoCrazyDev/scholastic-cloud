@@ -362,6 +362,7 @@ const ReceiptBuilderView: React.FC = () => {
                 options={[
                   { value: '80mm', label: '80mm (Thermal Printer)' },
                   { value: '58mm', label: '58mm (Small Thermal)' },
+                  { value: 'Quarter-A4', label: '1/4 A4' },
                   { value: 'A4', label: 'A4 (Standard)' },
                   { value: 'Letter', label: 'Letter' },
                   { value: 'Half-Letter', label: 'Half Letter' },
@@ -408,7 +409,7 @@ const ReceiptBuilderView: React.FC = () => {
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Live Preview</h3>
             <div
               className="border border-gray-300 rounded bg-white p-4 mx-auto overflow-hidden"
-              style={{ maxWidth: paperSize === '58mm' ? '180px' : paperSize === '80mm' ? '250px' : '100%' }}
+              style={{ maxWidth: paperSize === '58mm' ? '180px' : paperSize === '80mm' ? '250px' : paperSize === 'Quarter-A4' ? '300px' : '100%' }}
             >
               {layout.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center">Empty receipt</p>

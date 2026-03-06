@@ -95,6 +95,7 @@ const Finance: React.FC = () => {
   const [debouncedLedgerSearch, setDebouncedLedgerSearch] = useState('')
   const [selectedLedgerStudent, setSelectedLedgerStudent] = useState<Student | null>(null)
   const [ledgerAcademicYear, setLedgerAcademicYear] = useState(defaultAcademicYear)
+  const [ledgerViewMode, setLedgerViewMode] = useState<'entries' | 'monthly' | 'quarterly'>('entries')
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedStudentSearch(studentSearchTerm), 300)
@@ -1380,7 +1381,47 @@ const Finance: React.FC = () => {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Ledger entries</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">Ledger View</h3>
+                    <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setLedgerViewMode('entries')}
+                        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                          ledgerViewMode === 'entries'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        Entries
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLedgerViewMode('monthly')}
+                        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                          ledgerViewMode === 'monthly'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLedgerViewMode('quarterly')}
+                        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                          ledgerViewMode === 'quarterly'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        Quarterly
+                      </button>
+                    </div>
+                  </div>
+
+                  {ledgerViewMode === 'entries' && (
+                    <>
                   {ledgerQuery.isLoading ? (
                     <p className="text-gray-500">Loading ledger...</p>
                   ) : (
@@ -1451,6 +1492,213 @@ const Finance: React.FC = () => {
                       </table>
                     </div>
                   )}
+                    </>
+                  )}
+
+                  {(ledgerViewMode === 'monthly' || ledgerViewMode === 'quarterly') && (() => {
+                    const totals = ledgerQuery.data?.data?.totals
+                    const totalPayable = (totals?.balance_forward ?? 0) + (totals?.charges ?? 0) - (totals?.discounts ?? 0)
+                    const startYear = Number(ledgerAcademicYear.split('-')[0]) || currentYear
+
+                    const schoolMonths = [
+                      { month: 6, year: startYear, label: 'June' },
+                      { month: 7, year: startYear, label: 'July' },
+                      { month: 8, year: startYear, label: 'August' },
+                      { month: 9, year: startYear, label: 'September' },
+                      { month: 10, year: startYear, label: 'October' },
+                      { month: 11, year: startYear, label: 'November' },
+                      { month: 12, year: startYear, label: 'December' },
+                      { month: 1, year: startYear + 1, label: 'January' },
+                      { month: 2, year: startYear + 1, label: 'February' },
+                      { month: 3, year: startYear + 1, label: 'March' },
+                    ]
+
+                    const payments = ledgerQuery.data?.data?.entries?.filter(
+                      (e) => e.type === 'payment'
+                    ) || []
+
+                    const paidByMonth: Record<string, number> = {}
+                    for (const p of payments) {
+                      if (!p.date) continue
+                      const d = new Date(p.date)
+                      const key = `${d.getMonth() + 1}-${d.getFullYear()}`
+                      paidByMonth[key] = (paidByMonth[key] ?? 0) + Math.abs(p.amount)
+                    }
+
+                    if (ledgerViewMode === 'monthly') {
+                      const monthlyDue = totalPayable > 0 ? totalPayable / 10 : 0
+                      let cumulativeDue = 0
+                      let cumulativePaid = 0
+
+                      const rows = schoolMonths.map((sm) => {
+                        const key = `${sm.month}-${sm.year}`
+                        const paid = paidByMonth[key] ?? 0
+                        cumulativeDue += monthlyDue
+                        cumulativePaid += paid
+                        const remaining = Math.max(cumulativeDue - cumulativePaid, 0)
+                        return { ...sm, due: monthlyDue, paid, cumulativeDue, cumulativePaid, remaining }
+                      })
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <span>Total Payable: <strong className="text-gray-900">{formatCurrency(totalPayable)}</strong></span>
+                            <span>Monthly Due: <strong className="text-gray-900">{formatCurrency(monthlyDue)}</strong></span>
+                          </div>
+                          <div className="overflow-x-auto rounded-lg border border-gray-200">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monthly Due</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Due</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Paid</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Remaining</th>
+                                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200 bg-white">
+                                {rows.map((r) => {
+                                  const isFullyPaid = r.cumulativePaid >= r.cumulativeDue - 0.01
+                                  return (
+                                    <tr key={`${r.month}-${r.year}`} className="hover:bg-gray-50/50">
+                                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.label} {r.year}</td>
+                                      <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.due)}</td>
+                                      <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.paid)}</td>
+                                      <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativeDue)}</td>
+                                      <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativePaid)}</td>
+                                      <td className="px-4 py-3 text-sm text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.remaining)}</td>
+                                      <td className="px-4 py-3 text-center">
+                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                          isFullyPaid
+                                            ? 'bg-green-100 text-green-700'
+                                            : r.paid > 0
+                                              ? 'bg-yellow-100 text-yellow-700'
+                                              : 'bg-gray-100 text-gray-500'
+                                        }`}>
+                                          {isFullyPaid ? 'Paid' : r.paid > 0 ? 'Partial' : 'Unpaid'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                              <tfoot className="bg-gray-50">
+                                <tr className="font-semibold">
+                                  <td className="px-4 py-3 text-sm text-gray-900">Total</td>
+                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalPayable)}</td>
+                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
+                                    {formatCurrency(rows.reduce((s, r) => s + r.paid, 0))}
+                                  </td>
+                                  <td colSpan={2} />
+                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
+                                    {formatCurrency(Math.max(totalPayable - rows.reduce((s, r) => s + r.paid, 0), 0))}
+                                  </td>
+                                  <td />
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    const quarters = [
+                      { label: 'Q1 (Jun–Aug)', monthIndices: [0, 1, 2] },
+                      { label: 'Q2 (Sep–Nov)', monthIndices: [3, 4, 5] },
+                      { label: 'Q3 (Dec–Feb)', monthIndices: [6, 7, 8] },
+                      { label: 'Q4 (Mar)', monthIndices: [9] },
+                    ]
+
+                    const quarterlyDues = [
+                      totalPayable * 3 / 10,
+                      totalPayable * 3 / 10,
+                      totalPayable * 3 / 10,
+                      totalPayable * 1 / 10,
+                    ]
+
+                    let qCumulativeDue = 0
+                    let qCumulativePaid = 0
+
+                    const qRows = quarters.map((q, qi) => {
+                      let paid = 0
+                      for (const idx of q.monthIndices) {
+                        const sm = schoolMonths[idx]
+                        const key = `${sm.month}-${sm.year}`
+                        paid += paidByMonth[key] ?? 0
+                      }
+                      const due = quarterlyDues[qi]
+                      qCumulativeDue += due
+                      qCumulativePaid += paid
+                      const remaining = Math.max(qCumulativeDue - qCumulativePaid, 0)
+                      return { ...q, due, paid, cumulativeDue: qCumulativeDue, cumulativePaid: qCumulativePaid, remaining }
+                    })
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span>Total Payable: <strong className="text-gray-900">{formatCurrency(totalPayable)}</strong></span>
+                          <span>Quarterly breakdown is proportional to months in each quarter (3-3-3-1).</span>
+                        </div>
+                        <div className="overflow-x-auto rounded-lg border border-gray-200">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quarter</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quarterly Due</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Due</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Paid</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Remaining</th>
+                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 bg-white">
+                              {qRows.map((r, idx) => {
+                                const isFullyPaid = r.cumulativePaid >= r.cumulativeDue - 0.01
+                                return (
+                                  <tr key={idx} className="hover:bg-gray-50/50">
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.label}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.due)}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.paid)}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativeDue)}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativePaid)}</td>
+                                    <td className="px-4 py-3 text-sm text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.remaining)}</td>
+                                    <td className="px-4 py-3 text-center">
+                                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                        isFullyPaid
+                                          ? 'bg-green-100 text-green-700'
+                                          : r.paid > 0
+                                            ? 'bg-yellow-100 text-yellow-700'
+                                            : 'bg-gray-100 text-gray-500'
+                                      }`}>
+                                        {isFullyPaid ? 'Paid' : r.paid > 0 ? 'Partial' : 'Unpaid'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                            <tfoot className="bg-gray-50">
+                              <tr className="font-semibold">
+                                <td className="px-4 py-3 text-sm text-gray-900">Total</td>
+                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalPayable)}</td>
+                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
+                                  {formatCurrency(qRows.reduce((s, r) => s + r.paid, 0))}
+                                </td>
+                                <td colSpan={2} />
+                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
+                                  {formatCurrency(Math.max(totalPayable - qRows.reduce((s, r) => s + r.paid, 0), 0))}
+                                </td>
+                                <td />
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </>
             )}
