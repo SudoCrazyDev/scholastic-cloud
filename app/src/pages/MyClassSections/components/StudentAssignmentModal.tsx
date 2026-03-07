@@ -46,11 +46,12 @@ export function StudentAssignmentModal({
     isLoading: searchLoading,
     error: searchError,
   } = useQuery({
-    queryKey: ['students-search-assignment', searchTerm, classSection.id],
+    queryKey: ['students-search-assignment', searchTerm, classSection.id, classSection.institution_id],
     queryFn: () => studentService.searchStudentsForAssignment({
       search: searchTerm,
       per_page: 20,
-      exclude_section_id: classSection.id
+      exclude_section_id: classSection.id,
+      institution_id: classSection.institution_id
     }),
     enabled: !!searchTerm && searchTerm.length >= 2,
     staleTime: 30000, // 30 seconds

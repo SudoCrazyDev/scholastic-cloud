@@ -546,37 +546,49 @@ class StudentController extends Controller
 
     /**
      * Search students for assignment to class sections.
+     * When institution_id is provided (e.g. from class section context), only returns students
+     * that belong to that institution OR have no institution assigned yet.
      */
     public function searchForAssignment(Request $request): JsonResponse
     {
         $perPage = $request->get('per_page', 20);
         $search = $request->get('search', '');
         $excludeSectionId = $request->get('exclude_section_id');
+        $institutionId = $request->get('institution_id');
 
-        // Get the authenticated user's default institution
-        $user = $request->user();
-        $defaultInstitutionId = $user->getDefaultInstitutionId();
-        // If no default institution, try to get the first available institution
-        if (!$defaultInstitutionId) {
-            $firstUserInstitution = $user->userInstitutions()->first();
-            if ($firstUserInstitution) {
-                $defaultInstitutionId = $firstUserInstitution->institution_id;
+        // When searching from a class section, require that section's institution to scope results
+        if ($institutionId) {
+            $query = Student::query();
+            $query->where(function ($q) use ($institutionId) {
+                $q->whereHas('studentInstitutions', function ($q2) use ($institutionId) {
+                    $q2->where('institution_id', $institutionId);
+                })
+                ->orWhereDoesntHave('studentInstitutions');
+            });
+        } else {
+            // Fallback: use user's default institution when no institution_id provided
+            $user = $request->user();
+            $defaultInstitutionId = $user->getDefaultInstitutionId();
+            if (!$defaultInstitutionId) {
+                $firstUserInstitution = $user->userInstitutions()->first();
+                if ($firstUserInstitution) {
+                    $defaultInstitutionId = $firstUserInstitution->institution_id;
+                }
             }
+            if (!$defaultInstitutionId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'User does not have any institution assigned'
+                ], 400);
+            }
+            $query = Student::query();
+            $query->where(function ($q) use ($defaultInstitutionId) {
+                $q->whereHas('studentInstitutions', function ($q2) use ($defaultInstitutionId) {
+                    $q2->where('institution_id', $defaultInstitutionId);
+                })
+                ->orWhereDoesntHave('studentInstitutions');
+            });
         }
-        
-        if (!$defaultInstitutionId) {
-            return response()->json([
-                'success' => false, 
-                'error' => 'User does not have any institution assigned'
-            ], 400);
-        }
-
-        $query = Student::query();
-
-        // Filter students by the user's institution
-        // $query->whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
-        //     $q->where('institution_id', $defaultInstitutionId);
-        // });
 
         // Exclude students already assigned to the specified section
         if ($excludeSectionId) {

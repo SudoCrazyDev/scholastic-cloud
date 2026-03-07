@@ -141,6 +141,7 @@ class StudentService {
     page?: number
     per_page?: number
     exclude_section_id?: string
+    institution_id?: string
   }) {
     const queryParams = new URLSearchParams()
     
@@ -148,6 +149,7 @@ class StudentService {
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.per_page) queryParams.append('per_page', params.per_page.toString())
     if (params?.exclude_section_id) queryParams.append('exclude_section_id', params.exclude_section_id)
+    if (params?.institution_id) queryParams.append('institution_id', params.institution_id)
 
     const url = `${this.baseUrl}/search-for-assignment${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     const response = await api.get<PaginatedResponse<Student>>(url)
