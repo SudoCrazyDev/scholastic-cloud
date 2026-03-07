@@ -70,7 +70,7 @@ class StudentFinanceController extends Controller
                 ->get();
         }
 
-        $payments = StudentPayment::with('schoolFee')
+        $payments = StudentPayment::with(['schoolFee', 'receivedBy'])
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -78,7 +78,7 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $discounts = StudentDiscount::with('schoolFee')
+        $discounts = StudentDiscount::with(['schoolFee', 'creator'])
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -87,7 +87,7 @@ class StudentFinanceController extends Controller
 
         $gradeLevelDiscounts = collect();
         if ($gradeLevel) {
-            $gradeLevelDiscounts = GradeLevelDiscount::with('schoolFee')
+            $gradeLevelDiscounts = GradeLevelDiscount::with(['schoolFee', 'creator'])
                 ->where('institution_id', $institutionId)
                 ->where('grade_level', $gradeLevel)
                 ->where('academic_year', $academicYear)
@@ -155,6 +155,10 @@ class StudentFinanceController extends Controller
             $feeName = $discount->schoolFee?->name;
             $label = $feeName ? 'Discount - ' . $feeName : 'Discount';
             $description = $discount->description ? $label . ' (' . $discount->description . ')' : $label;
+            $creator = $discount->creator;
+            $processedByName = $creator
+                ? trim(($creator->first_name ?? '') . ' ' . ($creator->last_name ?? ''))
+                : null;
 
             return [
                 'type' => 'discount',
@@ -166,6 +170,31 @@ class StudentFinanceController extends Controller
                 'discount_value' => (float) $discount->value,
                 'fee_id' => $discount->school_fee_id,
                 'fee_name' => $feeName,
+                'processed_by' => $processedByName,
+            ];
+        });
+
+        $gradeLevelDiscountEntries = $gradeLevelDiscountsWithAmount->map(function ($payload) {
+            $discount = $payload['discount'];
+            $feeName = $discount->schoolFee?->name;
+            $label = $feeName ? 'Grade Discount - ' . $feeName : 'Grade Discount';
+            $description = $discount->description ? $label . ' (' . $discount->description . ')' : $label;
+            $creator = $discount->creator;
+            $processedByName = $creator
+                ? trim(($creator->first_name ?? '') . ' ' . ($creator->last_name ?? ''))
+                : null;
+
+            return [
+                'type' => 'discount',
+                'description' => $description,
+                'amount' => -1 * (float) $payload['amount'],
+                'date' => $discount->created_at?->toDateString(),
+                'discount_id' => $discount->id,
+                'discount_type' => $discount->discount_type,
+                'discount_value' => (float) $discount->value,
+                'fee_id' => $discount->school_fee_id,
+                'fee_name' => $feeName,
+                'processed_by' => $processedByName,
             ];
         });
 
@@ -191,6 +220,11 @@ class StudentFinanceController extends Controller
         $paymentEntries = $payments->map(function ($payment) {
             $feeName = $payment->schoolFee?->name;
             $label = $feeName ? 'Payment - ' . $feeName : 'Payment';
+            $receivedBy = $payment->receivedBy;
+            $processedByName = $receivedBy
+                ? trim(($receivedBy->first_name ?? '') . ' ' . ($receivedBy->last_name ?? ''))
+                : null;
+
             return [
                 'type' => 'payment',
                 'description' => $label,
@@ -201,6 +235,7 @@ class StudentFinanceController extends Controller
                 'payment_id' => $payment->id,
                 'fee_id' => $payment->school_fee_id,
                 'fee_name' => $feeName,
+                'processed_by' => $processedByName,
             ];
         });
 

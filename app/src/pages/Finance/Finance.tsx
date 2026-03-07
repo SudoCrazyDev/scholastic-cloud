@@ -15,9 +15,11 @@ import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
+import DashboardCharts from './DashboardCharts'
 import CollectionsView from './CollectionsView'
 import DiscountsView from './DiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
+import ReceiptPrintModal from './ReceiptPrintModal'
 import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentPaymentData, StudentPayment } from '../../types'
 
 const Finance: React.FC = () => {
@@ -90,6 +92,7 @@ const Finance: React.FC = () => {
   })
   const [cashierError, setCashierError] = useState<string | null>(null)
   const [lastReceipt, setLastReceipt] = useState<StudentPayment | null>(null)
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
 
   const [ledgerSearchTerm, setLedgerSearchTerm] = useState('')
   const [debouncedLedgerSearch, setDebouncedLedgerSearch] = useState('')
@@ -175,6 +178,7 @@ const Finance: React.FC = () => {
     mutationFn: (payload: CreateStudentPaymentData) => studentPaymentService.createPayment(payload),
     onSuccess: (response) => {
       setLastReceipt(response.data)
+      setShowReceiptModal(true)
       setCashierPaymentForm((prev) => ({
         ...prev,
         amount: '',
@@ -685,6 +689,10 @@ const Finance: React.FC = () => {
               </p>
             )}
           </div>
+
+          {!dashboardQuery.isLoading && (
+            <DashboardCharts fees={dashboardFees} grades={gradeSummaries} />
+          )}
         </div>
       )}
 
@@ -1210,17 +1218,39 @@ const Finance: React.FC = () => {
 
             {lastReceipt && (
               <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="text-sm font-medium text-green-800">Last receipt</p>
-                <p className="text-lg font-semibold text-green-900 mt-1">
-                  Receipt # {lastReceipt.receipt_number ?? lastReceipt.id}
-                </p>
-                <p className="text-sm text-green-700 mt-1">
-                  Amount: ₱ {Number(lastReceipt.amount).toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Last receipt</p>
+                    <p className="text-lg font-semibold text-green-900 mt-1">
+                      Receipt # {lastReceipt.receipt_number ?? lastReceipt.id}
+                    </p>
+                    <p className="text-sm text-green-700 mt-1">
+                      Amount: ₱ {Number(lastReceipt.amount).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowReceiptModal(true)}
+                    className="border-green-300 text-green-700 hover:bg-green-100"
+                  >
+                    Print Receipt
+                  </Button>
+                </div>
               </div>
+            )}
+
+            {showReceiptModal && lastReceipt && selectedStudent && (
+              <ReceiptPrintModal
+                payment={lastReceipt}
+                studentName={getStudentFullName(selectedStudent)}
+                studentLrn={selectedStudent.lrn}
+                onClose={() => setShowReceiptModal(false)}
+              />
             )}
           </div>
         </div>
@@ -1444,6 +1474,9 @@ const Finance: React.FC = () => {
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                               Running Balance
                             </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Processed By
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 bg-white">
@@ -1476,12 +1509,15 @@ const Finance: React.FC = () => {
                                   maximumFractionDigits: 2,
                                 })}
                               </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                {entry.processed_by ?? '—'}
+                              </td>
                             </tr>
                           ))}
                           {!ledgerQuery.data?.data?.entries?.length && (
                             <tr>
                               <td
-                                colSpan={5}
+                                colSpan={6}
                                 className="px-4 py-8 text-center text-gray-500"
                               >
                                 No ledger entries for this academic year.
