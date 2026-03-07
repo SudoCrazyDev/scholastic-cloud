@@ -247,6 +247,7 @@ export interface StudentLedgerEntry {
   discount_type?: 'fixed' | 'percentage';
   discount_value?: number;
   running_balance?: number;
+  processed_by?: string | null;
 }
 
 export interface StudentLedgerResponse {
