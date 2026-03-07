@@ -125,7 +125,7 @@ const DashboardCharts: React.FC<DashboardChartsProps> = ({ fees, grades }) => {
             <BarChart data={paymentsByGrade} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `₱${(v / 1000).toFixed(0)}k`} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="total" name="Payments" radius={[4, 4, 0, 0]}>
                 {paymentsByGrade.map((_, idx) => (
@@ -173,7 +173,7 @@ const DashboardCharts: React.FC<DashboardChartsProps> = ({ fees, grades }) => {
             <BarChart data={collectiblesByGrade} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `₱${(v / 1000).toFixed(0)}k`} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="total" name="Collectibles" radius={[4, 4, 0, 0]}>
                 {collectiblesByGrade.map((_, idx) => (
