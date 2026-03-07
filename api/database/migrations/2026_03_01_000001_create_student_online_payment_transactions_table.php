@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('academic_year');
             $table->decimal('amount', 12, 2);
             $table->string('currency', 3)->default('PHP');
-            $table->string('request_reference_number', 100)->unique();
+            $table->string('request_reference_number', 100)->unique('sop_txn_request_ref_unique');
             $table->string('provider_payment_id')->nullable();
             $table->string('provider_charge_id')->nullable();
             $table->text('checkout_url')->nullable();

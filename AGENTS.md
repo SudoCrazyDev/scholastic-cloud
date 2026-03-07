@@ -30,8 +30,7 @@ cd app && npm run dev -- --host 0.0.0.0
 ### Important gotchas
 
 - **System env vars override `.env`**: The Cloud Agent VM injects environment variables (from secrets) that override the `api/.env` file. The injected `DB_USERNAME`, `DB_PASSWORD`, and `DB_DATABASE` values do not match the Docker Compose MariaDB credentials. You **must** export the correct values (`DB_USERNAME=schoolmate_user`, `DB_PASSWORD=schoolmate_password`, `DB_DATABASE=schoolmate`) in your shell before running any `php artisan` command.
-- **Migration 2026_03_01 identifier length**: The `student_online_payment_transactions` migration creates a unique index name longer than MariaDB's 64-char limit. When running `migrate:fresh`, this migration fails. Workaround: manually create the table with a shorter index name via `DB::statement`, insert a row into the `migrations` table, then run `php artisan migrate` for the remaining migrations.
-- **VITE_API_URL must include `/api`**: Set `VITE_API_URL=http://localhost:8000/api` in `app/.env`. The frontend axios base URL is set directly from this value, and Laravel API routes are prefixed with `/api`.
+ **VITE_API_URL must include `/api`**: Set `VITE_API_URL=http://localhost:8000/api` in `app/.env`. The frontend axios base URL is set directly from this value, and Laravel API routes are prefixed with `/api`.
 - **Seeded user credentials**: `philiplouis0717@gmail.com` / `password` (first login prompts password change).
 
 ### Lint and test commands
