@@ -198,6 +198,25 @@ class StudentFinanceController extends Controller
             ];
         });
 
+        $gradeLevelDiscountEntries = $gradeLevelDiscountsWithAmount->map(function ($payload) {
+            $discount = $payload['discount'];
+            $feeName = $discount->schoolFee?->name;
+            $label = $feeName ? 'Grade Discount - ' . $feeName : 'Grade Discount';
+            $description = $discount->description ? $label . ' (' . $discount->description . ')' : $label;
+
+            return [
+                'type' => 'discount',
+                'description' => $description,
+                'amount' => -1 * (float) $payload['amount'],
+                'date' => $discount->created_at?->toDateString(),
+                'discount_id' => $discount->id,
+                'discount_type' => $discount->discount_type,
+                'discount_value' => (float) $discount->value,
+                'fee_id' => $discount->school_fee_id,
+                'fee_name' => $feeName,
+            ];
+        });
+
         $paymentEntries = $payments->map(function ($payment) {
             $feeName = $payment->schoolFee?->name;
             $label = $feeName ? 'Payment - ' . $feeName : 'Payment';
