@@ -165,7 +165,7 @@ const SchoolDays: React.FC = () => {
                   School Days
                 </h1>
                 <p className="mt-2 text-gray-600">
-                  Set the total number of school days per month for your institution.
+                  Set the total number of school days per month. Use the Department filter to set different school days per department (e.g. Elementary vs High School); use &quot;Institution-wide&quot; for shared/default.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ const SchoolDays: React.FC = () => {
               {departments.length > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-700 font-medium">Department:</span>
-                  <div className="min-w-[180px]">
+                  <div className="min-w-[200px]">
                     <Select
                       options={[
                         { value: '', label: 'Institution-wide (no department)' },
@@ -193,6 +193,11 @@ const SchoolDays: React.FC = () => {
                       onChange={(e) => setSelectedDepartmentId(e.target.value || null)}
                     />
                   </div>
+                  <span className="text-xs text-gray-500">
+                    {selectedDepartmentId
+                      ? `Editing: ${departments.find((d) => d.id === selectedDepartmentId)?.title ?? 'Department'}`
+                      : 'Editing: Institution-wide'}
+                  </span>
                 </div>
               )}
               <div className="flex items-center gap-2">

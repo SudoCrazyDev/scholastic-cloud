@@ -259,12 +259,12 @@ export default function PrintReportCard({
                                         const monthData = getAttendanceForMonth(index);
                                         return (
                                             <View key={`school-days-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
-                                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{monthData.schoolDays ?? ''}</Text>
+                                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{monthData.schoolDays === 0 ? '' : monthData.schoolDays}</Text>
                                             </View>
                                         );
                                     })}
                                     <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center"}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{attendanceTotals.schoolDays ?? ''}</Text>
+                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{attendanceTotals.schoolDays === 0 ? '' : attendanceTotals.schoolDays}</Text>
                                     </View>
                                 </View>
                                 <View style={{width: '100%', display: 'flex', flexDirection: 'row', borderBottom: '1px solid black'}}>
