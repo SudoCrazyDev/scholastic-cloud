@@ -142,17 +142,25 @@ export const useStudentReportCard = ({
     refetchOnReconnect: false,
   })
 
-  // Fetch school days for the institution
+  // Section's department (or institution default) determines which school days to use for attendance
+  const departmentIdForSchoolDays =
+    classSectionData?.data?.department_id ??
+    institutionData?.data?.default_department_id ??
+    null
+
+  // Fetch school days for the section's department (so Final Report Card attendance uses department school days)
   const {
     data: schoolDaysData,
     isLoading: schoolDaysLoading,
     error: schoolDaysError,
   } = useQuery({
-    queryKey: ['school-days', institutionId, academicYear],
-    queryFn: () => schoolDayService.getSchoolDays({
-      institution_id: institutionId,
-      academic_year: academicYear,
-    }),
+    queryKey: ['school-days', institutionId, academicYear, departmentIdForSchoolDays],
+    queryFn: () =>
+      schoolDayService.getSchoolDays({
+        institution_id: institutionId,
+        academic_year: academicYear,
+        department_id: departmentIdForSchoolDays ?? undefined,
+      }),
     enabled: enabled && !!institutionId && !!academicYear,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
