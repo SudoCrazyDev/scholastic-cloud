@@ -12,19 +12,20 @@ import { Select } from '../../components/select'
 import { Badge } from '../../components/badge'
 import { Alert } from '../../components/alert'
 
-const MONTHS = [
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
+// Academic year order: Jun (6) through May (5), matching report card attendance
+const ACADEMIC_MONTHS = [
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April' },
+  { value: 5, label: 'May' },
 ]
 
 const SchoolDays: React.FC = () => {
@@ -32,7 +33,6 @@ const SchoolDays: React.FC = () => {
   const { user } = useAuth()
   const currentYear = new Date().getFullYear()
 
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('')
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null)
   const [schoolDaysData, setSchoolDaysData] = useState<Record<number, number>>({})
@@ -44,17 +44,7 @@ const SchoolDays: React.FC = () => {
 
   const { departments } = useDepartments({ institutionId, enabled: !!institutionId })
 
-  // Generate year options (current year and previous 2 years)
-  const yearOptions = useMemo(() => {
-    const years = []
-    for (let i = 0; i < 3; i++) {
-      const year = currentYear - i
-      years.push({ value: year.toString(), label: year.toString() })
-    }
-    return years
-  }, [currentYear])
-
-  // Generate academic year options (common format: 2024-2025)
+  // Generate academic year options (common format: 2025-2026); one selection = full year Jun–May
   const academicYearOptions = useMemo(() => {
     const years = []
     for (let i = 0; i < 5; i++) {
@@ -76,7 +66,6 @@ const SchoolDays: React.FC = () => {
     institutionId,
     departmentId: selectedDepartmentId || undefined,
     academicYear: selectedAcademicYear,
-    year: selectedYear,
     enabled: !!institutionId && !!selectedAcademicYear,
   })
 
@@ -120,7 +109,6 @@ const SchoolDays: React.FC = () => {
         institution_id: institutionId,
         department_id: selectedDepartmentId || null,
         academic_year: selectedAcademicYear,
-        year: selectedYear,
         school_days: schoolDays,
       })
 
@@ -128,7 +116,7 @@ const SchoolDays: React.FC = () => {
     } catch (error) {
       // Error is handled in the hook
     }
-  }, [schoolDaysData, institutionId, selectedDepartmentId, selectedAcademicYear, selectedYear, bulkUpsert, refetch])
+  }, [schoolDaysData, institutionId, selectedDepartmentId, selectedAcademicYear, bulkUpsert, refetch])
 
   if (!hasAccess) {
     return <Navigate to="/dashboard" replace />
@@ -209,16 +197,9 @@ const SchoolDays: React.FC = () => {
                     onChange={(e) => setSelectedAcademicYear(e.target.value)}
                   />
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700 font-medium">Year:</span>
-                <div className="min-w-[100px]">
-                  <Select
-                    options={yearOptions}
-                    value={selectedYear.toString()}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  />
-                </div>
+                <span className="text-xs text-gray-500">
+                  Jun–May (e.g. 2025-2026 = Jun 2025 through May 2026)
+                </span>
               </div>
               <Button
                 onClick={handleSave}
@@ -271,8 +252,8 @@ const SchoolDays: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {MONTHS.map((month, index) => {
-                      const monthNumber = parseInt(month.value)
+                    {ACADEMIC_MONTHS.map((month, index) => {
+                      const monthNumber = month.value
                       const days = schoolDaysData[monthNumber] || 0
                       return (
                         <tr
@@ -318,15 +299,15 @@ const SchoolDays: React.FC = () => {
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                <span className="font-medium">Total School Days (Year):</span>{' '}
+                <span className="font-medium">Total School Days (Academic Year):</span>{' '}
                 <Badge color="blue">
                   {Object.values(schoolDaysData).reduce((sum, days) => sum + days, 0)} days
                 </Badge>
               </div>
               <div className="text-sm text-gray-600">
-                <span className="font-medium">Selected Period:</span>{' '}
+                <span className="font-medium">Academic Year:</span>{' '}
                 <Badge color="green">
-                  {selectedAcademicYear} - {selectedYear}
+                  {selectedAcademicYear}
                 </Badge>
               </div>
             </div>

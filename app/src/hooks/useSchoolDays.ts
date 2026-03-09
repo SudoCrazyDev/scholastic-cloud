@@ -3,27 +3,26 @@ import { schoolDayService } from '../services/schoolDayService'
 import type { CreateSchoolDayData, UpdateSchoolDayData, BulkUpsertSchoolDayData } from '../types'
 import { toast } from 'react-hot-toast'
 
+/** Options for fetching/updating school days. Scope is by academic year (e.g. 2025-2026), not calendar year. */
 interface UseSchoolDaysOptions {
   institutionId: string
   departmentId?: string | null
   academicYear?: string
   month?: number
-  year?: number
   enabled?: boolean
 }
 
 export const useSchoolDays = (options: UseSchoolDaysOptions) => {
-  const { institutionId, departmentId, academicYear, month, year, enabled = true } = options
+  const { institutionId, departmentId, academicYear, month, enabled = true } = options
   const queryClient = useQueryClient()
 
   const query = useQuery({
-    queryKey: ['school-days', { institutionId, departmentId, academicYear, month, year }],
+    queryKey: ['school-days', { institutionId, departmentId, academicYear, month }],
     queryFn: () => schoolDayService.getSchoolDays({
       institution_id: institutionId,
       department_id: departmentId ?? undefined,
       academic_year: academicYear,
       month,
-      year,
     }),
     enabled: enabled && !!institutionId,
   })

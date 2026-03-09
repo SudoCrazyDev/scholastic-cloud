@@ -12,7 +12,39 @@ use Illuminate\Support\Facades\DB;
 class SchoolDayController extends Controller
 {
     /**
+     * Parse academic year string (e.g. "2025-2026") into [startYear, endYear].
+     * Academic year runs Jun (startYear) through May (endYear).
+     */
+    private function parseAcademicYear(string $academicYear): ?array
+    {
+        if (preg_match('/^(\d{4})-(\d{4})$/', trim($academicYear), $m)) {
+            $start = (int) $m[1];
+            $end = (int) $m[2];
+            if ($end === $start + 1) {
+                return [$start, $end];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * For a given month (1-12) and academic year (e.g. 2025-2026), return the calendar year.
+     * Jun (6) - May (5) => months 6-12 use start year, months 1-5 use end year.
+     */
+    private function yearForMonthInAcademicYear(int $month, string $academicYear): ?int
+    {
+        $parsed = $this->parseAcademicYear($academicYear);
+        if (!$parsed) {
+            return null;
+        }
+        [$startYear, $endYear] = $parsed;
+        return $month >= 6 ? $startYear : $endYear;
+    }
+
+    /**
      * Display a listing of school days records.
+     * When academic_year is provided, returns exactly 12 rows (one per month) in academic order
+     * (Jun, Jul, ..., Dec, Jan, ..., May), with year derived from academic year. No separate year filter.
      */
     public function index(Request $request): JsonResponse
     {
@@ -55,6 +87,45 @@ class SchoolDayController extends Controller
             ->orderBy('month', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
+
+        // When filtering by academic_year only: return exactly 12 rows (one per month) in academic
+        // order (Jun→May). Prefer rows whose year matches the academic year; fill missing months with 0.
+        if ($request->filled('academic_year') && !$request->filled('month') && !$request->filled('year')) {
+            $parsed = $this->parseAcademicYear($request->academic_year);
+            if ($parsed) {
+                [$startYear, $endYear] = $parsed;
+                $byMonth = [];
+                foreach ($schoolDays as $row) {
+                    $m = (int) $row->month;
+                    $expectedYear = $m >= 6 ? $startYear : $endYear;
+                    if (!isset($byMonth[$m]) || (int) $row->year === $expectedYear) {
+                        $byMonth[$m] = $row;
+                    }
+                }
+                $academicOrder = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
+                $result = [];
+                foreach ($academicOrder as $month) {
+                    $expectedYear = $month >= 6 ? $startYear : $endYear;
+                    if (isset($byMonth[$month])) {
+                        $result[] = $byMonth[$month];
+                    } else {
+                        $result[] = (object) [
+                            'id' => null,
+                            'institution_id' => $request->institution_id,
+                            'department_id' => $request->department_id,
+                            'academic_year' => $request->academic_year,
+                            'month' => $month,
+                            'year' => $expectedYear,
+                            'total_days' => 0,
+                        ];
+                    }
+                }
+                return response()->json([
+                    'success' => true,
+                    'data' => $result
+                ]);
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -213,7 +284,8 @@ class SchoolDayController extends Controller
     }
 
     /**
-     * Bulk upsert school days records for multiple months.
+     * Bulk upsert school days records for all 12 months of an academic year.
+     * Calendar year is derived from academic year: Jun–Dec = start year, Jan–May = end year.
      */
     public function bulkUpsert(Request $request): JsonResponse
     {
@@ -221,7 +293,6 @@ class SchoolDayController extends Controller
             'institution_id' => 'required|uuid|exists:institutions,id',
             'department_id' => 'nullable|uuid|exists:departments,id',
             'academic_year' => 'required|string|max:255',
-            'year' => 'required|integer',
             'school_days' => 'required|array',
             'school_days.*.month' => 'required|integer|min:1|max:12',
             'school_days.*.total_days' => 'required|integer|min:0',
@@ -235,25 +306,40 @@ class SchoolDayController extends Controller
             ], 422);
         }
 
+        $parsed = $this->parseAcademicYear($request->academic_year);
+        if (!$parsed) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid academic year format. Use e.g. 2025-2026.',
+                'errors' => ['academic_year' => ['Must be in format YYYY-YYYY (e.g. 2025-2026).']]
+            ], 422);
+        }
+
         try {
             DB::beginTransaction();
 
             $institutionId = $request->institution_id;
             $departmentId = $request->department_id ?? null;
             $academicYear = $request->academic_year;
-            $year = $request->year;
             $schoolDays = $request->school_days;
 
             $created = [];
             $updated = [];
 
+            // Derive calendar year per month: Jun–Dec = start year, Jan–May = end year of academic year.
             foreach ($schoolDays as $schoolDayData) {
+                $month = (int) $schoolDayData['month'];
+                $year = $this->yearForMonthInAcademicYear($month, $academicYear);
+                if ($year === null) {
+                    continue;
+                }
+
                 $schoolDay = SchoolDay::updateOrCreate(
                     [
                         'institution_id' => $institutionId,
                         'department_id' => $departmentId,
                         'academic_year' => $academicYear,
-                        'month' => $schoolDayData['month'],
+                        'month' => $month,
                         'year' => $year,
                     ],
                     [

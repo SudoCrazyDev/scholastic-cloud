@@ -1128,7 +1128,6 @@ export interface BulkUpsertSchoolDayData {
   institution_id: string;
   department_id?: string | null;
   academic_year: string;
-  year: number;
   school_days: Array<{
     month: number;
     total_days: number;
