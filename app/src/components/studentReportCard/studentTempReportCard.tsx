@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer } from '@react-pdf/renderer';
 import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../../types';
-import { roundGrade, getPassFailRemarks } from '@/utils/gradeUtils';
+import { roundGrade, getPassFailRemarks, calculateAgeAsOfOctober31 } from '@/utils/gradeUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
 
 /** Set to false to show empty Final Grade and Remarks for now. Set to true to show computed values. */
@@ -103,6 +103,16 @@ export default function PrintTempReportCard({
                           LRN: {student?.lrn || ""}
                         </Text>
                     </View>
+                    {student?.birthdate && (
+                        <View style={{ paddingHorizontal: '20px', width: '100%', display: 'flex', flexDirection: 'row', marginTop: '2px', gap: 16 }}>
+                          <Text style={{ fontSize: '9px', fontFamily: 'Helvetica' }}>
+                            Age (as of Oct 31): {calculateAgeAsOfOctober31(student.birthdate, academicYear)}
+                          </Text>
+                          <Text style={{ fontSize: '9px', fontFamily: 'Helvetica' }}>
+                            Sex: {student.gender === 'male' ? 'M' : student.gender === 'female' ? 'F' : 'O'}
+                          </Text>
+                        </View>
+                    )}
                     <View style={{width: '50%', paddingHorizontal: '20px', display: 'flex', flexDirection: 'column', marginTop: '5px'}}>
                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', marginBottom: '10px'}}>REPORT ON LEARNING PROGRESS AND ACHIEVEMENT</Text>
                         <View style={{display: 'flex', flexDirection: 'row', border: '1px solid black'}}>

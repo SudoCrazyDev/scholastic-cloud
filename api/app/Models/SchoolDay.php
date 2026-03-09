@@ -13,6 +13,7 @@ class SchoolDay extends Model
     protected $fillable = [
         'id',
         'institution_id',
+        'department_id',
         'academic_year',
         'month',
         'year',
@@ -28,6 +29,11 @@ class SchoolDay extends Model
     public function institution()
     {
         return $this->belongsTo(Institution::class);
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
     }
 }
 

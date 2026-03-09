@@ -18,7 +18,7 @@ class InstitutionController extends Controller
      */
     public function index(): JsonResponse
     {
-        $institutions = Institution::with('subscription')->get();
+        $institutions = Institution::with(['subscription', 'defaultDepartment'])->get();
         
         return response()->json([
             'success' => true,
@@ -44,6 +44,12 @@ class InstitutionController extends Controller
 
             $data = $validator->validated();
 
+            // default_department_id must belong to this institution
+            if (array_key_exists('default_department_id', $data)) {
+                $data['default_department_id'] = ($data['default_department_id'] && $institution->departments()->where('id', $data['default_department_id'])->exists())
+                    ? $data['default_department_id'] : null;
+            }
+
             // Handle logo file upload to R2
             if ($request->hasFile('logo')) {
                 $logo = $request->file('logo');
@@ -59,7 +65,7 @@ class InstitutionController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Institution created successfully',
-                'data' => $institution->load('subscription')
+                'data' => $institution->load(['subscription', 'defaultDepartment'])
             ], 201);
 
         } catch (ValidationException $e) {
@@ -83,7 +89,7 @@ class InstitutionController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $institution = Institution::with('subscription')->findOrFail($id);
+            $institution = Institution::with(['subscription', 'defaultDepartment'])->findOrFail($id);
             
             return response()->json([
                 'success' => true,
@@ -144,7 +150,7 @@ class InstitutionController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Institution updated successfully',
-                'data' => $institution->load('subscription')
+                'data' => $institution->load(['subscription', 'defaultDepartment'])
             ]);
 
         } catch (ValidationException $e) {

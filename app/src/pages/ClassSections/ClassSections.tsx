@@ -7,11 +7,22 @@ import { useClassSections } from '../../hooks/useClassSections'
 import { useSubjects } from '../../hooks/useSubjects'
 import { useStudents } from '../../hooks/useStudents'
 import { useAuth } from '../../hooks/useAuth'
+import { useDepartments } from '../../hooks/useDepartments'
+import { useQuery } from '@tanstack/react-query'
+import { institutionService } from '../../services/institutionService'
 import type { ClassSection, Subject } from '../../types'
 
 const ClassSections: React.FC = () => {
   const { user } = useAuth()
   const institutionId = user?.user_institutions?.[0]?.institution_id || ''
+
+  const { data: institutionResponse } = useQuery({
+    queryKey: ['institution', institutionId],
+    queryFn: () => institutionService.getInstitution(institutionId),
+    enabled: !!institutionId,
+  })
+  const institution = institutionResponse?.data
+  const { departments } = useDepartments({ institutionId, enabled: !!institutionId })
   
   // State for search and filters
   const [searchValue, setSearchValue] = useState<string>('')
@@ -264,6 +275,8 @@ const ClassSections: React.FC = () => {
         onSubmit={handleModalSubmit}
         classSection={editingClassSection}
         gradeLevels={gradeLevels}
+        departments={departments}
+        defaultDepartmentId={institution?.default_department_id ?? null}
         loading={modalLoading}
       />
 

@@ -18,6 +18,7 @@ class SchoolDayController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'institution_id' => 'required|uuid|exists:institutions,id',
+            'department_id' => 'nullable|uuid|exists:departments,id',
             'academic_year' => 'nullable|string',
             'month' => 'nullable|integer|min:1|max:12',
             'year' => 'nullable|integer',
@@ -31,8 +32,12 @@ class SchoolDayController extends Controller
             ], 422);
         }
 
-        $query = SchoolDay::with(['institution'])
+        $query = SchoolDay::with(['institution', 'department'])
             ->where('institution_id', $request->institution_id);
+
+        if ($request->filled('department_id')) {
+            $query->where('department_id', $request->department_id);
+        }
 
         if ($request->filled('academic_year')) {
             $query->where('academic_year', $request->academic_year);
@@ -64,6 +69,7 @@ class SchoolDayController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'institution_id' => 'required|uuid|exists:institutions,id',
+            'department_id' => 'nullable|uuid|exists:departments,id',
             'academic_year' => 'required|string|max:255',
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer',
@@ -80,6 +86,7 @@ class SchoolDayController extends Controller
 
         // Check if school day record already exists
         $existing = SchoolDay::where('institution_id', $request->institution_id)
+            ->where('department_id', $request->department_id)
             ->where('academic_year', $request->academic_year)
             ->where('month', $request->month)
             ->where('year', $request->year)
@@ -116,7 +123,7 @@ class SchoolDayController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $schoolDay = SchoolDay::with(['institution'])->find($id);
+        $schoolDay = SchoolDay::with(['institution', 'department'])->find($id);
 
         if (!$schoolDay) {
             return response()->json([
@@ -212,6 +219,7 @@ class SchoolDayController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'institution_id' => 'required|uuid|exists:institutions,id',
+            'department_id' => 'nullable|uuid|exists:departments,id',
             'academic_year' => 'required|string|max:255',
             'year' => 'required|integer',
             'school_days' => 'required|array',
@@ -231,6 +239,7 @@ class SchoolDayController extends Controller
             DB::beginTransaction();
 
             $institutionId = $request->institution_id;
+            $departmentId = $request->department_id ?? null;
             $academicYear = $request->academic_year;
             $year = $request->year;
             $schoolDays = $request->school_days;
@@ -242,6 +251,7 @@ class SchoolDayController extends Controller
                 $schoolDay = SchoolDay::updateOrCreate(
                     [
                         'institution_id' => $institutionId,
+                        'department_id' => $departmentId,
                         'academic_year' => $academicYear,
                         'month' => $schoolDayData['month'],
                         'year' => $year,

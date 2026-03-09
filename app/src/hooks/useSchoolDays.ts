@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast'
 
 interface UseSchoolDaysOptions {
   institutionId: string
+  departmentId?: string | null
   academicYear?: string
   month?: number
   year?: number
@@ -12,13 +13,14 @@ interface UseSchoolDaysOptions {
 }
 
 export const useSchoolDays = (options: UseSchoolDaysOptions) => {
-  const { institutionId, academicYear, month, year, enabled = true } = options
+  const { institutionId, departmentId, academicYear, month, year, enabled = true } = options
   const queryClient = useQueryClient()
 
   const query = useQuery({
-    queryKey: ['school-days', { institutionId, academicYear, month, year }],
+    queryKey: ['school-days', { institutionId, departmentId, academicYear, month, year }],
     queryFn: () => schoolDayService.getSchoolDays({
       institution_id: institutionId,
+      department_id: departmentId ?? undefined,
       academic_year: academicYear,
       month,
       year,

@@ -24,6 +24,7 @@ import {
   Calendar,
   Settings,
   FileText,
+  FolderTree,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -169,6 +170,13 @@ const menuItems: MenuItem[] = [
     label: 'School Days',
     icon: <Calendar className="w-5 h-5" />,
     path: '/school-days',
+    allowedRoles: ['principal', 'institution-administrator'],
+  },
+  {
+    id: 'departments',
+    label: 'Departments',
+    icon: <FolderTree className="w-5 h-5" />,
+    path: '/departments',
     allowedRoles: ['principal', 'institution-administrator'],
   },
   {

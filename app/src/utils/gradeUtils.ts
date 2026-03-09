@@ -128,15 +128,34 @@ export const getQuarterGrade = (grades: StudentRunningGrade[], quarter: '1' | '2
   return Math.round(gradeValue(quarterGrade))
 }
 
-export const calculateAge = (birthdate: string): number => {
+/**
+ * Computes age in completed years as of a given reference date.
+ */
+export const calculateAgeAsOf = (birthdate: string, referenceDate: Date): number => {
   const birth = new Date(birthdate)
-  const today = new Date()
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+  let age = referenceDate.getFullYear() - birth.getFullYear()
+  const monthDiff = referenceDate.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < birth.getDate())) {
     age--
   }
-  
-  return age
+  return Math.max(0, age)
+}
+
+/**
+ * DepEd standard: age as of October 31 of the school year.
+ * School year format is "YYYY-YYYY" (e.g. "2025-2026"); the first year is used (Oct 31, 2025).
+ * See DepEd Order No. 15, s. 2025 and kindergarten age-cutoff policy.
+ */
+export const calculateAgeAsOfOctober31 = (birthdate: string, academicYear: string): number => {
+  const match = String(academicYear || '').trim().match(/^(\d{4})/)
+  const year = match ? parseInt(match[1], 10) : new Date().getFullYear()
+  const referenceDate = new Date(year, 9, 31) // October 31 (month is 0-indexed)
+  return calculateAgeAsOf(birthdate, referenceDate)
+}
+
+/**
+ * Age in completed years as of today (for general use outside report cards).
+ */
+export const calculateAge = (birthdate: string): number => {
+  return calculateAgeAsOf(birthdate, new Date())
 } 

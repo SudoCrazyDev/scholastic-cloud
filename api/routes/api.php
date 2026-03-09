@@ -35,6 +35,7 @@ use App\Http\Controllers\StudentAdditionalFeeController;
 use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\StudentRfidTagController;
 use App\Http\Controllers\RfidScanLogController;
+use App\Http\Controllers\DepartmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -84,6 +85,12 @@ Route::middleware('auth.token')->group(function () {
     // Institution routes
     Route::apiResource('institutions', InstitutionController::class);
     Route::post('institutions/{id}', [InstitutionController::class, 'update']); // POST route for file uploads
+    Route::get('departments', [DepartmentController::class, 'index']);
+    Route::post('departments', [DepartmentController::class, 'store']);
+    Route::get('departments/{id}', [DepartmentController::class, 'show']);
+    Route::put('departments/{id}', [DepartmentController::class, 'update']);
+    Route::patch('departments/{id}', [DepartmentController::class, 'update']);
+    Route::delete('departments/{id}', [DepartmentController::class, 'destroy']);
     Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
     Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
     // User routes

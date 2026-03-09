@@ -28,6 +28,7 @@ class Institution extends Model
         'gov_id',
         'logo',
         'subscription_id',
+        'default_department_id',
     ];
 
     /**
@@ -74,6 +75,22 @@ class Institution extends Model
     }
 
     /**
+     * Get the default department for the institution.
+     */
+    public function defaultDepartment(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'default_department_id');
+    }
+
+    /**
+     * Get the departments for the institution.
+     */
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class);
+    }
+
+    /**
      * Get the certificates for the institution.
      */
     public function certificates(): HasMany
@@ -95,6 +112,7 @@ class Institution extends Model
             'gov_id' => 'nullable|string|max:255',
             'logo' => 'nullable|file|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'subscription_id' => 'nullable|uuid|exists:subscriptions,id',
+            'default_department_id' => 'nullable|uuid|exists:departments,id',
         ];
     }
 }

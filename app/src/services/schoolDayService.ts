@@ -6,13 +6,16 @@ class SchoolDayService {
 
   async getSchoolDays(params: {
     institution_id: string
+    department_id?: string | null
     academic_year?: string
     month?: number
     year?: number
   }) {
     const queryParams = new URLSearchParams()
     queryParams.append('institution_id', params.institution_id)
-    
+    if (params.department_id) {
+      queryParams.append('department_id', params.department_id)
+    }
     if (params.academic_year) {
       queryParams.append('academic_year', params.academic_year)
     }

@@ -12,12 +12,20 @@ import { useTeachers } from '../../../hooks/useTeachers'
 import { useSubjectTemplates } from '../../../hooks/useSubjectTemplates'
 import type { ClassSection, CreateClassSectionData, SubjectTemplate } from '../../../types'
 
+interface DepartmentOption {
+  id: string
+  title: string
+  slug: string
+}
+
 interface ClassSectionModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: CreateClassSectionData, templateId?: string) => Promise<void>
   classSection?: ClassSection | null
   gradeLevels: string[]
+  departments: DepartmentOption[]
+  defaultDepartmentId?: string | null
   loading?: boolean
   error?: string | null
 }
@@ -44,6 +52,8 @@ export function ClassSectionModal({
   onSubmit, 
   classSection, 
   gradeLevels,
+  departments = [],
+  defaultDepartmentId = null,
   loading = false,
   error = null 
 }: ClassSectionModalProps) {
@@ -73,6 +83,7 @@ export function ClassSectionModal({
       title: '',
       adviser_id: '',
       academic_year: '',
+      department_id: '',
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -82,6 +93,7 @@ export function ClassSectionModal({
           title: values.title,
           adviser: values.adviser_id || undefined,
           academic_year: values.academic_year || undefined,
+          department_id: values.department_id || defaultDepartmentId || undefined,
         }
         
         // Pass the template ID if a template is selected
@@ -115,6 +127,7 @@ export function ClassSectionModal({
           title: classSection.title,
           adviser_id: '',
           academic_year: classSection.academic_year || '',
+          department_id: classSection.department_id || '',
         })
         
         // Set adviser if available
@@ -308,6 +321,25 @@ export function ClassSectionModal({
                     <p className="mt-1 text-sm text-red-600">{formik.errors.academic_year}</p>
                   )}
                 </div>
+
+                {/* Department */}
+                {departments.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Department
+                    </label>
+                    <Select
+                      name="department_id"
+                      value={formik.values.department_id}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      options={[
+                        { value: '', label: defaultDepartmentId ? 'Use institution default' : 'None' },
+                        ...departments.map((d) => ({ value: d.id, label: `${d.title} (${d.slug})` })),
+                      ]}
+                    />
+                  </div>
+                )}
 
                 {/* Adviser */}
                 <div className="relative z-0">

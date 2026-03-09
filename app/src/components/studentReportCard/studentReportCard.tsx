@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
-import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAge } from '../../utils/gradeUtils';
+import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
     'Maka-Diyos': [
@@ -220,7 +220,7 @@ export default function PrintReportCard({
         );
     }
 
-    const studentAge = calculateAge(student.birthdate);
+    const studentAge = calculateAgeAsOfOctober31(student.birthdate, academicYear);
     const teacher = (classSection as any)?.adviser
     const teacherName = formatTeacherName(teacher)
     const schoolLogoUrl = toAbsoluteUrl(institution.logo)

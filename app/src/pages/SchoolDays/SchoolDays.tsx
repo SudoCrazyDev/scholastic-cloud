@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { useSchoolDays } from '../../hooks/useSchoolDays'
 import { useAuth } from '../../hooks/useAuth'
+import { useDepartments } from '../../hooks/useDepartments'
 import { Loader2, Calendar, Save, Building2, AlertCircle } from 'lucide-react'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
@@ -33,12 +34,15 @@ const SchoolDays: React.FC = () => {
 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('')
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null)
   const [schoolDaysData, setSchoolDaysData] = useState<Record<number, number>>({})
 
   // Get institution ID from user
   const institutionId = useMemo(() => {
     return user?.user_institutions?.[0]?.institution_id || ''
   }, [user])
+
+  const { departments } = useDepartments({ institutionId, enabled: !!institutionId })
 
   // Generate year options (current year and previous 2 years)
   const yearOptions = useMemo(() => {
@@ -70,6 +74,7 @@ const SchoolDays: React.FC = () => {
     refetch,
   } = useSchoolDays({
     institutionId,
+    departmentId: selectedDepartmentId || undefined,
     academicYear: selectedAcademicYear,
     year: selectedYear,
     enabled: !!institutionId && !!selectedAcademicYear,
@@ -113,6 +118,7 @@ const SchoolDays: React.FC = () => {
 
       await bulkUpsert({
         institution_id: institutionId,
+        department_id: selectedDepartmentId || null,
         academic_year: selectedAcademicYear,
         year: selectedYear,
         school_days: schoolDays,
@@ -122,7 +128,7 @@ const SchoolDays: React.FC = () => {
     } catch (error) {
       // Error is handled in the hook
     }
-  }, [schoolDaysData, institutionId, selectedAcademicYear, selectedYear, bulkUpsert, refetch])
+  }, [schoolDaysData, institutionId, selectedDepartmentId, selectedAcademicYear, selectedYear, bulkUpsert, refetch])
 
   if (!hasAccess) {
     return <Navigate to="/dashboard" replace />
@@ -174,6 +180,21 @@ const SchoolDays: React.FC = () => {
           {/* Filters */}
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-4">
+              {departments.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-700 font-medium">Department:</span>
+                  <div className="min-w-[180px]">
+                    <Select
+                      options={[
+                        { value: '', label: 'Institution-wide (no department)' },
+                        ...departments.map((d) => ({ value: d.id, label: `${d.title} (${d.slug})` })),
+                      ]}
+                      value={selectedDepartmentId ?? ''}
+                      onChange={(e) => setSelectedDepartmentId(e.target.value || null)}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700 font-medium">Academic Year:</span>
                 <div className="min-w-[160px]">

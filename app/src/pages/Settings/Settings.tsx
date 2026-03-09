@@ -6,9 +6,11 @@ import { toast } from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
 import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { institutionService } from '../../services/institutionService'
+import { departmentService } from '../../services/departmentService'
 import { Input } from '../../components/input'
 import { Button } from '../../components/button'
 import { Textarea } from '../../components/textarea'
+import { Select } from '../../components/select'
 import { Alert } from '../../components/alert'
 import { Building2 } from 'lucide-react'
 import { TrashIcon } from '@heroicons/react/24/outline'
@@ -26,6 +28,7 @@ const Settings: React.FC = () => {
     division: '',
     region: '',
     gov_id: '',
+    default_department_id: '' as string | null,
     logo: null as File | null,
   })
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -47,6 +50,14 @@ const Settings: React.FC = () => {
   })
 
   const institution = institutionResponse?.data
+
+  // Fetch departments for default department dropdown
+  const { data: departmentsResponse } = useQuery({
+    queryKey: ['departments', institutionId],
+    queryFn: () => departmentService.getDepartments(institutionId ?? undefined),
+    enabled: !!institutionId && !!institution,
+  })
+  const departments = (departmentsResponse as { data?: { id: string; title: string; slug: string }[] })?.data ?? []
 
   // Update mutation
   const updateMutation = useMutation({
@@ -81,6 +92,7 @@ const Settings: React.FC = () => {
         division: institution.division || '',
         region: institution.region || '',
         gov_id: institution.gov_id || '',
+        default_department_id: institution.default_department_id ?? '',
         logo: null,
       })
       setLogoPreview(institution.logo || null)
@@ -178,6 +190,7 @@ const Settings: React.FC = () => {
       division: formData.division,
       region: formData.region,
       gov_id: formData.gov_id,
+      default_department_id: formData.default_department_id || null,
     }
     if (formData.logo instanceof File) {
       submitData.logo = formData.logo
@@ -310,6 +323,23 @@ const Settings: React.FC = () => {
                 error={errors.region}
                 disabled={updateMutation.isPending}
               />
+
+              {/* Default Department */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Default Department</label>
+                <Select
+                  value={formData.default_department_id || ''}
+                  onChange={(e) => handleFieldChange('default_department_id', e.target.value || '')}
+                  disabled={updateMutation.isPending}
+                  options={[
+                    { value: '', label: 'None (sections use no default department)' },
+                    ...departments.map((d) => ({ value: d.id, label: `${d.title} (${d.slug})` })),
+                  ]}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Sections without a department will use this as their effective department. Set departments in Class Sections.
+                </p>
+              </div>
 
               {/* Logo File Upload Field */}
               <div>

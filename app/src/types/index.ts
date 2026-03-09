@@ -432,6 +432,26 @@ export interface FinanceCollectionsResponse {
   quarterly: QuarterlyCollection[];
 }
 
+// Department types
+export interface Department {
+  id: string;
+  institution_id: string;
+  title: string;
+  slug: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDepartmentData {
+  title: string;
+  slug?: string;
+}
+
+export interface UpdateDepartmentData {
+  title?: string;
+  slug?: string;
+}
+
 // Institution types
 export interface Institution {
   id: string;
@@ -442,6 +462,8 @@ export interface Institution {
   region?: string;
   gov_id?: string;
   logo?: string;
+  default_department_id?: string | null;
+  default_department?: Department | null;
   created_at: string;
   updated_at: string;
 }
@@ -466,6 +488,7 @@ export interface UpdateInstitutionData {
   gov_id?: string;
   logo?: string | File;
   subscription_id?: string;
+  default_department_id?: string | null;
 }
 
 // User types
@@ -501,6 +524,8 @@ export interface UpdateUserData {
 export interface ClassSection {
   id: string;
   institution_id: string;
+  department_id?: string | null;
+  department?: Department | null;
   grade_level: string;
   title: string;
   adviser?: User;
@@ -514,6 +539,7 @@ export interface CreateClassSectionData {
   title: string;
   adviser?: string;
   academic_year?: string;
+  department_id?: string | null;
 }
 
 export interface UpdateClassSectionData {
@@ -521,6 +547,7 @@ export interface UpdateClassSectionData {
   title?: string;
   adviser?: string;
   academic_year?: string;
+  department_id?: string | null;
 }
 
 // Subject Template types
@@ -1074,6 +1101,8 @@ export interface KioskScanResponse extends RfidScanLog {
 export interface SchoolDay {
   id: string;
   institution_id: string;
+  department_id?: string | null;
+  department?: Department | null;
   academic_year: string;
   month: number; // 1-12
   year: number; // e.g., 2025
@@ -1097,6 +1126,7 @@ export interface UpdateSchoolDayData {
 
 export interface BulkUpsertSchoolDayData {
   institution_id: string;
+  department_id?: string | null;
   academic_year: string;
   year: number;
   school_days: Array<{

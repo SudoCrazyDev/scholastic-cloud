@@ -12,6 +12,7 @@ class ClassSection extends Model
 
     protected $fillable = [
         'institution_id',
+        'department_id',
         'grade_level',
         'title',
         'adviser',
@@ -34,6 +35,14 @@ class ClassSection extends Model
     public function institution()
     {
         return $this->belongsTo(Institution::class);
+    }
+
+    /**
+     * Get the department for this class section (null means use institution default).
+     */
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
     }
 
     /**

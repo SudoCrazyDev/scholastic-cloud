@@ -29,6 +29,7 @@ import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
 import CertificateBuilderPage from './pages/CertificateBuilder/CertificateBuilderPage';
 import CertificateList from './pages/CertificateBuilder/CertificateList';
 import SchoolDays from './pages/SchoolDays';
+import Departments from './pages/Departments/Departments';
 import Settings from './pages/Settings/Settings';
 import Finance from './pages/Finance';
 import Login from './pages/Login';
@@ -112,6 +113,7 @@ function App() {
               <Route path="certificate-builder" element={<CertificateBuilderPage />} />
               <Route path="certificates" element={<CertificateList />} />
               <Route path="school-days" element={<SchoolDays />} />
+              <Route path="departments" element={<Departments />} />
               <Route path="finance" element={<Finance />} />
               <Route path="finance/school-fees" element={<Finance />} />
               <Route path="finance/default-amounts" element={<Finance />} />
