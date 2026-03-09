@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
+import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
 import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
@@ -24,7 +25,8 @@ const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
 
 const ACADEMIC_YEAR_MONTHS = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
 const ATTENDANCE_MONTH_LABELS = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
-const DEPED_LOGO_URL = 'https://depedrizal.ph/wp-content/uploads/2018/08/deped-logo.png';
+/** Local asset (public/deped-logo.png) to avoid CORS from external URLs */
+const DEPED_LOGO_URL = '/deped-logo.png';
 
 const toAbsoluteUrl = (value?: string) => {
     const raw = String(value || '').trim();
@@ -110,6 +112,8 @@ export default function PrintReportCard({
         academicYear,
         enabled: true
     });
+
+    const { schoolLogoUrl } = useInstitutionLogo(institutionId || undefined);
 
     // MUST be above early returns (hooks order must be consistent).
     const coreValueMap = useMemo(() => {
@@ -223,9 +227,8 @@ export default function PrintReportCard({
     const studentAge = calculateAgeAsOfOctober31(student.birthdate, academicYear);
     const teacher = (classSection as any)?.adviser
     const teacherName = formatTeacherName(teacher)
-    const schoolLogoUrl = toAbsoluteUrl(institution.logo)
     const leftHeaderLogo = DEPED_LOGO_URL
-    const rightHeaderLogo = schoolLogoUrl || DEPED_LOGO_URL
+    const rightHeaderLogo = schoolLogoUrl || toAbsoluteUrl(institution?.logo) || DEPED_LOGO_URL
     const principalDisplay = (principalName || '').trim() ? principalName : ' '
 
     const pdfKey = viewerKey || `${studentId}|${classSectionId}|${institutionId}|${academicYear}`

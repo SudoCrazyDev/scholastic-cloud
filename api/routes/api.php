@@ -91,6 +91,7 @@ Route::middleware('auth.token')->group(function () {
     Route::put('departments/{id}', [DepartmentController::class, 'update']);
     Route::patch('departments/{id}', [DepartmentController::class, 'update']);
     Route::delete('departments/{id}', [DepartmentController::class, 'destroy']);
+    Route::get('institutions/{id}/logo', [InstitutionController::class, 'showLogo']);
     Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
     Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
     // User routes

@@ -12,6 +12,7 @@ export * from './useSubjectEcrItems';
 export { useStudentScores } from './useStudentScores';
 export * from './useStudentRunningGrades';
 export { useStudentReportCard } from './useStudentReportCard';
+export { useInstitutionLogo } from './useInstitutionLogo';
 
 // Generic data table hook
 export { useDataTable } from './useDataTable'

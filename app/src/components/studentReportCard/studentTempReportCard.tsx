@@ -1,8 +1,12 @@
 import { useMemo } from 'react';
-import { Page, Text, View, Document, PDFViewer } from '@react-pdf/renderer';
+import { Page, Text, View, Document, PDFViewer, Image } from '@react-pdf/renderer';
 import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../../types';
 import { roundGrade, getPassFailRemarks, calculateAgeAsOfOctober31 } from '@/utils/gradeUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
+import { useInstitutionLogo } from '@/hooks/useInstitutionLogo';
+
+/** Local asset (public/deped-logo.png) to avoid CORS from external URLs */
+const DEPED_LOGO_URL = '/deped-logo.png';
 
 /** Set to false to show empty Final Grade and Remarks for now. Set to true to show computed values. */
 const SHOW_FINAL_GRADE_AND_REMARKS_VALUES = false;
@@ -61,6 +65,8 @@ export default function PrintTempReportCard({
       }
     );
 
+    const { schoolLogoUrl } = useInstitutionLogo(institution?.id);
+
     const coreValueMap = useMemo(() => {
       const map: Record<string, Record<string, Record<string, string>>> = {};
       (Array.isArray(coreValueMarkings) ? coreValueMarkings : []).forEach((m: any) => {
@@ -86,14 +92,28 @@ export default function PrintTempReportCard({
             <Document>
                 <Page size="A5" orientation="landscape" style={{height: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'center', fontFamily: 'Helvetica', flexWrap: 'wrap'}}>
                     <View style={{ width: '95%', alignContent: "center", display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '10px' }}>
-                        <Text style={{ textTransform: 'uppercase', textAlign: 'center', fontSize: '13px' }}>
-                          {institution?.title || 'SCHOOL NAME'}
-                        </Text>
-                        <Text style={{ fontSize: '10px', textAlign: 'center' }}>
-                          {institution?.address || 'School Address'}
-                          {institution?.division && `, ${institution.division}`}
-                          {institution?.region && `, ${institution.region}`}
-                        </Text>
+                        <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: '6px', gap: 12 }}>
+                            {DEPED_LOGO_URL ? (
+                                <Image src={DEPED_LOGO_URL} style={{ height: 40, width: 40, objectFit: 'contain' }} />
+                            ) : (
+                                <View style={{ height: 40, width: 40 }} />
+                            )}
+                            <View style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <Text style={{ textTransform: 'uppercase', textAlign: 'center', fontSize: '13px' }}>
+                                    {institution?.title || 'SCHOOL NAME'}
+                                </Text>
+                                <Text style={{ fontSize: '10px', textAlign: 'center' }}>
+                                    {institution?.address || 'School Address'}
+                                    {institution?.division && `, ${institution.division}`}
+                                    {institution?.region && `, ${institution.region}`}
+                                </Text>
+                            </View>
+                            {schoolLogoUrl ? (
+                                <Image src={schoolLogoUrl} style={{ height: 40, width: 40, objectFit: 'contain' }} />
+                            ) : (
+                                <View style={{ height: 40, width: 40 }} />
+                            )}
+                        </View>
                     </View>
                     <View style={{ paddingHorizontal: '20px', width: '100%', display: 'flex', flexDirection: 'row', marginTop: '5px'}}>
                         <Text style={{ textTransform: 'uppercase', fontFamily: 'Helvetica-Bold', fontSize: '12px'}}>

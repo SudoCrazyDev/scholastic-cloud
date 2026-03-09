@@ -6,6 +6,7 @@ use App\Models\Institution;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -200,6 +201,39 @@ class InstitutionController extends Controller
                 'message' => 'Failed to delete institution',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Serve institution logo image (for report cards, etc.).
+     * Streams the file from R2 so the frontend can use it with auth.
+     */
+    public function showLogo(string $id): Response|JsonResponse
+    {
+        try {
+            $institution = Institution::findOrFail($id);
+            $logoKey = $institution->getRawOriginal('logo');
+            if (! $logoKey || ! str_starts_with($logoKey, 'institutions/')) {
+                return response()->json(['message' => 'Logo not found'], 404);
+            }
+            if (! Storage::disk('r2')->exists($logoKey)) {
+                return response()->json(['message' => 'Logo file not found'], 404);
+            }
+            $contents = Storage::disk('r2')->get($logoKey);
+            $mime = match (strtolower(pathinfo($logoKey, PATHINFO_EXTENSION))) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'gif' => 'image/gif',
+                'webp' => 'image/webp',
+                default => 'image/png',
+            };
+            return response($contents, 200, [
+                'Content-Type' => $mime,
+                'Cache-Control' => 'private, max-age=3600',
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['message' => 'Institution not found'], 404);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to load logo'], 500);
         }
     }
 
