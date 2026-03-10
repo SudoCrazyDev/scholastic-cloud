@@ -40,6 +40,7 @@ import MySubjects from './pages/MySubjects';
 import MyFinance from './pages/MyFinance';
 import GateEnter from './pages/Gate/GateEnter';
 import GateExit from './pages/Gate/GateExit';
+import FormBuilderPage from './pages/FormBuilder/FormBuilderPage';
 
 
 function App() {
@@ -112,6 +113,7 @@ function App() {
               <Route path="certificate-builder/new" element={<CertificateBuilder />} />
               <Route path="certificate-builder" element={<CertificateBuilderPage />} />
               <Route path="certificates" element={<CertificateList />} />
+              <Route path="form-builder" element={<FormBuilderPage />} />
               <Route path="school-days" element={<SchoolDays />} />
               <Route path="departments" element={<Departments />} />
               <Route path="finance" element={<Finance />} />

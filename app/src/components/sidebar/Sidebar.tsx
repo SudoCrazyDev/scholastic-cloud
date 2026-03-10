@@ -25,6 +25,7 @@ import {
   Settings,
   FileText,
   FolderTree,
+  LayoutTemplate,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -163,7 +164,7 @@ const menuItems: MenuItem[] = [
     label: 'Proficiency',
     icon: <TrendingUp className="w-5 h-5" />,
     path: '/proficiency',
-    allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
+    allowedRoles: ['principal', 'institution-administrator', 'curriculum-head', 'assistant-principal'],
   },
   {
     id: 'school-days',
@@ -198,6 +199,13 @@ const menuItems: MenuItem[] = [
     label: 'Certificate Builder',
     icon: <FileText className="w-5 h-5" />,
     path: '/certificate-builder',
+    allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'form-builder',
+    label: 'Form Builder',
+    icon: <LayoutTemplate className="w-5 h-5" />,
+    path: '/form-builder',
     allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
   },
 
