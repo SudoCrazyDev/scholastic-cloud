@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
-import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
+import { calculateFinalGrade, getPassFailRemarks, getGeneralAverageRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
     'Maka-Diyos': [
@@ -206,6 +206,26 @@ export default function PrintReportCard({
             count += 1;
         }
         return count === 0 ? 0 : Math.round(sum / count);
+    }, [subjects, grades]);
+
+    // Only show General Average and its Remarks when every subject in every area has all 4 quarter grades.
+    const allQuartersCompleteForGeneralAverage = useMemo(() => {
+        const parentSubjects = (subjects || []).filter((s: any) => s.subject_type === 'parent');
+        for (const parent of parentSubjects) {
+            const subjectIdsInArea = [
+                parent.id,
+                ...(subjects || []).filter((s: any) => s.parent_subject_id === parent.id).map((s: any) => s.id),
+            ];
+            for (const sid of subjectIdsInArea) {
+                const subjectGrades = (grades || []).filter((g: any) => g.subject_id === sid);
+                const q1 = getQuarterGrade(subjectGrades, '1');
+                const q2 = getQuarterGrade(subjectGrades, '2');
+                const q3 = getQuarterGrade(subjectGrades, '3');
+                const q4 = getQuarterGrade(subjectGrades, '4');
+                if (q1 <= 0 || q2 <= 0 || q3 <= 0 || q4 <= 0) return false;
+            }
+        }
+        return true;
     }, [subjects, grades]);
 
     if (isLoading) {
@@ -513,7 +533,8 @@ export default function PrintReportCard({
                             const subjectRemarks = getPassFailRemarks(subjectFinalGrade);
                             const displayTitle = subject.variant ? `${subject.title} - ${subject.variant}` : subject.title;
                             const isChild = subject.subject_type === 'child';
-                            const showFinalAndRemarks = !isChild && subjectFinalGrade > 0;
+                            const allQuartersHaveValues = quarter1Grade > 0 && quarter2Grade > 0 && quarter3Grade > 0 && quarter4Grade > 0;
+                            const showFinalAndRemarks = !isChild && subjectFinalGrade > 0 && allQuartersHaveValues;
                             
                             return (
                                 <View key={subject.id} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
@@ -557,12 +578,23 @@ export default function PrintReportCard({
                         })}
                         {/* ===== SUBJECTS END =====*/}
                         <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{width: '90%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                            <View style={{width: '30%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>GENERAL AVERAGE</Text>
                             </View>
-                            <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
+                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black'}}>
+                                <View style={{width: '25%', borderRight: '1px solid black'}} />
+                                <View style={{width: '25%', borderRight: '1px solid black'}} />
+                                <View style={{width: '25%', borderRight: '1px solid black'}} />
+                                <View style={{width: '25%'}} />
+                            </View>
+                            <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                    {generalAverage > 0 ? generalAverage : ''}
+                                    {allQuartersCompleteForGeneralAverage && generalAverage > 0 ? generalAverage : ''}
+                                </Text>
+                            </View>
+                            <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
+                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
+                                    {allQuartersCompleteForGeneralAverage && generalAverage > 0 ? getGeneralAverageRemarks(generalAverage) : ''}
                                 </Text>
                             </View>
                         </View>
