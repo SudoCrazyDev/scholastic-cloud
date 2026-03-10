@@ -578,14 +578,8 @@ export default function PrintReportCard({
                         })}
                         {/* ===== SUBJECTS END =====*/}
                         <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{width: '30%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                            <View style={{width: '70%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', alignSelf: 'center'}}>GENERAL AVERAGE</Text>
-                            </View>
-                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black'}}>
-                                <View style={{width: '25%', borderRight: '1px solid black'}} />
-                                <View style={{width: '25%', borderRight: '1px solid black'}} />
-                                <View style={{width: '25%', borderRight: '1px solid black'}} />
-                                <View style={{width: '25%'}} />
                             </View>
                             <View style={{width: '10%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>

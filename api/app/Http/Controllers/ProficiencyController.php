@@ -98,7 +98,7 @@ class ProficiencyController extends Controller
             }
         }
         $allStudentIds = array_map('strval', array_keys($allStudentIds));
-        $allSubjectIds = array_values(array_unique(array_map('strval', array_values($allSubjectIds))));
+        $allSubjectIds = array_values(array_unique(array_map('strval', array_keys($allSubjectIds))));
 
         if (empty($allStudentIds) || empty($allSubjectIds)) {
             return response()->json([
@@ -314,7 +314,7 @@ class ProficiencyController extends Controller
             }
         }
         $allStudentIds = array_map('strval', array_keys($allStudentIds));
-        $allSubjectIds = array_values(array_unique(array_map('strval', array_values($allSubjectIds))));
+        $allSubjectIds = array_values(array_unique(array_map('strval', array_keys($allSubjectIds))));
 
         if (empty($allStudentIds) || empty($allSubjectIds)) {
             return response()->json([

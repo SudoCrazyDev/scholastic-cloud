@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import { useRoleAccess } from '../../hooks/useRoleAccess';
 import { useClassSections } from '../../hooks/useClassSections';
 import { useQuery } from '@tanstack/react-query';
@@ -9,12 +10,16 @@ import {
 } from '../../services/proficiencyService';
 import { Select } from '../../components/select';
 import { Navigate } from 'react-router-dom';
-import { TrendingUp, LayoutGrid, Layers } from 'lucide-react';
+import { TrendingUp, LayoutGrid, Layers, HelpCircle } from 'lucide-react';
+
+/** Roles that can access the Proficiency page. Add more slugs here if needed (e.g. 'subject-teacher', 'institution-administrator'). */
+const PROFICIENCY_ALLOWED_ROLES = ['principal', 'curriculum-head', 'assistant-principal', 'institution-administrator'];
 
 type ViewMode = 'by-grade' | 'by-section';
 
 export default function Proficiency() {
-  const { hasAccess } = useRoleAccess(['principal', 'curriculum-head', 'assistant-principal']);
+  const { isLoading: authLoading } = useAuth();
+  const { hasAccess } = useRoleAccess(PROFICIENCY_ALLOWED_ROLES);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025-2026');
   const [selectedGradeLevel, setSelectedGradeLevel] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('by-grade');
@@ -102,6 +107,9 @@ export default function Proficiency() {
   const isLoading = viewMode === 'by-grade' ? proficiencyLoading : bySectionLoading;
   const error = viewMode === 'by-grade' ? proficiencyError : bySectionError;
   const hasRows = viewMode === 'by-grade' ? rows.length > 0 : sectionRows.length > 0;
+  const displayedRows = viewMode === 'by-grade' ? rows : sectionRows;
+  const allPassingPctZero =
+    hasRows && displayedRows.every((r) => r.passing_percentage === 0);
 
   const pctClass = (pct: number) =>
     pct >= 75 ? 'text-green-600 font-medium' : pct >= 50 ? 'text-amber-600' : 'text-red-600 font-medium';
@@ -109,6 +117,13 @@ export default function Proficiency() {
     <span className={pctClass(pct)}>{pct}%</span>
   );
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+      </div>
+    );
+  }
   if (!hasAccess) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -244,8 +259,36 @@ export default function Proficiency() {
                 ? 'No proficiency data for the selected academic year and grade level.'
                 : 'No proficiency data for the selected section(s).'}
             </p>
+            <div className="mt-6 text-left max-w-xl mx-auto bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-amber-900 flex items-center gap-2">
+                <HelpCircle className="h-4 w-4" />
+                Why no data? What to check
+              </h4>
+              <ul className="mt-2 text-sm text-amber-800 list-disc list-inside space-y-1">
+                <li>Class sections exist for the selected <strong>academic year</strong> (and grade, if filtered).</li>
+                <li>Each section has <strong>subjects</strong> assigned (e.g. via subject template).</li>
+                <li>Each section has <strong>students enrolled</strong> (student_sections).</li>
+                <li><strong>Grades</strong> are entered in <em>Consolidated Grades</em> (or equivalent) for that year — stored in <code className="bg-amber-100 px-1 rounded">student_running_grades</code> with matching <code className="bg-amber-100 px-1 rounded">academic_year</code>.</li>
+              </ul>
+            </div>
           </div>
-        ) : viewMode === 'by-section' ? (
+        ) : (
+          <>
+            {allPassingPctZero && (
+              <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-amber-900 flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4" />
+                  Seeing 0%? What to check
+                </h4>
+                <ul className="mt-2 text-sm text-amber-800 list-disc list-inside space-y-1">
+                  <li><strong>Passing grade is 75.</strong> Percent shown is the share of students with average grade ≥ 75.</li>
+                  <li>Ensure <strong>quarter grades</strong> are entered in Consolidated Grades for the selected academic year.</li>
+                  <li>Grades must be in <code className="bg-amber-100 px-1 rounded">student_running_grades</code> with the same <code className="bg-amber-100 px-1 rounded">academic_year</code> as the section.</li>
+                  <li>Subject IDs in grades must match the <strong>subjects attached to the class section</strong> (not a different section/template).</li>
+                </ul>
+              </div>
+            )}
+            {viewMode === 'by-section' ? (
           <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -444,6 +487,8 @@ export default function Proficiency() {
               </table>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>
