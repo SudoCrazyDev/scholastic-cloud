@@ -36,6 +36,7 @@ use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\StudentRfidTagController;
 use App\Http\Controllers\RfidScanLogController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\GradeLevelController;
 
 /*
 |--------------------------------------------------------------------------
@@ -85,6 +86,10 @@ Route::middleware('auth.token')->group(function () {
     // Institution routes
     Route::apiResource('institutions', InstitutionController::class);
     Route::post('institutions/{id}', [InstitutionController::class, 'update']); // POST route for file uploads
+    Route::get('grade-levels', [GradeLevelController::class, 'index']);
+    Route::post('grade-levels', [GradeLevelController::class, 'store']);
+    Route::put('grade-levels/{id}', [GradeLevelController::class, 'update']);
+    Route::delete('grade-levels/{id}', [GradeLevelController::class, 'destroy']);
     Route::get('departments', [DepartmentController::class, 'index']);
     Route::post('departments', [DepartmentController::class, 'store']);
     Route::get('departments/{id}', [DepartmentController::class, 'show']);

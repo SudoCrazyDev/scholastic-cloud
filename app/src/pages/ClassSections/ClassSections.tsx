@@ -8,6 +8,7 @@ import { useSubjects } from '../../hooks/useSubjects'
 import { useStudents } from '../../hooks/useStudents'
 import { useAuth } from '../../hooks/useAuth'
 import { useDepartments } from '../../hooks/useDepartments'
+import { useGradeLevels } from '../../hooks/useGradeLevels'
 import { useQuery } from '@tanstack/react-query'
 import { institutionService } from '../../services/institutionService'
 import type { ClassSection, Subject } from '../../types'
@@ -23,7 +24,8 @@ const ClassSections: React.FC = () => {
   })
   const institution = institutionResponse?.data
   const { departments } = useDepartments({ institutionId, enabled: !!institutionId })
-  
+  const { gradeLevels: gradeLevelsFromApi } = useGradeLevels()
+
   // State for search and filters
   const [searchValue, setSearchValue] = useState<string>('')
   const [gradeFilter, setGradeFilter] = useState<string>('')
@@ -104,22 +106,25 @@ const ClassSections: React.FC = () => {
     institution_id: institutionId,
   })
 
-  const gradeLevels = [
-    'Kinder 1',
-    'Kinder 2',
-    'Grade 1',
-    'Grade 2',
-    'Grade 3',
-    'Grade 4',
-    'Grade 5',
-    'Grade 6',
-    'Grade 7',
-    'Grade 8',
-    'Grade 9',
-    'Grade 10',
-    'Grade 11',
-    'Grade 12',
-  ]
+  const gradeLevels =
+    gradeLevelsFromApi.length > 0
+      ? gradeLevelsFromApi.map((gl) => gl.title)
+      : [
+          'Kinder 1',
+          'Kinder 2',
+          'Grade 1',
+          'Grade 2',
+          'Grade 3',
+          'Grade 4',
+          'Grade 5',
+          'Grade 6',
+          'Grade 7',
+          'Grade 8',
+          'Grade 9',
+          'Grade 10',
+          'Grade 11',
+          'Grade 12',
+        ]
 
   // Helper function to build hierarchical structure
   const buildSubjectHierarchy = (subjects: Subject[]) => {

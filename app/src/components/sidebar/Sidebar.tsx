@@ -26,6 +26,7 @@ import {
   FileText,
   FolderTree,
   LayoutTemplate,
+  ListOrdered,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -115,6 +116,13 @@ const menuItems: MenuItem[] = [
     label: 'Subscriptions',
     icon: <CreditCard className="w-5 h-5" />,
     path: '/subscriptions',
+    allowedRoles: ['super-administrator'],
+  },
+  {
+    id: 'grade-levels',
+    label: 'Grade Levels',
+    icon: <ListOrdered className="w-5 h-5" />,
+    path: '/grade-levels',
     allowedRoles: ['super-administrator'],
   },
   {

@@ -60,6 +60,24 @@ export interface UpdateRoleData {
   slug?: string;
 }
 
+export interface GradeLevel {
+  id: string;
+  title: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateGradeLevelData {
+  title: string;
+  sort_order?: number;
+}
+
+export interface UpdateGradeLevelData {
+  title?: string;
+  sort_order?: number;
+}
+
 // Subscription types
 export interface Subscription {
   id: string;

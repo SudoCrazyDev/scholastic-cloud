@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useRoleAccess } from '../../hooks/useRoleAccess';
 import { useClassSections } from '../../hooks/useClassSections';
+import { useGradeLevels } from '../../hooks/useGradeLevels';
 import { useQuery } from '@tanstack/react-query';
 import {
   proficiencyService,
@@ -26,6 +27,7 @@ export default function Proficiency() {
   const [selectedSectionId, setSelectedSectionId] = useState('');
 
   const { classSections } = useClassSections();
+  const { gradeLevels: gradeLevelsFromApi } = useGradeLevels();
 
   const availableAcademicYears = [
     ...new Set(
@@ -35,13 +37,27 @@ export default function Proficiency() {
     ),
   ].sort().reverse();
 
-  const availableGradeLevels = [
-    ...new Set(
-      classSections
-        .map((s) => s.grade_level)
-        .filter((gl): gl is string => Boolean(gl))
-    ),
-  ].sort((a, b) => String(a).localeCompare(String(b)));
+  // All + Kinder 1, Kinder 2, Grade 1 … Grade 12 from DB (fallback if API empty)
+  const defaultGradeLevelTitles = [
+    'Kinder 1',
+    'Kinder 2',
+    'Grade 1',
+    'Grade 2',
+    'Grade 3',
+    'Grade 4',
+    'Grade 5',
+    'Grade 6',
+    'Grade 7',
+    'Grade 8',
+    'Grade 9',
+    'Grade 10',
+    'Grade 11',
+    'Grade 12',
+  ];
+  const gradeLevelTitles =
+    gradeLevelsFromApi.length > 0
+      ? gradeLevelsFromApi.map((gl) => gl.title)
+      : defaultGradeLevelTitles;
 
   const sectionsForYear = classSections.filter(
     (s) => s.academic_year === selectedAcademicYear
@@ -200,7 +216,7 @@ export default function Proficiency() {
                 className="w-48"
                 options={[
                   { value: '', label: 'All' },
-                  ...availableGradeLevels.map((gl) => ({ value: gl, label: String(gl) })),
+                  ...gradeLevelTitles.map((gl) => ({ value: gl, label: gl })),
                 ]}
                 placeholder="All grade levels"
               />
