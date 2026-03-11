@@ -17,6 +17,8 @@ import type { ClassSection, Subject } from '../../../types'
 interface ClassSectionSubjectsProps {
   selectedClassSection: ClassSection | null
   subjects: Subject[]
+  /** When true, show all subjects in a flat list with student_running_grades count (impersonation debug) */
+  debugMode?: boolean
   onCreateSubject: () => void
   onEditSubject: (subject: Subject) => void
   onDeleteSubject: (subject: Subject) => void
@@ -28,6 +30,7 @@ interface ClassSectionSubjectsProps {
 export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
   selectedClassSection,
   subjects,
+  debugMode = false,
   onCreateSubject,
   onEditSubject,
   onDeleteSubject,
@@ -254,6 +257,11 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
                 Parent
               </span>
             )}
+            {debugMode && typeof subject.student_running_grades_count === 'number' && (
+              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full flex-shrink-0 font-mono">
+                {subject.student_running_grades_count} running grade{subject.student_running_grades_count !== 1 ? 's' : ''}
+              </span>
+            )}
             {subject.variant && (
               <span className="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded-full flex-shrink-0">
                 Variant
@@ -397,6 +405,13 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
               <PlusIcon className="w-4 h-4" />
               <span>Add First Subject</span>
             </motion.button>
+          </div>
+        ) : debugMode ? (
+          /* Debug: flat list of all subjects with student_running_grades count */
+          <div className="space-y-3">
+            {localSubjects.map((subject) => (
+              <SubjectItem key={subject.id} subject={subject} isChild={!!subject.parent_subject_id} />
+            ))}
           </div>
         ) : (
           <div className="space-y-3">

@@ -657,6 +657,8 @@ export interface Subject {
   child_subjects?: Subject[]; // For nested display
   class_section?: ClassSection;
   institution?: Institution;
+  /** Present when fetched with ?debug=1 (e.g. impersonation debug mode) */
+  student_running_grades_count?: number;
 }
 
 // Assigned Subject types (for user's assigned subjects)

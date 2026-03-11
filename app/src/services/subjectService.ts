@@ -15,6 +15,7 @@ class SubjectService {
     search?: string
     page?: number
     per_page?: number
+    debug?: boolean
   }): Promise<PaginatedResponse<Subject>> {
     const response = await api.get('/subjects', { params })
     return response.data

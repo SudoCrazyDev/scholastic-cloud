@@ -39,12 +39,18 @@ class SubjectController extends Controller
             ]);
         }
 
-        $subjects = Subject::with(['institution', 'classSection', 'adviserUser', 'parentSubject', 'childSubjects'])
+        $query = Subject::with(['institution', 'classSection', 'adviserUser', 'parentSubject', 'childSubjects'])
             ->where('institution_id', $defaultInstitution->institution_id)
             ->where('class_section_id', $classSectionId)
             ->orderBy('order', 'asc')
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->orderBy('created_at', 'desc');
+
+        // Debug mode (e.g. when super-admin impersonating): include all subjects and add student_running_grades count
+        if ($request->boolean('debug')) {
+            $query->withCount('studentRunningGrades');
+        }
+
+        $subjects = $query->get();
 
         return response()->json([
             'success' => true,

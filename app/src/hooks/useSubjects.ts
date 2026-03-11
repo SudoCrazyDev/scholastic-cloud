@@ -9,6 +9,8 @@ interface UseSubjectsOptions {
   search?: string
   page?: number
   per_page?: number
+  /** When true, API returns all subjects with student_running_grades_count (e.g. for impersonation debug) */
+  debug?: boolean
 }
 
 interface DeleteConfirmation {

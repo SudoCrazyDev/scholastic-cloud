@@ -14,8 +14,11 @@ import { institutionService } from '../../services/institutionService'
 import type { ClassSection, Subject } from '../../types'
 
 const ClassSections: React.FC = () => {
-  const { user } = useAuth()
+  const { user, isImpersonating } = useAuth()
   const institutionId = user?.user_institutions?.[0]?.institution_id || ''
+
+  // Debug mode (only available when impersonating): show all subjects flat with student_running_grades count
+  const [debugMode, setDebugMode] = useState(false)
 
   const { data: institutionResponse } = useQuery({
     queryKey: ['institution', institutionId],
@@ -104,6 +107,7 @@ const ClassSections: React.FC = () => {
   } = useSubjects({
     class_section_id: selectedClassSection?.id,
     institution_id: institutionId,
+    debug: isImpersonating && debugMode && !!selectedClassSection?.id,
   })
 
   const gradeLevels =
@@ -151,9 +155,9 @@ const ClassSections: React.FC = () => {
     return rootSubjects
   }
 
-  // Filtered subjects for selected class section
-  const filteredSubjects = selectedClassSection 
-    ? buildSubjectHierarchy(subjects)
+  // Filtered subjects for selected class section (hierarchy in normal mode, flat in debug)
+  const filteredSubjects = selectedClassSection
+    ? (isImpersonating && debugMode ? subjects : buildSubjectHierarchy(subjects))
     : []
 
   // Available sections for transfer (exclude current section)
@@ -260,9 +264,24 @@ const ClassSections: React.FC = () => {
 
         {/* Second Column - Subjects */}
         <div className="space-y-4">
+          {isImpersonating && selectedClassSection && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2">
+              <span className="text-sm font-medium text-amber-800">Impersonation debug</span>
+              <label className="flex cursor-pointer items-center gap-2">
+                <span className="text-sm text-amber-700">Debug</span>
+                <input
+                  type="checkbox"
+                  checked={debugMode}
+                  onChange={(e) => setDebugMode(e.target.checked)}
+                  className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                />
+              </label>
+            </div>
+          )}
           <ClassSectionSubjects
             selectedClassSection={selectedClassSection}
             subjects={filteredSubjects}
+            debugMode={isImpersonating && debugMode}
             onCreateSubject={handleCreateSubject}
             onEditSubject={handleEditSubject}
             onDeleteSubject={handleDeleteSubject}

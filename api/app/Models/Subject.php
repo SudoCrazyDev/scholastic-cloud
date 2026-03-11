@@ -101,6 +101,14 @@ class Subject extends Model
     }
 
     /**
+     * Get the student running grades for this subject.
+     */
+    public function studentRunningGrades(): HasMany
+    {
+        return $this->hasMany(StudentRunningGrade::class);
+    }
+
+    /**
      * Check if this subject has child subjects
      */
     public function hasChildSubjects(): bool
