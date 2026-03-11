@@ -83,6 +83,8 @@ interface PrintReportCardProps {
     viewerKey?: string;
     viewerHeight?: string;
     principalName?: string;
+    /** When set, displayed on card instead of calculated age (as of Oct 31). */
+    overrideAge?: string;
 }
 
 export default function PrintReportCard({ 
@@ -93,6 +95,7 @@ export default function PrintReportCard({
     viewerKey,
     viewerHeight = '100%',
     principalName = '',
+    overrideAge,
 }: PrintReportCardProps) {
     const { 
         student, 
@@ -244,7 +247,9 @@ export default function PrintReportCard({
         );
     }
 
-    const studentAge = calculateAgeAsOfOctober31(student.birthdate, academicYear);
+    const studentAge = (overrideAge !== undefined && overrideAge !== '')
+        ? overrideAge
+        : calculateAgeAsOfOctober31(student.birthdate, academicYear);
     const teacher = (classSection as any)?.adviser
     const teacherName = formatTeacherName(teacher)
     const leftHeaderLogo = DEPED_LOGO_URL

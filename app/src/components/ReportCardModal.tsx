@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Button } from './button'
@@ -28,8 +29,14 @@ export function ReportCardModal({
   student,
   loading = false,
 }: ReportCardModalProps) {
+  const [overrideAge, setOverrideAge] = useState<string>('')
+
   const handleClose = () => {
     onClose()
+  }
+
+  const handleApplyAge = () => {
+    setOverrideAge((prev) => prev.trim())
   }
 
   return (
@@ -71,6 +78,20 @@ export function ReportCardModal({
 
               {/* Content */}
               <div className="p-6">
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <label className="text-sm font-medium text-gray-700">Age (override)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Set age on card"
+                    value={overrideAge}
+                    onChange={(e) => setOverrideAge(e.target.value)}
+                    className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={handleApplyAge}>
+                    Apply
+                  </Button>
+                </div>
                 {loading || !institution || !classSection || !student ? (
                   <div className="flex items-center justify-center h-[600px]">
                     <div className="text-center">
@@ -96,6 +117,7 @@ export function ReportCardModal({
                       institution={institution}
                       classSection={classSection}
                       student={student}
+                      overrideAge={overrideAge.trim() || undefined}
                     />
                   </div>
                 )}

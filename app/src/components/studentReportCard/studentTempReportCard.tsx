@@ -43,6 +43,8 @@ interface PrintTempReportCardProps {
   institution?: Institution
   classSection?: ClassSection | null
   student?: Student | null
+  /** When set, displayed on card instead of calculated age (as of Oct 31). */
+  overrideAge?: string
 }
 
 export default function PrintTempReportCard({ 
@@ -50,7 +52,8 @@ export default function PrintTempReportCard({
   studentSubjectsGrade = [],
   institution,
   classSection,
-  student
+  student,
+  overrideAge,
 }: PrintTempReportCardProps) {
     const academicYear = classSection?.academic_year || '';
     const studentId = student?.id || '';
@@ -123,13 +126,13 @@ export default function PrintTempReportCard({
                           LRN: {student?.lrn || ""}
                         </Text>
                     </View>
-                    {student?.birthdate && (
+                    {(student?.birthdate || (overrideAge != null && overrideAge !== '')) && (
                         <View style={{ paddingHorizontal: '20px', width: '100%', display: 'flex', flexDirection: 'row', marginTop: '2px', gap: 16 }}>
                           <Text style={{ fontSize: '9px', fontFamily: 'Helvetica' }}>
-                            Age (as of Oct 31): {calculateAgeAsOfOctober31(student.birthdate, academicYear)}
+                            Age (as of Oct 31): {overrideAge ? overrideAge : (student?.birthdate ? calculateAgeAsOfOctober31(student.birthdate, academicYear) : '')}
                           </Text>
                           <Text style={{ fontSize: '9px', fontFamily: 'Helvetica' }}>
-                            Sex: {student.gender === 'male' ? 'M' : student.gender === 'female' ? 'F' : 'O'}
+                            Sex: {student?.gender === 'male' ? 'M' : student?.gender === 'female' ? 'F' : 'O'}
                           </Text>
                         </View>
                     )}

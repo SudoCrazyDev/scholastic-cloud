@@ -101,6 +101,7 @@ export function StudentReportCardModal({
   }
 
   const [selectedPrincipalId, setSelectedPrincipalId] = useState<string>('')
+  const [overrideAge, setOverrideAge] = useState<string>('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -160,6 +161,20 @@ export function StudentReportCardModal({
 
               {/* Content */}
               <div className="p-6">
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <label className="text-sm font-medium text-gray-700">Age (override)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Set age on card"
+                    value={overrideAge}
+                    onChange={(e) => setOverrideAge(e.target.value)}
+                    className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => setOverrideAge((prev) => prev.trim())}>
+                    Apply
+                  </Button>
+                </div>
                 {principals.length > 1 && (
                   <div className="mb-3 flex items-center gap-3">
                     <div className="text-sm font-medium text-gray-700">Principal</div>
@@ -186,6 +201,7 @@ export function StudentReportCardModal({
                       classSectionId={classSectionId || ''}
                       institutionId={institutionId || ''}
                       academicYear={academicYear || '2024-2025'}
+                      overrideAge={overrideAge.trim() || undefined}
                     />
                   </PdfErrorBoundary>
                 </div>
