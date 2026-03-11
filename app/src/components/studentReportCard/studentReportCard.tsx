@@ -23,8 +23,8 @@ const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
     ],
 };
 
-const ACADEMIC_YEAR_MONTHS = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
-const ATTENDANCE_MONTH_LABELS = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
+const ACADEMIC_YEAR_MONTHS = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+const ATTENDANCE_MONTH_LABELS = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
 /** Local asset (public/deped-logo.png) to avoid CORS from external URLs */
 const DEPED_LOGO_URL = '/deped-logo.png';
 
@@ -68,7 +68,7 @@ const formatTeacherName = (teacher: any) => {
 
 const styles = StyleSheet.create({
     // Attendance table:
-    // - 1 label column + 13 month/total columns
+    // - 1 label column + 11 month/total columns (Jun–Mar, no Apr/May)
     // - widths must not overflow (7% * 13 + 15% = 106% caused misalignment/double borders)
     attendanceMonthContainer: {width: '6.53%', textAlign: 'center', borderRight: '1px solid black'},
     attendanceMonthContainerLast: {width: '6.53%', textAlign: 'center'},
@@ -288,7 +288,7 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of school days</Text>
                                     </View>
-                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => {
+                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => {
                                         const monthData = getAttendanceForMonth(index);
                                         return (
                                             <View key={`school-days-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
@@ -304,7 +304,7 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of days present</Text>
                                     </View>
-                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => {
+                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => {
                                         const monthData = getAttendanceForMonth(index);
                                         return (
                                             <View key={`present-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
@@ -320,7 +320,7 @@ export default function PrintReportCard({
                                     <View style={{width: '15%', borderRight: '1px solid black', padding: '2px'}}>
                                         <Text style={{fontSize: '5px', textAlign: 'center'}}>No. of days absent</Text>
                                     </View>
-                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => {
+                                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => {
                                         const monthData = getAttendanceForMonth(index);
                                         const absent = Number(monthData.absent);
                                         return (
