@@ -211,7 +211,8 @@ export default function PrintReportCard({
         return count === 0 ? 0 : Math.round(sum / count);
     }, [subjects, grades]);
 
-    // Only show General Average and its Remarks when every subject in every area has all 4 quarter grades.
+    // Only show General Average when every subject the student has grades for (in each area) has all 4 quarter grades.
+    // Skip areas where the student has no grades (e.g. only takes one specialization when section has four).
     const allQuartersCompleteForGeneralAverage = useMemo(() => {
         const parentSubjects = (subjects || []).filter((s: any) => s.subject_type === 'parent');
         for (const parent of parentSubjects) {
@@ -219,7 +220,11 @@ export default function PrintReportCard({
                 parent.id,
                 ...(subjects || []).filter((s: any) => s.parent_subject_id === parent.id).map((s: any) => s.id),
             ];
-            for (const sid of subjectIdsInArea) {
+            const subjectIdsWithGrades = subjectIdsInArea.filter(
+                (sid: string) => (grades || []).filter((g: any) => g.subject_id === sid).length > 0
+            );
+            if (subjectIdsWithGrades.length === 0) continue;
+            for (const sid of subjectIdsWithGrades) {
                 const subjectGrades = (grades || []).filter((g: any) => g.subject_id === sid);
                 const q1 = getQuarterGrade(subjectGrades, '1');
                 const q2 = getQuarterGrade(subjectGrades, '2');
