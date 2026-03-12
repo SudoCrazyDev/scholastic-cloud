@@ -121,9 +121,10 @@ export const getPassFailRemarks = (grade: number): string => {
 
 /**
  * General Average remarks (Final Report Card): promotion honors by average.
- * Below 90: Promoted; 90-94: Promoted with Honors; 95-97: Promoted with High Honors; 98-100: Promoted with Highest Honors.
+ * Below 75: Retained; 75–89: Promoted; 90–94: Promoted with Honors; 95–97: Promoted with High Honors; 98–100: Promoted with Highest Honors.
  */
 export const getGeneralAverageRemarks = (grade: number): string => {
+  if (grade < 75) return 'Retained'
   if (grade >= 98) return 'Promoted with Highest Honors'
   if (grade >= 95) return 'Promoted with High Honors'
   if (grade >= 90) return 'Promoted with Honors'

@@ -68,10 +68,10 @@ const formatTeacherName = (teacher: any) => {
 
 const styles = StyleSheet.create({
     // Attendance table:
-    // - 1 label column + 11 month/total columns (Jun–Mar, no Apr/May)
+    // - 1 label column + 10 month columns + 1 narrower Total column (Jun–Mar, no Apr/May)
     // - widths must not overflow (7% * 13 + 15% = 106% caused misalignment/double borders)
     attendanceMonthContainer: {width: '6.53%', textAlign: 'center', borderRight: '1px solid black'},
-    attendanceMonthContainerLast: {width: '6.53%', textAlign: 'center'},
+    attendanceMonthContainerLast: {width: '4%', textAlign: 'center'},
     attendanceMonthText: {fontSize: '7px', fontFamily: 'Helvetica'}
 });
 
@@ -296,7 +296,7 @@ export default function PrintReportCard({
                                             </View>
                                         );
                                     })}
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center"}}>
+                                    <View style={styles.attendanceMonthContainerLast}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{attendanceTotals.schoolDays === 0 ? '' : attendanceTotals.schoolDays}</Text>
                                     </View>
                                 </View>
@@ -312,7 +312,7 @@ export default function PrintReportCard({
                                             </View>
                                         );
                                     })}
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center"}}>
+                                    <View style={styles.attendanceMonthContainerLast}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{attendanceTotals.present || ''}</Text>
                                     </View>
                                 </View>
@@ -329,7 +329,7 @@ export default function PrintReportCard({
                                             </View>
                                         );
                                     })}
-                                    <View style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center"}}>
+                                    <View style={styles.attendanceMonthContainerLast}>
                                         <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{isNaN(Number(attendanceTotals.absent)) ? '' : String(attendanceTotals.absent)}</Text>
                                     </View>
                                 </View>
