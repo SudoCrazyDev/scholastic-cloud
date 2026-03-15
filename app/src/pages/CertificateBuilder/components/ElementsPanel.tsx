@@ -37,6 +37,7 @@ const STUDENT_VARIABLES: Array<{ key: string; label: string; icon: React.Compone
 	{ key: 'lrn', label: 'LRN', icon: Hash, type: 'text' },
 	{ key: 'first_name', label: 'First Name', icon: User, type: 'text' },
 	{ key: 'middle_name', label: 'Middle Name', icon: User, type: 'text' },
+	{ key: 'middle_initial', label: 'Middle Initial', icon: User, type: 'text' },
 	{ key: 'last_name', label: 'Last Name', icon: User, type: 'text' },
 	{ key: 'extension', label: 'Extension', icon: User, type: 'text' },
 	{ key: 'gender', label: 'Gender', icon: User, type: 'text' },

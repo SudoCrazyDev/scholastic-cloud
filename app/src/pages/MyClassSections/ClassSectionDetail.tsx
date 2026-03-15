@@ -26,7 +26,8 @@ import {
   FileText,
   BarChart3,
   Award,
-  Calendar
+  Calendar,
+  ScrollText
 } from 'lucide-react'
 import type { Student, Subject, StudentSubjectGrade } from '../../types'
 import ClassSectionHeader from './components/ClassSectionHeader'
@@ -37,6 +38,7 @@ import ClassSectionConsolidatedGradesTab from './components/ClassSectionConsolid
 import ClassSectionSubjectsTab from './components/ClassSectionSubjectsTab'
 import ClassSectionCoreValuesTab from './components/ClassSectionCoreValuesTab'
 import ClassSectionAttendanceTab from './components/ClassSectionAttendanceTab'
+import ClassSectionCertificatesTab from './components/ClassSectionCertificatesTab'
 import { Select } from '../../components/select'
 import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils'
 
@@ -55,7 +57,7 @@ const ClassSectionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user, isImpersonating } = useAuth()
-  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values' | 'attendance'>('students')
+  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values' | 'attendance' | 'certificates'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
   const [showRemoveModal, setShowRemoveModal] = useState(false)
@@ -498,100 +500,34 @@ const ClassSectionDetail: React.FC = () => {
       >
         <div className="sticky top-0 z-20 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 transition-shadow">
           <nav
-            className="flex overflow-x-auto no-scrollbar space-x-2 sm:space-x-8 px-2 sm:px-6 py-1 sm:py-0"
+            className="flex overflow-x-auto no-scrollbar px-2 sm:px-4 py-1 sm:py-0 gap-1 sm:gap-2"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
-            <button
-              onClick={() => setActiveTab('students')}
-              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                activeTab === 'students'
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4" />
-                <span>Students ({students.length})</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('subjects')}
-              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                activeTab === 'subjects'
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <BookOpen className="w-4 h-4" />
-                <span>Subjects ({subjects.length})</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('ranking')}
-              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                activeTab === 'ranking'
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Trophy className="w-4 h-4" />
-                <span>Student Ranking</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('report-cards')}
-              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                activeTab === 'report-cards'
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4" />
-                <span>Report Cards</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('consolidated-grades')}
-              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                activeTab === 'consolidated-grades'
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-4 h-4" />
-                <span>Consolidated Grades</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('core-values')}
-              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                activeTab === 'core-values'
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Award className="w-4 h-4" />
-                <span>Core Values</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('attendance')}
-              className={`py-3 px-2 sm:py-4 sm:px-1 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                activeTab === 'attendance'
-                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                  : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4" />
-                <span>Attendance</span>
-              </div>
-            </button>
+            {([
+              { key: 'students' as const, icon: Users, label: `Students (${students.length})` },
+              { key: 'subjects' as const, icon: BookOpen, label: `Subjects (${subjects.length})` },
+              { key: 'ranking' as const, icon: Trophy, label: 'Student Ranking' },
+              { key: 'report-cards' as const, icon: FileText, label: 'Report Cards' },
+              { key: 'consolidated-grades' as const, icon: BarChart3, label: 'Consolidated Grades' },
+              { key: 'core-values' as const, icon: Award, label: 'Core Values' },
+              { key: 'attendance' as const, icon: Calendar, label: 'Attendance' },
+              { key: 'certificates' as const, icon: ScrollText, label: 'Certificates' },
+            ] as const).map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`whitespace-nowrap flex-shrink-0 py-3 px-3 sm:py-4 sm:px-3 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                  activeTab === key
+                    ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
+                    : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
+                }`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Icon className="w-4 h-4" />
+                  <span>{label}</span>
+                </div>
+              </button>
+            ))}
           </nav>
         </div>
 
@@ -753,6 +689,23 @@ const ClassSectionDetail: React.FC = () => {
                     classSectionId={id!}
                     students={students}
                     academicYear={classSectionData?.academic_year || ''}
+                    getFullName={getFullName}
+                  />
+                </motion.div>
+              )}
+
+              {activeTab === 'certificates' && (
+                <motion.div
+                  key="certificates"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ClassSectionCertificatesTab
+                    students={students}
+                    gradeLevel={classSectionData?.grade_level || ''}
+                    institution={finalInstitution}
                     getFullName={getFullName}
                   />
                 </motion.div>

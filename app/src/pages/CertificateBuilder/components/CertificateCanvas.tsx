@@ -1,10 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { 
-	Move, 
-	RotateCw
-} from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import type { Student } from '@/types';
 
 export interface CanvasElement {
@@ -43,10 +40,12 @@ export interface CanvasElement {
 	points?: number;
 
 	// Variable placeholders (for institution, student, or future variable sections)
-	/** e.g. 'institution' | 'student' – certificate is "student certificate" if any element has variableType === 'student' */
 	variableType?: 'institution' | 'student';
-	/** Key used when binding data (e.g. 'middle_name', 'lrn', 'institution_title') */
 	variableKey?: string;
+
+	// Prefix / suffix for variable text elements
+	prefix?: string;
+	suffix?: string;
 }
 
 interface CertificateCanvasProps {
@@ -61,16 +60,41 @@ interface CertificateCanvasProps {
 	onChangeEnd: () => void;
 	showGrid: boolean;
 	snappingEnabled: boolean;
-	/** When set, student variable elements show this student's data as sample preview */
 	previewStudent?: Student | null;
 }
 
-/** Map certificate variableKey to Student field (extension → ext_name) */
 function getStudentVariableValue(student: Student, variableKey: string): string {
-	const key = variableKey === 'extension' ? 'ext_name' : variableKey;
-	const value = (student as unknown as Record<string, unknown>)[key];
+	if (variableKey === 'extension') {
+		const value = (student as unknown as Record<string, unknown>).ext_name;
+		return value != null ? String(value) : '';
+	}
+	if (variableKey === 'middle_initial') {
+		const mn = (student as unknown as Record<string, unknown>).middle_name;
+		if (mn == null || String(mn).trim() === '') return '';
+		return String(mn).trim().charAt(0).toUpperCase();
+	}
+	const value = (student as unknown as Record<string, unknown>)[variableKey];
 	return value != null ? String(value) : '';
 }
+
+/** Builds the display text, wrapping with prefix/suffix when the element is a variable */
+function buildDisplayText(element: CanvasElement, previewStudent: Student | null | undefined): string {
+	const isStudentVar = element.variableType === 'student' && element.variableKey && previewStudent;
+	const studentTextValue = isStudentVar ? getStudentVariableValue(previewStudent, element.variableKey!) : null;
+
+	const raw = studentTextValue !== null
+		? studentTextValue
+		: (element.content || (element.type === 'text' ? 'Sample Text' : 'This is a sample paragraph with rich text content. You can edit this text with formatting options.'));
+
+	const hasVariable = !!element.variableType && !!element.variableKey;
+	if (!hasVariable) return raw;
+
+	const prefix = element.prefix ?? '';
+	const suffix = element.suffix ?? '';
+	return `${prefix}${raw}${suffix}`;
+}
+
+type InteractionKind = 'move' | 'resize' | 'rotate';
 
 const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 	width,
@@ -87,81 +111,98 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 	previewStudent
 }) => {
 	const canvasRef = useRef<HTMLDivElement>(null);
-	const [draggedElement, setDraggedElement] = useState<string | null>(null);
-	const [resizeHandle, setResizeHandle] = useState<string | null>(null);
-	const [rotateHandle, setRotateHandle] = useState<string | null>(null);
-	const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 	const [snapGrid] = useState(20);
 
-	const getSnapPosition = (value: number) => {
-		if (!snappingEnabled) return value;
-		return Math.round(value / snapGrid) * snapGrid;
-	};
+	// Stable refs so the mousemove handler never reads stale closure values
+	const elementsRef = useRef(elements);
+	elementsRef.current = elements;
+	const onChangeRef = useRef(onChange);
+	onChangeRef.current = onChange;
+	const onChangeEndRef = useRef(onChangeEnd);
+	onChangeEndRef.current = onChangeEnd;
+	const scaleRef = useRef(scale);
+	scaleRef.current = scale;
+	const snappingRef = useRef(snappingEnabled);
+	snappingRef.current = snappingEnabled;
+	const snapGridRef = useRef(snapGrid);
+	snapGridRef.current = snapGrid;
 
-	const handleMouseDown = (e: React.MouseEvent, elementId: string, action: 'move' | 'resize' | 'rotate') => {
+	// Interaction state stored entirely in a ref — zero re-renders during drag
+	const interactionRef = useRef<{
+		kind: InteractionKind;
+		elementId: string;
+		// Absolute: mouse position at mousedown
+		mouseOriginX: number;
+		mouseOriginY: number;
+		// Absolute: element geometry at mousedown
+		elOriginX: number;
+		elOriginY: number;
+		elOriginW: number;
+		elOriginH: number;
+	} | null>(null);
+
+	// Only used for visual feedback (selection highlight during drag)
+	const [activeElementId, setActiveElementId] = useState<string | null>(null);
+	const [activeKind, setActiveKind] = useState<InteractionKind | null>(null);
+
+	const handleMouseDown = useCallback((e: React.MouseEvent, elementId: string, action: InteractionKind) => {
 		e.preventDefault();
 		e.stopPropagation();
 		
-		console.log('Mouse down event:', { action, elementId, clientX: e.clientX, clientY: e.clientY });
-		
 		const rect = canvasRef.current?.getBoundingClientRect();
 		if (!rect) return;
-		
-		const x = (e.clientX - rect.left) / scale;
-		const y = (e.clientY - rect.top) / scale;
-		
-		setDragStart({ x, y });
-		
-		switch (action) {
-			case 'move':
-				setDraggedElement(elementId);
-				console.log('Setting dragged element:', elementId);
-				break;
-			case 'resize':
-				setResizeHandle(elementId);
-				console.log('Setting resize handle:', elementId);
-				break;
-			case 'rotate':
-				setRotateHandle(elementId);
-				console.log('Setting rotate handle:', elementId);
-				break;
-		}
-		
-		onInteractionStart();
-	};
 
-	const handleElementClick = (e: React.MouseEvent, elementId: string) => {
+		const element = elementsRef.current.find(el => el.id === elementId);
+		if (!element || element.locked) return;
+		
+		const mx = (e.clientX - rect.left) / scaleRef.current;
+		const my = (e.clientY - rect.top) / scaleRef.current;
+		
+		interactionRef.current = {
+			kind: action,
+			elementId,
+			mouseOriginX: mx,
+			mouseOriginY: my,
+			elOriginX: element.x,
+			elOriginY: element.y,
+			elOriginW: element.width,
+			elOriginH: element.height,
+		};
+		setActiveElementId(elementId);
+		setActiveKind(action);
+		onInteractionStart();
+	}, [onInteractionStart]);
+
+	const handleElementClick = useCallback((e: React.MouseEvent, elementId: string) => {
 		e.stopPropagation();
 		
 		if (e.shiftKey) {
-			// Multi-select
 			if (selectedElementIds.includes(elementId)) {
 				onSelect(selectedElementIds.filter(id => id !== elementId));
 			} else {
 				onSelect([...selectedElementIds, elementId]);
 			}
 		} else {
-			// Single select
 			onSelect([elementId]);
 		}
-	};
+	}, [selectedElementIds, onSelect]);
 
-	const handleCanvasClick = () => {
+	const handleCanvasClick = useCallback(() => {
 		onSelect([]);
-	};
+	}, [onSelect]);
 
 	const renderElement = (element: CanvasElement) => {
 		if (element.hidden) return null;
 		
 		const isSelected = selectedElementIds.includes(element.id);
-		const isDragging = draggedElement === element.id;
-		const isResizing = resizeHandle === element.id;
-		const isRotating = rotateHandle === element.id;
+		const isDragging = activeKind === 'move' && activeElementId === element.id;
+		const isResizing = activeKind === 'resize' && activeElementId === element.id;
+		const isRotating = activeKind === 'rotate' && activeElementId === element.id;
 		
-		const elementStyle = {
-			position: 'absolute' as const,
-			left: 0, // Position relative to wrapper, not canvas
-			top: 0,  // Position relative to wrapper, not canvas
+		const elementStyle: React.CSSProperties = {
+			position: 'absolute',
+			left: 0,
+			top: 0,
 			width: element.width,
 			height: element.height,
 			minWidth: element.width,
@@ -170,18 +211,14 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 			opacity: element.opacity || 1,
 			zIndex: element.zIndex,
 			cursor: element.locked ? 'not-allowed' : (isDragging ? 'grabbing' : 'grab'),
-			boxSizing: 'border-box' as const,
-			// Add visual feedback when dragging
+			boxSizing: 'border-box',
 			...(isDragging && {
-				opacity: 0.8,
-				boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-				transform: `rotate(${element.rotation || 0}deg) scale(1.02)`,
+				opacity: 0.85,
+				filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))',
 			}),
 		};
 		
-		const isStudentVar = element.variableType === 'student' && element.variableKey && previewStudent;
-		const studentTextValue = isStudentVar ? getStudentVariableValue(previewStudent, element.variableKey!) : null;
-		const displayText = studentTextValue !== null ? studentTextValue : (element.content || (element.type === 'text' ? 'Sample Text' : 'This is a sample paragraph with rich text content. You can edit this text with formatting options.'));
+		const displayText = buildDisplayText(element, previewStudent);
 		
 		let elementContent: React.ReactNode;
 		
@@ -200,7 +237,7 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 							textDecoration: element.textDecoration || 'none',
 							display: 'flex',
 							alignItems: 'center',
-							justifyContent: element.textAlign === 'center' ? 'center' : 'flex-start',
+							justifyContent: element.textAlign === 'center' ? 'center' : element.textAlign === 'right' ? 'flex-end' : 'flex-start',
 							padding: '4px',
 							userSelect: 'none',
 						}}
@@ -276,8 +313,7 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 				);
 				break;
 
-			case 'qr':
-				// QR code encodes element.content (e.g. placeholder '{lrn}' or actual LRN when bound to student / preview)
+			case 'qr': {
 				const qrStudentVar = element.variableType === 'student' && element.variableKey && previewStudent;
 				const qrValue = qrStudentVar ? getStudentVariableValue(previewStudent, element.variableKey ?? '') : null;
 				const qrDisplayValue = (qrValue != null && qrValue !== '') ? qrValue : (element.content || '{lrn}');
@@ -303,6 +339,7 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 					</div>
 				);
 				break;
+			}
 				
 			default:
 				elementContent = (
@@ -318,70 +355,32 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 		}
 		
 		return (
-			<motion.div
+			<div
 				key={element.id}
-				layout
-				initial={{ opacity: 0, scale: 0.8 }}
-				animate={{ 
-					opacity: 1, 
-					scale: 1,
-				}}
-				exit={{ opacity: 0, scale: 0.8 }}
-				transition={{ duration: 0.2 }}
-				className={`
-					relative group
-					${isDragging ? 'z-50' : ''}
-					${isResizing ? 'z-50' : ''}
-					${isRotating ? 'z-50' : ''}
-				`}
+				className={`absolute group ${isDragging || isResizing || isRotating ? 'z-50' : ''}`}
 				onClick={(e) => handleElementClick(e, element.id)}
 				onMouseDown={(e) => handleMouseDown(e, element.id, 'move')}
 				style={{
-					position: 'absolute',
 					left: element.x,
 					top: element.y,
 					width: element.width,
 					height: element.height,
 				}}
 			>
-				{/* Selection border - positioned absolutely on canvas */}
-				{isSelected && !element.locked && (
-					<motion.div
-						initial={{ opacity: 0, scale: 0.95 }}
-						animate={{ opacity: 1, scale: 1 }}
-						transition={{ duration: 0.15 }}
-						style={{
-							position: 'absolute',
-							top: -4,
-							left: -4,
-							width: `calc(100% + 8px)`,
-							height: `calc(100% + 8px)`,
-							border: '2px solid #3b82f6',
-							pointerEvents: 'none',
-							zIndex: 10,
-							backgroundColor: 'rgba(59, 130, 246, 0.1)',
-						}}
-					/>
-				)}
-
-				{/* Center point - show when selected so user knows where center is */}
+				{/* Selection border */}
 				{isSelected && !element.locked && (
 					<div
 						style={{
 							position: 'absolute',
-							left: '50%',
-							top: '50%',
-							transform: 'translate(-50%, -50%)',
-							width: 8,
-							height: 8,
-							borderRadius: '50%',
-							backgroundColor: '#3b82f6',
-							border: '2px solid white',
-							boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.8)',
+							top: -2,
+							left: -2,
+							width: `calc(100% + 4px)`,
+							height: `calc(100% + 4px)`,
+							border: '1.5px solid #3b82f6',
+							borderRadius: 2,
 							pointerEvents: 'none',
-							zIndex: 11,
+							zIndex: 10,
 						}}
-						title="Center"
 					/>
 				)}
 				
@@ -392,160 +391,142 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 						e.stopPropagation();
 						handleMouseDown(e, element.id, 'move');
 					}
-				} as any)}
+				} as React.HTMLAttributes<HTMLElement>)}
 				
 				{/* Selection handles */}
 				{isSelected && !element.locked && (
 					<>
-						{/* Corner resize handles */}
-						{/* Top-left */}
+						{/* Corner resize handles — small squares */}
+						{(['nw', 'ne', 'sw', 'se'] as const).map((corner) => {
+							const pos: React.CSSProperties = {
+								position: 'absolute',
+								width: 8,
+								height: 8,
+								backgroundColor: '#ffffff',
+								border: '1.5px solid #3b82f6',
+								borderRadius: 1,
+								zIndex: 12,
+								...(corner.includes('n') ? { top: -4 } : { bottom: -4 }),
+								...(corner.includes('w') ? { left: -4 } : { right: -4 }),
+								cursor: `${corner}-resize`,
+							};
+							return (
+								<div
+									key={corner}
+									style={pos}
+									onMouseDown={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										handleMouseDown(e, element.id, 'resize');
+									}}
+								/>
+							);
+						})}
+
+						{/* Rotate handle — line + circle above the element */}
 						<div
-							className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-nw-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
-							onMouseDown={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								handleMouseDown(e, element.id, 'resize');
+							style={{
+								position: 'absolute',
+								top: -28,
+								left: '50%',
+								transform: 'translateX(-50%)',
+								display: 'flex',
+								flexDirection: 'column',
+								alignItems: 'center',
+								pointerEvents: 'none',
+								zIndex: 12,
 							}}
-							title="Resize"
-						/>
-						
-						{/* Top-right */}
-						<div
-							className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-ne-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
-							onMouseDown={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								handleMouseDown(e, element.id, 'resize');
-							}}
-							title="Resize"
-						/>
-						
-						{/* Bottom-left */}
-						<div
-							className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-sw-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
-							onMouseDown={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								handleMouseDown(e, element.id, 'resize');
-							}}
-							title="Resize"
-						/>
-						
-						{/* Bottom-right */}
-						<div
-							className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded cursor-se-resize hover:bg-blue-600 hover:scale-110 transition-all duration-150"
-							onMouseDown={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								handleMouseDown(e, element.id, 'resize');
-							}}
-							title="Resize"
-						/>
-						
-						{/* Rotate handle */}
-						<div
-							className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-grab hover:bg-blue-600 hover:scale-110 transition-all duration-150"
-							onMouseDown={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								handleMouseDown(e, element.id, 'rotate');
-							}}
-							title="Rotate"
 						>
-							<RotateCw className="w-2.5 h-2.5 text-white" />
-						</div>
-						
-						{/* Move indicator */}
-						<div className="absolute -top-3 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-blue-500 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity">
-							<Move className="w-3 h-3 inline mr-1" />
-							Move
+							<div
+								style={{
+									width: 18,
+									height: 18,
+									borderRadius: '50%',
+									backgroundColor: '#ffffff',
+									border: '1.5px solid #3b82f6',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									cursor: 'grab',
+									pointerEvents: 'auto',
+								}}
+								onMouseDown={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									handleMouseDown(e, element.id, 'rotate');
+								}}
+							>
+								<RotateCw style={{ width: 10, height: 10, color: '#3b82f6' }} />
+							</div>
+							{/* Stem connecting rotate handle to element */}
+							<div style={{ width: 1, height: 6, backgroundColor: '#3b82f6' }} />
 						</div>
 					</>
 				)}
-			</motion.div>
+			</div>
 		);
 	};
 
-	// Global mouse event handlers
+	// Global mouse listeners — registered ONCE, reads everything from refs
 	useEffect(() => {
 		const handleGlobalMouseMove = (e: MouseEvent) => {
-			if (!draggedElement && !resizeHandle && !rotateHandle) return;
-			
-			console.log('Global mouse move:', { draggedElement, resizeHandle, rotateHandle, clientX: e.clientX, clientY: e.clientY });
-			
+			const i = interactionRef.current;
+			if (!i) return;
+
 			const rect = canvasRef.current?.getBoundingClientRect();
 			if (!rect) return;
-			
-			const x = (e.clientX - rect.left) / scale;
-			const y = (e.clientY - rect.top) / scale;
-			
-			const deltaX = x - dragStart.x;
-			const deltaY = y - dragStart.y;
-			
-			console.log('Mouse move deltas:', { deltaX, deltaY, threshold: 5 });
-			
-			// Add movement threshold to prevent jittery movement
-			const movementThreshold = 5;
-			if (Math.abs(deltaX) < movementThreshold && Math.abs(deltaY) < movementThreshold) {
-				console.log('Movement below threshold, skipping');
-				return;
+
+			const curScale = scaleRef.current;
+			const mx = (e.clientX - rect.left) / curScale;
+			const my = (e.clientY - rect.top) / curScale;
+
+			const totalDx = mx - i.mouseOriginX;
+			const totalDy = my - i.mouseOriginY;
+
+			const element = elementsRef.current.find(el => el.id === i.elementId);
+			if (!element || element.locked) return;
+
+			const doSnap = snappingRef.current;
+			const grid = snapGridRef.current;
+			const snapVal = (v: number) => doSnap ? Math.round(v / grid) * grid : v;
+
+			if (i.kind === 'move') {
+				const newX = snapVal(i.elOriginX + totalDx);
+				const newY = snapVal(i.elOriginY + totalDy);
+				onChangeRef.current({ ...element, x: newX, y: newY });
 			}
-			
-			if (draggedElement) {
-				const element = elements.find(el => el.id === draggedElement);
-				if (element && !element.locked) {
-					// No dampening - direct 1:1 movement for natural feel
-					const newX = getSnapPosition(element.x + deltaX);
-					const newY = getSnapPosition(element.y + deltaY);
-					console.log('Moving element:', { oldX: element.x, oldY: element.y, newX, newY });
-					onChange({ ...element, x: newX, y: newY });
-					
-					// Update dragStart to current position for next frame
-					setDragStart({ x, y });
-				}
+
+			if (i.kind === 'resize') {
+				const newW = Math.max(20, snapVal(i.elOriginW + totalDx));
+				const newH = Math.max(20, snapVal(i.elOriginH + totalDy));
+				onChangeRef.current({ ...element, width: newW, height: newH });
 			}
-			
-			if (resizeHandle) {
-				const element = elements.find(el => el.id === resizeHandle);
-				if (element && !element.locked) {
-					// No dampening - direct 1:1 resizing for natural feel
-					const newWidth = Math.max(20, getSnapPosition(element.width + deltaX));
-					const newHeight = Math.max(20, getSnapPosition(element.height + deltaY));
-					console.log('Resizing element:', { oldWidth: element.width, oldHeight: element.height, newWidth, newHeight });
-					onChange({ ...element, width: newWidth, height: newHeight });
-					
-					// Update dragStart to current position for next frame
-					setDragStart({ x, y });
-				}
-			}
-			
-			if (rotateHandle) {
-				const element = elements.find(el => el.id === rotateHandle);
-				if (element && !element.locked) {
-					const centerX = element.x + element.width / 2;
-					const centerY = element.y + element.height / 2;
-					const angle = Math.atan2(y - centerY, x - centerX) * (180 / Math.PI);
-					console.log('Rotating element:', { oldRotation: element.rotation, newRotation: angle });
-					onChange({ ...element, rotation: angle });
-				}
+
+			if (i.kind === 'rotate') {
+				const cx = element.x + element.width / 2;
+				const cy = element.y + element.height / 2;
+				const angle = Math.atan2(my - cy, mx - cx) * (180 / Math.PI) + 90;
+				onChangeRef.current({ ...element, rotation: Math.round(angle) });
 			}
 		};
-		
+
 		const handleGlobalMouseUp = () => {
-			setDraggedElement(null);
-			setResizeHandle(null);
-			setRotateHandle(null);
-			onChangeEnd();
+			if (interactionRef.current) {
+				interactionRef.current = null;
+				setActiveElementId(null);
+				setActiveKind(null);
+				onChangeEndRef.current();
+			}
 		};
-		
+
 		document.addEventListener('mousemove', handleGlobalMouseMove);
 		document.addEventListener('mouseup', handleGlobalMouseUp);
-		
+
 		return () => {
 			document.removeEventListener('mousemove', handleGlobalMouseMove);
 			document.removeEventListener('mouseup', handleGlobalMouseUp);
 		};
-	}, [draggedElement, resizeHandle, rotateHandle, dragStart, elements, onChange, onChangeEnd, scale, snapGrid, snappingEnabled]);
+	}, []);
 
 	return (
 		<div
@@ -576,12 +557,10 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 						height: '100%',
 						opacity: 0.4,
 						zIndex: 1,
-						// Ensure grid covers the entire canvas area
 						left: 0,
 						top: 0,
 						right: 0,
 						bottom: 0,
-						// Add a small buffer to ensure grid covers edges
 						margin: '1px'
 					}}
 				/>

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import * as Headless from '@headlessui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, ChevronDown, ChevronRight } from 'lucide-react';
-import { Select } from '@/components/select';
 import { Switch, SwitchField } from '@/components/switch';
 
 export type StudentScope = 'all' | 'limited';
@@ -16,8 +15,6 @@ export interface PublishOptions {
 /** Grade levels 1–12 (string to match class_sections.grade_level) */
 export const GRADE_LEVELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
-const GRADE_LEVEL_OPTIONS = GRADE_LEVELS.map((g) => ({ value: g, label: `Grade ${g}` }));
-
 interface PublishOptionsPanelProps {
 	options: PublishOptions;
 	onChange: (options: PublishOptions) => void;
@@ -26,13 +23,14 @@ interface PublishOptionsPanelProps {
 const PublishOptionsPanel: React.FC<PublishOptionsPanelProps> = ({ options, onChange }) => {
 	const [collapsed, setCollapsed] = useState(false);
 
-	const handleGradeLevelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-		const selected = Array.from(e.target.selectedOptions, (opt) => opt.value);
-		const gradeLevels = selected.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+	const toggleGradeLevel = (grade: string) => {
+		const current = options.gradeLevels.includes(grade)
+			? options.gradeLevels.filter((g) => g !== grade)
+			: [...options.gradeLevels, grade].sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
 		onChange({
 			...options,
-			scopeGradeLevelsOnly: gradeLevels.length > 0,
-			gradeLevels,
+			scopeGradeLevelsOnly: current.length > 0,
+			gradeLevels: current,
 		});
 	};
 
@@ -72,20 +70,28 @@ const PublishOptionsPanel: React.FC<PublishOptionsPanelProps> = ({ options, onCh
 						className="overflow-hidden"
 					>
 						<div className="px-4 pb-4 space-y-4">
-							{/* Only for selected Grade Level – multi-select */}
+							{/* Only for selected Grade Level – checkboxes */}
 							<div className="space-y-2">
 								<label className="block text-sm font-medium text-gray-700">Only for selected Grade Level</label>
-								<Select
-									multiple
-									options={GRADE_LEVEL_OPTIONS}
-									value={options.gradeLevels}
-									onChange={handleGradeLevelChange}
-									placeholder="Select grade levels..."
-									className="min-h-[80px] text-sm border-gray-300 rounded-lg"
-								/>
+								<div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto py-1.5 px-2 border border-gray-200 rounded-lg bg-gray-50/50">
+									{GRADE_LEVELS.map((grade) => (
+										<label
+											key={grade}
+											className="flex items-center gap-3 py-2 px-2.5 rounded-md hover:bg-gray-100/80 cursor-pointer text-sm text-gray-700 transition-colors duration-150"
+										>
+											<input
+												type="checkbox"
+												checked={options.gradeLevels.includes(grade)}
+												onChange={() => toggleGradeLevel(grade)}
+												className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-0 transition-all duration-200 ease-out cursor-pointer"
+											/>
+											<span>Grade {grade}</span>
+										</label>
+									))}
+								</div>
 								{options.gradeLevels.length > 0 && (
 									<p className="text-xs text-gray-500">
-										{options.gradeLevels.length} selected. Hold Ctrl/Cmd to select multiple.
+										{options.gradeLevels.length} selected.
 									</p>
 								)}
 							</div>

@@ -211,6 +211,23 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									onChange={(e) => updateElement({ content: e.target.value })}
 									
 								/>
+								{/* Prefix / Suffix — only for variable text elements */}
+								{element.variableType && element.variableKey && (
+									<div className="grid grid-cols-2 gap-3">
+										<Input
+											label="Prefix"
+											placeholder="e.g. Name: "
+											value={element.prefix ?? ''}
+											onChange={(e) => updateElement({ prefix: e.target.value })}
+										/>
+										<Input
+											label="Suffix"
+											placeholder="e.g.  Jr."
+											value={element.suffix ?? ''}
+											onChange={(e) => updateElement({ suffix: e.target.value })}
+										/>
+									</div>
+								)}
 								<Select
 									label="Font Family"
 									value={element.fontFamily || 'Arial'}
