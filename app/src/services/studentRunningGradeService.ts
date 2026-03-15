@@ -114,6 +114,15 @@ class StudentRunningGradeService {
     return response.data;
   }
 
+  async recalculateParentGrades(studentId: string, quarter: '1' | '2' | '3' | '4', academicYear: string) {
+    const response = await api.post(`${this.baseUrl}/recalculate-parent-grades`, {
+      student_id: studentId,
+      quarter,
+      academic_year: academicYear,
+    });
+    return response.data;
+  }
+
   async bulkUpsertFinalGrades(grades: Array<{
     studentId: string;
     subjectId: string;

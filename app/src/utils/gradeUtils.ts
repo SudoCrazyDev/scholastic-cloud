@@ -103,7 +103,10 @@ export const calculateFinalGrade = (grades: StudentRunningGrade[]): number => {
   const validGrades = grades.filter(grade => gradeValue(grade) > 0)
   if (validGrades.length === 0) return 0
 
-  const sum = validGrades.reduce((total, grade) => total + gradeValue(grade), 0)
+  // Round each quarter grade to a whole number before averaging — this matches
+  // how getQuarterGrade displays individual quarters and follows DepEd rules
+  // (Final Grade = average of the already-transmitted/rounded quarter grades).
+  const sum = validGrades.reduce((total, grade) => total + Math.round(gradeValue(grade)), 0)
   return Math.round(sum / validGrades.length)
 }
 

@@ -54,7 +54,7 @@ const SUCCESS_TIMEOUT = 3000
 const ClassSectionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, isImpersonating } = useAuth()
   const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values' | 'attendance'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
@@ -704,6 +704,9 @@ const ClassSectionDetail: React.FC = () => {
                     setStudentSearchTerm={setStudentSearchTerm}
                     handleViewTempReportCard={handleViewTempReportCard}
                     handleViewReportCard={handleViewReportCard}
+                    isImpersonating={isImpersonating}
+                    subjects={subjects}
+                    academicYear={classSectionData?.academic_year ?? ''}
                   />
                 </motion.div>
               )}

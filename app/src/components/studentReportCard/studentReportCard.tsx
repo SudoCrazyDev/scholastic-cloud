@@ -1,6 +1,9 @@
 
 import { useMemo } from 'react';
-import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
+import { Page, Text, View, Document, PDFViewer, StyleSheet, Image, Font } from '@react-pdf/renderer';
+
+// Prevent mid-word hyphenation so long subject names wrap at word boundaries (e.g. "TVE - Computer\nSystem Servicing" instead of "TVE - Computer Sys-\ntem Servicing").
+Font.registerHyphenationCallback((word) => [word]);
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
 import { calculateFinalGrade, getPassFailRemarks, getGeneralAverageRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
@@ -67,11 +70,10 @@ const formatTeacherName = (teacher: any) => {
 };
 
 const styles = StyleSheet.create({
-    // Attendance table:
-    // - 1 label column + 10 month columns + 1 narrower Total column (Jun–Mar, no Apr/May)
-    // - widths must not overflow (7% * 13 + 15% = 106% caused misalignment/double borders)
-    attendanceMonthContainer: {width: '6.53%', textAlign: 'center', borderRight: '1px solid black'},
-    attendanceMonthContainerLast: {width: '4%', textAlign: 'center'},
+    // Attendance table: 15% label + 11 equal data columns (10 months + Total) × 7.7% = ~99.7%
+    // All columns same width so Total doesn't appear wider due to leftover flex space.
+    attendanceMonthContainer: {width: '7.7%', textAlign: 'center', borderRight: '1px solid black'},
+    attendanceMonthContainerLast: {width: '7.7%', flexGrow: 0, flexShrink: 0, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center'},
     attendanceMonthText: {fontSize: '7px', fontFamily: 'Helvetica'}
 });
 
@@ -291,7 +293,7 @@ export default function PrintReportCard({
                                     {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => {
                                         const monthData = getAttendanceForMonth(index);
                                         return (
-                                            <View key={`school-days-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                            <View key={`school-days-${index}`} style={{width: '7.7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                                 <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{monthData.schoolDays === 0 ? '' : monthData.schoolDays}</Text>
                                             </View>
                                         );
@@ -307,7 +309,7 @@ export default function PrintReportCard({
                                     {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => {
                                         const monthData = getAttendanceForMonth(index);
                                         return (
-                                            <View key={`present-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                            <View key={`present-${index}`} style={{width: '7.7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                                 <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{monthData.present || ''}</Text>
                                             </View>
                                         );
@@ -324,7 +326,7 @@ export default function PrintReportCard({
                                         const monthData = getAttendanceForMonth(index);
                                         const absent = Number(monthData.absent);
                                         return (
-                                            <View key={`absent-${index}`} style={{width: '6.53%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
+                                            <View key={`absent-${index}`} style={{width: '7.7%', textAlign: 'center', display: 'flex', flexDirection: "column", justifyContent: "center", borderRight: '1px solid black'}}>
                                                 <Text style={{fontSize: '7px', fontFamily: 'Helvetica'}}>{isNaN(absent) ? '' : String(absent)}</Text>
                                             </View>
                                         );

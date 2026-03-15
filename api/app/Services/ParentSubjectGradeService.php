@@ -93,12 +93,12 @@ class ParentSubjectGradeService
                 return;
             }
 
-            // Calculate the average of child subject final grades
+            // Calculate the average of child subject final grades.
+            // Each child's final_grade is already a whole-number encoded grade, so we
+            // average them and round to the nearest whole number — consistent with how
+            // the report card displays individual quarter grades (Math.round per quarter).
             $totalGrade = $childGrades->sum('final_grade');
-            $averageGrade = $totalGrade / $childGrades->count();
-
-            // Round to 2 decimal places
-            $averageGrade = round($averageGrade, 2);
+            $averageGrade = (int) round($totalGrade / $childGrades->count());
 
             Log::info("Calculated average grade", [
                 'total_grade' => $totalGrade,
@@ -200,11 +200,10 @@ class ParentSubjectGradeService
                 return null; // No child grades found
             }
 
-            // Calculate the average of child subject final grades
+            // Calculate the average of child subject final grades (whole number).
             $totalGrade = $childGrades->sum('final_grade');
-            $averageGrade = $totalGrade / $childGrades->count();
 
-            return round($averageGrade, 2);
+            return (float) (int) round($totalGrade / $childGrades->count());
 
         } catch (\Exception $e) {
             Log::error("Error getting parent subject grade", [

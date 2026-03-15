@@ -211,6 +211,7 @@ Route::middleware('auth.token')->group(function () {
     // StudentRunningGrade routes
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
     Route::post('student-running-grades/bulk-upsert-final-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'bulkUpsertFinalGrades']);
+    Route::post('student-running-grades/recalculate-parent-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'recalculateParentSubjectGrades']);
     Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
     // StudentAttendance routes
     Route::post('student-attendances/bulk-upsert', [StudentAttendanceController::class, 'bulkUpsert']);
