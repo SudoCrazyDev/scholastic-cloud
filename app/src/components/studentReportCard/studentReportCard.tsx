@@ -383,7 +383,7 @@ export default function PrintReportCard({
                                     Name:{' '}
                                     <Text style={{textDecoration: 'underline'}}>
                                         {`${student.last_name || ''}, ${student.first_name || ''}${
-                                            student.middle_name ? `, ${String(student.middle_name).trim().charAt(0)}.` : ''
+                                            student.middle_name ? ` ${String(student.middle_name).trim().charAt(0)}.` : ''
                                         }${student.ext_name ? `, ${student.ext_name}` : ''}`.toUpperCase()}
                                     </Text>
                                 </Text>
