@@ -104,6 +104,12 @@ export function StudentReportCardModal({
   const [overrideAge, setOverrideAge] = useState<string>('')
 
   useEffect(() => {
+    if (isOpen) {
+      setOverrideAge('')
+    }
+  }, [isOpen])
+
+  useEffect(() => {
     if (!isOpen) return
     if (selectedPrincipalId) return
     if (principals.length > 0) {
