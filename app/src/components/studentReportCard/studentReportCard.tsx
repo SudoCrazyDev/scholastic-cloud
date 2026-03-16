@@ -213,6 +213,23 @@ export default function PrintReportCard({
         return count === 0 ? 0 : Math.round(sum / count);
     }, [subjects, grades]);
 
+    const failedSubjectCount = useMemo(() => {
+        let count = 0;
+        const displayed = (subjects || []).filter((s: any) => s.subject_type !== 'child');
+        for (const subject of displayed) {
+            const subjectGrades = (grades || []).filter((g: any) => g.subject_id === subject.id);
+            const q1 = getQuarterGrade(subjectGrades, '1');
+            const q2 = getQuarterGrade(subjectGrades, '2');
+            const q3 = getQuarterGrade(subjectGrades, '3');
+            const q4 = getQuarterGrade(subjectGrades, '4');
+            const finalGrade = calculateFinalGrade(subjectGrades);
+            if (q1 > 0 && q2 > 0 && q3 > 0 && q4 > 0 && finalGrade > 0 && finalGrade < 75) {
+                count++;
+            }
+        }
+        return count;
+    }, [subjects, grades]);
+
     // Only show General Average when every subject the student has grades for (in each area) has all 4 quarter grades.
     // Skip areas where the student has no grades (e.g. only takes one specialization when section has four).
     const allQuartersCompleteForGeneralAverage = useMemo(() => {
@@ -600,7 +617,7 @@ export default function PrintReportCard({
                             </View>
                             <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                    {allQuartersCompleteForGeneralAverage && generalAverage > 0 ? getGeneralAverageRemarks(generalAverage) : ''}
+                                    {allQuartersCompleteForGeneralAverage && generalAverage > 0 ? getGeneralAverageRemarks(generalAverage, failedSubjectCount) : ''}
                                 </Text>
                             </View>
                         </View>
