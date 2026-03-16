@@ -27,18 +27,33 @@ interface CertificatePreviewModalProps {
   institution?: Institution | null
 }
 
-function getStudentVariableValue(student: Student, variableKey: string): string {
+function getStudentVariableValue(student: Student, variableKey: string, nameFormat?: 'last_first' | 'first_last'): string {
+  const s = student as unknown as Record<string, unknown>
+
   if (variableKey === 'extension') {
-    const value = (student as unknown as Record<string, unknown>).ext_name
-    return value != null ? String(value) : ''
+    return s.ext_name != null ? String(s.ext_name) : ''
   }
   if (variableKey === 'middle_initial') {
-    const mn = (student as unknown as Record<string, unknown>).middle_name
+    const mn = s.middle_name
     if (mn == null || String(mn).trim() === '') return ''
     return String(mn).trim().charAt(0).toUpperCase()
   }
-  const value = (student as unknown as Record<string, unknown>)[variableKey]
-  return value != null ? String(value) : ''
+  if (variableKey === 'full_name') {
+    const firstName  = s.first_name  != null ? String(s.first_name).trim()  : ''
+    const lastName   = s.last_name   != null ? String(s.last_name).trim()   : ''
+    const middleName = s.middle_name != null ? String(s.middle_name).trim() : ''
+    const extName    = s.ext_name    != null ? String(s.ext_name).trim()    : ''
+    const mi = middleName ? middleName.charAt(0).toUpperCase() + '.' : ''
+
+    if (nameFormat === 'first_last') {
+      return [firstName, mi, lastName, extName].filter(Boolean).join(' ')
+    }
+    // Default: last_first — LAST NAME, FIRST NAME MI. EXT NAME
+    const afterComma = [firstName, mi, extName].filter(Boolean).join(' ')
+    return lastName ? `${lastName}, ${afterComma}`.trimEnd() : afterComma
+  }
+
+  return s[variableKey] != null ? String(s[variableKey]) : ''
 }
 
 function resolveDisplayText(element: CanvasElement, student: Student, _institution?: Institution | null): string {
@@ -49,7 +64,7 @@ function resolveDisplayText(element: CanvasElement, student: Student, _instituti
   // The element.content always holds what the user typed/sees in the builder,
   // so for institution variables (and everything else) we just use content as-is.
   if (element.variableType === 'student' && element.variableKey) {
-    const raw = getStudentVariableValue(student, element.variableKey)
+    const raw = getStudentVariableValue(student, element.variableKey, element.nameFormat)
     return `${prefix}${raw}${suffix}`
   }
 
