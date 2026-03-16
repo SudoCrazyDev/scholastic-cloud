@@ -2,7 +2,7 @@ import React from 'react';
 import { FinalGradeInput } from './FinalGradeInput';
 import type { StudentRunningGrade } from '../../../services/studentRunningGradeService';
 import type { Student } from '../../../types';
-import { toNumber } from '../../../utils/gradeUtils';
+
 
 interface StudentGradesByQuarterProps {
   student: Student;
@@ -92,7 +92,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
             {allQuarters.map((quarter) => {
               const grade = gradesByQuarter[quarter];
               const calculatedGrade = grade?.grade;
-              const finalGrade = grade?.final_grade || 0;
+              const finalGrade = grade?.final_grade;
 
               return (
                 <div key={quarter} className="flex flex-col items-center space-y-2">
@@ -101,7 +101,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
                       studentId={student.id}
                       subjectId={subjectId}
                       quarter={quarter}
-                      currentFinalGrade={toNumber(finalGrade)}
+                      currentFinalGrade={finalGrade ?? undefined}
                       calculatedGrade={calculatedGrade}
                       gradeId={grade?.id}
                       academicYear={academicYear}
@@ -120,7 +120,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
             {filteredQuarters.map((quarter) => {
               const grade = gradesByQuarter[quarter];
               const calculatedGrade = grade?.grade;
-              const finalGrade = grade?.final_grade || 0;
+              const finalGrade = grade?.final_grade;
 
               return (
                 <div key={quarter} className="flex flex-col items-center space-y-2">
@@ -129,7 +129,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
                       studentId={student.id}
                       subjectId={subjectId}
                       quarter={quarter}
-                      currentFinalGrade={toNumber(finalGrade)}
+                      currentFinalGrade={finalGrade ?? undefined}
                       calculatedGrade={calculatedGrade}
                       gradeId={grade?.id}
                       academicYear={academicYear}

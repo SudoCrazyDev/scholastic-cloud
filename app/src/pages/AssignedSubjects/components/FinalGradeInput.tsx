@@ -31,7 +31,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   studentId,
   subjectId,
   quarter,
-  currentFinalGrade = 0,
+  currentFinalGrade,
   calculatedGrade,
   gradeId,
   academicYear = '2025-2026',
@@ -39,7 +39,9 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   onGradeChange,
   isDisabled = false,
 }) => {
-  const [finalGrade, setFinalGrade] = useState(toNumber(currentFinalGrade));
+  const [finalGrade, setFinalGrade] = useState<number | ''>(
+    currentFinalGrade != null ? currentFinalGrade : ''
+  );
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
   const updateFinalGradeMutation = useUpdateFinalGrade();
   const upsertFinalGradeMutation = useUpsertFinalGrade();
@@ -47,19 +49,37 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
 
   // Update local state when currentFinalGrade prop changes
   useEffect(() => {
-    setFinalGrade(toNumber(currentFinalGrade));
+    setFinalGrade(currentFinalGrade != null ? currentFinalGrade : '');
     setHasLocalChanges(false);
   }, [currentFinalGrade]);
 
   const handleFinalGradeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(e.target.value);
+    const rawValue = e.target.value;
+
+    if (rawValue === '') {
+      setFinalGrade('');
+      setHasLocalChanges(true);
+      if (isBatchMode && onGradeChange) {
+        onGradeChange({
+          studentId,
+          subjectId,
+          quarter,
+          finalGrade: 0,
+          gradeId,
+          academicYear,
+          hasChanged: (currentFinalGrade ?? 0) !== 0,
+        });
+      }
+      return;
+    }
+
+    const value = Number(rawValue);
     if (!isNaN(value) && value >= 0 && value <= 100) {
       setFinalGrade(value);
       setHasLocalChanges(true);
       
-      // Notify parent component about the change for batch mode
       if (isBatchMode && onGradeChange) {
-        const originalGrade = toNumber(currentFinalGrade);
+        const originalGrade = currentFinalGrade ?? 0;
         onGradeChange({
           studentId,
           subjectId,
@@ -79,9 +99,9 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
       return;
     }
 
-    // Check if the value has actually changed
-    const originalGrade = toNumber(currentFinalGrade);
-    if (finalGrade === originalGrade) {
+    const numericGrade = finalGrade === '' ? 0 : finalGrade;
+    const originalGrade = currentFinalGrade ?? 0;
+    if (numericGrade === originalGrade) {
       toast.success('No changes to save', {
         duration: 2000,
         icon: 'ℹ️',
@@ -106,22 +126,19 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
 
     try {
       if (gradeId) {
-        // Update existing grade
         await updateFinalGradeMutation.mutateAsync({
           id: gradeId,
-          finalGrade: finalGrade,
+          finalGrade: numericGrade,
         });
       } else {
-        // Create new grade if it doesn't exist
         await upsertFinalGradeMutation.mutateAsync({
           studentId,
           subjectId,
           quarter,
-          finalGrade,
+          finalGrade: numericGrade,
           academicYear,
         });
       }
-      // Dismiss loading toast (success toast will show from mutation)
       toast.dismiss(loadingToast);
       setHasLocalChanges(false);
     } catch (error) {
@@ -137,8 +154,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
       return;
     }
 
-    // Check if the calculated grade is different from current final grade
-    const currentFinalGradeNum = toNumber(currentFinalGrade);
+    const currentFinalGradeNum = currentFinalGrade ?? 0;
     if (numCalculatedGrade === currentFinalGradeNum) {
       // No change, just update the local state and don't make API call
       setFinalGrade(numCalculatedGrade);
@@ -246,6 +262,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
           max="100"
           step="0.1"
           value={finalGrade}
+          placeholder=""
           onChange={handleFinalGradeChange}
           onBlur={isBatchMode ? undefined : handleSave}
           onKeyPress={(e) => {
