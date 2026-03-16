@@ -24,3 +24,16 @@ export function designHasVariables(design: DesignElementsLike | null | undefined
 	if (!design?.elements || !Array.isArray(design.elements)) return false;
 	return design.elements.some((el) => Boolean(el.variableType && el.variableKey));
 }
+
+const RANKING_VARIABLE_KEYS = ['ranking', 'student_rank', 'student_gpa'];
+
+/**
+ * Returns true if the design contains any student ranking variable (ranking, student_rank, student_gpa).
+ * Certificates with ranking variables should only be shown for honor students.
+ */
+export function designHasRankingVariables(design: DesignElementsLike | null | undefined): boolean {
+	if (!design?.elements || !Array.isArray(design.elements)) return false;
+	return design.elements.some(
+		(el) => el.variableType === 'student' && RANKING_VARIABLE_KEYS.includes(el.variableKey ?? '')
+	);
+}

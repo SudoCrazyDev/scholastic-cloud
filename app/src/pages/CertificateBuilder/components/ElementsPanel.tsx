@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Type, Image, FileText, Building2, Hash, MapPin, Globe, ImageIcon, User, BookUser, PanelLeftClose, QrCode, ChevronDown, ChevronRight } from 'lucide-react';
+import { Type, Image, FileText, Building2, Hash, MapPin, Globe, ImageIcon, User, BookUser, PanelLeftClose, QrCode, ChevronDown, ChevronRight, Trophy, Medal } from 'lucide-react';
 import { type CanvasElement } from './CertificateCanvas';
 import type { Institution } from '@/types';
 
@@ -44,6 +44,9 @@ const STUDENT_VARIABLES: Array<{ key: string; label: string; icon: React.Compone
 	{ key: 'gender', label: 'Gender', icon: User, type: 'text' },
 	{ key: 'religion', label: 'Religion', icon: BookUser, type: 'text' },
 	{ key: 'lrn_qr', label: 'LRN QR', icon: QrCode, type: 'qr' },
+	{ key: 'ranking', label: 'Student Ranking', icon: Trophy, type: 'text' },
+	{ key: 'student_rank', label: 'Rank Number', icon: Medal, type: 'text' },
+	{ key: 'student_gpa', label: 'GPA', icon: Medal, type: 'text' },
 ];
 
 export default function ElementsPanel({ institution, onAddElement, onCollapse }: ElementsPanelProps) {

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { listCertificates, type CertificateRecord } from '@/services/certificateService';
+import { listCertificates, duplicateCertificate, type CertificateRecord } from '@/services/certificateService';
 import Button from '@/components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'react-hot-toast';
 import { designHasStudentVariables } from './certificateDesignUtils';
 import { 
   PlusIcon, 
@@ -11,12 +12,14 @@ import {
   CalendarIcon, 
   ArrowTopRightOnSquareIcon,
   ClockIcon,
-  BuildingOfficeIcon
+  BuildingOfficeIcon,
+  DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
 
 export default function CertificateList() {
 	const [items, setItems] = useState<CertificateRecord[]>([]);
 	const [loading, setLoading] = useState(false);
+	const [duplicatingId, setDuplicatingId] = useState<number | string | null>(null);
 	const navigate = useNavigate();
 	const { user } = useAuth();
 
@@ -26,25 +29,36 @@ export default function CertificateList() {
 	const currentInstitution = defaultUi?.institution || mainUi?.institution;
 	const institutionId = defaultUi?.institution_id || mainUi?.institution_id || currentInstitution?.id;
 
-	useEffect(() => {
-		async function load() {
-			if (!institutionId) {
-				setItems([]);
-				setLoading(false);
-				return;
-			}
-
-			setLoading(true);
-			try {
-				const resp = await listCertificates({ institution_id: institutionId });
-				const data = Array.isArray(resp) ? resp : (resp as { data?: CertificateRecord[] }).data ?? [];
-				setItems(data);
-			} finally {
-				setLoading(false);
-			}
+	const loadCertificates = useCallback(async () => {
+		if (!institutionId) {
+			setItems([]);
+			setLoading(false);
+			return;
 		}
-		load();
+		setLoading(true);
+		try {
+			const resp = await listCertificates({ institution_id: institutionId });
+			const data = Array.isArray(resp) ? resp : (resp as { data?: CertificateRecord[] }).data ?? [];
+			setItems(data);
+		} finally {
+			setLoading(false);
+		}
 	}, [institutionId]);
+
+	useEffect(() => { loadCertificates(); }, [loadCertificates]);
+
+	const handleDuplicate = async (item: CertificateRecord) => {
+		try {
+			setDuplicatingId(item.id);
+			await duplicateCertificate(item.id);
+			toast.success('Certificate duplicated!');
+			await loadCertificates();
+		} catch {
+			toast.error('Failed to duplicate certificate');
+		} finally {
+			setDuplicatingId(null);
+		}
+	};
 
 	// Animation variants
 	const containerVariants = {
@@ -285,15 +299,26 @@ export default function CertificateList() {
 											</div>
 										</div>
 
-										{/* Action Button */}
+									{/* Action Buttons */}
+									<div className="flex gap-2">
 										<Button
 											variant="secondary"
 											onClick={() => navigate(`/certificate-builder?id=${item.id}`)}
-											className="w-full bg-gray-50 hover:bg-indigo-50 border-gray-200 hover:border-indigo-200 text-gray-700 hover:text-indigo-700 transition-all duration-200 group-hover:shadow-md"
+											className="flex-1 bg-gray-50 hover:bg-indigo-50 border-gray-200 hover:border-indigo-200 text-gray-700 hover:text-indigo-700 transition-all duration-200 group-hover:shadow-md"
 										>
 											<ArrowTopRightOnSquareIcon className="w-4 h-4 mr-2" />
-											Open Certificate
+											Open
 										</Button>
+										<Button
+											variant="secondary"
+											onClick={() => handleDuplicate(item)}
+											disabled={duplicatingId === item.id}
+											className="bg-gray-50 hover:bg-purple-50 border-gray-200 hover:border-purple-200 text-gray-700 hover:text-purple-700 transition-all duration-200 group-hover:shadow-md disabled:opacity-50"
+											title="Duplicate certificate"
+										>
+											<DocumentDuplicateIcon className={`w-4 h-4 ${duplicatingId === item.id ? 'animate-spin' : ''}`} />
+										</Button>
+									</div>
 									</motion.div>
 								))}
 							</AnimatePresence>

@@ -99,7 +99,7 @@ export function useDuplicateCertificate() {
 	const queryClient = useQueryClient();
 	
 	return useMutation({
-		mutationFn: ({ id, newTitle }: { id: number; newTitle?: string }) =>
+		mutationFn: ({ id, newTitle }: { id: number | string; newTitle?: string }) =>
 			duplicateCertificate(id, newTitle),
 		onSuccess: (data) => {
 			toast.success('Certificate duplicated successfully!');

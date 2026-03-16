@@ -707,6 +707,8 @@ const ClassSectionDetail: React.FC = () => {
                     gradeLevel={classSectionData?.grade_level || ''}
                     institution={finalInstitution}
                     getFullName={getFullName}
+                    sectionId={id!}
+                    quarter={selectedQuarter === 'final' ? 1 : Number(selectedQuarter)}
                   />
                 </motion.div>
               )}

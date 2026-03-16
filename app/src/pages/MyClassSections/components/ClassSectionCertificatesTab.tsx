@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query'
 import { listCertificates, type CertificateRecord } from '@/services/certificateService'
 import type { Student, Institution } from '@/types'
 import type { PublishOptions } from '@/pages/CertificateBuilder/components/PublishOptionsPanel'
+import { designHasRankingVariables } from '@/pages/CertificateBuilder/certificateDesignUtils'
+import { useConsolidatedGrades } from '@/hooks/useConsolidatedGrades'
 import CertificatePreviewModal from './CertificatePreviewModal'
 
 interface ClassSectionCertificatesTabProps {
@@ -12,12 +14,45 @@ interface ClassSectionCertificatesTabProps {
   gradeLevel: string
   institution?: Institution | null
   getFullName: (user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => string
+  sectionId: string
+  quarter: number
+}
+
+interface RankingEntry {
+  student_id: string
+  gpa: number
+  rank: number
+  remarks: string
 }
 
 /** Extract the numeric part from grade strings like "Grade 10", "10", "grade 7", etc. */
 function normalizeGrade(raw: string): string {
   const digits = raw.replace(/\D/g, '')
   return digits || raw.trim().toLowerCase()
+}
+
+const getRemarks = (finalGrade: number | null) => {
+  if (finalGrade === null) return 'N/A'
+  if (finalGrade >= 98) return 'With Highest Honors'
+  if (finalGrade >= 95) return 'With High Honor'
+  if (finalGrade >= 90) return 'With Honors'
+  return ''
+}
+
+const getBaseTitle = (title: string) => title.split(/[-(]/)[0].trim()
+
+const calculateFinalGradeFromGrouped = (
+  subjects: Array<{ grade: number | string | null; subject_type?: string }>
+): number | null => {
+  const parentAndRegular = subjects.filter((s) => s.subject_type !== 'child')
+  const validGrades = parentAndRegular
+    .map((s) => {
+      const g = typeof s.grade === 'string' ? parseFloat(s.grade) : s.grade
+      return g != null && !Number.isNaN(g) ? g : null
+    })
+    .filter((g): g is number => g !== null)
+  if (validGrades.length === 0) return null
+  return Math.round(validGrades.reduce((a, b) => a + b, 0) / validGrades.length)
 }
 
 function isCertificateVisibleForGrade(cert: CertificateRecord, gradeLevel: string): boolean {
@@ -36,6 +71,8 @@ export default function ClassSectionCertificatesTab({
   gradeLevel,
   institution,
   getFullName,
+  sectionId,
+  quarter,
 }: ClassSectionCertificatesTabProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [previewState, setPreviewState] = useState<{
@@ -54,6 +91,65 @@ export default function ClassSectionCertificatesTab({
     return all.filter((c) => isCertificateVisibleForGrade(c, gradeLevel))
   }, [certsResponse?.data, gradeLevel])
 
+  const hasAnyRankingCert = useMemo(
+    () => certificates.some((c) => designHasRankingVariables(c.design_json)),
+    [certificates]
+  )
+
+  const { data: gradesData } = useConsolidatedGrades(
+    hasAnyRankingCert ? sectionId : '',
+    hasAnyRankingCert ? quarter : ''
+  )
+
+  const rankingMap = useMemo<Map<string, RankingEntry>>(() => {
+    const map = new Map<string, RankingEntry>()
+    if (!gradesData?.students) return map
+
+    const entries = gradesData.students.map((student: any) => {
+      const grouped: Record<string, { grades: (number | string | null)[]; subjects: any[] }> = {}
+      const individualSubjects: any[] = []
+      student.subjects.forEach((subject: any) => {
+        if (subject.subject_variant && String(subject.subject_variant).trim() !== '') {
+          const base = getBaseTitle(subject.subject_title)
+          if (!grouped[base]) grouped[base] = { grades: [], subjects: [] }
+          grouped[base].grades.push(subject.grade)
+          grouped[base].subjects.push(subject)
+        } else {
+          individualSubjects.push(subject)
+        }
+      })
+      const groupedList = Object.keys(grouped).map((base) => {
+        const grades = grouped[base].grades
+          .map((g) => (g == null ? null : typeof g === 'string' ? parseFloat(g) : g))
+          .filter((g) => g != null && !Number.isNaN(g)) as number[]
+        const avg = grades.length > 0 ? Math.round(grades.reduce((a, b) => a + b, 0) / grades.length) : null
+        const subjects = grouped[base].subjects
+        const isChildGroup = subjects.every((s: any) => s.subject_type === 'child')
+        return {
+          subject_title: base,
+          grade: avg,
+          subject_type: isChildGroup ? 'child' : (subjects[0]?.subject_type || 'regular'),
+        }
+      })
+      const individualList = individualSubjects.map((s: any) => ({
+        subject_title: s.subject_title,
+        grade: s.grade,
+        subject_type: s.subject_type,
+      }))
+      const allSubjects = [...groupedList, ...individualList]
+      const gpa = calculateFinalGradeFromGrouped(allSubjects)
+      const remarks = getRemarks(gpa)
+      return { student_id: student.student_id as string, gpa: gpa ?? 0, rank: 0, remarks }
+    })
+
+    const honorEntries = entries
+      .filter((e) => e.remarks && e.remarks !== '' && e.remarks !== 'N/A')
+      .sort((a, b) => b.gpa - a.gpa)
+    honorEntries.forEach((e, i) => { e.rank = i + 1 })
+    honorEntries.forEach((e) => map.set(e.student_id, e))
+    return map
+  }, [gradesData])
+
   const filteredStudents = useMemo(() => {
     if (!searchTerm.trim()) return students
     const q = searchTerm.toLowerCase()
@@ -63,6 +159,27 @@ export default function ClassSectionCertificatesTab({
       return full.includes(q) || lrn.includes(q)
     })
   }, [students, searchTerm, getFullName])
+
+  const getCertificatesForStudent = (student: Student) => {
+    return certificates.filter((cert) => {
+      if (designHasRankingVariables(cert.design_json)) {
+        return rankingMap.has(student.id)
+      }
+      return true
+    })
+  }
+
+  const enrichStudentForCert = (student: Student, cert: CertificateRecord): Student => {
+    if (!designHasRankingVariables(cert.design_json)) return student
+    const entry = rankingMap.get(student.id)
+    if (!entry) return student
+    return {
+      ...student,
+      ranking: entry.remarks,
+      student_rank: String(entry.rank),
+      student_gpa: String(entry.gpa),
+    } as Student
+  }
 
   const grouped = useMemo(() => {
     const map: Record<string, (Student & { assignmentId: string })[]> = {}
@@ -165,37 +282,46 @@ export default function ClassSectionCertificatesTab({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {groupStudents.map((student, idx) => (
-                    <tr
-                      key={student.id}
-                      className={`hover:bg-gray-50/80 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-900">{getFullName(student)}</span>
-                          {student.lrn && (
-                            <span className="text-xs text-gray-400 mt-0.5">LRN: {student.lrn}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {certificates.map((cert) => (
-                            <button
-                              key={cert.id}
-                              onClick={() => setPreviewState({ certificate: cert, student })}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
-                                bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-sm"
-                              title={`View ${cert.title} for ${getFullName(student)}`}
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              {cert.title}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {groupStudents.map((student, idx) => {
+                    const studentCerts = getCertificatesForStudent(student)
+                    if (studentCerts.length === 0) return null
+                    return (
+                      <tr
+                        key={student.id}
+                        className={`hover:bg-gray-50/80 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">{getFullName(student)}</span>
+                            {student.lrn && (
+                              <span className="text-xs text-gray-400 mt-0.5">LRN: {student.lrn}</span>
+                            )}
+                            {rankingMap.has(student.id) && (
+                              <span className="text-xs text-amber-600 mt-0.5 font-medium">
+                                {rankingMap.get(student.id)!.remarks} (Rank #{rankingMap.get(student.id)!.rank})
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-2">
+                            {studentCerts.map((cert) => (
+                              <button
+                                key={cert.id}
+                                onClick={() => setPreviewState({ certificate: cert, student: enrichStudentForCert(student, cert) })}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
+                                  bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-sm"
+                                title={`View ${cert.title} for ${getFullName(student)}`}
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                {cert.title}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

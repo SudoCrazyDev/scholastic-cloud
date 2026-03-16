@@ -64,7 +64,7 @@ export async function deleteCertificate(id: number): Promise<void> {
 	await api.delete(`/certificates/${id}`);
 }
 
-export async function duplicateCertificate(id: number, newTitle?: string): Promise<CertificateRecord> {
+export async function duplicateCertificate(id: number | string, newTitle?: string): Promise<CertificateRecord> {
 	const original = await getCertificate(id);
 	const title = newTitle || `${original.title} (Copy)`;
 	
