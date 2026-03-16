@@ -228,6 +228,17 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 										/>
 									</div>
 								)}
+								{/* Name Format — only for Full Name variable */}
+								{element.variableKey === 'full_name' && (
+									<Select
+										label="Name Format"
+										value={element.nameFormat ?? 'last_first'}
+										onChange={(e) => updateElement({ nameFormat: e.target.value as 'last_first' | 'first_last' })}
+									>
+										<option value="last_first">LAST NAME, FIRST NAME MI. EXT NAME</option>
+										<option value="first_last">FIRST NAME MI. LAST NAME EXT NAME</option>
+									</Select>
+								)}
 								<Select
 									label="Font Family"
 									value={element.fontFamily || 'Arial'}

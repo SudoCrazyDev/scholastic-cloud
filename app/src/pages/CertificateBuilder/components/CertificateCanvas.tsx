@@ -46,6 +46,9 @@ export interface CanvasElement {
 	// Prefix / suffix for variable text elements
 	prefix?: string;
 	suffix?: string;
+
+	// Full-name format: 'last_first' = LAST, FIRST MI. EXT | 'first_last' = FIRST MI. LAST EXT
+	nameFormat?: 'last_first' | 'first_last';
 }
 
 interface CertificateCanvasProps {
@@ -63,24 +66,40 @@ interface CertificateCanvasProps {
 	previewStudent?: Student | null;
 }
 
-function getStudentVariableValue(student: Student, variableKey: string): string {
+function getStudentVariableValue(student: Student, variableKey: string, nameFormat?: 'last_first' | 'first_last'): string {
+	const s = student as unknown as Record<string, unknown>;
+
 	if (variableKey === 'extension') {
-		const value = (student as unknown as Record<string, unknown>).ext_name;
-		return value != null ? String(value) : '';
+		return s.ext_name != null ? String(s.ext_name) : '';
 	}
 	if (variableKey === 'middle_initial') {
-		const mn = (student as unknown as Record<string, unknown>).middle_name;
+		const mn = s.middle_name;
 		if (mn == null || String(mn).trim() === '') return '';
 		return String(mn).trim().charAt(0).toUpperCase();
 	}
-	const value = (student as unknown as Record<string, unknown>)[variableKey];
-	return value != null ? String(value) : '';
+	if (variableKey === 'full_name') {
+		const firstName = s.first_name != null ? String(s.first_name).trim() : '';
+		const lastName  = s.last_name  != null ? String(s.last_name).trim()  : '';
+		const middleName = s.middle_name != null ? String(s.middle_name).trim() : '';
+		const extName   = s.ext_name   != null ? String(s.ext_name).trim()   : '';
+		const mi = middleName ? middleName.charAt(0).toUpperCase() + '.' : '';
+
+		if (nameFormat === 'first_last') {
+			// FIRST NAME MIDDLE INITIAL. LAST NAME EXT NAME
+			return [firstName, mi, lastName, extName].filter(Boolean).join(' ');
+		}
+		// Default: last_first — LAST NAME, FIRST NAME MIDDLE INITIAL. EXT NAME
+		const afterComma = [firstName, mi, extName].filter(Boolean).join(' ');
+		return lastName ? `${lastName}, ${afterComma}`.trimEnd() : afterComma;
+	}
+
+	return s[variableKey] != null ? String(s[variableKey]) : '';
 }
 
 /** Builds the display text, wrapping with prefix/suffix when the element is a variable */
 function buildDisplayText(element: CanvasElement, previewStudent: Student | null | undefined): string {
 	const isStudentVar = element.variableType === 'student' && element.variableKey && previewStudent;
-	const studentTextValue = isStudentVar ? getStudentVariableValue(previewStudent, element.variableKey!) : null;
+	const studentTextValue = isStudentVar ? getStudentVariableValue(previewStudent, element.variableKey!, element.nameFormat) : null;
 
 	const raw = studentTextValue !== null
 		? studentTextValue

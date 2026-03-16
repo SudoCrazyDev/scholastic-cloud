@@ -35,6 +35,7 @@ const VARIABLES: Array<{
 /** Student elements – text placeholders like {middle_name}, or QR (LRN QR); data binding ready for future student implementation */
 const STUDENT_VARIABLES: Array<{ key: string; label: string; icon: React.ComponentType<{ className?: string }>; type: 'text' | 'qr' }> = [
 	{ key: 'lrn', label: 'LRN', icon: Hash, type: 'text' },
+	{ key: 'full_name', label: 'Full Name', icon: User, type: 'text' },
 	{ key: 'first_name', label: 'First Name', icon: User, type: 'text' },
 	{ key: 'middle_name', label: 'Middle Name', icon: User, type: 'text' },
 	{ key: 'middle_initial', label: 'Middle Initial', icon: User, type: 'text' },
@@ -204,6 +205,7 @@ export default function ElementsPanel({ institution, onAddElement, onCollapse }:
 				textAlign: 'left',
 				variableType: 'student',
 				variableKey: variable.key,
+				...(variable.key === 'full_name' && { nameFormat: 'last_first' as const }),
 			} as CanvasElement);
 		}
 	};
