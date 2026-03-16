@@ -49,6 +49,9 @@ export interface CanvasElement {
 
 	// Full-name format: 'last_first' = LAST, FIRST MI. EXT | 'first_last' = FIRST MI. LAST EXT
 	nameFormat?: 'last_first' | 'first_last';
+
+	// Text transform for full_name (and any text element)
+	textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
 }
 
 interface CertificateCanvasProps {
@@ -242,25 +245,26 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 		let elementContent: React.ReactNode;
 		
 		switch (element.type) {
-			case 'text':
-				elementContent = (
-					<div
-						style={{
-							...elementStyle,
-							fontFamily: element.fontFamily || 'Arial',
-							fontSize: element.fontSize || 16,
-							fontWeight: element.fontWeight || 'normal',
-							fontStyle: element.fontStyle || 'normal',
-							color: element.color || '#000000',
-							textAlign: (element.textAlign as 'left' | 'center' | 'right' | 'justify') || 'left',
-							textDecoration: element.textDecoration || 'none',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: element.textAlign === 'center' ? 'center' : element.textAlign === 'right' ? 'flex-end' : 'flex-start',
-							padding: '4px',
-							userSelect: 'none',
-						}}
-					>
+		case 'text':
+			elementContent = (
+				<div
+					style={{
+						...elementStyle,
+						fontFamily: element.fontFamily || 'Arial',
+						fontSize: element.fontSize || 16,
+						fontWeight: element.fontWeight || 'normal',
+						fontStyle: element.fontStyle || 'normal',
+						color: element.color || '#000000',
+						textAlign: (element.textAlign as 'left' | 'center' | 'right' | 'justify') || 'left',
+						textDecoration: element.textDecoration || 'none',
+						textTransform: (element.textTransform as React.CSSProperties['textTransform']) || 'none',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: element.textAlign === 'center' ? 'center' : element.textAlign === 'right' ? 'flex-end' : 'flex-start',
+						padding: '4px',
+						userSelect: 'none',
+					}}
+				>
 						{displayText}
 					</div>
 				);

@@ -131,6 +131,7 @@ function StaticElement({ element, student, institution }: { element: CanvasEleme
             color: element.color || '#000000',
             textAlign: (element.textAlign as React.CSSProperties['textAlign']) || 'left',
             textDecoration: element.textDecoration || 'none',
+            textTransform: (element.textTransform as React.CSSProperties['textTransform']) || 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: element.textAlign === 'center' ? 'center' : element.textAlign === 'right' ? 'flex-end' : 'flex-start',
