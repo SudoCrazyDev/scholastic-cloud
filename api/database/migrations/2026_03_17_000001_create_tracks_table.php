@@ -1,27 +1,22 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("
-            CREATE TABLE `tracks` (
-                `id` uuid NOT NULL,
-                `institution_id` uuid NOT NULL,
-                `title` varchar(255) NOT NULL,
-                `slug` varchar(255) NOT NULL,
-                `created_at` timestamp NULL DEFAULT NULL,
-                `updated_at` timestamp NULL DEFAULT NULL,
-                PRIMARY KEY (`id`),
-                UNIQUE KEY `tracks_institution_id_slug_unique` (`institution_id`, `slug`),
-                KEY `tracks_institution_id_foreign` (`institution_id`),
-                CONSTRAINT `tracks_institution_id_foreign` FOREIGN KEY (`institution_id`) REFERENCES `institutions` (`id`) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
+        Schema::create('tracks', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('institution_id')->references('id')->on('institutions')->onDelete('cascade');
+            $table->string('title');
+            $table->string('slug');
+            $table->timestamps();
+
+            $table->unique(['institution_id', 'slug']);
+        });
     }
 
     public function down(): void
