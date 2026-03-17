@@ -709,6 +709,8 @@ const ClassSectionDetail: React.FC = () => {
                     getFullName={getFullName}
                     sectionId={id!}
                     quarter={selectedQuarter === 'final' ? 1 : Number(selectedQuarter)}
+                    track={classSectionData?.track}
+                    strand={classSectionData?.strand}
                   />
                 </motion.div>
               )}

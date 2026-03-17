@@ -6,9 +6,14 @@ import html2canvas from 'html2canvas'
 import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
-import type { Student, Institution } from '@/types'
+import type { Student, Institution, Track, Strand } from '@/types'
 import type { CertificateRecord } from '@/services/certificateService'
 import type { CanvasElement } from '@/pages/CertificateBuilder/components/CertificateCanvas'
+
+export interface SectionData {
+  track?: Track | null
+  strand?: Strand | null
+}
 
 const PAPER_PRESETS = {
   a4:     { portrait: { w: 794, h: 1123, pdf: 'a4' as const }, landscape: { w: 1123, h: 794, pdf: 'a4' as const } },
@@ -25,6 +30,7 @@ interface CertificatePreviewModalProps {
   certificate: CertificateRecord
   student: Student
   institution?: Institution | null
+  sectionData?: SectionData | null
 }
 
 function getStudentVariableValue(student: Student, variableKey: string, nameFormat?: 'last_first' | 'first_last'): string {
@@ -56,15 +62,24 @@ function getStudentVariableValue(student: Student, variableKey: string, nameForm
   return s[variableKey] != null ? String(s[variableKey]) : ''
 }
 
-function resolveDisplayText(element: CanvasElement, student: Student, _institution?: Institution | null): string {
+function getSectionVariableValue(sectionData: SectionData | null | undefined, variableKey: string): string {
+  if (!sectionData) return ''
+  if (variableKey === 'track') return sectionData.track?.title || ''
+  if (variableKey === 'strand') return sectionData.strand?.title || ''
+  return ''
+}
+
+function resolveDisplayText(element: CanvasElement, student: Student, _institution?: Institution | null, sectionData?: SectionData | null): string {
   const prefix = element.prefix ?? ''
   const suffix = element.suffix ?? ''
 
-  // Student variables are the only ones that get dynamically resolved per-student.
-  // The element.content always holds what the user typed/sees in the builder,
-  // so for institution variables (and everything else) we just use content as-is.
   if (element.variableType === 'student' && element.variableKey) {
     const raw = getStudentVariableValue(student, element.variableKey, element.nameFormat)
+    return `${prefix}${raw}${suffix}`
+  }
+
+  if (element.variableType === 'section' && element.variableKey) {
+    const raw = getSectionVariableValue(sectionData, element.variableKey)
     return `${prefix}${raw}${suffix}`
   }
 
@@ -91,10 +106,10 @@ function parseDesign(raw: unknown): Record<string, unknown> {
   return {}
 }
 
-function StaticElement({ element, student, institution }: { element: CanvasElement; student: Student; institution?: Institution | null }) {
+function StaticElement({ element, student, institution, sectionData }: { element: CanvasElement; student: Student; institution?: Institution | null; sectionData?: SectionData | null }) {
   if (element.hidden) return null
 
-  const displayText = resolveDisplayText(element, student, institution)
+  const displayText = resolveDisplayText(element, student, institution, sectionData)
 
   const wrapperStyle: React.CSSProperties = {
     position: 'absolute',
@@ -245,7 +260,7 @@ function StaticElement({ element, student, institution }: { element: CanvasEleme
   }
 }
 
-export default function CertificatePreviewModal({ isOpen, onClose, certificate, student, institution }: CertificatePreviewModalProps) {
+export default function CertificatePreviewModal({ isOpen, onClose, certificate, student, institution, sectionData }: CertificatePreviewModalProps) {
   const { isImpersonating } = useAuth()
   const canvasRef = useRef<HTMLDivElement>(null)
   const scaleWrapperRef = useRef<HTMLDivElement>(null)
@@ -469,7 +484,7 @@ export default function CertificatePreviewModal({ isOpen, onClose, certificate, 
               }}
             >
               {elements.map((el, idx) => (
-                <StaticElement key={el.id || `el-${idx}`} element={el} student={student} institution={institution} />
+                <StaticElement key={el.id || `el-${idx}`} element={el} student={student} institution={institution} sectionData={sectionData} />
               ))}
             </div>
           </div>

@@ -538,12 +538,37 @@ export interface UpdateUserData {
   is_active?: boolean;
 }
 
+// Track & Strand types (SHS)
+export interface Track {
+  id: string;
+  institution_id: string;
+  title: string;
+  slug: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Strand {
+  id: string;
+  institution_id: string;
+  track_id: string;
+  title: string;
+  slug: string;
+  track?: Track;
+  created_at: string;
+  updated_at: string;
+}
+
 // Class Section types
 export interface ClassSection {
   id: string;
   institution_id: string;
   department_id?: string | null;
   department?: Department | null;
+  track_id?: string | null;
+  strand_id?: string | null;
+  track?: Track | null;
+  strand?: Strand | null;
   grade_level: string;
   title: string;
   adviser?: User;
@@ -558,6 +583,8 @@ export interface CreateClassSectionData {
   adviser?: string;
   academic_year?: string;
   department_id?: string | null;
+  track_id?: string | null;
+  strand_id?: string | null;
 }
 
 export interface UpdateClassSectionData {
@@ -566,6 +593,8 @@ export interface UpdateClassSectionData {
   adviser?: string;
   academic_year?: string;
   department_id?: string | null;
+  track_id?: string | null;
+  strand_id?: string | null;
 }
 
 // Subject Template types

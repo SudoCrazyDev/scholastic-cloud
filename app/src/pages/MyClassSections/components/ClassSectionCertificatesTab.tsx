@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Search, FileText, Loader2, Award } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { listCertificates, type CertificateRecord } from '@/services/certificateService'
-import type { Student, Institution } from '@/types'
+import type { Student, Institution, Track, Strand } from '@/types'
 import type { PublishOptions } from '@/pages/CertificateBuilder/components/PublishOptionsPanel'
 import { designHasRankingVariables } from '@/pages/CertificateBuilder/certificateDesignUtils'
 import { useConsolidatedGrades } from '@/hooks/useConsolidatedGrades'
@@ -16,6 +16,8 @@ interface ClassSectionCertificatesTabProps {
   getFullName: (user: { first_name?: string; middle_name?: string; last_name?: string; ext_name?: string }) => string
   sectionId: string
   quarter: number
+  track?: Track | null
+  strand?: Strand | null
 }
 
 interface RankingEntry {
@@ -73,6 +75,8 @@ export default function ClassSectionCertificatesTab({
   getFullName,
   sectionId,
   quarter,
+  track = null,
+  strand = null,
 }: ClassSectionCertificatesTabProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [previewState, setPreviewState] = useState<{
@@ -344,6 +348,7 @@ export default function ClassSectionCertificatesTab({
           certificate={previewState.certificate}
           student={previewState.student}
           institution={institution}
+          sectionData={{ track, strand }}
         />
       )}
     </div>

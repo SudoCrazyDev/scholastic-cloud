@@ -37,6 +37,8 @@ use App\Http\Controllers\StudentRfidTagController;
 use App\Http\Controllers\RfidScanLogController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\GradeLevelController;
+use App\Http\Controllers\TrackController;
+use App\Http\Controllers\StrandController;
 
 /*
 |--------------------------------------------------------------------------
@@ -148,6 +150,15 @@ Route::middleware('auth.token')->group(function () {
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);
     Route::post('staffs/{id}/reset-password', [StaffController::class, 'resetPassword']);
     Route::apiResource('staffs', StaffController::class);
+    // Track & Strand routes
+    Route::get('tracks', [TrackController::class, 'index']);
+    Route::post('tracks', [TrackController::class, 'store']);
+    Route::put('tracks/{id}', [TrackController::class, 'update']);
+    Route::delete('tracks/{id}', [TrackController::class, 'destroy']);
+    Route::get('strands', [StrandController::class, 'index']);
+    Route::post('strands', [StrandController::class, 'store']);
+    Route::put('strands/{id}', [StrandController::class, 'update']);
+    Route::delete('strands/{id}', [StrandController::class, 'destroy']);
     // ClassSection routes
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);

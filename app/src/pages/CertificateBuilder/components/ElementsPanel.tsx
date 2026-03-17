@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Type, Image, FileText, Building2, Hash, MapPin, Globe, ImageIcon, User, BookUser, PanelLeftClose, QrCode, ChevronDown, ChevronRight, Trophy, Medal } from 'lucide-react';
+import { Type, Image, FileText, Building2, Hash, MapPin, Globe, ImageIcon, User, BookUser, PanelLeftClose, QrCode, ChevronDown, ChevronRight, Trophy, Medal, Route, Layers } from 'lucide-react';
 import { type CanvasElement } from './CertificateCanvas';
 import type { Institution } from '@/types';
 
@@ -32,6 +32,12 @@ const VARIABLES: Array<{
 	{ id: 'var-logo', label: 'Logo', icon: ImageIcon, type: 'image', variableKey: 'logo' },
 ];
 
+/** Section-level elements – SHS Track & Strand placeholders */
+const SECTION_VARIABLES: Array<{ key: string; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+	{ key: 'track', label: 'Track', icon: Route },
+	{ key: 'strand', label: 'Strand', icon: Layers },
+];
+
 /** Student elements – text placeholders like {middle_name}, or QR (LRN QR); data binding ready for future student implementation */
 const STUDENT_VARIABLES: Array<{ key: string; label: string; icon: React.ComponentType<{ className?: string }>; type: 'text' | 'qr' }> = [
 	{ key: 'lrn', label: 'LRN', icon: Hash, type: 'text' },
@@ -52,6 +58,7 @@ const STUDENT_VARIABLES: Array<{ key: string; label: string; icon: React.Compone
 export default function ElementsPanel({ institution, onAddElement, onCollapse }: ElementsPanelProps) {
 	const [elementsOpen, setElementsOpen] = useState(true);
 	const [variablesOpen, setVariablesOpen] = useState(true);
+	const [sectionOpen, setSectionOpen] = useState(true);
 	const [studentOpen, setStudentOpen] = useState(true);
 
 	const createElement = (type: string) => {
@@ -164,6 +171,32 @@ export default function ElementsPanel({ institution, onAddElement, onCollapse }:
 				variableKey: variable.variableKey,
 			} as CanvasElement);
 		}
+	};
+
+	const addSectionVariable = (variable: (typeof SECTION_VARIABLES)[number]) => {
+		const placeholder = `{${variable.key}}`;
+		onAddElement({
+			id: crypto.randomUUID(),
+			type: 'text',
+			x: 100,
+			y: 100,
+			width: 200,
+			height: 30,
+			rotation: 0,
+			opacity: 1,
+			hidden: false,
+			locked: false,
+			zIndex: 0,
+			content: placeholder,
+			fontSize: 14,
+			fontFamily: 'Arial',
+			fontWeight: 'normal',
+			fontStyle: 'normal',
+			color: '#000000',
+			textAlign: 'left',
+			variableType: 'section',
+			variableKey: variable.key,
+		} as CanvasElement);
 	};
 
 	const addStudentVariable = (variable: (typeof STUDENT_VARIABLES)[number]) => {
@@ -325,16 +358,61 @@ export default function ElementsPanel({ institution, onAddElement, onCollapse }:
 					</AnimatePresence>
 				</div>
 
-				{/* Student - collapsible */}
-				<div className="border-b border-gray-200 last:border-b-0">
-					<button
-						type="button"
-						onClick={() => setStudentOpen((o) => !o)}
-						className="w-full flex items-center gap-2 py-2 px-1 text-left hover:bg-gray-50 rounded-md transition-colors"
-					>
-						{studentOpen ? <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-500 flex-shrink-0" />}
-						<h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Student</h4>
-					</button>
+			{/* Section (Track & Strand) - collapsible */}
+			<div className="border-b border-gray-200 last:border-b-0">
+				<button
+					type="button"
+					onClick={() => setSectionOpen((o) => !o)}
+					className="w-full flex items-center gap-2 py-2 px-1 text-left hover:bg-gray-50 rounded-md transition-colors"
+				>
+					{sectionOpen ? <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+					<h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Section</h4>
+				</button>
+				<AnimatePresence initial={false}>
+					{sectionOpen && (
+						<motion.div
+							initial={{ height: 0, opacity: 0 }}
+							animate={{ height: 'auto', opacity: 1 }}
+							exit={{ height: 0, opacity: 0 }}
+							transition={{ duration: 0.2 }}
+							className="overflow-hidden"
+						>
+							<p className="text-[10px] text-gray-400 mb-2 px-1">SHS Track & Strand</p>
+							<div className="space-y-1.5 pb-3">
+								{SECTION_VARIABLES.map((variable) => {
+									const Icon = variable.icon;
+									return (
+										<motion.button
+											key={variable.key}
+											whileHover={{ scale: 1.02, x: 2 }}
+											whileTap={{ scale: 0.98 }}
+											onClick={() => addSectionVariable(variable)}
+											className="w-full flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border border-amber-200/50 hover:border-amber-300 rounded-lg transition-all text-left shadow-sm hover:shadow"
+											title={`Add {${variable.key}}`}
+										>
+											<div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm">
+												<Icon className="w-3.5 h-3.5 text-amber-600" />
+											</div>
+											<span className="text-xs font-medium text-gray-700 truncate">{variable.label}</span>
+										</motion.button>
+									);
+								})}
+							</div>
+						</motion.div>
+					)}
+				</AnimatePresence>
+			</div>
+
+			{/* Student - collapsible */}
+			<div className="border-b border-gray-200 last:border-b-0">
+				<button
+					type="button"
+					onClick={() => setStudentOpen((o) => !o)}
+					className="w-full flex items-center gap-2 py-2 px-1 text-left hover:bg-gray-50 rounded-md transition-colors"
+				>
+					{studentOpen ? <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+					<h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Student</h4>
+				</button>
 					<AnimatePresence initial={false}>
 						{studentOpen && (
 							<motion.div

@@ -18,12 +18,17 @@ export const GRADE_LEVELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 
 interface PublishOptionsPanelProps {
 	options: PublishOptions;
 	onChange: (options: PublishOptions) => void;
+	/** When true, only Grade 11 and 12 are enabled; others are forced off */
+	lockToSHS?: boolean;
 }
 
-const PublishOptionsPanel: React.FC<PublishOptionsPanelProps> = ({ options, onChange }) => {
+const SHS_GRADES = ['11', '12'];
+
+const PublishOptionsPanel: React.FC<PublishOptionsPanelProps> = ({ options, onChange, lockToSHS = false }) => {
 	const [collapsed, setCollapsed] = useState(false);
 
 	const toggleGradeLevel = (grade: string) => {
+		if (lockToSHS && !SHS_GRADES.includes(grade)) return;
 		const current = options.gradeLevels.includes(grade)
 			? options.gradeLevels.filter((g) => g !== grade)
 			: [...options.gradeLevels, grade].sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
@@ -74,20 +79,26 @@ const PublishOptionsPanel: React.FC<PublishOptionsPanelProps> = ({ options, onCh
 							<div className="space-y-2">
 								<label className="block text-sm font-medium text-gray-700">Only for selected Grade Level</label>
 								<div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto py-1.5 px-2 border border-gray-200 rounded-lg bg-gray-50/50">
-									{GRADE_LEVELS.map((grade) => (
+								{GRADE_LEVELS.map((grade) => {
+									const isDisabled = lockToSHS && !SHS_GRADES.includes(grade);
+									const isForced = lockToSHS && SHS_GRADES.includes(grade);
+									const isChecked = isForced || options.gradeLevels.includes(grade);
+									return (
 										<label
 											key={grade}
-											className="flex items-center gap-3 py-2 px-2.5 rounded-md hover:bg-gray-100/80 cursor-pointer text-sm text-gray-700 transition-colors duration-150"
+											className={`flex items-center gap-3 py-2 px-2.5 rounded-md text-sm transition-colors duration-150 ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100/80 cursor-pointer text-gray-700'}`}
 										>
 											<input
 												type="checkbox"
-												checked={options.gradeLevels.includes(grade)}
+												checked={isChecked}
 												onChange={() => toggleGradeLevel(grade)}
-												className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-0 transition-all duration-200 ease-out cursor-pointer"
+												disabled={isDisabled || isForced}
+												className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-0 transition-all duration-200 ease-out cursor-pointer disabled:cursor-not-allowed"
 											/>
 											<span>Grade {grade}</span>
 										</label>
-									))}
+									);
+								})}
 								</div>
 								{options.gradeLevels.length > 0 && (
 									<p className="text-xs text-gray-500">

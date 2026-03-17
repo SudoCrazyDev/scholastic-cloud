@@ -13,6 +13,8 @@ class ClassSection extends Model
     protected $fillable = [
         'institution_id',
         'department_id',
+        'track_id',
+        'strand_id',
         'grade_level',
         'title',
         'adviser',
@@ -43,6 +45,16 @@ class ClassSection extends Model
     public function department()
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function track()
+    {
+        return $this->belongsTo(Track::class);
+    }
+
+    public function strand()
+    {
+        return $this->belongsTo(Strand::class);
     }
 
     /**

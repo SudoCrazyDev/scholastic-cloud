@@ -39,8 +39,8 @@ export interface CanvasElement {
 	cornerRadius?: number;
 	points?: number;
 
-	// Variable placeholders (for institution, student, or future variable sections)
-	variableType?: 'institution' | 'student';
+	// Variable placeholders (for institution, student, or section-level data)
+	variableType?: 'institution' | 'student' | 'section';
 	variableKey?: string;
 
 	// Prefix / suffix for variable text elements
@@ -52,6 +52,11 @@ export interface CanvasElement {
 
 	// Text transform for full_name (and any text element)
 	textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+}
+
+interface SectionPreviewData {
+	trackTitle?: string;
+	strandTitle?: string;
 }
 
 interface CertificateCanvasProps {
@@ -67,6 +72,7 @@ interface CertificateCanvasProps {
 	showGrid: boolean;
 	snappingEnabled: boolean;
 	previewStudent?: Student | null;
+	sectionPreview?: SectionPreviewData | null;
 }
 
 function getStudentVariableValue(student: Student, variableKey: string, nameFormat?: 'last_first' | 'first_last'): string {
@@ -99,13 +105,25 @@ function getStudentVariableValue(student: Student, variableKey: string, nameForm
 	return s[variableKey] != null ? String(s[variableKey]) : '';
 }
 
+function getSectionVariableValue(sectionPreview: SectionPreviewData | null | undefined, variableKey: string): string | null {
+	if (!sectionPreview) return null;
+	if (variableKey === 'track') return sectionPreview.trackTitle || null;
+	if (variableKey === 'strand') return sectionPreview.strandTitle || null;
+	return null;
+}
+
 /** Builds the display text, wrapping with prefix/suffix when the element is a variable */
-function buildDisplayText(element: CanvasElement, previewStudent: Student | null | undefined): string {
+function buildDisplayText(element: CanvasElement, previewStudent: Student | null | undefined, sectionPreview?: SectionPreviewData | null): string {
 	const isStudentVar = element.variableType === 'student' && element.variableKey && previewStudent;
 	const studentTextValue = isStudentVar ? getStudentVariableValue(previewStudent, element.variableKey!, element.nameFormat) : null;
 
-	const raw = studentTextValue !== null
-		? studentTextValue
+	const isSectionVar = element.variableType === 'section' && element.variableKey;
+	const sectionTextValue = isSectionVar ? getSectionVariableValue(sectionPreview, element.variableKey!) : null;
+
+	const resolvedValue = studentTextValue ?? sectionTextValue;
+
+	const raw = resolvedValue !== null
+		? resolvedValue
 		: (element.content || (element.type === 'text' ? 'Sample Text' : 'This is a sample paragraph with rich text content. You can edit this text with formatting options.'));
 
 	const hasVariable = !!element.variableType && !!element.variableKey;
@@ -130,7 +148,8 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 	onChangeEnd,
 	showGrid,
 	snappingEnabled,
-	previewStudent
+	previewStudent,
+	sectionPreview
 }) => {
 	const canvasRef = useRef<HTMLDivElement>(null);
 	const [snapGrid] = useState(20);
@@ -240,7 +259,7 @@ const CertificateCanvas: React.FC<CertificateCanvasProps> = ({
 			}),
 		};
 		
-		const displayText = buildDisplayText(element, previewStudent);
+		const displayText = buildDisplayText(element, previewStudent, sectionPreview);
 		
 		let elementContent: React.ReactNode;
 		

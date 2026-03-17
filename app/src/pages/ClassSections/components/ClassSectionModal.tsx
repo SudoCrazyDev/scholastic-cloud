@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
@@ -10,6 +10,8 @@ import { Select } from '../../../components/select'
 import { Autocomplete } from '../../../components/autocomplete'
 import { useTeachers } from '../../../hooks/useTeachers'
 import { useSubjectTemplates } from '../../../hooks/useSubjectTemplates'
+import { useTracks } from '../../../hooks/useTracks'
+import { useStrands } from '../../../hooks/useStrands'
 import type { ClassSection, CreateClassSectionData, SubjectTemplate } from '../../../types'
 
 interface DepartmentOption {
@@ -45,6 +47,11 @@ const validationSchema = Yup.object().shape({
     .max(20, 'Academic year must be less than 20 characters')
     .optional(),
 })
+
+function isSeniorHighSchool(gradeLevel: string): boolean {
+  const normalized = gradeLevel.replace(/\D/g, '')
+  return normalized === '11' || normalized === '12'
+}
 
 export function ClassSectionModal({ 
   isOpen, 
@@ -84,16 +91,21 @@ export function ClassSectionModal({
       adviser_id: '',
       academic_year: '',
       department_id: '',
+      track_id: '',
+      strand_id: '',
     },
     validationSchema,
     onSubmit: async (values) => {
       try {
+        const isSHS = isSeniorHighSchool(values.grade_level)
         const submitData: CreateClassSectionData = {
           grade_level: values.grade_level,
           title: values.title,
           adviser: values.adviser_id || undefined,
           academic_year: values.academic_year || undefined,
           department_id: values.department_id || defaultDepartmentId || undefined,
+          track_id: isSHS && values.track_id ? values.track_id : null,
+          strand_id: isSHS && values.strand_id ? values.strand_id : null,
         }
         
         // Pass the template ID if a template is selected
@@ -104,6 +116,11 @@ export function ClassSectionModal({
       }
     },
   })
+
+  // Fetch tracks & strands for SHS
+  const { tracks, loading: tracksLoading } = useTracks()
+  const { strands, loading: strandsLoading } = useStrands(formik.values.track_id || undefined)
+  const showSHS = useMemo(() => isSeniorHighSchool(formik.values.grade_level || ''), [formik.values.grade_level])
 
   // Reset form when modal opens/closes or classSection changes
   useEffect(() => {
@@ -128,6 +145,8 @@ export function ClassSectionModal({
           adviser_id: '',
           academic_year: classSection.academic_year || '',
           department_id: classSection.department_id || '',
+          track_id: classSection.track_id || '',
+          strand_id: classSection.strand_id || '',
         })
         
         // Set adviser if available
@@ -283,6 +302,51 @@ export function ClassSectionModal({
                     <p className="mt-1 text-sm text-red-600">{formik.errors.grade_level}</p>
                   )}
                 </div>
+
+                {/* Track (SHS only) */}
+                {showSHS && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Track
+                    </label>
+                    <Select
+                      name="track_id"
+                      value={formik.values.track_id}
+                      onChange={(e) => {
+                        formik.handleChange(e)
+                        formik.setFieldValue('strand_id', '')
+                      }}
+                      onBlur={formik.handleBlur}
+                      placeholder="Select track"
+                      options={[
+                        { value: '', label: 'Select a track' },
+                        ...tracks.map(t => ({ value: t.id, label: t.title })),
+                      ]}
+                      disabled={tracksLoading}
+                    />
+                  </div>
+                )}
+
+                {/* Strand (SHS only, after track selected) */}
+                {showSHS && formik.values.track_id && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Strand
+                    </label>
+                    <Select
+                      name="strand_id"
+                      value={formik.values.strand_id}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      placeholder="Select strand"
+                      options={[
+                        { value: '', label: 'Select a strand' },
+                        ...strands.map(s => ({ value: s.id, label: s.title })),
+                      ]}
+                      disabled={strandsLoading}
+                    />
+                  </div>
+                )}
 
                 {/* Title */}
                 <div>

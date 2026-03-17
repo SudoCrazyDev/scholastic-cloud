@@ -9,9 +9,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCertificate } from '@/hooks/useCertificates';
 import { institutionService } from '@/services/institutionService';
 import { studentService } from '@/services/studentService';
+import { useTracks } from '@/hooks/useTracks';
+import { useStrands } from '@/hooks/useStrands';
+import type { Track as TrackType, Strand as StrandType } from '@/types';
 import { nanoid } from 'nanoid';
 import type { Institution, UserInstitution as UserInstitutionType, Student } from '@/types';
-import { designHasStudentVariables } from './certificateDesignUtils';
+import { designHasStudentVariables, designHasTrackStrandVariables } from './certificateDesignUtils';
 
 // Components
 import ElementsPanel from './components/ElementsPanel';
@@ -24,7 +27,7 @@ import PublishOptionsPanel, { type PublishOptions } from './components/PublishOp
 // UI Components
 import Button from '@/components/ui/Button';
 import Card, { CardBody } from '@/components/ui/Card';
-import { AlertTriangle, Building2, PanelLeft, User, X } from 'lucide-react';
+import { AlertTriangle, Building2, PanelLeft, User, X, Route, Layers } from 'lucide-react';
 
 const RULER_SIZE = 28;
 const TICK_INTERVAL = 100;
@@ -97,6 +100,8 @@ export default function CertificateBuilder() {
 		gradeLevels: [],
 		studentScope: 'all',
 	});
+	const [previewTrack, setPreviewTrack] = useState<TrackType | null>(null);
+	const [previewStrand, setPreviewStrand] = useState<StrandType | null>(null);
 	
 	// Refs
 	const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -135,6 +140,11 @@ export default function CertificateBuilder() {
 	const searchStudents = Array.isArray((studentsResponse as { data?: unknown })?.data)
 		? ((studentsResponse as { data: Student[] }).data)
 		: [];
+
+	// Track/Strand preview (when certificate has section variables)
+	const hasTrackStrandVars = designHasTrackStrandVariables({ elements });
+	const { tracks } = useTracks();
+	const { strands } = useStrands(previewTrack?.id || undefined);
 
 	// Fallback for "Creating certificate for" label (name/title from user_institutions or full fetch)
 	const currentInstitution = useMemo(() => {
@@ -268,6 +278,17 @@ export default function CertificateBuilder() {
 			});
 		}
 	}, [certificate, certificateId, isLoadingCertificate]);
+
+	// Auto-set Grade 11 & 12 in publish options when track/strand elements exist
+	useEffect(() => {
+		if (hasTrackStrandVars) {
+			setPublishOptions(prev => ({
+				...prev,
+				scopeGradeLevelsOnly: true,
+				gradeLevels: ['11', '12'],
+			}));
+		}
+	}, [hasTrackStrandVars]);
 
 	// Certificate not found (e.g. 404) — redirect back to list
 	useEffect(() => {
@@ -506,7 +527,55 @@ export default function CertificateBuilder() {
 					</div>
 				)}
 
-				{/* Canvas Area with optional Rulers - canvas centered in viewport */}
+				{/* Track/Strand preview bar (when certificate has section variables) */}
+			{hasTrackStrandVars && (
+				<div className="px-4 py-2 bg-amber-50/80 border-b border-amber-200 flex items-center gap-3 flex-wrap">
+					<div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+						<Route className="w-4 h-4" />
+						<span>Track / Strand preview</span>
+					</div>
+					<select
+						value={previewTrack?.id || ''}
+						onChange={(e) => {
+							const t = tracks.find(tr => tr.id === e.target.value) || null;
+							setPreviewTrack(t);
+							setPreviewStrand(null);
+						}}
+						className="px-3 py-1.5 text-sm border border-amber-200 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+					>
+						<option value="">Select Track...</option>
+						{tracks.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+					</select>
+					{previewTrack && (
+						<>
+							<Layers className="w-4 h-4 text-amber-700" />
+							<select
+								value={previewStrand?.id || ''}
+								onChange={(e) => {
+									const s = strands.find(st => st.id === e.target.value) || null;
+									setPreviewStrand(s);
+								}}
+								className="px-3 py-1.5 text-sm border border-amber-200 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+							>
+								<option value="">Select Strand...</option>
+								{strands.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+							</select>
+						</>
+					)}
+					{(previewTrack || previewStrand) && (
+						<button
+							type="button"
+							onClick={() => { setPreviewTrack(null); setPreviewStrand(null); }}
+							className="p-1 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+							title="Clear preview"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					)}
+				</div>
+			)}
+
+			{/* Canvas Area with optional Rulers - canvas centered in viewport */}
 				<div className="flex-1 overflow-auto p-6">
 					{(() => {
 						const rulerOffset = showRuler ? RULER_SIZE : 0;
@@ -642,21 +711,25 @@ export default function CertificateBuilder() {
 										zIndex: 3,
 									}}
 								>
-									<CertificateCanvas
-										width={canvasSize.w}
-										height={canvasSize.h}
-										scale={zoom}
-										elements={elements}
-										selectedElementIds={selectedIds}
-										onSelect={setSelectedIds}
-										onChange={handleUpdateElement}
-										onInteractionStart={handleInteractionStart}
-										onChangeEnd={() => {}}
-										showGrid={showGrid}
-										snappingEnabled={snapping}
-										previewStudent={previewStudent}
-										key={`${canvasSize.w}-${canvasSize.h}`}
-									/>
+								<CertificateCanvas
+									width={canvasSize.w}
+									height={canvasSize.h}
+									scale={zoom}
+									elements={elements}
+									selectedElementIds={selectedIds}
+									onSelect={setSelectedIds}
+									onChange={handleUpdateElement}
+									onInteractionStart={handleInteractionStart}
+									onChangeEnd={() => {}}
+									showGrid={showGrid}
+									snappingEnabled={snapping}
+									previewStudent={previewStudent}
+									sectionPreview={hasTrackStrandVars ? {
+										trackTitle: previewTrack?.title,
+										strandTitle: previewStrand?.title,
+									} : null}
+									key={`${canvasSize.w}-${canvasSize.h}`}
+								/>
 								</div>
 							</div>
 						</div>
@@ -686,10 +759,10 @@ export default function CertificateBuilder() {
 				transition={{ type: "spring", stiffness: 300, damping: 30 }}
 				className="w-80 border-l border-gray-200 bg-white flex flex-col"
 			>
-				{/* Publish options – only when editing (certificate has id) */}
-				{certificateId && (
-					<PublishOptionsPanel options={publishOptions} onChange={setPublishOptions} />
-				)}
+			{/* Publish options – only when editing (certificate has id) */}
+			{certificateId && (
+				<PublishOptionsPanel options={publishOptions} onChange={setPublishOptions} lockToSHS={hasTrackStrandVars} />
+			)}
 				{/* Properties Panel */}
 				<div className="flex-1 overflow-hidden">
 					<PropertiesPanel 

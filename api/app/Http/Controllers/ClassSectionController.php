@@ -37,7 +37,7 @@ class ClassSectionController extends Controller
             $query = ClassSection::where('institution_id', $institutionId);
         }
         
-        $query = $query->with(['adviser', 'department']);
+        $query = $query->with(['adviser', 'department', 'track', 'strand']);
         
         // Search by title
         if ($request->has('search') && $request->search) {
@@ -76,10 +76,12 @@ class ClassSectionController extends Controller
             'adviser' => 'nullable|exists:users,id',
             'academic_year' => 'nullable|string',
             'department_id' => 'nullable|uuid|exists:departments,id',
+            'track_id' => 'nullable|uuid|exists:tracks,id',
+            'strand_id' => 'nullable|uuid|exists:strands,id',
         ]);
         $validated['institution_id'] = $institutionId;
         $section = ClassSection::create($validated);
-        $section->load(['adviser', 'department']);
+        $section->load(['adviser', 'department', 'track', 'strand']);
         return response()->json(['data' => $section], 201);
     }
 
@@ -88,7 +90,7 @@ class ClassSectionController extends Controller
         $user = $request->user();
         $institutionId = $user->getDefaultInstitutionId();
         $section = ClassSection::where('institution_id', $institutionId)
-            ->with(['adviser', 'department'])
+            ->with(['adviser', 'department', 'track', 'strand'])
             ->findOrFail($id);
         return response()->json(['data' => $section]);
     }
@@ -104,10 +106,12 @@ class ClassSectionController extends Controller
             'adviser' => 'nullable|exists:users,id',
             'academic_year' => 'nullable|string',
             'department_id' => 'nullable|uuid|exists:departments,id',
+            'track_id' => 'nullable|uuid|exists:tracks,id',
+            'strand_id' => 'nullable|uuid|exists:strands,id',
         ]);
         $validated['institution_id'] = $institutionId;
         $section->update($validated);
-        $section->load(['adviser', 'department']);
+        $section->load(['adviser', 'department', 'track', 'strand']);
         return response()->json(['data' => $section]);
     }
 
@@ -151,7 +155,7 @@ class ClassSectionController extends Controller
             $query = ClassSection::where('institution_id', $institutionId);
         }
         
-        $query = $query->with(['adviser', 'department']);
+        $query = $query->with(['adviser', 'department', 'track', 'strand']);
         
         // Search by title
         if ($request->has('search') && $request->search) {
