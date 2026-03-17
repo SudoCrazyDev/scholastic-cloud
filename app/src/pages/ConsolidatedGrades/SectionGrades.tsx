@@ -46,9 +46,12 @@ export default function SectionGrades() {
     return 'text-red-600 font-semibold';
   };
 
-  // Update calculateFinalGrade to round to whole number
-  const calculateFinalGrade = (subjects: Array<{ grade: number | string | null }>) => {
-    const validGrades = subjects
+  const calculateFinalGrade = (subjects: Array<{ grade: number | string | null; subject_type?: string; parent_subject_id?: string | null }>) => {
+    const parentAndRegularSubjects = subjects.filter(subject =>
+      subject.subject_type !== 'child'
+    );
+
+    const validGrades = parentAndRegularSubjects
       .map(subject => {
         const grade = typeof subject.grade === 'string' ? parseFloat(subject.grade) : subject.grade;
         return isNaN(grade as number) ? null : grade;
@@ -98,17 +101,16 @@ export default function SectionGrades() {
     }));
   }, [data]);
 
-  // For each student, group grades by base subject
+  // For each student, group grades by base subject (preserve subject_type for final grade calc)
   const studentsWithGroupedSubjects = React.useMemo(() => {
     if (!data) return [];
     return data.students.map((student: any) => {
-      const grouped: Record<string, { grades: (number | string | null)[] }> = {};
+      const grouped: Record<string, { grades: (number | string | null)[]; subject_type?: string; parent_subject_id?: string | null }> = {};
       student.subjects.forEach((subject: any) => {
         const base = getBaseTitle(subject.subject_title);
-        if (!grouped[base]) grouped[base] = { grades: [] };
+        if (!grouped[base]) grouped[base] = { grades: [], subject_type: subject.subject_type, parent_subject_id: subject.parent_subject_id };
         grouped[base].grades.push(subject.grade);
       });
-      // For each base, average grades (or use single if only one)
       const groupedSubjects = Object.keys(grouped).map(base => {
         const grades = grouped[base].grades
           .map(g => (g === null || g === undefined ? null : typeof g === 'string' ? parseFloat(g) : g))
@@ -120,6 +122,8 @@ export default function SectionGrades() {
         return {
           subject_title: base,
           grade: avg,
+          subject_type: grouped[base].subject_type,
+          parent_subject_id: grouped[base].parent_subject_id,
         };
       });
       return {

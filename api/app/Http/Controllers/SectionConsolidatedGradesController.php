@@ -59,17 +59,19 @@ class SectionConsolidatedGradesController extends Controller
             return trim($title);
         };
 
-        // Helper: compute the average grade for a subject across all 4 quarters
+        // Helper: compute the average grade for a subject across all 4 quarters.
+        // Round each quarter to whole number first, then average, then round — matches
+        // Final Report Card (gradeUtils.calculateFinalGrade / getQuarterGrade) and DepEd rules.
         $averageAcrossQuarters = function($studentId, $subjectId) use ($grades) {
             $quarterGrades = $grades->where('student_id', $studentId)
                 ->where('subject_id', $subjectId)
                 ->whereIn('quarter', [1, 2, 3, 4]);
-            $vals = [];
+            $rounded = [];
             foreach ($quarterGrades as $g) {
                 $v = $g->final_grade ?? $g->grade;
-                if ($v !== null) $vals[] = (float)$v;
+                if ($v !== null) $rounded[] = (int) round((float) $v);
             }
-            return count($vals) > 0 ? round(array_sum($vals) / count($vals)) : null;
+            return count($rounded) > 0 ? (int) round(array_sum($rounded) / count($rounded)) : null;
         };
 
         // Build the consolidated grades structure
@@ -80,59 +82,31 @@ class SectionConsolidatedGradesController extends Controller
             $handledParentIds = [];
             $handledBaseTitles = [];
 
-            // 1. Handle parent subjects (average their children)
+            // 1. Handle parent subjects — always use the parent's own stored grades
+            //    (ParentSubjectGradeService already computes & stores the correct average
+            //    of children per quarter; re-averaging children here can produce rounding
+            //    differences vs. the Final Report Card).
             foreach ($subjects as $subject) {
                 if ($subject->subject_type === 'parent') {
-                    
-                    $childSubjects = $subject->childSubjects;
-                    if ($childSubjects->count() > 0) {
-                        $childGrades = [];
-                        foreach ($childSubjects as $child) {
-                            if ($isFinal) {
-                                $avg = $averageAcrossQuarters($student->id, $child->id);
-                                if ($avg !== null) $childGrades[] = $avg;
-                            } else {
-                                $grade = $grades->where('student_id', $student->id)
-                                    ->where('subject_id', $child->id)
-                                    ->first();
-                                if ($grade) {
-                                    $childGrades[] = $grade->final_grade ?? $grade->grade;
-                                }
-                            }
-                        }
-                        $avg = count($childGrades) > 0 ? round(array_sum($childGrades) / count($childGrades)) : null;
-                        $studentGrades[] = [
-                            'subject_id' => $subject->id,
-                            'subject_title' => $subject->title,
-                            'subject_variant' => $subject->variant,
-                            'subject_type' => $subject->subject_type,
-                            'parent_subject_id' => $subject->parent_subject_id,
-                            'grade' => $avg !== null ? (int)$avg : null,
-                            'final_grade' => $avg !== null ? (int)$avg : null,
-                            'calculated_grade' => $avg !== null ? (int)$avg : null,
-                        ];
-                        $handledParentIds[] = $subject->id;
+                    if ($isFinal) {
+                        $val = $averageAcrossQuarters($student->id, $subject->id);
                     } else {
-                        if ($isFinal) {
-                            $val = $averageAcrossQuarters($student->id, $subject->id);
-                        } else {
-                            $grade = $grades->where('student_id', $student->id)
-                                ->where('subject_id', $subject->id)
-                                ->first();
-                            $val = $grade ? ($grade->final_grade ?? $grade->grade) : null;
-                        }
-                        $studentGrades[] = [
-                            'subject_id' => $subject->id,
-                            'subject_title' => $subject->title,
-                            'subject_variant' => $subject->variant,
-                            'subject_type' => $subject->subject_type,
-                            'parent_subject_id' => $subject->parent_subject_id,
-                            'grade' => $val !== null ? (float)$val : null,
-                            'final_grade' => $val !== null ? (float)$val : null,
-                            'calculated_grade' => $val !== null ? (float)$val : null,
-                        ];
-                        $handledParentIds[] = $subject->id;
+                        $grade = $grades->where('student_id', $student->id)
+                            ->where('subject_id', $subject->id)
+                            ->first();
+                        $val = $grade ? ($grade->final_grade ?? $grade->grade) : null;
                     }
+                    $studentGrades[] = [
+                        'subject_id' => $subject->id,
+                        'subject_title' => $subject->title,
+                        'subject_variant' => $subject->variant,
+                        'subject_type' => $subject->subject_type,
+                        'parent_subject_id' => $subject->parent_subject_id,
+                        'grade' => $val !== null ? (int) round((float) $val) : null,
+                        'final_grade' => $val !== null ? (int) round((float) $val) : null,
+                        'calculated_grade' => $val !== null ? (int) round((float) $val) : null,
+                    ];
+                    $handledParentIds[] = $subject->id;
                 }
             }
 
