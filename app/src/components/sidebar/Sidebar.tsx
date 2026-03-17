@@ -27,6 +27,7 @@ import {
   FolderTree,
   LayoutTemplate,
   ListOrdered,
+  Route,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -186,6 +187,13 @@ const menuItems: MenuItem[] = [
     label: 'Departments',
     icon: <FolderTree className="w-5 h-5" />,
     path: '/departments',
+    allowedRoles: ['principal', 'institution-administrator'],
+  },
+  {
+    id: 'tracks-strands',
+    label: 'Tracks & Strands',
+    icon: <Route className="w-5 h-5" />,
+    path: '/tracks-strands',
     allowedRoles: ['principal', 'institution-administrator'],
   },
   {

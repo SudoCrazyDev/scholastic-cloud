@@ -32,6 +32,7 @@ import SchoolDays from './pages/SchoolDays';
 import Departments from './pages/Departments/Departments';
 import GradeLevels from './pages/GradeLevels/GradeLevels';
 import Settings from './pages/Settings/Settings';
+import TracksStrands from './pages/TracksStrands/TracksStrands';
 import Finance from './pages/Finance';
 import Login from './pages/Login';
 import MyAssessments from './pages/MyAssessments';
@@ -118,6 +119,7 @@ function App() {
               <Route path="school-days" element={<SchoolDays />} />
               <Route path="departments" element={<Departments />} />
               <Route path="grade-levels" element={<GradeLevels />} />
+              <Route path="tracks-strands" element={<TracksStrands />} />
               <Route path="finance" element={<Finance />} />
               <Route path="finance/school-fees" element={<Finance />} />
               <Route path="finance/default-amounts" element={<Finance />} />

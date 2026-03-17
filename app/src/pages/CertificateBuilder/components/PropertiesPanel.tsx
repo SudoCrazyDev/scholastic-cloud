@@ -257,14 +257,15 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 									onChange={(e) => updateElement({ fontFamily: e.target.value })}
 									
 								>
-									<option value="Arial">Arial</option>
-									<option value="Helvetica">Helvetica</option>
-									<option value="Times New Roman">Times New Roman</option>
-									<option value="Georgia">Georgia</option>
-									<option value="Verdana">Verdana</option>
-									<option value="Courier New">Courier New</option>
-									<option value="UnifrakturMaguntia">Old English</option>
-									<option value="Old English Text MT">Old English Text MT (system)</option>
+								<option value="Arial">Arial</option>
+								<option value="Bookman Old Style">Bookman Old Style</option>
+								<option value="Courier New">Courier New</option>
+								<option value="Georgia">Georgia</option>
+								<option value="Helvetica">Helvetica</option>
+								<option value="Old English Text MT">Old English Text MT (system)</option>
+								<option value="Times New Roman">Times New Roman</option>
+								<option value="UnifrakturMaguntia">Old English</option>
+								<option value="Verdana">Verdana</option>
 								</Select>
 								<div className="grid grid-cols-2 gap-3">
 									<Input
