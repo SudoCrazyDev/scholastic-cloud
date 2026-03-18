@@ -187,6 +187,17 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
     }
     return result;
   }, [subjectsResponse, data]);
+
+  // For Final Quarter only: exclude child subjects from display and exports
+  const displaySubjects = React.useMemo(() => {
+    if (selectedQuarter !== 'final') return baseSubjects;
+    const subjectMap = new Map((subjectsResponse?.data ?? []).map((s: Subject) => [s.id, s]));
+    return baseSubjects.filter(col => {
+      const firstSubject = subjectMap.get(col.subject_ids[0]);
+      return !firstSubject || firstSubject.subject_type !== 'child';
+    });
+  }, [baseSubjects, selectedQuarter, subjectsResponse]);
+
   // Per-student list of subjects with subject_id for lookup; no merging of parent/child
   const studentsWithGroupedSubjects = React.useMemo(() => {
     if (!data) return [];
@@ -309,7 +320,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                   size="sm"
                   onClick={() => exportConsolidatedGradesToExcel(
                     data, 
-                    baseSubjects, 
+                    displaySubjects, 
                     studentsWithGroupedSubjects, 
                     institutionName, 
                     selectedQuarter
@@ -342,7 +353,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                         Student
                       </div>
                     </th>
-                    {baseSubjects.map((subject) => (
+                    {displaySubjects.map((subject) => (
                       <th
                         key={subject.subject_ids.join('-')}
                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[140px]"
@@ -386,7 +397,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                             </div>
                           </div>
                         </td>
-                        {baseSubjects.map((subject) => {
+                        {displaySubjects.map((subject) => {
                           const grade = getGradeForColumn(grouped, subject.subject_ids);
                           return (
                             <td key={subject.subject_ids.join('-')} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
@@ -438,7 +449,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                         Student
                       </div>
                     </th>
-                    {baseSubjects.map((subject) => (
+                    {displaySubjects.map((subject) => (
                       <th
                         key={subject.subject_ids.join('-')}
                         className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[140px]"
@@ -482,7 +493,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                             </div>
                           </div>
                         </td>
-                        {baseSubjects.map((subject) => {
+                        {displaySubjects.map((subject) => {
                           const grade = getGradeForColumn(grouped, subject.subject_ids);
                           return (
                             <td key={subject.subject_ids.join('-')} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
@@ -537,7 +548,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                             Student
                           </div>
                         </th>
-                        {baseSubjects.map((subject) => (
+                        {displaySubjects.map((subject) => (
                           <th
                             key={subject.subject_ids.join('-')}
                             className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[140px]"
@@ -581,7 +592,7 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                                 </div>
                               </div>
                             </td>
-                            {baseSubjects.map((subject) => {
+                            {displaySubjects.map((subject) => {
                               const grade = getGradeForColumn(grouped, subject.subject_ids);
                               return (
                                 <td key={subject.subject_ids.join('-')} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">

@@ -139,7 +139,7 @@ interface ConsolidatedGradesPDFProps {
       grade_level: string;
       academic_year: string;
     };
-    quarter: number;
+    quarter: number | string;
     students: Array<{
       student_id: string;
       student_name: string;
@@ -167,14 +167,15 @@ const formatGrade = (grade: number | string | null) => {
   return Math.round(numGrade).toString();
 };
 
-const getQuarterLabel = (quarter: number) => {
-  const quarters = {
+const getQuarterLabel = (quarter: number | string) => {
+  if (quarter === 'final') return 'Final Quarter';
+  const quarters: Record<number, string> = {
     1: 'First Quarter',
     2: 'Second Quarter',
     3: 'Third Quarter',
     4: 'Fourth Quarter',
   };
-  return quarters[quarter as keyof typeof quarters] || `Quarter ${quarter}`;
+  return quarters[quarter as number] || `Quarter ${quarter}`;
 };
 
 const getRemarks = (finalGrade: number | null) => {
@@ -194,11 +195,18 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
   // Helper to get base subject title
   const getBaseTitle = (title: string) => title.split(/[-(]/)[0].trim();
 
+  // For Final Quarter only: exclude child subjects from columns
+  const isFinalQuarter = quarter === 'final';
+
   // --- Group subjects by base and variants for table columns (flattened for header/columns) ---
   const subjectGroups = React.useMemo(() => {
     if (!students.length) return [];
+    let subjectsToShow = students[0].subjects;
+    if (isFinalQuarter) {
+      subjectsToShow = subjectsToShow.filter((s: any) => s.subject_type !== 'child');
+    }
     const map: Record<string, { base: string; variants: string[] }> = {};
-    students[0].subjects.forEach((subject: any) => {
+    subjectsToShow.forEach((subject: any) => {
       const base = getBaseTitle(subject.subject_title);
       if (!map[base]) map[base] = { base, variants: [] };
       if (!map[base].variants.includes(subject.subject_title)) {
@@ -206,7 +214,7 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
       }
     });
     return Object.values(map);
-  }, [students]);
+  }, [students, isFinalQuarter]);
 
   // --- Flatten all subject columns for header/rows ---
   const allSubjectColumns = React.useMemo(() => {
