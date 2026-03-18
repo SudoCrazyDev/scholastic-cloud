@@ -87,6 +87,8 @@ interface PrintReportCardProps {
     principalName?: string;
     /** When set, displayed on card instead of calculated age (as of Oct 31). */
     overrideAge?: string;
+    /** When true, shows General Average remarks (e.g. Promoted, Promoted with Honors). Default false. */
+    showGeneralAverageRemarks?: boolean;
 }
 
 export default function PrintReportCard({ 
@@ -98,6 +100,7 @@ export default function PrintReportCard({
     viewerHeight = '100%',
     principalName = '',
     overrideAge,
+    showGeneralAverageRemarks = false,
 }: PrintReportCardProps) {
     const { 
         student, 
@@ -617,7 +620,7 @@ export default function PrintReportCard({
                             </View>
                             <View style={{width: '20%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'center'}}>
                                 <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center'}}>
-                                    {allQuartersCompleteForGeneralAverage && generalAverage > 0 ? getGeneralAverageRemarks(generalAverage, failedSubjectCount) : ''}
+                                    {showGeneralAverageRemarks && allQuartersCompleteForGeneralAverage && generalAverage > 0 ? getGeneralAverageRemarks(generalAverage, failedSubjectCount) : ''}
                                 </Text>
                             </View>
                         </View>

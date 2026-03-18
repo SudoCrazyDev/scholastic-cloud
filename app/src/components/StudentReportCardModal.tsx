@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Button } from './button'
+import { Switch, SwitchField } from './switch'
 import PrintReportCard from './studentReportCard/studentReportCard.tsx'
 import { Component, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -103,6 +104,25 @@ export function StudentReportCardModal({
   const [selectedPrincipalId, setSelectedPrincipalId] = useState<string>('')
   const [overrideAge, setOverrideAge] = useState<string>('')
 
+  const SHOW_GENERAL_AVERAGE_REMARKS_KEY = 'reportCard.showGeneralAverageRemarks'
+  const [showGeneralAverageRemarks, setShowGeneralAverageRemarks] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(SHOW_GENERAL_AVERAGE_REMARKS_KEY)
+      return stored === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const handleShowGeneralAverageRemarksChange = (checked: boolean) => {
+    setShowGeneralAverageRemarks(checked)
+    try {
+      localStorage.setItem(SHOW_GENERAL_AVERAGE_REMARKS_KEY, String(checked))
+    } catch {
+      // localStorage may be unavailable (private browsing, etc.)
+    }
+  }
+
   useEffect(() => {
     if (isOpen) {
       setOverrideAge('')
@@ -124,9 +144,9 @@ export function StudentReportCardModal({
   const principalName = formatPersonName(selectedPrincipal)
 
   const pdfKey = useMemo(() => {
-    // include principal selection so PDFViewer remounts (avoids react-pdf incremental update bug)
-    return `${studentId || ''}|${classSectionId || ''}|${institutionId || ''}|${academicYear || ''}|${selectedPrincipalId || ''}`
-  }, [studentId, classSectionId, institutionId, academicYear, selectedPrincipalId])
+    // include principal selection and showGeneralAverageRemarks so PDFViewer remounts (avoids react-pdf incremental update bug)
+    return `${studentId || ''}|${classSectionId || ''}|${institutionId || ''}|${academicYear || ''}|${selectedPrincipalId || ''}|${showGeneralAverageRemarks}`
+  }, [studentId, classSectionId, institutionId, academicYear, selectedPrincipalId, showGeneralAverageRemarks])
 
   return (
     <AnimatePresence>
@@ -167,8 +187,16 @@ export function StudentReportCardModal({
 
               {/* Content */}
               <div className="p-6">
-                <div className="mb-3 flex flex-wrap items-center gap-3">
-                  <label className="text-sm font-medium text-gray-700">Age (override)</label>
+                <div className="mb-3 flex flex-wrap items-center gap-4">
+                  <SwitchField className="flex flex-row items-center justify-between gap-4 w-auto">
+                    <label className="text-sm font-medium text-gray-700 cursor-pointer">Show General Average Remarks</label>
+                    <Switch
+                      checked={showGeneralAverageRemarks}
+                      onChange={handleShowGeneralAverageRemarksChange}
+                    />
+                  </SwitchField>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="text-sm font-medium text-gray-700">Age (override)</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -180,6 +208,7 @@ export function StudentReportCardModal({
                   <Button type="button" variant="outline" size="sm" onClick={() => setOverrideAge((prev) => prev.trim())}>
                     Apply
                   </Button>
+                  </div>
                 </div>
                 {principals.length > 1 && (
                   <div className="mb-3 flex items-center gap-3">
@@ -208,6 +237,7 @@ export function StudentReportCardModal({
                       institutionId={institutionId || ''}
                       academicYear={academicYear || '2024-2025'}
                       overrideAge={overrideAge.trim() || undefined}
+                      showGeneralAverageRemarks={showGeneralAverageRemarks}
                     />
                   </PdfErrorBoundary>
                 </div>
