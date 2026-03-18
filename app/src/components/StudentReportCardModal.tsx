@@ -191,8 +191,10 @@ export function StudentReportCardModal({
                   <SwitchField className="flex flex-row items-center justify-between gap-4 w-auto">
                     <label className="text-sm font-medium text-gray-700 cursor-pointer">Show General Average Remarks</label>
                     <Switch
+                      color="indigo"
                       checked={showGeneralAverageRemarks}
                       onChange={handleShowGeneralAverageRemarksChange}
+                      className="!bg-zinc-200 dark:!bg-zinc-200 dark:!ring-zinc-300/60"
                     />
                   </SwitchField>
                   <div className="flex flex-wrap items-center gap-3">
