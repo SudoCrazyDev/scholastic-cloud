@@ -24,6 +24,8 @@ jobs:
 
       # Step 3: Install dependencies and build the project
       - name: Install dependencies and build
+        env:
+          PUBLIC_ADS: ${{ secrets.PUBLIC_ADS }}
         run: |
           cd website
           npm ci
