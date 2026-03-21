@@ -1,4 +1,4 @@
-name = "document-reader"
+name = "scholastic-document-reader"
 main = "src/index.js"
 compatibility_date = "2024-12-01"
 
@@ -9,3 +9,8 @@ binding = "AI"
 # Optional: increase limits for larger PDFs/images
 [limits]
 cpu_ms = 30000
+
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true

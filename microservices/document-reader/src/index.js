@@ -33,19 +33,18 @@ function error(message, status = 400) {
 
 /**
  * Extract text from an image using Workers AI (Llama 3.2 Vision).
- * @param {string} imageDataUrl - data URL e.g. "data:image/png;base64,..."
+ * @param {ArrayBuffer} buffer
  * @param {import("@cloudflare/workers-types").Ai} ai
  */
-async function readImageWithAI(imageDataUrl, ai) {
+async function readImageWithAI(buffer, ai) {
+  // Step 1: Submit agreement — must be a standalone prompt-only call (no image, no messages).
+  await ai.run(VISION_MODEL, { prompt: "agree" }).catch(() => {});
+
+  // Step 2: Actual OCR — prompt + image schema (image is not supported with the messages schema).
   const response = await ai.run(VISION_MODEL, {
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a document OCR assistant. Extract and return ALL text visible in the image, preserving structure (line breaks, lists) where clear. Return only the raw extracted text, no commentary.",
-      },
-      { role: "user", content: "Extract all text from this image.", image: imageDataUrl },
-    ],
+    prompt:
+      "You are a document OCR assistant specializing in civil registry documents. Extract the following fields from the document and return them in this exact format:\n\nChild First Name: \nChild Middle Name: \nChild Last Name: \nMother First Name: \nMother Middle Name: \nMother Last Name: \nFather First Name: \nFather Middle Name: \nFather Last Name: \n\nIf a field is not found or not visible, leave it blank. Return only these labeled fields, no other commentary.",
+    image: [...new Uint8Array(buffer)],
   });
   const text = response?.response ?? response?.result ?? String(response);
   return typeof text === "string" ? text : (text?.trim?.() ?? JSON.stringify(text));
@@ -135,9 +134,7 @@ export default {
 
     try {
       if (IMAGE_TYPES.has(normalizedMime)) {
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-        const dataUrl = `data:${normalizedMime};base64,${base64}`;
-        const text = await readImageWithAI(dataUrl, env.AI);
+        const text = await readImageWithAI(buffer, env.AI);
         return json({ success: true, type: "image", text });
       }
 
