@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { 
+import {
   ArrowLeftIcon,
   UserIcon,
   AcademicCapIcon,
@@ -12,13 +12,19 @@ import {
   XMarkIcon,
   PhotoIcon,
   DocumentTextIcon,
-  BanknotesIcon
+  BanknotesIcon,
+  ChevronDownIcon,
+  ArrowUpTrayIcon,
+  TrashIcon,
+  DocumentIcon,
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
-import { StudentFinanceTab } from './components'
+import { StudentFinanceTab, CrossCheckModal } from './components'
 import { studentService } from '../../services/studentService'
-import type { Student } from '../../types'
+import { studentDocumentService } from '../../services/studentDocumentService'
+import { toast } from 'react-hot-toast'
+import type { Student, StudentDocument } from '../../types'
 
 const tabs = [
   { id: 'personal', name: 'Personal Details', icon: UserIcon },
@@ -39,14 +45,18 @@ export default function StudentDetail() {
   const [error, setError] = useState<string | null>(null)
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [documents, setDocuments] = useState<StudentDocument[]>([])
+  const [docOpenStates, setDocOpenStates] = useState<Record<string, boolean>>({})
+  const [docUploading, setDocUploading] = useState<Record<string, boolean>>({})
+  const [crossCheckDoc, setCrossCheckDoc] = useState<StudentDocument | null>(null)
 
   useEffect(() => {
     const fetchStudent = async () => {
       if (!id) return
-      
+
       setLoading(true)
       setError(null)
-      
+
       try {
         const response = await studentService.getStudent(id)
         if (response.success) {
@@ -63,7 +73,20 @@ export default function StudentDetail() {
       }
     }
 
+    const fetchDocuments = async () => {
+      if (!id) return
+      try {
+        const response = await studentDocumentService.getDocuments(id)
+        if (response.success) {
+          setDocuments(response.data)
+        }
+      } catch (err) {
+        console.error('Error fetching documents:', err)
+      }
+    }
+
     fetchStudent()
+    fetchDocuments()
   }, [id])
 
   const handleBack = () => {
@@ -367,13 +390,171 @@ export default function StudentDetail() {
     </div>
   )
 
+  const DOCUMENT_TYPES = [
+    { key: 'psa_birth_certificate', label: 'PSA/Birth Certificate' },
+  ]
+
+  const toggleDocAccordion = (key: string) => {
+    setDocOpenStates(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const getDocumentByType = (type: string) =>
+    documents.find(d => d.document_type === type) ?? null
+
+  const handleDocumentUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    documentType: string
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file || !id) return
+
+    setDocUploading(prev => ({ ...prev, [documentType]: true }))
+    try {
+      const response = await studentDocumentService.uploadDocument(id, documentType, file)
+      if (response.success) {
+        setDocuments(prev => {
+          const filtered = prev.filter(d => d.document_type !== documentType)
+          return [...filtered, response.data]
+        })
+        toast.success('Document uploaded successfully')
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to upload document')
+    } finally {
+      setDocUploading(prev => ({ ...prev, [documentType]: false }))
+      e.target.value = ''
+    }
+  }
+
+  const handleDocumentDelete = async (documentType: string, documentId: string) => {
+    if (!id) return
+    try {
+      await studentDocumentService.deleteDocument(id, documentId)
+      setDocuments(prev => prev.filter(d => d.id !== documentId))
+      toast.success('Document removed')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to remove document')
+    }
+  }
+
   const renderDocuments = () => (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <div className="text-center py-12">
-        <IdentificationIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Documents</h3>
-        <p className="text-gray-500">Student documents will be available when connected to the backend API.</p>
-      </div>
+    <div className="space-y-3">
+      {DOCUMENT_TYPES.map(({ key, label }) => {
+        const isOpen = docOpenStates[key] ?? false
+        const existing = getDocumentByType(key)
+        const uploading = docUploading[key] ?? false
+        const isPdf = existing?.mime_type === 'application/pdf'
+
+        return (
+          <div key={key} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            {/* Accordion Header */}
+            <button
+              type="button"
+              onClick={() => toggleDocAccordion(key)}
+              className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <IdentificationIcon className="w-5 h-5 text-indigo-500 shrink-0" />
+                <span className="font-medium text-gray-900">{label}</span>
+                {existing && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                    Uploaded
+                  </span>
+                )}
+              </div>
+              <ChevronDownIcon
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {/* Accordion Body */}
+            {isOpen && (
+              <div className="px-6 pb-6 border-t border-gray-100">
+                <div className="pt-4 space-y-4">
+                  {existing ? (
+                    /* Existing document preview */
+                    <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="shrink-0">
+                        {isPdf ? (
+                          <DocumentIcon className="w-10 h-10 text-red-400" />
+                        ) : (
+                          <img
+                            src={existing.url}
+                            alt={existing.file_name}
+                            className="w-20 h-20 object-cover rounded border border-gray-200"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{existing.file_name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{existing.mime_type}</p>
+                        {existing.url && (
+                          <a
+                            href={existing.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-indigo-600 hover:underline mt-1 inline-block"
+                          >
+                            View file
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setCrossCheckDoc(existing)}
+                          className="text-xs text-violet-600 hover:underline mt-0.5 inline-block text-left"
+                        >
+                          Cross Check
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDocumentDelete(key, existing.id)}
+                        className="shrink-0 p-1.5 rounded text-red-500 hover:bg-red-50 transition-colors"
+                        title="Remove document"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No document uploaded yet.</p>
+                  )}
+
+                  {/* Upload input */}
+                  <label className="cursor-pointer block">
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={e => handleDocumentUpload(e, key)}
+                    />
+                    <div
+                      className={`flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg transition-colors text-sm
+                        ${uploading
+                          ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                          : 'border-indigo-300 text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50'
+                        }`}
+                    >
+                      {uploading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-400" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowUpTrayIcon className="w-4 h-4" />
+                          {existing ? 'Replace document' : 'Upload document'}
+                          <span className="text-gray-400 font-normal">— PDF, PNG, JPG, WebP</span>
+                        </>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 
@@ -477,6 +658,14 @@ export default function StudentDetail() {
           {renderTabContent()}
         </motion.div>
       </div>
+
+      {crossCheckDoc && id && (
+        <CrossCheckModal
+          studentId={id}
+          document={crossCheckDoc}
+          onClose={() => setCrossCheckDoc(null)}
+        />
+      )}
     </div>
   )
 } 

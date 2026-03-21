@@ -5,6 +5,7 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
+        "db:migrate": "docker compose exec api php artisan migrate",
         "db:migrate-fresh": "docker compose exec api php artisan migrate:fresh --seed"
     },
     "devDependencies": {

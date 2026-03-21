@@ -937,6 +937,20 @@ export interface UpdateStudentData {
   is_active?: boolean;
 }
 
+export interface StudentDocument {
+  id: string;
+  student_id: string;
+  institution_id: string;
+  document_type: string;
+  file_path: string;
+  file_name: string;
+  mime_type: string;
+  uploaded_by?: string;
+  url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Student Attendance types
 export interface StudentAttendance {
   id: string;

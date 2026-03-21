@@ -39,6 +39,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\TrackController;
 use App\Http\Controllers\StrandController;
+use App\Http\Controllers\StudentDocumentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -145,6 +146,10 @@ Route::middleware('auth.token')->group(function () {
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
     Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
+    Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index']);
+    Route::post('students/{studentId}/documents', [StudentDocumentController::class, 'store']);
+    Route::post('students/{studentId}/documents/{documentId}/cross-check', [StudentDocumentController::class, 'crossCheck']);
+    Route::delete('students/{studentId}/documents/{documentId}', [StudentDocumentController::class, 'destroy']);
     Route::apiResource('students', StudentController::class);
     // Staff routes
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);
