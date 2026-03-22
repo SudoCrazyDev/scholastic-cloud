@@ -60,6 +60,6 @@ jobs:
             set ftp:ssl-allow yes;
             set ssl:verify-certificate no;
             open -u $DEPLOYMENT_USERNAME,$DEPLOYMENT_PASSWORD $DEPLOYMENT_SERVER;
-            mirror --reverse --verbose website/dist/ ~/;
+            mirror --reverse --verbose --exclude ^v2/ --exclude ^api.scholastic.cloud/ website/dist/ ~/;
             quit
           "
