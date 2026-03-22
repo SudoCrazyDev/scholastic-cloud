@@ -60,6 +60,6 @@ jobs:
             set ftp:ssl-allow yes;
             set ssl:verify-certificate no;
             open -u $DEPLOYMENT_USERNAME,$DEPLOYMENT_PASSWORD $DEPLOYMENT_SERVER;
-            mirror --reverse --delete --verbose website/dist/ ~/public_html/;
+            mirror --reverse --delete --verbose website/dist/ ~/;
             quit
           "
