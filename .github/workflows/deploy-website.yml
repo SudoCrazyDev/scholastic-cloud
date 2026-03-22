@@ -48,12 +48,18 @@ jobs:
           npm ci
           npm run build  # This builds your Astro project into the 'dist' folder
 
-      # Step 5: Deploy the dist folder to Hostinger using FTP
+      # Step 5: Deploy the dist folder to Hostinger using lftp
       - name: Deploy to FTP server
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.DEPLOYMENT_SERVER }}
-          username: ${{ secrets.DEPLOYMENT_USERNAME }}
-          password: ${{ secrets.DEPLOYMENT_PASSWORD }}
-          local-dir: website/dist/
-          server-dir: "~/domains/scholastic.cloud/public_html/"
+        env:
+          DEPLOYMENT_SERVER: ${{ secrets.DEPLOYMENT_SERVER }}
+          DEPLOYMENT_USERNAME: ${{ secrets.DEPLOYMENT_USERNAME }}
+          DEPLOYMENT_PASSWORD: ${{ secrets.DEPLOYMENT_PASSWORD }}
+        run: |
+          sudo apt-get install -y lftp
+          lftp -e "
+            set ftp:ssl-allow yes;
+            set ssl:verify-certificate no;
+            open -u $DEPLOYMENT_USERNAME,$DEPLOYMENT_PASSWORD $DEPLOYMENT_SERVER;
+            mirror --reverse --delete --verbose website/dist/ ~/domains/scholastic.cloud/public_html/;
+            quit
+          "
