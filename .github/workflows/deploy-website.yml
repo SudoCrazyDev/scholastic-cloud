@@ -16,13 +16,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Setup Node.js
+      # Step 2: Check required secrets
+      - name: Check required secrets
+        env:
+          DEPLOYMENT_SERVER: ${{ secrets.DEPLOYMENT_SERVER }}
+          DEPLOYMENT_USERNAME: ${{ secrets.DEPLOYMENT_USERNAME }}
+          DEPLOYMENT_PASSWORD: ${{ secrets.DEPLOYMENT_PASSWORD }}
+        run: |
+          missing=()
+          [ -z "$DEPLOYMENT_SERVER" ] && missing+=("DEPLOYMENT_SERVER")
+          [ -z "$DEPLOYMENT_USERNAME" ] && missing+=("DEPLOYMENT_USERNAME")
+          [ -z "$DEPLOYMENT_PASSWORD" ] && missing+=("DEPLOYMENT_PASSWORD")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "❌ Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "✅ All required secrets are present"
+
+      # Step 3: Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      # Step 3: Install dependencies and build the project
+      # Step 4: Install dependencies and build the project
       - name: Install dependencies and build
         env:
           PUBLIC_ADS: ${{ secrets.PUBLIC_ADS }}
@@ -31,7 +48,7 @@ jobs:
           npm ci
           npm run build  # This builds your Astro project into the 'dist' folder
 
-      # Step 4: Deploy the dist folder to Hostinger using FTP
+      # Step 5: Deploy the dist folder to Hostinger using FTP
       - name: Deploy to FTP server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
