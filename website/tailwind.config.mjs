@@ -4,6 +4,10 @@ export default {
 	darkMode: 'class',
 	theme: {
 		extend: {
+			fontFamily: {
+				sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				display: ['"Syne"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+			},
 			colors: {
 				primary: {
 					50: '#eef2ff',
