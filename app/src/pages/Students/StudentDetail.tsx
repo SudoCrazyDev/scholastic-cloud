@@ -426,7 +426,7 @@ export default function StudentDetail() {
     }
   }
 
-  const handleDocumentDelete = async (documentType: string, documentId: string) => {
+  const handleDocumentDelete = async (_documentType: string, documentId: string) => {
     if (!id) return
     try {
       await studentDocumentService.deleteDocument(id, documentId)

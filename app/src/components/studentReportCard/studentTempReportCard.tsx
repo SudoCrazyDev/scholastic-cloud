@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer, Image } from '@react-pdf/renderer';
 import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../../types';
 import { roundGrade, getPassFailRemarks, calculateAgeAsOfOctober31 } from '@/utils/gradeUtils';
+import { fitPdfSingleLineFontSizePx, formatStudentNameReportCard } from '@/utils/reportCardPdfUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
 import { useInstitutionLogo } from '@/hooks/useInstitutionLogo';
 
@@ -90,6 +91,12 @@ export default function PrintTempReportCard({
       return coreValueMap?.[coreValue]?.[behaviorStatement]?.[quarter] || '';
     };
 
+    const adviserLineName =
+      classSection?.adviser?.first_name && classSection?.adviser?.last_name
+        ? `${classSection.adviser.first_name}${classSection.adviser.middle_name ? ` ${String(classSection.adviser.middle_name).trim().charAt(0)}.` : ''} ${classSection.adviser.last_name}${classSection.adviser.ext_name ? ` ${classSection.adviser.ext_name}` : ''}`.trim()
+        : 'TEACHER NAME';
+    const adviserNameFontPx = fitPdfSingleLineFontSizePx(adviserLineName, 248, 10);
+
     return (
         <PDFViewer className='w-full' style={{height: '600px'}}>
             <Document>
@@ -120,7 +127,7 @@ export default function PrintTempReportCard({
                     </View>
                     <View style={{ paddingHorizontal: '20px', width: '100%', display: 'flex', flexDirection: 'row', marginTop: '5px'}}>
                         <Text style={{ textTransform: 'uppercase', fontFamily: 'Helvetica-Bold', fontSize: '12px'}}>
-                          {student ? `${student.last_name}, ${student.first_name} ${student.middle_name ? student.middle_name + ' ' : ''}${student.ext_name || ''}`.trim() : 'STUDENT NAME'}
+                          {student ? formatStudentNameReportCard(student) || 'STUDENT NAME' : 'STUDENT NAME'}
                         </Text>
                         <Text style={{ marginLeft: 'auto', fontFamily: 'Helvetica-Bold', fontSize: '12px' }}>
                           LRN: {student?.lrn || ""}
@@ -373,10 +380,8 @@ export default function PrintTempReportCard({
                             </View>
                         </View>
                         <View style={{ display: 'flex', flexDirection: 'column', marginTop: '10px', marginBottom: '5px'}}>
-                            <Text style={{ textTransform: 'uppercase', fontSize: '10px', fontFamily: 'Helvetica-Bold' }}>
-                              {classSection?.adviser?.first_name && classSection?.adviser?.last_name 
-                                ? `${classSection.adviser.first_name}${classSection.adviser.middle_name ? ` ${String(classSection.adviser.middle_name).trim().charAt(0)}.` : ''} ${classSection.adviser.last_name}${classSection.adviser.ext_name ? ` ${classSection.adviser.ext_name}` : ''}`.trim()
-                                : 'TEACHER NAME'}
+                            <Text wrap={false} style={{ textTransform: 'uppercase', fontSize: `${adviserNameFontPx}px`, fontFamily: 'Helvetica-Bold', width: '100%', textAlign: 'center' }}>
+                              {adviserLineName}
                             </Text>
                             <Text style={{ fontSize: '8px'}}>ADVISER</Text>
                             {classSection?.grade_level && (

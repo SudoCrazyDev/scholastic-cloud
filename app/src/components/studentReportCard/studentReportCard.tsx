@@ -7,6 +7,7 @@ Font.registerHyphenationCallback((word) => [word]);
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
 import { calculateFinalGrade, getPassFailRemarks, getGeneralAverageRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
+import { fitPdfSingleLineFontSizePx, REPORT_CARD_SIGNATURE_HALF_MAX_PT, formatStudentNameReportCard } from '../../utils/reportCardPdfUtils';
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
     'Maka-Diyos': [
@@ -57,6 +58,16 @@ const formatGradeLevel = (value: unknown) => {
     const asText = String(value ?? '').trim();
     if (!asText) return '';
     return asText.replace(/^grade\s*/i, '').trim();
+};
+
+/** Next grade for eligibility line: numeric grade level + 1 (e.g. 7 → 8). */
+const incrementGradeLevelDisplay = (value: unknown) => {
+    const asText = String(value ?? '').trim();
+    if (!asText) return '';
+    const stripped = asText.replace(/^grade\s*/i, '').trim();
+    const n = parseInt(stripped, 10);
+    if (Number.isNaN(n)) return '';
+    return String(n + 1);
 };
 
 const formatTeacherName = (teacher: any) => {
@@ -282,6 +293,12 @@ export default function PrintReportCard({
     const leftHeaderLogo = DEPED_LOGO_URL
     const rightHeaderLogo = schoolLogoUrl || toAbsoluteUrl(institution?.logo) || DEPED_LOGO_URL
     const principalDisplay = (principalName || '').trim() ? principalName : ' '
+    const teacherNameFontPx = fitPdfSingleLineFontSizePx(teacherName || ' ', REPORT_CARD_SIGNATURE_HALF_MAX_PT, 8);
+    const principalNameFontPx = fitPdfSingleLineFontSizePx(principalDisplay || ' ', REPORT_CARD_SIGNATURE_HALF_MAX_PT, 8);
+
+    const currentGradeDisplay = formatGradeLevel(classSection.grade_level) || '—';
+    const currentSectionDisplay = String(classSection.title || '').trim() || '—';
+    const eligibilityNextGradeDisplay = incrementGradeLevelDisplay(classSection.grade_level) || '—';
 
     const pdfKey = viewerKey || `${studentId}|${classSectionId}|${institutionId}|${academicYear}`
 
@@ -404,9 +421,7 @@ export default function PrintReportCard({
                                 <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '8px', textTransform: 'uppercase'}}>
                                     Name:{' '}
                                     <Text style={{textDecoration: 'underline'}}>
-                                        {`${student.last_name || ''}, ${student.first_name || ''}${
-                                            student.middle_name ? ` ${String(student.middle_name).trim().charAt(0)}.` : ''
-                                        }${student.ext_name ? `, ${student.ext_name}` : ''}`.toUpperCase()}
+                                        {formatStudentNameReportCard(student).toUpperCase()}
                                     </Text>
                                 </Text>
                             </View>
@@ -435,11 +450,11 @@ export default function PrintReportCard({
                             
                             <View style={{marginTop: '3px', width: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between'}}>
                                 <View style={{marginTop: '8px', width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                    <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{principalDisplay}</Text>
+                                    <Text wrap={false} style={{fontSize: `${principalNameFontPx}px`, textTransform: 'uppercase', textDecoration: 'underline', width: '100%', textAlign: 'center'}}>{principalDisplay}</Text>
                                     <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Principal</Text>
                                 </View>
                                 <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                    <Text style={{fontSize: '8px', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
+                                    <Text wrap={false} style={{fontSize: `${teacherNameFontPx}px`, textDecoration: 'underline', width: '100%', textAlign: 'center'}}>{teacherName || ' '}</Text>
                                     <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Teacher</Text>
                                 </View>
                             </View>
@@ -450,18 +465,27 @@ export default function PrintReportCard({
                             
                             <View style={{marginTop: '0px', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
                                 <Text style={{fontFamily: 'Helvetica-Bold', fontSize: '10px'}}></Text>
-                                <View style={{display: 'flex', flexDirection: 'row', marginTop: '2px', marginBottom: '8px', alignSelf: 'flex-start'}}>
-                                    <Text style={{fontSize: '8px', fontFamily: 'Helvetica'}}>Admitted to Grade:______________</Text>
-                                    <Text style={{fontSize: '8px', fontFamily: 'Helvetica'}}>Section:______________</Text>
+                                <View style={{display: 'flex', flexDirection: 'row', marginTop: '2px', marginBottom: '8px', alignSelf: 'flex-start', flexWrap: 'wrap'}}>
+                                    <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginRight: 16}}>
+                                        Admitted to Grade:{' '}
+                                        <Text style={{textDecoration: 'underline'}}>{currentGradeDisplay}</Text>
+                                    </Text>
+                                    <Text style={{fontSize: '8px', fontFamily: 'Helvetica'}}>
+                                        Section:{' '}
+                                        <Text style={{textDecoration: 'underline'}}>{currentSectionDisplay}</Text>
+                                    </Text>
                                 </View>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'flex-start'}}>Eligibility for Admission to Grade:_______________________</Text>
+                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', alignSelf: 'flex-start'}}>
+                                    Eligibility for Admission to Grade:{' '}
+                                    <Text style={{textDecoration: 'underline'}}>{eligibilityNextGradeDisplay}</Text>
+                                </Text>
                                 <View style={{display: 'flex', flexDirection: 'row', marginTop: '5px'}}>
                                     <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                        <Text style={{fontSize: '8px', textTransform: 'uppercase', textDecoration: 'underline'}}>{principalDisplay}</Text>
+                                        <Text wrap={false} style={{fontSize: `${principalNameFontPx}px`, textTransform: 'uppercase', textDecoration: 'underline', width: '100%', textAlign: 'center'}}>{principalDisplay}</Text>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Principal</Text>
                                     </View>
                                     <View style={{width: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-                                        <Text style={{fontSize: '8px', textDecoration: 'underline'}}>{teacherName || ' '}</Text>
+                                        <Text wrap={false} style={{fontSize: `${teacherNameFontPx}px`, textDecoration: 'underline', width: '100%', textAlign: 'center'}}>{teacherName || ' '}</Text>
                                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginTop: '2px'}}>Teacher</Text>
                                     </View>
                                 </View>
