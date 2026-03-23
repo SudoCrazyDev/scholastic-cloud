@@ -28,6 +28,7 @@ import {
   LayoutTemplate,
   ListOrdered,
   Route,
+  ClipboardList,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -145,6 +146,13 @@ const menuItems: MenuItem[] = [
     label: 'Students',
     icon: <StudentsIcon className="w-5 h-5" />,
     path: '/students',
+    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'admission-forms',
+    label: 'Admission Form',
+    icon: <ClipboardList className="w-5 h-5" />,
+    path: '/admission-forms',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
   {

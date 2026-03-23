@@ -43,6 +43,8 @@ import MyFinance from './pages/MyFinance';
 import GateEnter from './pages/Gate/GateEnter';
 import GateExit from './pages/Gate/GateExit';
 import FormBuilderPage from './pages/FormBuilder/FormBuilderPage';
+import PublicAdmissionForm from './pages/PublicAdmission/PublicAdmissionForm';
+import AdmissionForms from './pages/AdmissionForms/AdmissionForms';
 
 
 function App() {
@@ -63,6 +65,7 @@ function App() {
             {/* Public Kiosk Gate Pages */}
             <Route path="gate-enter" element={<GateEnter />} />
             <Route path="gate-exit" element={<GateExit />} />
+            <Route path="admission/:institutionId" element={<PublicAdmissionForm />} />
 
             {/* Private Routes */}
             <Route element={<PrivateLayout />}>
@@ -74,6 +77,7 @@ function App() {
               <Route path="subscriptions" element={<Subscriptions />} />
               <Route path="staffs" element={<Staffs />} />
               <Route path="students" element={<Students />} />
+              <Route path="admission-forms" element={<AdmissionForms />} />
               <Route path="students/:id" element={<StudentDetail />} />
               <Route path="class-sections" element={<ClassSections />} />
               <Route path="my-class-sections" element={<MyClassSections />} />

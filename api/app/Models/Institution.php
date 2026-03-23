@@ -91,6 +91,14 @@ class Institution extends Model
     }
 
     /**
+     * Online admission form submissions targeting this institution.
+     */
+    public function admissionFormSubmissions(): HasMany
+    {
+        return $this->hasMany(AdmissionFormSubmission::class);
+    }
+
+    /**
      * Get the certificates for the institution.
      */
     public function certificates(): HasMany

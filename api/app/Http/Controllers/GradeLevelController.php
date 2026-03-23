@@ -31,6 +31,19 @@ class GradeLevelController extends Controller
     }
 
     /**
+     * Public list for online admission form (no auth).
+     */
+    public function publicIndex(): JsonResponse
+    {
+        $gradeLevels = GradeLevel::orderBy('sort_order')->orderBy('title')->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $gradeLevels,
+        ]);
+    }
+
+    /**
      * Create a grade level (Super Administrator only).
      */
     public function store(Request $request): JsonResponse

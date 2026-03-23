@@ -40,6 +40,7 @@ use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\TrackController;
 use App\Http\Controllers\StrandController;
 use App\Http\Controllers\StudentDocumentController;
+use App\Http\Controllers\AdmissionFormSubmissionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,6 +61,11 @@ Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackControll
 
 // Public kiosk endpoint for RFID gate scanners
 Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan']);
+
+// Public online admission form (no auth)
+Route::get('/public/institutions/{id}', [AdmissionFormSubmissionController::class, 'publicInstitution']);
+Route::get('/public/grade-levels', [GradeLevelController::class, 'publicIndex']);
+Route::post('/public/admission-form-submissions', [AdmissionFormSubmissionController::class, 'publicStore']);
 
 // Protected routes (authentication required)
 Route::middleware('auth.token')->group(function () {
@@ -297,6 +303,10 @@ Route::middleware('auth.token')->group(function () {
 
     // Certificate routes
     Route::apiResource('certificates', CertificateController::class);
+
+    // Online admission form submissions (admin list/detail)
+    Route::get('admission-form-submissions', [AdmissionFormSubmissionController::class, 'index']);
+    Route::get('admission-form-submissions/{id}', [AdmissionFormSubmissionController::class, 'show']);
 });
 
 Route::get('/health', function () {

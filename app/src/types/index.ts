@@ -951,6 +951,69 @@ export interface StudentDocument {
   updated_at?: string;
 }
 
+/** Online admission form (public submit; stored as JSON payload, no finance section). */
+export interface AdmissionHealthBlock {
+  answer: boolean
+  when?: string
+  details?: string
+}
+
+export interface AdmissionFormPayload {
+  grade_level: string
+  general_information: {
+    surname: string
+    first_name: string
+    middle_name?: string
+    full_name?: string
+    complete_address: string
+    mobile_number: string
+    birthdate: string
+    place_of_birth?: string
+    religion?: string
+    gender: string
+    age?: number
+    mother_tongue?: string
+    last_school_attended?: string
+    school_year?: string
+    school_address?: string
+    lrn?: string
+  }
+  family_information: {
+    father: { name?: string; age?: number; occupation?: string }
+    mother: { name?: string; age?: number; occupation?: string }
+    siblings: { brothers?: number; sisters?: number }
+  }
+  emergency_contact: {
+    name: string
+    address?: string
+    relationship?: string
+    age?: number
+    contact_number: string
+  }
+  health_information: {
+    had_chicken_pox: AdmissionHealthBlock
+    had_chicken_pox_vaccine: AdmissionHealthBlock
+    hospitalization_past_year: AdmissionHealthBlock
+    chronic_condition: AdmissionHealthBlock
+    allergies: AdmissionHealthBlock
+    other_medical_problems: AdmissionHealthBlock
+  }
+  agreement: {
+    school_policies_accepted: boolean
+    privacy_read_policy: boolean
+    privacy_consent_given: boolean
+  }
+}
+
+export interface AdmissionFormSubmissionListItem {
+  id: string
+  institution_id: string
+  payload: AdmissionFormPayload
+  created_at?: string
+  updated_at?: string
+  institution?: { id: string; title: string; abbr?: string | null; address?: string | null }
+}
+
 // Student Attendance types
 export interface StudentAttendance {
   id: string;
