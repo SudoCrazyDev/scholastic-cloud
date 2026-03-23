@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ClipboardList } from 'lucide-react'
 import { admissionFormService } from '../../services/admissionFormService'
 import { useAuth } from '../../hooks/useAuth'
+import { useRoleAccess } from '../../hooks/useRoleAccess'
 import type { AdmissionFormPayload, AdmissionFormSubmissionListItem } from '../../types'
 import { AdmissionSubmissionDetailView } from './AdmissionSubmissionDetailView'
 
@@ -14,7 +16,11 @@ function applicantLabel(payload: AdmissionFormPayload): string {
   return parts || '—'
 }
 
+const ADMISSION_FORMS_ROLES = ['principal', 'institution-administrator']
+
 export default function AdmissionForms() {
+  const navigate = useNavigate()
+  const { hasAccess } = useRoleAccess(ADMISSION_FORMS_ROLES)
   const { user } = useAuth()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -25,7 +31,9 @@ export default function AdmissionForms() {
     user?.user_institutions?.find((ui: { is_default?: boolean }) => ui.is_default)?.institution_id
     ?? user?.user_institutions?.[0]?.institution_id
 
-  const isSuperAdmin = user?.role?.slug === 'super-administrator'
+  useEffect(() => {
+    if (!hasAccess) navigate('/dashboard')
+  }, [hasAccess, navigate])
 
   const publicFormUrl = useMemo(() => {
     if (!institutionId || typeof window === 'undefined') return ''
@@ -41,7 +49,7 @@ export default function AdmissionForms() {
         search: search || undefined,
         institution_id: institutionId,
       }),
-    enabled: !!institutionId,
+    enabled: hasAccess && !!institutionId,
   })
 
   const copyLink = async () => {
@@ -66,6 +74,8 @@ export default function AdmissionForms() {
     }
   }
 
+  if (!hasAccess) return null
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -79,7 +89,7 @@ export default function AdmissionForms() {
               Submissions from the public online admission form (not student records).
             </p>
           </div>
-          {!isSuperAdmin && publicFormUrl ? (
+          {publicFormUrl ? (
             <button
               type="button"
               onClick={copyLink}
@@ -136,11 +146,6 @@ export default function AdmissionForms() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {isSuperAdmin ? (
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        Institution
-                      </th>
-                    ) : null}
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       Applicant
                     </th>
@@ -158,11 +163,6 @@ export default function AdmissionForms() {
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {(data?.data ?? []).map((row) => (
                     <tr key={row.id} className="hover:bg-gray-50">
-                      {isSuperAdmin ? (
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {row.institution?.title ?? row.institution_id}
-                        </td>
-                      ) : null}
                       <td className="px-4 py-3 text-sm text-gray-900">{applicantLabel(row.payload)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.payload.grade_level}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">

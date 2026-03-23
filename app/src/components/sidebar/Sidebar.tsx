@@ -153,7 +153,7 @@ const menuItems: MenuItem[] = [
     label: 'Admission Form',
     icon: <ClipboardList className="w-5 h-5" />,
     path: '/admission-forms',
-    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+    allowedRoles: ['principal', 'institution-administrator'],
   },
   {
     id: 'finance',

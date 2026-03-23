@@ -13,15 +13,28 @@ use Illuminate\Validation\ValidationException;
 
 class AdmissionFormSubmissionController extends Controller
 {
-    private function isSuperAdmin(Request $request): bool
+    /** Roles allowed to list/view admission submissions (staff UI). */
+    private const ADMISSION_SUBMISSION_ROLES = ['principal', 'institution-administrator'];
+
+    private function canAccessAdmissionSubmissions(Request $request): bool
     {
         $user = $request->user();
-        if (!$user instanceof User) {
+        if (! $user instanceof User) {
             return false;
         }
-        $role = $user->getRole();
+        $slug = $user->getRole()?->slug;
 
-        return $role && $role->slug === 'super-administrator';
+        return $slug !== null && in_array($slug, self::ADMISSION_SUBMISSION_ROLES, true);
+    }
+
+    private function resolveUserInstitutionId(User $user): ?string
+    {
+        $institutionId = $user->getDefaultInstitutionId();
+        if (! $institutionId) {
+            $institutionId = $user->userInstitutions()->first()?->institution_id;
+        }
+
+        return $institutionId;
     }
 
     /**
@@ -76,7 +89,7 @@ class AdmissionFormSubmissionController extends Controller
     }
 
     /**
-     * Authenticated: list submissions for the user’s institution (super-admin: all or filter).
+     * Authenticated: list submissions for the user’s institution (principal & institution-administrator only).
      */
     public function index(Request $request): JsonResponse
     {
@@ -87,27 +100,20 @@ class AdmissionFormSubmissionController extends Controller
             ], 403);
         }
 
+        if (! $this->canAccessAdmissionSubmissions($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
+        /** @var User $user */
         $user = $request->user();
         $perPage = min((int) $request->get('per_page', 15), 100);
 
         $query = AdmissionFormSubmission::query()->with('institution:id,title,abbr');
 
-        // Always scope to one institution (never list all schools). Super-admins may pass
-        // institution_id to switch context; staff always use their assigned institution only.
-        if ($this->isSuperAdmin($request)) {
-            $institutionId = $request->get('institution_id');
-            if (!$institutionId) {
-                $institutionId = $user->getDefaultInstitutionId();
-                if (!$institutionId) {
-                    $institutionId = $user->userInstitutions()->first()?->institution_id;
-                }
-            }
-        } else {
-            $institutionId = $user->getDefaultInstitutionId();
-            if (!$institutionId) {
-                $institutionId = $user->userInstitutions()->first()?->institution_id;
-            }
-        }
+        $institutionId = $this->resolveUserInstitutionId($user);
 
         if (!$institutionId) {
             return response()->json([
@@ -145,7 +151,7 @@ class AdmissionFormSubmissionController extends Controller
     }
 
     /**
-     * Authenticated: single submission (scoped to institution unless super-admin).
+     * Authenticated: single submission (principal & institution-administrator; scoped to institution).
      */
     public function show(Request $request, string $id): JsonResponse
     {
@@ -156,6 +162,16 @@ class AdmissionFormSubmissionController extends Controller
             ], 403);
         }
 
+        if (! $this->canAccessAdmissionSubmissions($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+            ], 403);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+
         $submission = AdmissionFormSubmission::query()->with('institution:id,title,abbr,address')->find($id);
 
         if (!$submission) {
@@ -165,18 +181,12 @@ class AdmissionFormSubmissionController extends Controller
             ], 404);
         }
 
-        if (!$this->isSuperAdmin($request)) {
-            $institutionId = $request->user()->getDefaultInstitutionId();
-            if (!$institutionId) {
-                $first = $request->user()->userInstitutions()->first();
-                $institutionId = $first?->institution_id;
-            }
-            if (!$institutionId || $submission->institution_id !== $institutionId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Forbidden.',
-                ], 403);
-            }
+        $institutionId = $this->resolveUserInstitutionId($user);
+        if (! $institutionId || $submission->institution_id !== $institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden.',
+            ], 403);
         }
 
         return response()->json([
