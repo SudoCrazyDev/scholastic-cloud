@@ -137,11 +137,36 @@ type PublicInstitution = {
   title: string
   abbr?: string | null
   address?: string | null
+  logo_url?: string | null
+}
+
+function InstitutionLogo({
+  title,
+  logoUrl,
+  className,
+}: {
+  title: string
+  logoUrl: string | null | undefined
+  className?: string
+}) {
+  if (!logoUrl?.trim()) return null
+  return (
+    <div className={clsx('flex justify-center', className)}>
+      <img
+        src={logoUrl}
+        alt={`${title} logo`}
+        className="max-h-24 max-w-[min(100%,280px)] w-auto object-contain object-center"
+        loading="eager"
+        decoding="async"
+      />
+    </div>
+  )
 }
 
 function AdmissionThankYou({ institution }: { institution: PublicInstitution }) {
   return (
     <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-indigo-950/5 ring-1 ring-slate-200/80 p-8 md:p-10 text-center">
+      <InstitutionLogo title={institution.title} logoUrl={institution.logo_url} className="mb-6" />
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-6">
         <CheckCircle2 className="h-9 w-9" strokeWidth={2} aria-hidden />
       </div>
@@ -276,6 +301,7 @@ function PublicAdmissionForm() {
     >
       <div className="max-w-3xl mx-auto">
         <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-indigo-950/5 ring-1 ring-slate-200/80 p-6 md:p-8 mb-6">
+          <InstitutionLogo title={institution.title} logoUrl={institution.logo_url} className="mb-5" />
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Admission Form</h1>
           <p className="mt-1 text-slate-600">
             {institution.title}

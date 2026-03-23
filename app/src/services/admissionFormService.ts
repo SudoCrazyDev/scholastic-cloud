@@ -3,9 +3,16 @@ import type { AdmissionFormPayload, AdmissionFormSubmissionListItem } from '../t
 
 export const admissionFormService = {
   async getPublicInstitution(id: string) {
-    const response = await api.get<{ success: boolean; data: { id: string; title: string; abbr: string | null; address: string | null } }>(
-      `/public/institutions/${id}`
-    )
+    const response = await api.get<{
+      success: boolean
+      data: {
+        id: string
+        title: string
+        abbr: string | null
+        address: string | null
+        logo_url: string | null
+      }
+    }>(`/public/institutions/${id}`)
     return response.data
   },
 

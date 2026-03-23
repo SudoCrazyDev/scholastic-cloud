@@ -38,13 +38,13 @@ class AdmissionFormSubmissionController extends Controller
     }
 
     /**
-     * Public: verify institution exists (minimal data for admission form header).
+     * Public: verify institution exists (minimal data for admission form header, including logo URL).
      */
     public function publicInstitution(string $id): JsonResponse
     {
-        $institution = Institution::query()->select(['id', 'title', 'abbr', 'address'])->find($id);
+        $institution = Institution::query()->select(['id', 'title', 'abbr', 'address', 'logo'])->find($id);
 
-        if (!$institution) {
+        if (! $institution) {
             return response()->json([
                 'success' => false,
                 'message' => 'Institution not found.',
@@ -53,7 +53,13 @@ class AdmissionFormSubmissionController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $institution,
+            'data' => [
+                'id' => $institution->id,
+                'title' => $institution->title,
+                'abbr' => $institution->abbr,
+                'address' => $institution->address,
+                'logo_url' => $institution->logo,
+            ],
         ]);
     }
 
