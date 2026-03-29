@@ -172,8 +172,7 @@ class TimetableController extends Controller
             ->where('institution_id', $defaultInstitution->institution_id)
             ->whereIn('adviser', $teacherIds)
             ->whereNotNull('start_time')
-            ->whereNotNull('end_time')
-            ->whereNotNull('meeting_days');
+            ->whereNotNull('end_time');
 
         if ($request->filled('academic_year')) {
             $query->whereHas('classSection', function ($q) use ($request) {
