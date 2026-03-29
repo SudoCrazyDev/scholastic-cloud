@@ -9,6 +9,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\ClassSectionController;
+use App\Http\Controllers\TimetableController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\SubjectTemplateController;
 use App\Http\Controllers\StudentController;
@@ -174,6 +175,11 @@ Route::middleware('auth.token')->group(function () {
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);
     Route::apiResource('class-sections', ClassSectionController::class);
+
+    // Timetable routes
+    Route::get('timetable/section/{sectionId}', [TimetableController::class, 'getSectionTimetable']);
+    Route::get('timetable/conflicts', [TimetableController::class, 'getConflicts']);
+    Route::patch('timetable/subjects/{subjectId}/schedule', [TimetableController::class, 'updateSubjectSchedule']);
     // Subject routes
     Route::get('subjects/by-institution', [SubjectController::class, 'indexByInstitution']);
     Route::apiResource('subjects', SubjectController::class);

@@ -37,13 +37,13 @@ class ClassSectionController extends Controller
             $query = ClassSection::where('institution_id', $institutionId);
         }
         
-        $query = $query->with(['adviser', 'department', 'track', 'strand']);
-        
+        $query = $query->with(['adviserUser', 'department', 'track', 'strand']);
+
         // Search by title
         if ($request->has('search') && $request->search) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
-        
+
         // Filter by grade_level
         if ($request->has('grade_level') && $request->grade_level) {
             $query->where('grade_level', $request->grade_level);
@@ -52,9 +52,9 @@ class ClassSectionController extends Controller
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
-        
+
         $sections = $query->paginate($request->get('per_page', 15));
-        
+
         return response()->json([
             'data' => $sections->items(),
             'pagination' => [
@@ -81,7 +81,7 @@ class ClassSectionController extends Controller
         ]);
         $validated['institution_id'] = $institutionId;
         $section = ClassSection::create($validated);
-        $section->load(['adviser', 'department', 'track', 'strand']);
+        $section->load(['adviserUser', 'department', 'track', 'strand']);
         return response()->json(['data' => $section], 201);
     }
 
@@ -90,7 +90,7 @@ class ClassSectionController extends Controller
         $user = $request->user();
         $institutionId = $user->getDefaultInstitutionId();
         $section = ClassSection::where('institution_id', $institutionId)
-            ->with(['adviser', 'department', 'track', 'strand'])
+            ->with(['adviserUser', 'department', 'track', 'strand'])
             ->findOrFail($id);
         return response()->json(['data' => $section]);
     }
@@ -111,7 +111,7 @@ class ClassSectionController extends Controller
         ]);
         $validated['institution_id'] = $institutionId;
         $section->update($validated);
-        $section->load(['adviser', 'department', 'track', 'strand']);
+        $section->load(['adviserUser', 'department', 'track', 'strand']);
         return response()->json(['data' => $section]);
     }
 
@@ -155,13 +155,13 @@ class ClassSectionController extends Controller
             $query = ClassSection::where('institution_id', $institutionId);
         }
         
-        $query = $query->with(['adviser', 'department', 'track', 'strand']);
-        
+        $query = $query->with(['adviserUser', 'department', 'track', 'strand']);
+
         // Search by title
         if ($request->has('search') && $request->search) {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
-        
+
         // Filter by grade_level
         if ($request->has('grade_level') && $request->grade_level) {
             $query->where('grade_level', $request->grade_level);
@@ -170,9 +170,9 @@ class ClassSectionController extends Controller
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
-        
+
         $sections = $query->paginate($request->get('per_page', 15));
-        
+
         return response()->json([
             'data' => $sections->items(),
             'pagination' => [

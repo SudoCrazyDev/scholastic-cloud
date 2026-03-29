@@ -679,6 +679,7 @@ export interface Subject {
   variant?: string; // Optional variant (e.g., "Sewing", "Machineries", "Plumbing")
   start_time?: string;
   end_time?: string;
+  meeting_days?: string[] | null; // e.g. ['monday','wednesday','friday']
   is_limited_student?: boolean;
   order: number; // Order for sorting subjects
   created_at: string;
@@ -832,6 +833,7 @@ export interface CreateSubjectData {
   variant?: string;
   start_time?: string;
   end_time?: string;
+  meeting_days?: string[] | null;
   is_limited_student?: boolean;
 }
 
@@ -845,7 +847,36 @@ export interface UpdateSubjectData {
   variant?: string;
   start_time?: string;
   end_time?: string;
+  meeting_days?: string[] | null;
   is_limited_student?: boolean;
+}
+
+export interface TimetableConflict {
+  teacher_id: string;
+  teacher_name: string;
+  shared_days: string[];
+  subject_a: {
+    id: string;
+    title: string;
+    section: string;
+    start_time: string;
+    end_time: string;
+    meeting_days: string[];
+  };
+  subject_b: {
+    id: string;
+    title: string;
+    section: string;
+    start_time: string;
+    end_time: string;
+    meeting_days: string[];
+  };
+}
+
+export interface UpdateSubjectScheduleData {
+  start_time?: string | null;
+  end_time?: string | null;
+  meeting_days?: string[] | null;
 }
 
 export interface ReorderSubjectsData {

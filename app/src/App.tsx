@@ -45,6 +45,7 @@ import GateExit from './pages/Gate/GateExit';
 import FormBuilderPage from './pages/FormBuilder/FormBuilderPage';
 import PublicAdmissionForm from './pages/PublicAdmission/PublicAdmissionForm';
 import AdmissionForms from './pages/AdmissionForms/AdmissionForms';
+import Timetable from './pages/Timetable/Timetable';
 
 
 function App() {
@@ -80,6 +81,7 @@ function App() {
               <Route path="admission-forms" element={<AdmissionForms />} />
               <Route path="students/:id" element={<StudentDetail />} />
               <Route path="class-sections" element={<ClassSections />} />
+              <Route path="timetable" element={<Timetable />} />
               <Route path="my-class-sections" element={<MyClassSections />} />
               <Route path="my-class-sections/:id" element={<ClassSectionDetail />} />
               <Route path="assigned-subjects" element={<AssignedSubjects />} />

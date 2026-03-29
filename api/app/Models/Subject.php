@@ -22,6 +22,7 @@ class Subject extends Model
         'variant',
         'start_time',
         'end_time',
+        'meeting_days',
         'is_limited_student',
         'order',
     ];
@@ -30,6 +31,7 @@ class Subject extends Model
         'is_limited_student' => 'boolean',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
+        'meeting_days' => 'array',
     ];
 
     public function institution(): BelongsTo

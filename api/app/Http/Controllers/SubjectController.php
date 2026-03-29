@@ -117,6 +117,8 @@ class SubjectController extends Controller
                 'variant' => 'nullable|string|max:255',
                 'start_time' => 'nullable|date_format:H:i',
                 'end_time' => 'nullable|date_format:H:i',
+                'meeting_days' => 'nullable|array',
+                'meeting_days.*' => 'string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
                 'is_limited_student' => 'boolean',
                 'order' => 'nullable|integer|min:0',
             ]);
@@ -277,6 +279,8 @@ class SubjectController extends Controller
                 'variant' => 'nullable|string|max:255',
                 'start_time' => 'nullable|date_format:H:i',
                 'end_time' => 'nullable|date_format:H:i',
+                'meeting_days' => 'nullable|array',
+                'meeting_days.*' => 'string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
                 'is_limited_student' => 'boolean',
                 'order' => 'nullable|integer|min:0',
             ]);

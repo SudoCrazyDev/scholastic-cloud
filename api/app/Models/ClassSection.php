@@ -26,7 +26,7 @@ class ClassSection extends Model
     /**
      * Get the adviser (user) for this class section.
      */
-    public function adviser()
+    public function adviserUser()
     {
         return $this->belongsTo(User::class, 'adviser');
     }

@@ -29,6 +29,7 @@ import {
   ListOrdered,
   Route,
   ClipboardList,
+  CalendarDays,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -132,6 +133,13 @@ const menuItems: MenuItem[] = [
     label: 'Class Sections',
     icon: <GraduationCap className="w-5 h-5" />,
     path: '/class-sections',
+    allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+  },
+  {
+    id: 'timetable',
+    label: 'Timetable',
+    icon: <CalendarDays className="w-5 h-5" />,
+    path: '/timetable',
     allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
   },
   {
