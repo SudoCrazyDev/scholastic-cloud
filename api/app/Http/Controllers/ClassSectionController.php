@@ -39,9 +39,13 @@ class ClassSectionController extends Controller
         
         $query = $query->with(['adviserUser', 'department', 'track', 'strand']);
 
-        // Search by title
+        // Search by title or grade_level
         if ($request->has('search') && $request->search) {
-            $query->where('title', 'like', '%' . $request->search . '%');
+            $search = '%' . $request->search . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', $search)
+                  ->orWhere('grade_level', 'like', $search);
+            });
         }
 
         // Filter by grade_level
@@ -157,9 +161,13 @@ class ClassSectionController extends Controller
         
         $query = $query->with(['adviserUser', 'department', 'track', 'strand']);
 
-        // Search by title
+        // Search by title or grade_level
         if ($request->has('search') && $request->search) {
-            $query->where('title', 'like', '%' . $request->search . '%');
+            $search = '%' . $request->search . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', $search)
+                  ->orWhere('grade_level', 'like', $search);
+            });
         }
 
         // Filter by grade_level
@@ -182,6 +190,23 @@ class ClassSectionController extends Controller
                 'total' => $sections->total(),
             ]
         ]);
+    }
+
+    /**
+     * Return distinct academic years for the institution's class sections.
+     */
+    public function getAcademicYears(Request $request)
+    {
+        $user = $request->user();
+        $institutionId = $user->getDefaultInstitutionId();
+
+        $years = ClassSection::where('institution_id', $institutionId)
+            ->whereNotNull('academic_year')
+            ->distinct()
+            ->orderBy('academic_year', 'desc')
+            ->pluck('academic_year');
+
+        return response()->json(['data' => $years]);
     }
 
     /**

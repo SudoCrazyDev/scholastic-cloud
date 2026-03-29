@@ -173,12 +173,14 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('strands/{id}', [StrandController::class, 'destroy']);
     // ClassSection routes
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
+    Route::get('class-sections/academic-years', [ClassSectionController::class, 'getAcademicYears']);
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);
     Route::apiResource('class-sections', ClassSectionController::class);
 
     // Timetable routes
     Route::get('timetable/section/{sectionId}', [TimetableController::class, 'getSectionTimetable']);
     Route::get('timetable/conflicts', [TimetableController::class, 'getConflicts']);
+    Route::get('timetable/teachers', [TimetableController::class, 'getTeachersTimetable']);
     Route::patch('timetable/subjects/{subjectId}/schedule', [TimetableController::class, 'updateSubjectSchedule']);
     // Subject routes
     Route::get('subjects/by-institution', [SubjectController::class, 'indexByInstitution']);

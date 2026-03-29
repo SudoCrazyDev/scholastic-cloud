@@ -144,6 +144,68 @@ class TimetableController extends Controller
     }
 
     /**
+     * Return subjects grouped by teacher for a set of teacher IDs.
+     * Used for the Teacher Timetable view.
+     */
+    public function getTeachersTimetable(Request $request): JsonResponse
+    {
+        $authenticatedUser = $request->user();
+
+        $defaultInstitution = $authenticatedUser->userInstitutions()
+            ->where('is_default', true)
+            ->first();
+
+        if (!$defaultInstitution) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No default institution found for authenticated user'
+            ], 403);
+        }
+
+        $teacherIds = $request->input('ids', []);
+
+        if (empty($teacherIds)) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $query = Subject::with(['classSection'])
+            ->where('institution_id', $defaultInstitution->institution_id)
+            ->whereIn('adviser', $teacherIds)
+            ->whereNotNull('start_time')
+            ->whereNotNull('end_time')
+            ->whereNotNull('meeting_days');
+
+        if ($request->filled('academic_year')) {
+            $query->whereHas('classSection', function ($q) use ($request) {
+                $q->where('academic_year', $request->academic_year);
+            });
+        }
+
+        $subjects = $query->get();
+
+        $grouped = [];
+        foreach ($teacherIds as $teacherId) {
+            $grouped[$teacherId] = $subjects
+                ->where('adviser', $teacherId)
+                ->values()
+                ->map(fn($s) => [
+                    'id'          => $s->id,
+                    'title'       => $s->title,
+                    'section'     => $s->classSection?->title,
+                    'grade_level' => $s->classSection?->grade_level,
+                    'start_time'  => $s->start_time,
+                    'end_time'    => $s->end_time,
+                    'meeting_days'=> $s->meeting_days,
+                ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $grouped,
+        ]);
+    }
+
+    /**
      * Update the schedule (start_time, end_time, meeting_days) for a single subject.
      */
     public function updateSubjectSchedule(Request $request, string $subjectId): JsonResponse
