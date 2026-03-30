@@ -62,6 +62,11 @@ class ClassSectionService {
     await api.delete(`${this.baseUrl}/${id}`)
   }
 
+  async getAcademicYears(): Promise<{ data: string[] }> {
+    const response = await api.get<{ data: string[] }>(`${this.baseUrl}/academic-years`)
+    return response.data
+  }
+
   async dissolveSection(id: string, data: {
     student_assignments: Array<{
       student_id: string
