@@ -92,8 +92,8 @@ export default function PrintTempReportCard({
     };
 
     const adviserLineName =
-      classSection?.adviser?.first_name && classSection?.adviser?.last_name
-        ? `${classSection.adviser.first_name}${classSection.adviser.middle_name ? ` ${String(classSection.adviser.middle_name).trim().charAt(0)}.` : ''} ${classSection.adviser.last_name}${classSection.adviser.ext_name ? ` ${classSection.adviser.ext_name}` : ''}`.trim()
+      classSection?.adviser_user?.first_name && classSection?.adviser_user?.last_name
+        ? `${classSection.adviser_user.first_name}${classSection.adviser_user.middle_name ? ` ${String(classSection.adviser_user.middle_name).trim().charAt(0)}.` : ''} ${classSection.adviser_user.last_name}${classSection.adviser_user.ext_name ? ` ${classSection.adviser_user.ext_name}` : ''}`.trim()
         : 'TEACHER NAME';
     const adviserNameFontPx = fitPdfSingleLineFontSizePx(adviserLineName, 248, 10);
 

@@ -119,10 +119,10 @@ const MyClassSections: React.FC = () => {
                   </div>
                 )}
 
-                {classSection.adviser && (
+                {classSection.adviser_user && (
                   <div className="flex items-center text-sm text-gray-600">
                     <User className="w-4 h-4 mr-2" />
-                    <span>Adviser: {getFullName(classSection.adviser)}</span>
+                    <span>Adviser: {getFullName(classSection.adviser_user)}</span>
                   </div>
                 )}
               </div>

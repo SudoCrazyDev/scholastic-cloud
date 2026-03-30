@@ -152,7 +152,7 @@ export function ClassSectionModal({
         // Set adviser if available
         if (classSection.adviser) {
           // First try to find in the teachers array
-          const teacher = teachers.find(t => t.id === classSection.adviser?.id)
+          const teacher = teachers.find(t => t.id === classSection.adviser)
           if (teacher) {
             const teacherName = getFullName(teacher)
             setSelectedTeacher({
@@ -161,18 +161,18 @@ export function ClassSectionModal({
               description: teacher.email
             })
             formik.setFieldValue('adviser_id', teacher.id)
-          } else {
-            // If teacher not found in array, use adviser data directly
-            const adviser = classSection.adviser
+          } else if (classSection.adviser_user) {
+            // If teacher not found in array, use adviser_user relation data
+            const adviser = classSection.adviser_user
             const adviserName = [adviser.first_name, adviser.middle_name, adviser.last_name, adviser.ext_name]
               .filter(Boolean)
               .join(' ')
             setSelectedTeacher({
-              id: adviser.id,
+              id: classSection.adviser,
               label: adviserName,
               description: adviser.email
             })
-            formik.setFieldValue('adviser_id', adviser.id)
+            formik.setFieldValue('adviser_id', classSection.adviser)
           }
         } else {
           setSelectedTeacher(null)
@@ -211,12 +211,12 @@ export function ClassSectionModal({
     }))
     
     // If editing and adviser exists but not in teachers array, add it
-    if (classSection?.adviser) {
-      const adviserInOptions = options.some(opt => opt.id === classSection.adviser?.id)
+    if (classSection?.adviser && classSection?.adviser_user) {
+      const adviserInOptions = options.some(opt => opt.id === classSection.adviser)
       if (!adviserInOptions) {
-        const adviser = classSection.adviser
+        const adviser = classSection.adviser_user
         options.unshift({
-          id: adviser.id,
+          id: classSection.adviser,
           label: [adviser.first_name, adviser.middle_name, adviser.last_name, adviser.ext_name]
             .filter(Boolean)
             .join(' '),
@@ -224,11 +224,11 @@ export function ClassSectionModal({
         })
       }
     }
-    
+
     return options
     // Note: getFullName is a pure function, so we don't need it in dependencies
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teachers, classSection?.adviser?.id])
+  }, [teachers, classSection?.adviser])
 
   const handleClose = () => {
     if (!loading) {

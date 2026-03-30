@@ -571,7 +571,8 @@ export interface ClassSection {
   strand?: Strand | null;
   grade_level: string;
   title: string;
-  adviser?: User;
+  adviser?: string; // raw UUID FK
+  adviser_user?: User; // loaded relation
   academic_year?: string;
   created_at: string;
   updated_at: string;

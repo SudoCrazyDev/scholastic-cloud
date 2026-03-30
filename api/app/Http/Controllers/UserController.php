@@ -315,7 +315,7 @@ class UserController extends Controller
             $userRoleSlug = $userRole->slug;
 
             // Build query for class sections based on user role
-            $query = \App\Models\ClassSection::with(['institution', 'adviser', 'students']);
+            $query = \App\Models\ClassSection::with(['institution', 'adviserUser', 'students']);
 
             if ($userRoleSlug === 'subject-teacher') {
                 // Subject teachers see only class sections where they are the adviser

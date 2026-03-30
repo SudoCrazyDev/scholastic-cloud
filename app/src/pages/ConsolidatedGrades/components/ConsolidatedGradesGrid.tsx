@@ -52,8 +52,8 @@ export function ConsolidatedGradesGrid({
               <User className="w-4 h-4 mr-2 text-gray-400" />
               <span className="font-medium">Adviser:</span>
               <span className="ml-1">
-                {section.adviser ? 
-                  `${section.adviser.first_name} ${section.adviser.last_name}` : 
+                {section.adviser_user ?
+                  `${section.adviser_user.first_name} ${section.adviser_user.last_name}` :
                   'Not assigned'
                 }
               </span>

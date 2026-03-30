@@ -124,7 +124,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <span className="font-medium">Adviser:</span>
-                      <span className="ml-1 truncate">{classSection.adviser ? `${classSection.adviser?.last_name}, ${classSection.adviser?.first_name}` : 'Unassigned'}</span>
+                      <span className="ml-1 truncate">{classSection.adviser_user ? `${classSection.adviser_user.last_name}, ${classSection.adviser_user.first_name}` : 'Unassigned'}</span>
                     </div>
                   </div>
                 </div>
