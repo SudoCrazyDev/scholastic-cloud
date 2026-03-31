@@ -288,7 +288,7 @@ export default function PrintReportCard({
     const studentAge = (overrideAge !== undefined && overrideAge !== '')
         ? overrideAge
         : calculateAgeAsOfOctober31(student.birthdate, academicYear);
-    const teacher = (classSection as any)?.adviser
+    const teacher = (classSection as any)?.adviser_user
     const teacherName = formatTeacherName(teacher)
     const leftHeaderLogo = DEPED_LOGO_URL
     const rightHeaderLogo = schoolLogoUrl || toAbsoluteUrl(institution?.logo) || DEPED_LOGO_URL
