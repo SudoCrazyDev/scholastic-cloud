@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Institution;
+use App\Models\InstitutionAcademicYear;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -291,6 +292,61 @@ class InstitutionController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * List all academic years for an institution.
+     */
+    public function getAcademicYears(string $id): JsonResponse
+    {
+        $institution = Institution::findOrFail($id);
+        $years = $institution->academicYears()->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $years,
+        ]);
+    }
+
+    /**
+     * Update the current academic year for an institution.
+     * Also records the year in institution_academic_years if not already present.
+     * Restricted to principal and institution-administrator roles.
+     */
+    public function updateAcademicYear(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $role = $user->getRole();
+
+        if (!$role || !in_array($role->slug, ['principal', 'institution-administrator'])) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'current_academic_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+        ]);
+
+        $institution = Institution::findOrFail($id);
+        $year = $request->current_academic_year;
+
+        // Mark all other years as not current
+        InstitutionAcademicYear::where('institution_id', $institution->id)
+            ->where('year', '!=', $year)
+            ->update(['is_current' => false]);
+
+        // Upsert the selected year as current
+        InstitutionAcademicYear::updateOrCreate(
+            ['institution_id' => $institution->id, 'year' => $year],
+            ['is_current' => true]
+        );
+
+        $institution->update(['current_academic_year' => $year]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Academic year updated successfully',
+            'data' => $institution,
+        ]);
     }
 
     /**

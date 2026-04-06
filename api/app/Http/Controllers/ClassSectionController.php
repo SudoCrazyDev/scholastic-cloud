@@ -84,6 +84,15 @@ class ClassSectionController extends Controller
             'strand_id' => 'nullable|uuid|exists:strands,id',
         ]);
         $validated['institution_id'] = $institutionId;
+
+        // Auto-default academic_year from institution's current_academic_year if not provided
+        if (empty($validated['academic_year']) && $institutionId) {
+            $institution = \App\Models\Institution::find($institutionId);
+            if ($institution?->current_academic_year) {
+                $validated['academic_year'] = $institution->current_academic_year;
+            }
+        }
+
         $section = ClassSection::create($validated);
         $section->load(['adviserUser', 'department', 'track', 'strand']);
         return response()->json(['data' => $section], 201);

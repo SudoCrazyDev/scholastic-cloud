@@ -12,6 +12,7 @@ import { useTeachers } from '../../../hooks/useTeachers'
 import { useSubjectTemplates } from '../../../hooks/useSubjectTemplates'
 import { useTracks } from '../../../hooks/useTracks'
 import { useStrands } from '../../../hooks/useStrands'
+import { useAuth } from '../../../hooks/useAuth'
 import type { ClassSection, CreateClassSectionData, SubjectTemplate } from '../../../types'
 
 interface DepartmentOption {
@@ -48,6 +49,20 @@ const validationSchema = Yup.object().shape({
     .optional(),
 })
 
+function generateAcademicYearOptions(currentAcademicYear: string | null): { value: string; label: string }[] {
+  let baseYear = new Date().getFullYear()
+  if (currentAcademicYear) {
+    const parsed = parseInt(currentAcademicYear.split('-')[0])
+    if (!isNaN(parsed)) baseYear = parsed
+  }
+  const years = []
+  for (let y = baseYear - 5; y <= baseYear + 5; y++) {
+    const label = `${y}-${y + 1}`
+    years.push({ value: label, label })
+  }
+  return years
+}
+
 function isSeniorHighSchool(gradeLevel: string): boolean {
   const normalized = gradeLevel.replace(/\D/g, '')
   return normalized === '11' || normalized === '12'
@@ -82,6 +97,8 @@ export function ClassSectionModal({
   // Fetch subject templates
   const { templates, loading: templatesLoading } = useSubjectTemplates()
 
+  const { currentAcademicYear } = useAuth()
+
   const isEditing = !!classSection
 
   const formik = useFormik({
@@ -89,7 +106,7 @@ export function ClassSectionModal({
       grade_level: '',
       title: '',
       adviser_id: '',
-      academic_year: '',
+      academic_year: isEditing ? '' : (currentAcademicYear ?? ''),
       department_id: '',
       track_id: '',
       strand_id: '',
@@ -372,14 +389,17 @@ export function ClassSectionModal({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Academic Year
                   </label>
-                  <Input
-                    type="text"
+                  <Select
                     name="academic_year"
                     value={formik.values.academic_year}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
-                    placeholder="e.g., 2024-2025 (optional)"
                     className={formik.touched.academic_year && formik.errors.academic_year ? 'border-red-500' : ''}
+                    placeholder="Select academic year"
+                    options={[
+                      { value: '', label: 'None (optional)' },
+                      ...generateAcademicYearOptions(currentAcademicYear),
+                    ]}
                   />
                   {formik.touched.academic_year && formik.errors.academic_year && (
                     <p className="mt-1 text-sm text-red-600">{formik.errors.academic_year}</p>

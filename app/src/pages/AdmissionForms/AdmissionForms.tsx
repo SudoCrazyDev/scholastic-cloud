@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ClipboardList } from 'lucide-react'
 import { admissionFormService } from '../../services/admissionFormService'
@@ -8,6 +8,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { useRoleAccess } from '../../hooks/useRoleAccess'
 import type { AdmissionFormPayload, AdmissionFormSubmissionListItem } from '../../types'
 import { AdmissionSubmissionDetailView } from './AdmissionSubmissionDetailView'
+import { AcceptModal } from './AcceptModal'
+import type { AcceptPayload } from './AcceptModal'
+import { ConfirmationModal } from '../../components/ConfirmationModal'
 
 function applicantLabel(payload: AdmissionFormPayload): string {
   const g = payload.general_information
@@ -16,16 +19,43 @@ function applicantLabel(payload: AdmissionFormPayload): string {
   return parts || '—'
 }
 
+function StatusBadge({ status }: { status: AdmissionFormSubmissionListItem['status'] }) {
+  if (status === 'accepted') {
+    return (
+      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+        Accepted
+      </span>
+    )
+  }
+  if (status === 'rejected') {
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+        Rejected
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+      Pending
+    </span>
+  )
+}
+
 const ADMISSION_FORMS_ROLES = ['principal', 'institution-administrator']
 
 export default function AdmissionForms() {
   const navigate = useNavigate()
   const { hasAccess } = useRoleAccess(ADMISSION_FORMS_ROLES)
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [searchDraft, setSearchDraft] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'accepted' | 'rejected'>('pending')
   const [detail, setDetail] = useState<AdmissionFormSubmissionListItem | null>(null)
+  const [acceptTarget, setAcceptTarget] = useState<AdmissionFormSubmissionListItem | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<AdmissionFormSubmissionListItem | null>(null)
+  const [rejecting, setRejecting] = useState(false)
 
   const institutionId =
     user?.user_institutions?.find((ui: { is_default?: boolean }) => ui.is_default)?.institution_id
@@ -40,14 +70,17 @@ export default function AdmissionForms() {
     return `${window.location.origin}/admission/${institutionId}`
   }, [institutionId])
 
+  const queryKey = ['admission-form-submissions', page, search, statusFilter, institutionId]
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['admission-form-submissions', page, search, institutionId],
+    queryKey,
     queryFn: () =>
       admissionFormService.list({
         page,
         per_page: 15,
         search: search || undefined,
         institution_id: institutionId,
+        status: statusFilter,
       }),
     enabled: hasAccess && !!institutionId,
   })
@@ -71,6 +104,31 @@ export default function AdmissionForms() {
       if (res.success && res.data) setDetail(res.data)
     } catch {
       toast.error('Could not load submission.')
+    }
+  }
+
+  const handleAccept = async (payload: AcceptPayload) => {
+    if (!acceptTarget) return
+    await admissionFormService.accept(acceptTarget.id, payload)
+    toast.success('Student enrolled successfully.')
+    setAcceptTarget(null)
+    setDetail(null)
+    queryClient.invalidateQueries({ queryKey })
+  }
+
+  const handleReject = async () => {
+    if (!rejectTarget) return
+    setRejecting(true)
+    try {
+      await admissionFormService.reject(rejectTarget.id)
+      toast.success('Submission rejected.')
+      setRejectTarget(null)
+      setDetail(null)
+      queryClient.invalidateQueries({ queryKey })
+    } catch {
+      toast.error('Failed to reject submission.')
+    } finally {
+      setRejecting(false)
     }
   }
 
@@ -98,6 +156,24 @@ export default function AdmissionForms() {
               Copy public form link
             </button>
           ) : null}
+        </div>
+
+        {/* Status tabs */}
+        <div className="flex gap-1 mb-4 border-b border-gray-200">
+          {(['pending', 'accepted', 'rejected'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => { setStatusFilter(s); setPage(1) }}
+              className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${
+                statusFilter === s
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
 
         <div className="bg-white rounded-lg shadow-sm ring-1 ring-gray-200 p-4 mb-6 flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -153,6 +229,15 @@ export default function AdmissionForms() {
                       Grade level
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Exists
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Previous section
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                       Submitted
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -165,17 +250,62 @@ export default function AdmissionForms() {
                     <tr key={row.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm text-gray-900">{applicantLabel(row.payload)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{row.payload.grade_level}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {row.student_match ? (
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                            Exists
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                            New
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {row.student_match?.section
+                          ? `${row.student_match.section.title} (${row.student_match.section.grade_level}) — ${row.student_match.section.academic_year}`
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <StatusBadge status={row.status ?? 'pending'} />
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {row.created_at ? new Date(row.created_at).toLocaleString() : '—'}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openDetail(row)}
-                          className="text-indigo-600 text-sm font-medium hover:text-indigo-500"
-                        >
-                          View
-                        </button>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openDetail(row)}
+                            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+                          >
+                            View
+                          </button>
+                          {(row.status ?? 'pending') === 'pending' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const res = await admissionFormService.getOne(row.id)
+                                  if (res.success && res.data) setAcceptTarget(res.data)
+                                }}
+                                className="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-green-500 transition-colors"
+                              >
+                                {row.student_match ? 'Re-enroll' : 'Accept'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const res = await admissionFormService.getOne(row.id)
+                                  if (res.success && res.data) setRejectTarget(res.data)
+                                }}
+                                className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm hover:bg-red-100 transition-colors"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -212,6 +342,7 @@ export default function AdmissionForms() {
         )}
       </div>
 
+      {/* Detail modal */}
       {detail ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
@@ -221,9 +352,12 @@ export default function AdmissionForms() {
         >
           <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 id="adm-detail-title" className="text-lg font-semibold text-gray-900">
-                Submission detail
-              </h2>
+              <div className="flex items-center gap-3">
+                <h2 id="adm-detail-title" className="text-lg font-semibold text-gray-900">
+                  Submission detail
+                </h2>
+                <StatusBadge status={detail.status ?? 'pending'} />
+              </div>
               <button
                 type="button"
                 onClick={() => setDetail(null)}
@@ -232,7 +366,7 @@ export default function AdmissionForms() {
                 Close
               </button>
             </div>
-            <div className="px-6 py-4 overflow-y-auto text-sm">
+            <div className="px-6 py-4 overflow-y-auto text-sm flex-1">
               {detail.institution ? (
                 <p className="text-gray-600 mb-4">
                   <span className="font-medium text-gray-800">Institution:</span> {detail.institution.title}
@@ -244,13 +378,39 @@ export default function AdmissionForms() {
                   {new Date(detail.created_at).toLocaleString()}
                 </p>
               ) : null}
+              {detail.student_match?.section && (
+                <p className="text-gray-600 mb-4">
+                  <span className="font-medium text-gray-800">Previous section:</span>{' '}
+                  {detail.student_match.section.title} ({detail.student_match.section.grade_level}) — {detail.student_match.section.academic_year}
+                </p>
+              )}
               <AdmissionSubmissionDetailView payload={detail.payload} />
             </div>
-            <div className="px-6 py-3 border-t border-gray-200 flex justify-end">
+            <div className="px-6 py-3 border-t border-gray-200 flex justify-between items-center gap-2">
+              <div className="flex gap-2">
+                {(detail.status ?? 'pending') === 'pending' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setAcceptTarget(detail)}
+                      className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-500 transition-colors"
+                    >
+                      {detail.student_match ? 'Re-enroll' : 'Accept'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRejectTarget(detail)}
+                      className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-100 transition-colors"
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setDetail(null)}
-                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200"
+                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
               >
                 Close
               </button>
@@ -258,6 +418,28 @@ export default function AdmissionForms() {
           </div>
         </div>
       ) : null}
+
+      {/* Accept modal */}
+      {acceptTarget ? (
+        <AcceptModal
+          submission={acceptTarget}
+          onConfirm={handleAccept}
+          onClose={() => setAcceptTarget(null)}
+        />
+      ) : null}
+
+      {/* Reject confirmation modal */}
+      <ConfirmationModal
+        isOpen={!!rejectTarget}
+        onClose={() => setRejectTarget(null)}
+        onConfirm={handleReject}
+        title="Reject submission"
+        message="Are you sure you want to reject this submission? This cannot be undone."
+        confirmText="Reject"
+        cancelText="Cancel"
+        variant="danger"
+        loading={rejecting}
+      />
     </div>
   )
 }

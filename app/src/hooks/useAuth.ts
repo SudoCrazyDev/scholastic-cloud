@@ -9,6 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isImpersonating: boolean;
+  currentAcademicYear: string | null;
   login: (loginData: LoginResponse) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
@@ -156,12 +157,20 @@ export const useAuthState = () => {
     }
   };
 
+  const currentAcademicYear: string | null = (() => {
+    if (!user?.user_institutions?.length) return null;
+    const defaultInstitution = user.user_institutions.find((ui: any) => ui.is_default);
+    const institution = defaultInstitution ?? user.user_institutions[0];
+    return institution?.institution?.current_academic_year ?? null;
+  })();
+
   return {
     user,
     token,
     isAuthenticated: !!token,
     isLoading,
     isImpersonating,
+    currentAcademicYear,
     login,
     logout,
     refreshProfile,

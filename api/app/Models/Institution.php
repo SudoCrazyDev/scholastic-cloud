@@ -29,6 +29,7 @@ class Institution extends Model
         'logo',
         'subscription_id',
         'default_department_id',
+        'current_academic_year',
     ];
 
     /**
@@ -96,6 +97,14 @@ class Institution extends Model
     public function admissionFormSubmissions(): HasMany
     {
         return $this->hasMany(AdmissionFormSubmission::class);
+    }
+
+    /**
+     * Get the academic years for the institution.
+     */
+    public function academicYears(): HasMany
+    {
+        return $this->hasMany(InstitutionAcademicYear::class)->orderByDesc('year');
     }
 
     /**

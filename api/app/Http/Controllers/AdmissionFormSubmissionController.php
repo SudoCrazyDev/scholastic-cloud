@@ -4,8 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
 use App\Models\AdmissionFormSubmission;
+use App\Models\ClassSection;
 use App\Models\Institution;
+use App\Models\Student;
+use App\Models\StudentInstitution;
+use App\Models\StudentSection;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -130,6 +135,11 @@ class AdmissionFormSubmissionController extends Controller
 
         $query->where('institution_id', $institutionId);
 
+        $status = $request->get('status', 'pending');
+        if (in_array($status, ['pending', 'accepted', 'rejected'])) {
+            $query->where('status', $status);
+        }
+
         if ($request->filled('search')) {
             $term = '%' . $request->get('search') . '%';
             $query->where(function ($q) use ($term) {
@@ -142,9 +152,12 @@ class AdmissionFormSubmissionController extends Controller
 
         $submissions = $query->orderByDesc('created_at')->paginate($perPage);
 
+        $items = $submissions->items();
+        $augmented = $this->augmentWithStudentMatches($items, $institutionId);
+
         return response()->json([
             'success' => true,
-            'data' => $submissions->items(),
+            'data' => $augmented,
             'pagination' => [
                 'current_page' => $submissions->currentPage(),
                 'last_page' => $submissions->lastPage(),
@@ -199,6 +212,211 @@ class AdmissionFormSubmissionController extends Controller
             'success' => true,
             'data' => $submission,
         ]);
+    }
+
+    /**
+     * Authenticated: accept a submission — create/link student and assign to a section.
+     */
+    public function accept(Request $request, string $id): JsonResponse
+    {
+        if (! $this->canAccessAdmissionSubmissions($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+        $institutionId = $this->resolveUserInstitutionId($user);
+
+        $submission = AdmissionFormSubmission::query()->find($id);
+        if (! $submission || $submission->institution_id !== $institutionId) {
+            return response()->json(['success' => false, 'message' => 'Submission not found.'], 404);
+        }
+        if ($submission->status === 'accepted') {
+            return response()->json(['success' => false, 'message' => 'This submission has already been accepted.'], 422);
+        }
+
+        $validated = $request->validate([
+            'section_id'  => 'required|uuid|exists:class_sections,id',
+            // New-student fields (required only when student_id is absent)
+            'student_id'  => 'nullable|uuid',   // existing student — skip creation
+            'first_name'  => 'required_without:student_id|string|max:255',
+            'last_name'   => 'required_without:student_id|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'lrn'         => 'nullable|string|max:50',
+            'gender'      => 'nullable|string|max:50',
+            'birthdate'   => 'nullable|string|max:50',
+            'religion'    => 'nullable|string|in:Catholic,Islam,Iglesia Ni Cristo,Baptists,Others',
+        ]);
+
+        $section = ClassSection::where('institution_id', $institutionId)->find($validated['section_id']);
+        if (! $section) {
+            return response()->json(['success' => false, 'message' => 'Section not found or does not belong to this institution.'], 422);
+        }
+
+        $institution = Institution::find($institutionId);
+        $academicYear = $institution?->current_academic_year ?? $section->academic_year ?? date('Y') . '-' . (date('Y') + 1);
+
+        DB::beginTransaction();
+        try {
+            if (! empty($validated['student_id'])) {
+                // Existing student — just enroll in the new section
+                $student = Student::find($validated['student_id']);
+                if (! $student) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => 'Student not found.'], 422);
+                }
+            } else {
+                // New student — create from payload + modal overrides
+                $gi = $submission->payload['general_information'] ?? [];
+                $student = Student::create([
+                    'first_name'  => $validated['first_name'],
+                    'last_name'   => $validated['last_name'],
+                    'middle_name' => $validated['middle_name'] ?? ($gi['middle_name'] ?? null),
+                    'lrn'         => $validated['lrn'] ?? ($gi['lrn'] ?? null) ?: null,
+                    'gender'      => $validated['gender'] ?? ($gi['gender'] ?? null),
+                    'birthdate'   => $validated['birthdate'] ?? ($gi['birthdate'] ?? null),
+                    'religion'    => $validated['religion'] ?? null,
+                    'is_active'   => true,
+                ]);
+
+                // Link student to institution (skip if already linked)
+                StudentInstitution::firstOrCreate(
+                    ['student_id' => $student->id, 'institution_id' => $institutionId],
+                    ['is_active' => true, 'academic_year' => $academicYear]
+                );
+            }
+
+            // Enroll in section (skip if already in this section for this academic year)
+            StudentSection::firstOrCreate(
+                ['student_id' => $student->id, 'section_id' => $section->id, 'academic_year' => $academicYear],
+                ['is_active' => true, 'is_promoted' => false]
+            );
+
+            $submission->update([
+                'status'     => 'accepted',
+                'student_id' => $student->id,
+            ]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to accept submission: ' . $e->getMessage()], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Submission accepted. Student enrolled in section.',
+            'data'    => ['student_id' => $student->id],
+        ]);
+    }
+
+    /**
+     * Authenticated: reject a submission.
+     */
+    public function reject(Request $request, string $id): JsonResponse
+    {
+        if (! $this->canAccessAdmissionSubmissions($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+        $institutionId = $this->resolveUserInstitutionId($user);
+
+        $submission = AdmissionFormSubmission::query()->find($id);
+        if (! $submission || $submission->institution_id !== $institutionId) {
+            return response()->json(['success' => false, 'message' => 'Submission not found.'], 404);
+        }
+        if ($submission->status !== 'pending') {
+            return response()->json(['success' => false, 'message' => 'Only pending submissions can be rejected.'], 422);
+        }
+
+        $submission->update(['status' => 'rejected']);
+
+        return response()->json(['success' => true, 'message' => 'Submission rejected.']);
+    }
+
+    /**
+     * For each submission item, look up a matching student (by LRN or first+last name)
+     * scoped to the institution, and attach student_match with their latest section.
+     */
+    private function augmentWithStudentMatches(array $items, string $institutionId): array
+    {
+        $lrns = [];
+        $namePairs = [];
+
+        foreach ($items as $item) {
+            $gi = $item->payload['general_information'] ?? [];
+            $lrn = trim($gi['lrn'] ?? '');
+            $firstName = trim($gi['first_name'] ?? '');
+            $lastName = trim($gi['surname'] ?? '');
+
+            if ($lrn !== '') {
+                $lrns[] = $lrn;
+            }
+            if ($firstName !== '' && $lastName !== '') {
+                $namePairs[] = [$firstName, $lastName];
+            }
+        }
+
+        $matchedStudents = collect();
+
+        if (!empty($lrns) || !empty($namePairs)) {
+            $matchedStudents = Student::query()
+                ->whereHas('studentInstitutions', fn ($q) => $q->where('institution_id', $institutionId))
+                ->where(function ($q) use ($lrns, $namePairs) {
+                    if (!empty($lrns)) {
+                        $q->whereIn('lrn', $lrns);
+                    }
+                    foreach ($namePairs as [$fn, $ln]) {
+                        $q->orWhere(function ($inner) use ($fn, $ln) {
+                            $inner->whereRaw('LOWER(first_name) = ?', [strtolower($fn)])
+                                  ->whereRaw('LOWER(last_name) = ?', [strtolower($ln)]);
+                        });
+                    }
+                })
+                ->with(['studentSections' => function ($q) {
+                    $q->with('classSection:id,title,grade_level,academic_year')
+                      ->orderByDesc('academic_year')
+                      ->orderByDesc('created_at');
+                }])
+                ->get();
+        }
+
+        $byLrn = $matchedStudents->filter(fn ($s) => $s->lrn !== null && $s->lrn !== '')
+                                 ->keyBy('lrn');
+        $byName = $matchedStudents->keyBy(
+            fn ($s) => strtolower(trim($s->first_name)) . '|' . strtolower(trim($s->last_name))
+        );
+
+        return collect($items)->map(function ($item) use ($byLrn, $byName) {
+            $gi = $item->payload['general_information'] ?? [];
+            $lrn = trim($gi['lrn'] ?? '');
+            $firstName = strtolower(trim($gi['first_name'] ?? ''));
+            $lastName = strtolower(trim($gi['surname'] ?? ''));
+
+            $student = null;
+            if ($lrn !== '' && $byLrn->has($lrn)) {
+                $student = $byLrn->get($lrn);
+            } elseif ($firstName !== '' && $lastName !== '') {
+                $student = $byName->get("$firstName|$lastName");
+            }
+
+            $latestSection = $student?->studentSections->first()?->classSection;
+
+            $arr = $item->toArray();
+            $arr['student_match'] = $student ? [
+                'id' => $student->id,
+                'section' => $latestSection ? [
+                    'id' => $latestSection->id,
+                    'title' => $latestSection->title,
+                    'grade_level' => $latestSection->grade_level,
+                    'academic_year' => $latestSection->academic_year,
+                ] : null,
+            ] : null;
+
+            return $arr;
+        })->all();
     }
 
     private function submissionValidationRules(): array

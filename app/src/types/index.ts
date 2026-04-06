@@ -482,6 +482,7 @@ export interface Institution {
   logo?: string;
   default_department_id?: string | null;
   default_department?: Department | null;
+  current_academic_year?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1041,9 +1042,15 @@ export interface AdmissionFormSubmissionListItem {
   id: string
   institution_id: string
   payload: AdmissionFormPayload
+  status: 'pending' | 'accepted' | 'rejected'
+  student_id?: string | null
   created_at?: string
   updated_at?: string
   institution?: { id: string; title: string; abbr?: string | null; address?: string | null }
+  student_match?: {
+    id: string
+    section: { id: string; title: string; grade_level: string; academic_year: string } | null
+  } | null
 }
 
 // Student Attendance types

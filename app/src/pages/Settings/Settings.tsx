@@ -12,15 +12,17 @@ import { Button } from '../../components/button'
 import { Textarea } from '../../components/textarea'
 import { Select } from '../../components/select'
 import { Alert } from '../../components/alert'
-import { Building2 } from 'lucide-react'
+import { Building2, CalendarDays } from 'lucide-react'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import type { UpdateInstitutionData } from '../../types'
 
 const Settings: React.FC = () => {
-  const { user } = useAuth()
+  const { user, refreshProfile } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { hasAccess } = useRoleAccess(['principal', 'institution-administrator'])
+  const [academicYearInput, setAcademicYearInput] = useState('')
+  const [academicYearError, setAcademicYearError] = useState('')
   const [formData, setFormData] = useState({
     title: '',
     abbr: '',
@@ -75,6 +77,29 @@ const Settings: React.FC = () => {
     },
   })
 
+  // Fetch academic year history
+  const { data: academicYears = [], refetch: refetchAcademicYears } = useQuery({
+    queryKey: ['institution-academic-years', institutionId],
+    queryFn: () => institutionService.getAcademicYears(institutionId!),
+    enabled: !!institutionId && hasAccess,
+  })
+
+  // Academic year mutation
+  const academicYearMutation = useMutation({
+    mutationFn: (year: string) =>
+      institutionService.updateAcademicYear(institutionId!, year),
+    onSuccess: async () => {
+      await refreshProfile()
+      queryClient.invalidateQueries({ queryKey: ['institution', institutionId] })
+      refetchAcademicYears()
+      toast.success('Academic year updated successfully!')
+    },
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || 'Failed to update academic year'
+      toast.error(msg)
+    },
+  })
+
   // Redirect if user doesn't have access
   useEffect(() => {
     if (!hasAccess) {
@@ -96,6 +121,7 @@ const Settings: React.FC = () => {
         logo: null,
       })
       setLogoPreview(institution.logo || null)
+      setAcademicYearInput(institution.current_academic_year || '')
     }
   }, [institution])
 
@@ -250,6 +276,116 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Academic Year Settings */}
+      {institution && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <CalendarDays className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Academic Year</h2>
+              <p className="text-sm text-gray-500">
+                Set the current school year. This will be applied globally as the default for all new records.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-end gap-4">
+            <div className="flex-1 max-w-xs">
+              <Input
+                label="Current Academic Year"
+                type="text"
+                value={academicYearInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setAcademicYearInput(e.target.value)
+                  setAcademicYearError('')
+                }}
+                placeholder="e.g. 2025-2026"
+                error={academicYearError}
+                disabled={academicYearMutation.isPending}
+              />
+              <p className="mt-1 text-xs text-gray-500">Format: YYYY-YYYY (e.g. 2025-2026)</p>
+            </div>
+            <div className="mb-6">
+              <Button
+                type="button"
+                color="primary"
+                disabled={academicYearMutation.isPending}
+                onClick={() => {
+                  const trimmed = academicYearInput.trim()
+                  if (!trimmed) {
+                    setAcademicYearError('Academic year is required')
+                    return
+                  }
+                  if (!/^\d{4}-\d{4}$/.test(trimmed)) {
+                    setAcademicYearError('Use format YYYY-YYYY (e.g. 2025-2026)')
+                    return
+                  }
+                  setAcademicYearError('')
+                  academicYearMutation.mutate(trimmed)
+                }}
+              >
+                {academicYearMutation.isPending ? 'Saving...' : 'Set Academic Year'}
+              </Button>
+            </div>
+          </div>
+
+          {academicYears.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Academic Year History</h3>
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Year
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {academicYears.map((ay) => (
+                      <tr key={ay.id} className={ay.is_current ? 'bg-indigo-50' : ''}>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {ay.year}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {ay.is_current ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                              Current
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {!ay.is_current && (
+                            <button
+                              type="button"
+                              disabled={academicYearMutation.isPending}
+                              onClick={() => academicYearMutation.mutate(ay.year)}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+                            >
+                              Set as current
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Form */}
       {institution && (

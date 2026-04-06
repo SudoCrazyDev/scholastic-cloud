@@ -2,14 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { Menu, CalendarDays } from 'lucide-react';
 
 interface TopbarProps {
   onMobileMenuClick?: () => void;
 }
 
 const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, currentAcademicYear } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const navigate = useNavigate();
@@ -70,6 +70,14 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick }) => {
 
         {/* Right Section - Actions */}
         <div className="flex items-center space-x-4">
+          {/* Current Academic Year Badge */}
+          {currentAcademicYear && (
+            <div className="hidden sm:flex items-center space-x-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium">
+              <CalendarDays className="w-4 h-4" />
+              <span>S.Y. {currentAcademicYear}</span>
+            </div>
+          )}
+
           {/* Notifications */}
           <div className="relative" ref={notificationsRef}>
             <motion.button

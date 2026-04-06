@@ -13,6 +13,8 @@ class AdmissionFormSubmission extends Model
     protected $fillable = [
         'institution_id',
         'payload',
+        'status',
+        'student_id',
     ];
 
     protected function casts(): array

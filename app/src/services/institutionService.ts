@@ -101,6 +101,20 @@ class InstitutionService {
     await api.delete(`${this.baseUrl}/${id}`)
   }
 
+  async getAcademicYears(institutionId: string): Promise<{ id: string; year: string; is_current: boolean; created_at: string }[]> {
+    const response = await api.get<{ data: { id: string; year: string; is_current: boolean; created_at: string }[] }>(
+      `${this.baseUrl}/${institutionId}/academic-years`
+    )
+    return response.data.data
+  }
+
+  async updateAcademicYear(institutionId: string, academicYear: string) {
+    const response = await api.put<{ data: Institution }>(`${this.baseUrl}/${institutionId}/academic-year`, {
+      current_academic_year: academicYear,
+    })
+    return response.data
+  }
+
   async assignSubscription(institutionId: string, subscriptionId: string, expirationDate: string, discount?: number) {
     const response = await api.post<{ data: any }>(`${this.baseUrl}/${institutionId}/subscriptions`, {
       subscription_id: subscriptionId,

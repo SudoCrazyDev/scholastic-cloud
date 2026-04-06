@@ -249,7 +249,8 @@ class AuthController extends Controller
                     ] : null,
                     'institution' => $userInstitution->institution ? [
                         'id' => $userInstitution->institution->id,
-                        'name' => $userInstitution->institution->name,
+                        'title' => $userInstitution->institution->title,
+                        'current_academic_year' => $userInstitution->institution->current_academic_year,
                     ] : null,
                 ];
             }),
@@ -333,7 +334,8 @@ class AuthController extends Controller
                     ] : null,
                     'institution' => $userInstitution->institution ? [
                         'id' => $userInstitution->institution->id,
-                        'name' => $userInstitution->institution->name,
+                        'title' => $userInstitution->institution->title,
+                        'current_academic_year' => $userInstitution->institution->current_academic_year,
                     ] : null,
                 ];
             }),

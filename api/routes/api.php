@@ -96,6 +96,8 @@ Route::middleware('auth.token')->group(function () {
     // Institution routes
     Route::apiResource('institutions', InstitutionController::class);
     Route::post('institutions/{id}', [InstitutionController::class, 'update']); // POST route for file uploads
+    Route::put('institutions/{id}/academic-year', [InstitutionController::class, 'updateAcademicYear']);
+    Route::get('institutions/{id}/academic-years', [InstitutionController::class, 'getAcademicYears']);
     Route::get('grade-levels', [GradeLevelController::class, 'index']);
     Route::post('grade-levels', [GradeLevelController::class, 'store']);
     Route::put('grade-levels/{id}', [GradeLevelController::class, 'update']);
@@ -312,9 +314,11 @@ Route::middleware('auth.token')->group(function () {
     // Certificate routes
     Route::apiResource('certificates', CertificateController::class);
 
-    // Online admission form submissions (admin list/detail)
+    // Online admission form submissions (admin list/detail/accept/reject)
     Route::get('admission-form-submissions', [AdmissionFormSubmissionController::class, 'index']);
     Route::get('admission-form-submissions/{id}', [AdmissionFormSubmissionController::class, 'show']);
+    Route::post('admission-form-submissions/{id}/accept', [AdmissionFormSubmissionController::class, 'accept']);
+    Route::post('admission-form-submissions/{id}/reject', [AdmissionFormSubmissionController::class, 'reject']);
 });
 
 Route::get('/health', function () {

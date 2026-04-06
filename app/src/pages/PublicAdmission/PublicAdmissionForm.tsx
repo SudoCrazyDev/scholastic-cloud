@@ -77,7 +77,7 @@ function buildInitialValues(): AdmissionFormPayload {
     family_information: {
       father: { name: '', age: undefined, occupation: '' },
       mother: { name: '', age: undefined, occupation: '' },
-      siblings: { brothers: undefined, sisters: undefined },
+      siblings: { brothers: 0, sisters: 0 },
     },
     emergency_contact: {
       name: '',
