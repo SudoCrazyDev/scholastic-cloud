@@ -9,8 +9,8 @@ return new class extends Migration
     {
         DB::statement("
             CREATE TABLE `institution_academic_years` (
-                `id` uuid NOT NULL,
-                `institution_id` uuid NOT NULL,
+                `id` char(36) NOT NULL,
+                `institution_id` char(36) NOT NULL,
                 `year` varchar(255) NOT NULL,
                 `is_current` tinyint(1) NOT NULL DEFAULT '0',
                 `created_at` timestamp NULL DEFAULT NULL,
