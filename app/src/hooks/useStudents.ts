@@ -96,32 +96,12 @@ export function useStudents(options?: { class_section_id?: string }) {
   // Create student mutation
   const createMutation = useMutation({
     mutationFn: (data: CreateStudentData) => studentService.createStudent(data),
-    onSuccess: () => {
-      toast.success('Student created successfully!')
-      queryClient.invalidateQueries({ queryKey: ['students'] })
-      setIsModalOpen(false)
-      setEditingStudent(null)
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to create student'
-      toast.error(message)
-    },
   })
 
   // Update student mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateStudentData }) => 
+    mutationFn: ({ id, data }: { id: string; data: UpdateStudentData }) =>
       studentService.updateStudent(id, data),
-    onSuccess: () => {
-      toast.success('Student updated successfully!')
-      queryClient.invalidateQueries({ queryKey: ['students'] })
-      setIsModalOpen(false)
-      setEditingStudent(null)
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to update student'
-      toast.error(message)
-    },
   })
 
   // Delete student mutation
@@ -206,11 +186,12 @@ export function useStudents(options?: { class_section_id?: string }) {
 
   const handleModalSubmit = useCallback(async (data: CreateStudentData) => {
     if (editingStudent) {
-      updateMutation.mutate({ id: editingStudent.id, data })
+      await updateMutation.mutateAsync({ id: editingStudent.id, data })
     } else {
-      createMutation.mutate(data)
+      await createMutation.mutateAsync(data)
     }
-  }, [editingStudent, createMutation, updateMutation])
+    queryClient.invalidateQueries({ queryKey: ['students'] })
+  }, [editingStudent, createMutation, updateMutation, queryClient])
 
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false)
