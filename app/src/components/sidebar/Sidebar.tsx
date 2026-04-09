@@ -30,6 +30,7 @@ import {
   Route,
   ClipboardList,
   CalendarDays,
+  ScanLine,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -183,6 +184,13 @@ const menuGroups: MenuGroup[] = [
         icon: <ClipboardList className="w-5 h-5" />,
         path: '/admission-forms',
         allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'gate-entries',
+        label: 'Gate Entries',
+        icon: <ScanLine className="w-5 h-5" />,
+        path: '/gate-entries',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
       },
     ],
   },
