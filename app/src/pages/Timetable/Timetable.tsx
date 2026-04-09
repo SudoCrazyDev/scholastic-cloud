@@ -92,8 +92,8 @@ const Timetable: React.FC = () => {
     closeScheduleModal,
   } = useUpdateSubjectSchedule()
 
-  const scheduledSubjects = subjects.filter(s => s.start_time && s.end_time && s.meeting_days?.length)
-  const unscheduledSubjects = subjects.filter(s => !s.start_time || !s.end_time || !s.meeting_days?.length)
+  const scheduledSubjects = subjects.filter(s => s.start_time && s.end_time)
+  const unscheduledSubjects = subjects.filter(s => !s.start_time || !s.end_time)
 
   return (
     <div
@@ -265,7 +265,7 @@ const Timetable: React.FC = () => {
                   )}
 
                   {subjects.map((subject: Subject) => {
-                    const isScheduled = !!(subject.start_time && subject.end_time && subject.meeting_days?.length)
+                    const isScheduled = !!(subject.start_time && subject.end_time)
                     const isConflict = conflictSubjectIds.has(subject.id)
 
                     return (

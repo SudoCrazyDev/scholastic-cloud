@@ -106,7 +106,7 @@ export function ClassSectionSubjectModal({
 
   const formik = useFormik({
     initialValues: {
-      subject_type: 'child' as 'parent' | 'child',
+      subject_type: 'parent' as 'parent' | 'child',
       parent_subject_id: '',
       title: '',
       variant: '',

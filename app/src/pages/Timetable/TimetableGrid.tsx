@@ -78,8 +78,11 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ subjects, conflictSubject
     DAYS.forEach(d => (map[d] = []))
 
     subjects.forEach(subject => {
-      if (!subject.start_time || !subject.end_time || !subject.meeting_days?.length) return
-      subject.meeting_days.forEach(day => {
+      if (!subject.start_time || !subject.end_time) return
+      const days = subject.meeting_days?.length
+        ? subject.meeting_days
+        : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+      days.forEach(day => {
         if (map[day]) {
           map[day].push({
             subject,
@@ -117,7 +120,7 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ subjects, conflictSubject
             <div
               key={slot}
               className="absolute right-2 text-[10px] text-gray-400 leading-none"
-              style={{ top: i * SLOT_HEIGHT_PX - 6 }}
+              style={{ top: i === 0 ? 0 : i * SLOT_HEIGHT_PX - 6 }}
             >
               {i % 2 === 0 ? slot : ''}
             </div>
@@ -145,13 +148,14 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ subjects, conflictSubject
               const topPx = minutesToOffset(timeToMinutes(subject.start_time!.slice(0, 5)))
               const heightPx = durationToPx(subject.start_time!.slice(0, 5), subject.end_time!.slice(0, 5))
               const isConflict = conflictSubjectIds.has(subject.id)
+              const noDays = !subject.meeting_days?.length
 
               return (
                 <div
                   key={subject.id}
-                  className={`absolute left-1 right-1 rounded-md border px-2 py-1 overflow-hidden cursor-pointer group transition-shadow hover:shadow-md ${colorClass} ${
-                    isConflict ? 'ring-2 ring-red-400 ring-offset-1' : ''
-                  }`}
+                  className={`absolute left-1 right-1 rounded-md px-2 py-1 overflow-hidden cursor-pointer group transition-shadow hover:shadow-md ${colorClass} ${
+                    noDays ? 'border-dashed border-2 opacity-60' : 'border'
+                  } ${isConflict ? 'ring-2 ring-red-400 ring-offset-1' : ''}`}
                   style={{ top: topPx + 1, height: Math.max(heightPx - 2, 20) }}
                   onClick={() => onEditSchedule(subject)}
                 >
