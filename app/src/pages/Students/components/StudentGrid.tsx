@@ -4,8 +4,6 @@ import {
   EyeIcon,
   TrashIcon,
   UserIcon,
-  CalendarIcon,
-  AcademicCapIcon,
   PencilIcon,
   KeyIcon,
   CpuChipIcon,
@@ -64,8 +62,8 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
   const isSelected = (student: Student) => selectedRows.some(item => item.id === student.id)
 
   const getFullName = (student: Student) => {
-    const parts = [student.first_name, student.middle_name, student.last_name].filter(Boolean)
-    const fullName = parts.join(' ')
+    const parts = [student.last_name, student.first_name, student.middle_name].filter(Boolean)
+    const fullName = parts.join(', ')
     return student.ext_name ? `${fullName} ${student.ext_name}` : fullName
   }
 
@@ -99,7 +97,6 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
     if (!rfidStudent || !rfidValue.trim()) return
     setRfidSaving(true)
     try {
-      // Check for existing tag first
       const existing = await studentRfidTagService.getByStudent(rfidStudent.id)
       const tag = existing.data?.[0]
       if (tag) {
@@ -119,7 +116,6 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
 
   const handleDownloadQR = (student: Student) => {
     setQrStudent(student)
-    // Allow the hidden canvas to render, then download
     setTimeout(() => {
       const canvas = document.getElementById(`qr-canvas-${student.id}`) as HTMLCanvasElement
       if (!canvas) return
@@ -142,7 +138,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
           <span className="ml-3 text-gray-600">Loading students...</span>
         </div>
       </div>
@@ -153,11 +149,6 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="text-center py-12">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Students</h3>
           <p className="text-gray-500">{error}</p>
         </div>
@@ -173,7 +164,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
             <UserIcon className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Students Found</h3>
-          <p className="text-gray-500 mb-6">Get started by creating your first student record.</p>
+          <p className="text-gray-500">Get started by creating your first student record.</p>
         </div>
       </div>
     )
@@ -181,146 +172,154 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        {/* Header with select all */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <Checkbox
-              checked={selectedRows.length === students.length && students.length > 0}
-              onChange={handleSelectAll}
-              indeterminate={selectedRows.length > 0 && selectedRows.length < students.length}
-            />
-            <span className="text-sm text-gray-600">
-              {selectedRows.length > 0
-                ? `${selectedRows.length} of ${students.length} selected`
-                : `${students.length} students`}
-            </span>
-          </div>
-        </div>
-
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {students.map((student) => (
-            <motion.div
-              key={student.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`relative group border rounded-lg p-4 transition-all duration-200 hover:shadow-md ${
-                isSelected(student)
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-            >
-              {/* Selection checkbox */}
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="w-10 px-4 py-3">
                 <Checkbox
-                  checked={isSelected(student)}
-                  onChange={(checked) => handleSelectStudent(student, checked)}
+                  checked={selectedRows.length === students.length && students.length > 0}
+                  onChange={handleSelectAll}
+                  indeterminate={selectedRows.length > 0 && selectedRows.length < students.length}
                 />
-              </div>
-
-              {/* Avatar */}
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-3 overflow-hidden">
-                {student.profile_picture ? (
-                  <img
-                    src={student.profile_picture}
-                    alt={`${getFullName(student)} profile`}
-                    className="w-full h-full object-cover"
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Student
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                LRN
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Gender
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Religion
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Birthdate
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {students.map((student, index) => (
+              <motion.tr
+                key={student.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: index * 0.02 }}
+                className={`group transition-colors ${
+                  isSelected(student) ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                }`}
+              >
+                {/* Checkbox */}
+                <td className="px-4 py-3">
+                  <Checkbox
+                    checked={isSelected(student)}
+                    onChange={(checked) => handleSelectStudent(student, checked)}
                   />
-                ) : (
-                  <UserIcon className="w-6 h-6 text-indigo-600" />
-                )}
-              </div>
+                </td>
 
-              {/* Student info */}
-              <div className="space-y-2">
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm truncate uppercase" title={getFullName(student)}>
-                    {getFullName(student)}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge color={getGenderColor(student.gender || 'other')}>
-                      {(student.gender || 'other').charAt(0).toUpperCase() + (student.gender || 'other').slice(1)}
-                    </Badge>
-                    <Badge color={getReligionColor(student.religion || 'Others')}>
-                      {student.religion || 'Others'}
-                    </Badge>
+                {/* Student */}
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-indigo-100 flex-shrink-0 flex items-center justify-center">
+                      {student.profile_picture ? (
+                        <img src={student.profile_picture} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <UserIcon className="w-4 h-4 text-indigo-500" />
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900 uppercase">
+                      {getFullName(student)}
+                    </span>
                   </div>
-                </div>
+                </td>
 
-                <div className="space-y-1">
-                  <div className="flex items-center text-xs text-gray-600">
-                    <AcademicCapIcon className="w-3 h-3 mr-1 flex-shrink-0" />
-                    <span className="truncate" title={student.lrn}>LRN: {student.lrn}</span>
+                {/* LRN */}
+                <td className="px-4 py-3 text-sm text-gray-600 font-mono">
+                  {student.lrn || '—'}
+                </td>
+
+                {/* Gender */}
+                <td className="px-4 py-3">
+                  <Badge color={getGenderColor(student.gender || 'other')}>
+                    {(student.gender || 'other').charAt(0).toUpperCase() + (student.gender || 'other').slice(1)}
+                  </Badge>
+                </td>
+
+                {/* Religion */}
+                <td className="px-4 py-3">
+                  <Badge color={getReligionColor(student.religion || 'Others')}>
+                    {student.religion || 'Others'}
+                  </Badge>
+                </td>
+
+                {/* Birthdate */}
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {formatDate(student.birthdate)}
+                </td>
+
+                {/* Actions */}
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => onView(student)}
+                      className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      title="View"
+                    >
+                      <EyeIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onEdit(student)}
+                      className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Edit"
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => openRfidModal(student)}
+                      className="p-1.5 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                      title="Assign RFID tag"
+                    >
+                      <CpuChipIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDownloadQR(student)}
+                      className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                      title="Download QR code"
+                    >
+                      <ArrowDownTrayIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onPasswordReset(student)}
+                      className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                      title="Reset portal password"
+                    >
+                      <KeyIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(student)}
+                      className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Delete"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div className="flex items-center text-xs text-gray-600">
-                    <CalendarIcon className="w-3 h-3 mr-1 flex-shrink-0" />
-                    <span className="truncate">Born {formatDate(student.birthdate)}</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Actions */}
-              <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                <button
-                  onClick={() => onView(student)}
-                  className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
-                  title="View student details"
-                >
-                  <EyeIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onEdit(student)}
-                  className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                  title="Edit student"
-                >
-                  <PencilIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => openRfidModal(student)}
-                  className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                  title="Assign RFID tag"
-                >
-                  <CpuChipIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDownloadQR(student)}
-                  className="p-1 text-gray-400 hover:text-purple-600 transition-colors"
-                  title="Download QR code"
-                >
-                  <ArrowDownTrayIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onPasswordReset(student)}
-                  className="p-1 text-gray-400 hover:text-amber-600 transition-colors"
-                  title="Reset portal password"
-                >
-                  <KeyIcon className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onDelete(student)}
-                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                  title="Delete student"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Hidden QR canvas for download */}
-              {qrStudent?.id === student.id && (
-                <div className="absolute -top-[9999px] -left-[9999px] pointer-events-none">
-                  <QRCodeCanvas
-                    id={`qr-canvas-${student.id}`}
-                    value={student.id}
-                    size={400}
-                    level="M"
-                  />
-                </div>
-              )}
-            </motion.div>
-          ))}
-        </div>
+                  {/* Hidden QR canvas for download */}
+                  {qrStudent?.id === student.id && (
+                    <div className="absolute -top-[9999px] -left-[9999px] pointer-events-none">
+                      <QRCodeCanvas id={`qr-canvas-${student.id}`} value={student.id} size={400} level="M" />
+                    </div>
+                  )}
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* RFID Modal */}
