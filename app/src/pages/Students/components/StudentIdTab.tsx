@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { CpuChipIcon, PencilIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { CpuChipIcon, PencilIcon, TrashIcon, PlusIcon, XMarkIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { studentRfidTagService } from '../../../services/studentRfidTagService'
@@ -79,13 +79,37 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
     .filter(Boolean)
     .join(' ')
 
+  const downloadQR = () => {
+    const svg = document.getElementById('student-qr-code') as unknown as SVGSVGElement
+    if (!svg) return
+    const serialized = new XMLSerializer().serializeToString(svg)
+    const blob = new Blob([serialized], { type: 'image/svg+xml' })
+    const url = URL.createObjectURL(blob)
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 400
+      canvas.height = 400
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, 400, 400)
+      ctx.drawImage(img, 0, 0, 400, 400)
+      URL.revokeObjectURL(url)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `student-qr-${student.id}.png`
+      a.click()
+    }
+    img.src = url
+  }
+
   return (
     <div className="space-y-6">
       {/* ID Card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-base font-semibold text-gray-900 mb-6">Student ID Card</h3>
 
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-4">
           <div className="w-80 rounded-2xl overflow-hidden shadow-lg border border-indigo-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
             {/* Header */}
             <div className="px-6 pt-6 pb-4 border-b border-indigo-500/40">
@@ -118,16 +142,21 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
             </div>
 
             {/* QR Code */}
-            <div className="bg-white mx-4 mb-5 rounded-xl p-4 flex items-center gap-4">
-              <QRCodeSVG value={student.id} size={80} level="M" includeMargin={false} />
-              <div className="min-w-0">
-                <p className="text-xs text-gray-500 font-medium">Student ID</p>
-                <p className="text-[10px] text-gray-400 break-all leading-tight mt-0.5">
-                  {student.id}
-                </p>
-              </div>
+            <div className="bg-white mx-4 mb-5 rounded-xl p-4 flex justify-center">
+              <QRCodeSVG
+                id="student-qr-code"
+                value={student.id}
+                size={160}
+                level="M"
+                includeMargin={false}
+              />
             </div>
           </div>
+
+          <Button variant="outline" size="sm" onClick={downloadQR}>
+            <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+            Download QR Code
+          </Button>
         </div>
       </div>
 
