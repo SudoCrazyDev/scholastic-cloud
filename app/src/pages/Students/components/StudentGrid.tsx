@@ -1,5 +1,20 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+
+function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="relative group/tip">
+      {children}
+      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50
+                      opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150">
+        <div className="bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded whitespace-nowrap shadow-lg">
+          {label}
+        </div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+      </div>
+    </div>
+  )
+}
 import {
   EyeIcon,
   TrashIcon,
@@ -265,48 +280,54 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 {/* Actions */}
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => onView(student)}
-                      className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                      title="View"
-                    >
-                      <EyeIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onEdit(student)}
-                      className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                      title="Edit"
-                    >
-                      <PencilIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => openRfidModal(student)}
-                      className="p-1.5 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
-                      title="Assign RFID tag"
-                    >
-                      <CpuChipIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDownloadQR(student)}
-                      className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
-                      title="Download QR code"
-                    >
-                      <ArrowDownTrayIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onPasswordReset(student)}
-                      className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                      title="Reset portal password"
-                    >
-                      <KeyIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(student)}
-                      className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      title="Delete"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+                    <Tooltip label="View details">
+                      <button
+                        onClick={() => onView(student)}
+                        className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      >
+                        <EyeIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Edit student">
+                      <button
+                        onClick={() => onEdit(student)}
+                        className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <PencilIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Assign RFID tag">
+                      <button
+                        onClick={() => openRfidModal(student)}
+                        className="p-1.5 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                      >
+                        <CpuChipIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Download QR code">
+                      <button
+                        onClick={() => handleDownloadQR(student)}
+                        className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                      >
+                        <ArrowDownTrayIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Reset portal password">
+                      <button
+                        onClick={() => onPasswordReset(student)}
+                        className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                      >
+                        <KeyIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label="Delete student">
+                      <button
+                        onClick={() => onDelete(student)}
+                        className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </Tooltip>
                   </div>
 
                   {/* Hidden QR canvas for download */}
