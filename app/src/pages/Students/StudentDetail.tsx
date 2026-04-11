@@ -17,10 +17,11 @@ import {
   ArrowUpTrayIcon,
   TrashIcon,
   DocumentIcon,
+  CreditCardIcon,
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
-import { StudentFinanceTab, CrossCheckModal } from './components'
+import { StudentFinanceTab, CrossCheckModal, StudentIdTab } from './components'
 import { studentService } from '../../services/studentService'
 import { studentDocumentService } from '../../services/studentDocumentService'
 import { toast } from 'react-hot-toast'
@@ -32,6 +33,7 @@ const tabs = [
   { id: 'medical', name: 'Medical Records', icon: HeartIcon },
   { id: 'documents', name: 'Documents', icon: IdentificationIcon },
   { id: 'finance', name: 'Finance', icon: BanknotesIcon },
+  { id: 'id', name: 'ID', icon: CreditCardIcon },
 ]
 
 export default function StudentDetail() {
@@ -587,6 +589,8 @@ export default function StudentDetail() {
         return renderDocuments()
       case 'finance':
         return <StudentFinanceTab student={student} studentId={student.id} />
+      case 'id':
+        return <StudentIdTab student={student} />
       default:
         return renderPersonalDetails()
     }
