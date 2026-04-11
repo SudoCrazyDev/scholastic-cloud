@@ -15,7 +15,29 @@
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_console_messages",
       "mcp__playwright__browser_network_requests",
-      "mcp__playwright__browser_evaluate"
+      "mcp__playwright__browser_evaluate",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(mysql -u root -padministrator scholastic_cloud_new_dev -e \"SELECT u.email, u.first_name, u.last_name, r.title as role FROM users u JOIN user_institutions ui ON ui.user_id = u.id JOIN roles r ON r.id = ui.role_id LIMIT 10;\")",
+      "mcp__playwright__browser_press_key",
+      "Bash(grep -E \"\\\\.\\(php|tsx?|jsx?\\)$\")",
+      "Bash(grep -E \"\\\\.\\(php\\)$\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"demo@scholasticcloud.com\",\"password\":\"Demo@1234\"}')",
+      "Bash(node -e \"require\\('@playwright/test'\\); console.log\\('playwright available'\\)\")",
+      "Bash(node -e \"require\\('@playwright/test'\\); console.log\\('ok'\\)\")",
+      "Bash(node test-scripts/demo-record.js)",
+      "Read(//c/Program Files/Google/Chrome/Application//**)",
+      "Read(//c/Program Files \\(x86\\)/Google/Chrome/**)",
+      "Bash(ls -lh \"c:\\\\Users\\\\admin\\\\Documents\\\\ScholasticCloud\\\\demo-videos\"/*.webm)",
+      "Bash(python3 -)",
+      "Bash(python3)",
+      "Bash(python3 \"C:/Users/admin/Documents/parse_students.py\")",
+      "Bash(npm view:*)",
+      "Bash(npm update:*)",
+      "Bash(wc -l /c/Users/admin/Documents/ScholasticCloud/app/src/pages/*/*.tsx)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl -s -X POST http://localhost:8000/api/login -H 'Content-Type: application/json' -d '{\"email\":\"test@test.com\",\"password\":\"wrong\"}')",
+      "Bash(curl -s -X POST http://localhost:8000/api/login -H 'Content-Type: application/json' -d '{\"email\":\"demo@scholasticcloud.com\",\"password\":\"Demo@1234\"}')"
     ]
   }
 }
