@@ -230,7 +230,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 }`}
               >
                 {/* Checkbox */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-2">
                   <Checkbox
                     checked={isSelected(student)}
                     onChange={(checked) => handleSelectStudent(student, checked)}
@@ -238,11 +238,15 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 </td>
 
                 {/* Student */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-indigo-100 flex-shrink-0 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full bg-indigo-100 flex-shrink-0 relative flex items-center justify-center overflow-hidden">
                       {student.profile_picture ? (
-                        <img src={student.profile_picture} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={student.profile_picture}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover rounded-full"
+                        />
                       ) : (
                         <UserIcon className="w-4 h-4 text-indigo-500" />
                       )}
@@ -259,14 +263,14 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 </td>
 
                 {/* Gender */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-2">
                   <Badge color={getGenderColor(student.gender || 'other')}>
                     {(student.gender || 'other').charAt(0).toUpperCase() + (student.gender || 'other').slice(1)}
                   </Badge>
                 </td>
 
                 {/* Religion */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-2">
                   <Badge color={getReligionColor(student.religion || 'Others')}>
                     {student.religion || 'Others'}
                   </Badge>
@@ -278,7 +282,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 </td>
 
                 {/* Actions */}
-                <td className="px-4 py-3">
+                <td className="px-4 py-2">
                   <div className="flex items-center justify-end gap-1">
                     <Tooltip label="View details">
                       <button
