@@ -97,7 +97,7 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
       URL.revokeObjectURL(url)
       const a = document.createElement('a')
       a.href = canvas.toDataURL('image/png')
-      a.download = `student-qr-${student.id}.png`
+      a.download = `${student.last_name}-${student.first_name}-student-qr.png`
       a.click()
     }
     img.src = url
