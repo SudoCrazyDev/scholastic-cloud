@@ -171,6 +171,11 @@ const menuGroups: MenuGroup[] = [
         path: '/staffs',
         allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
       },
+    ],
+  },
+  {
+    label: 'Students',
+    items: [
       {
         id: 'students',
         label: 'Students',
@@ -180,7 +185,7 @@ const menuGroups: MenuGroup[] = [
       },
       {
         id: 'admission-forms',
-        label: 'Admission Form',
+        label: 'Admission Forms',
         icon: <ClipboardList className="w-5 h-5" />,
         path: '/admission-forms',
         allowedRoles: ['principal', 'institution-administrator'],

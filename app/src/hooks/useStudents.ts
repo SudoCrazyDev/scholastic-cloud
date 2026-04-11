@@ -25,20 +25,6 @@ export function useStudents(options?: { class_section_id?: string }) {
     loading: false,
   })
 
-  // Parse search value to extract individual fields
-  const parseSearchValue = (search: string) => {
-    const parts = search.trim().split(' ')
-    return {
-      first_name: parts[0] || '',
-      middle_name: parts[1] || '',
-      last_name: parts[2] || '',
-    }
-  }
-
-  const searchParams = parseSearchValue(searchValue)
-
-  // Debug logging for hook parameters
-
   // Query for fetching students
   const {
     data: studentsData,
@@ -46,7 +32,7 @@ export function useStudents(options?: { class_section_id?: string }) {
     error,
     refetch,
   } = useQuery<StudentsQueryResponse>({
-    queryKey: ['students', { ...searchParams, ...options }],
+    queryKey: ['students', { search: searchValue, ...options }],
     queryFn: async () => {
       // If class_section_id is provided, use getStudentsByClassSection
       if (options?.class_section_id) {
@@ -55,7 +41,7 @@ export function useStudents(options?: { class_section_id?: string }) {
       }
       // Otherwise, use the general getStudents method
       const response = await studentService.getStudents({
-        ...searchParams,
+        search: searchValue,
         per_page: 70,
       });
       return { type: 'paginated', data: response };

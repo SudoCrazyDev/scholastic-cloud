@@ -138,17 +138,37 @@ export function StudentModal({
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      setIsUploading(true)
-      setProfileImageFile(file)
-      // Create preview
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setProfileImage(e.target?.result as string)
-        setIsUploading(false)
+    if (!file) return
+
+    setIsUploading(true)
+
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+
+      // Resize to max 800x800 before upload
+      const MAX = 800
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX }
+        else { width = Math.round((width * MAX) / height); height = MAX }
       }
-      reader.readAsDataURL(file)
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+
+      canvas.toBlob((blob) => {
+        if (!blob) { setIsUploading(false); return }
+        const compressed = new File([blob], file.name, { type: 'image/jpeg' })
+        setProfileImageFile(compressed)
+        setProfileImage(canvas.toDataURL('image/jpeg', 0.85))
+        setIsUploading(false)
+      }, 'image/jpeg', 0.85)
     }
+    img.src = objectUrl
   }
 
   const handleRemoveImage = () => {

@@ -147,9 +147,17 @@ class StudentController extends Controller
                     $extension = $file->getClientOriginalExtension() ?: 'jpg';
                     $fileName = Str::uuid() . '.' . $extension;
                     $r2Path = $defaultInstitutionId . '/student/' . $student->id . '/profile/' . $fileName;
-                    Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
-                    $student->update(['profile_picture' => $r2Path]);
+                    $uploaded = Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
+                    if ($uploaded) {
+                        $student->update(['profile_picture' => $r2Path]);
+                    } else {
+                        Log::error('R2 put() returned false for student profile picture', ['student_id' => $student->id]);
+                    }
                 } catch (\Exception $e) {
+                    Log::error('Failed to upload student profile picture to R2', [
+                        'student_id' => $student->id,
+                        'error' => $e->getMessage(),
+                    ]);
                     // Continue without profile picture - student is already created
                 }
             }
@@ -352,8 +360,12 @@ class StudentController extends Controller
                 $extension = $file->getClientOriginalExtension() ?: 'jpg';
                 $fileName = Str::uuid() . '.' . $extension;
                 $r2Path = $defaultInstitutionId . '/student/' . $student->id . '/profile/' . $fileName;
-                Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
-                $updateData['profile_picture'] = $r2Path;
+                $uploaded = Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
+                if ($uploaded) {
+                    $updateData['profile_picture'] = $r2Path;
+                } else {
+                    Log::error('R2 put() returned false for student profile picture', ['student_id' => $student->id]);
+                }
             } catch (\Exception $e) {
                 // Don't update profile picture if upload fails
             }
@@ -370,6 +382,7 @@ class StudentController extends Controller
      */
     public function updateWithFile(Request $request, $id): JsonResponse
     {
+
         // Get the authenticated user's institution
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
@@ -441,13 +454,27 @@ class StudentController extends Controller
                 $extension = $profilePictureFile->getClientOriginalExtension() ?: 'jpg';
                 $fileName = Str::uuid() . '.' . $extension;
                 $r2Path = $defaultInstitutionId . '/student/' . $student->id . '/profile/' . $fileName;
-                Storage::disk('r2')->put($r2Path, file_get_contents($profilePictureFile->getRealPath()));
+                $uploaded = Storage::disk('r2')->put($r2Path, file_get_contents($profilePictureFile->getRealPath()));
+                if (!$uploaded) {
+                    Log::error('R2 put() returned false for student profile picture', ['student_id' => $student->id]);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Failed to upload profile picture to storage.',
+                    ], 500);
+                }
                 $updateData['profile_picture'] = $r2Path;
             } catch (\Exception $e) {
-                // Don't update profile picture if upload fails
+                Log::error('Failed to upload student profile picture to R2', [
+                    'student_id' => $student->id,
+                    'error' => $e->getMessage(),
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to upload profile picture: ' . $e->getMessage(),
+                ], 500);
             }
         }
-        
+
         $student->update($updateData);
         return response()->json(['success' => true, 'data' => $student->fresh('studentInstitutions')]);
     }

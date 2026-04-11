@@ -107,34 +107,51 @@ export default function StudentDetail() {
     navigate('/sf9', { state: { selectedStudentId: student?.id } })
   }
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !student) return
 
     setIsUploading(true)
-    
-    try {
-      // Convert file to base64 for now (in a real app, you'd upload to a file server)
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        const base64Image = e.target?.result as string
-        
-        // Update the student with the new profile picture
-        const response = await studentService.updateStudent(student.id, {
-          profile_picture: base64Image
-        })
-        
-        if (response.success) {
-          setProfileImage(base64Image)
-          setStudent(response.data)
-        }
-        setIsUploading(false)
+
+    const img = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    img.onload = async () => {
+      URL.revokeObjectURL(objectUrl)
+
+      const MAX = 800
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX }
+        else { width = Math.round((width * MAX) / height); height = MAX }
       }
-      reader.readAsDataURL(file)
-    } catch (err) {
-      console.error('Error uploading image:', err)
-      setIsUploading(false)
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) { setIsUploading(false); return }
+        const compressed = new File([blob], file.name, { type: 'image/jpeg' })
+
+        try {
+          const response = await studentService.updateStudent(student.id, {
+            profile_picture: compressed,
+          })
+          if (response.success) {
+            setProfileImage(response.data.profile_picture || null)
+            setStudent(response.data)
+            toast.success('Profile picture updated successfully!')
+          }
+        } catch (err) {
+          console.error('Error uploading image:', err)
+          toast.error('Failed to upload profile picture.')
+        } finally {
+          setIsUploading(false)
+        }
+      }, 'image/jpeg', 0.85)
     }
+    img.src = objectUrl
   }
 
   const handleRemoveImage = async () => {

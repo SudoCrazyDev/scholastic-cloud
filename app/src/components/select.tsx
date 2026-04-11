@@ -12,10 +12,11 @@ export interface SelectProps extends Omit<Headless.SelectProps, 'as' | 'classNam
   options?: SelectOption[]
   placeholder?: string
   error?: boolean | string
+  inputSize?: 'sm' | 'md' | 'lg'
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, multiple, options = [], placeholder, error, ...props }, ref) => {
+  ({ className, multiple, options = [], placeholder, error, inputSize = 'md', ...props }, ref) => {
     return (
       <div className="relative">
         <span
@@ -42,15 +43,19 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             {...props}
             className={clsx([
               // Basic layout
-              'relative block w-full appearance-none rounded-lg py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
+              'relative block w-full appearance-none rounded-lg',
+              // Size-based padding matching Input component
+              inputSize === 'sm' && 'py-2 text-sm',
+              inputSize === 'md' && 'py-2.5 text-base',
+              inputSize === 'lg' && 'py-3 text-lg',
               // Horizontal padding
               multiple
-                ? 'px-[calc(--spacing(3.5)-1px)] sm:px-[calc(--spacing(3)-1px)]'
-                : 'pr-[calc(--spacing(10)-1px)] pl-[calc(--spacing(3.5)-1px)] sm:pr-[calc(--spacing(9)-1px)] sm:pl-[calc(--spacing(3)-1px)]',
+                ? 'px-3.5'
+                : 'pr-10 pl-3.5',
               // Options (multi-select)
               '[&_optgroup]:font-semibold',
               // Typography
-              'text-base/6 text-zinc-950 placeholder:text-zinc-500 sm:text-sm/6 dark:*:text-white',
+              'text-zinc-950 placeholder:text-zinc-500 dark:*:text-white',
               // Border
               'border border-zinc-950/10 data-hover:border-zinc-950/20',
               // Background color
