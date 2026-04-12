@@ -37,7 +37,8 @@
       "Bash(docker compose:*)",
       "Bash(docker exec:*)",
       "Bash(curl -s -X POST http://localhost:8000/api/login -H 'Content-Type: application/json' -d '{\"email\":\"test@test.com\",\"password\":\"wrong\"}')",
-      "Bash(curl -s -X POST http://localhost:8000/api/login -H 'Content-Type: application/json' -d '{\"email\":\"demo@scholasticcloud.com\",\"password\":\"Demo@1234\"}')"
+      "Bash(curl -s -X POST http://localhost:8000/api/login -H 'Content-Type: application/json' -d '{\"email\":\"demo@scholasticcloud.com\",\"password\":\"Demo@1234\"}')",
+      "Bash(node_modules/.bin/tsc -b --noEmit)"
     ]
   }
 }

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { classSectionService } from '../../services/classSectionService'
 import { useDebounce } from '../../hooks/useDebounce'
-import { Select } from '../../components/select'
 import type { AdmissionFormSubmissionListItem, ClassSection } from '../../types'
 
 interface Props {
@@ -18,13 +17,7 @@ export interface AcceptPayload {
   last_name?: string
   middle_name?: string
   lrn?: string
-  gender?: string
-  birthdate?: string
-  religion?: string
 }
-
-const GENDER_OPTIONS = ['Male', 'Female', 'Others'] as const
-const RELIGION_OPTIONS = ['Catholic', 'Islam', 'Iglesia Ni Cristo', 'Baptists', 'Others'] as const
 
 export function AcceptModal({ submission, onConfirm, onClose }: Props) {
   const gi = submission.payload.general_information
@@ -37,17 +30,11 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const debouncedSearch = useDebounce(sectionSearch, 300)
 
-  // New student fields
-  const [firstName, setFirstName] = useState(gi.first_name ?? '')
-  const [lastName, setLastName] = useState(gi.surname ?? '')
-  const [middleName, setMiddleName] = useState(gi.middle_name ?? '')
-  const [lrn, setLrn] = useState(gi.lrn ?? '')
-  const [gender, setGender] = useState(gi.gender ?? '')
-  const [birthdate, setBirthdate] = useState(gi.birthdate ?? '')
-  const [religion, setReligion] = useState(
-    RELIGION_OPTIONS.includes(gi.religion as typeof RELIGION_OPTIONS[number]) ? (gi.religion ?? '') : ''
-  )
-
+  // New student fields (read-only display values)
+  const firstName = gi.first_name ?? ''
+  const lastName = gi.surname ?? ''
+  const middleName = gi.middle_name ?? ''
+  const lrn = gi.lrn ?? ''
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -97,9 +84,6 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
       payload.last_name = lastName.trim()
       payload.middle_name = middleName.trim() || undefined
       payload.lrn = lrn.trim() || undefined
-      payload.gender = gender || undefined
-      payload.birthdate = birthdate || undefined
-      payload.religion = religion.trim() || undefined
     }
     setSubmitting(true)
     try {
@@ -157,16 +141,16 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
                   <label className="block text-xs font-medium text-gray-600 mb-1">First name *</label>
                   <input
                     value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    readOnly
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-default"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Last name *</label>
                   <input
                     value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    readOnly
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-default"
                   />
                 </div>
               </div>
@@ -176,58 +160,16 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Middle name</label>
                   <input
                     value={middleName}
-                    onChange={(e) => setMiddleName(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    readOnly
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-default"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">LRN</label>
                   <input
                     value={lrn}
-                    onChange={(e) => setLrn(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Gender pill toggle */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Gender</label>
-                <div className="flex gap-2">
-                  {GENDER_OPTIONS.map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => setGender(gender === opt ? '' : opt)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                        gender === opt
-                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                          : 'border-gray-300 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Birthdate</label>
-                  <input
-                    type="date"
-                    value={birthdate}
-                    onChange={(e) => setBirthdate(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Religion</label>
-                  <Select
-                    value={religion}
-                    onChange={(e) => setReligion(e.target.value)}
-                    placeholder="— Select —"
-                    options={RELIGION_OPTIONS.map((r) => ({ value: r, label: r }))}
+                    readOnly
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 cursor-default"
                   />
                 </div>
               </div>
