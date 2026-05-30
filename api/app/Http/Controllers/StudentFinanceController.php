@@ -6,15 +6,21 @@ use App\Auth\StudentPortalUser;
 use App\Models\GradeLevelDiscount;
 use App\Models\Student;
 use App\Models\StudentAdditionalFee;
+use App\Models\StudentPaymentPlan;
 use App\Models\StudentSection;
 use App\Models\SchoolFeeDefault;
 use App\Models\StudentDiscount;
 use App\Models\StudentPayment;
+use App\Services\PaymentPlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class StudentFinanceController extends Controller
 {
+    public function __construct(private PaymentPlanService $planService)
+    {
+    }
+
     /**
      * Get a student's ledger for an academic year.
      */
@@ -267,6 +273,19 @@ class StudentFinanceController extends Controller
 
         $balance = $balanceForward + $chargesTotal - $discountsTotal - $paymentsTotal;
 
+        $paymentPlan = StudentPaymentPlan::where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->first();
+
+        $installments = $this->planService->buildInstallments(
+            $paymentPlan,
+            $academicYear,
+            (float) $chargesTotal,
+            (float) $discountsTotal,
+            (float) $paymentsTotal
+        );
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -281,6 +300,8 @@ class StudentFinanceController extends Controller
                     'balance_forward' => round($balanceForward, 2),
                     'balance' => round($balance, 2),
                 ],
+                'payment_plan' => $this->planService->serializePlan($paymentPlan),
+                'installments' => $installments,
                 'available_academic_years' => $availableAcademicYears,
             ]
         ]);
@@ -437,6 +458,19 @@ class StudentFinanceController extends Controller
             ];
         }));
 
+        $paymentPlan = StudentPaymentPlan::where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->first();
+
+        $installments = $this->planService->buildInstallments(
+            $paymentPlan,
+            $academicYear,
+            (float) $chargesTotal,
+            (float) $discountsTotal,
+            (float) $paymentsTotal
+        );
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -462,6 +496,8 @@ class StudentFinanceController extends Controller
                     'balance_forward' => round($balanceForward, 2),
                     'balance' => round($balance, 2),
                 ],
+                'payment_plan' => $this->planService->serializePlan($paymentPlan),
+                'installments' => $installments,
                 'available_academic_years' => $availableAcademicYears,
             ]
         ]);

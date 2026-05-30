@@ -103,6 +103,10 @@ class StudentOnlinePaymentController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'currency' => 'nullable|string|size:3',
             'school_fee_id' => 'nullable|uuid|exists:school_fees,id',
+            'item_name' => 'nullable|string|max:255',
+            'item_description' => 'nullable|string|max:500',
+            'original_amount' => 'nullable|numeric|min:0',
+            'discount_amount' => 'nullable|numeric|min:0',
             'redirect_url' => 'required|array',
             'redirect_url.success' => 'required|url|max:2000',
             'redirect_url.failure' => 'required|url|max:2000',
@@ -125,7 +129,8 @@ class StudentOnlinePaymentController extends Controller
             ], 403);
         }
 
-        $student = Student::where('id', $studentId)
+        $student = Student::with(['studentAuth', 'user'])
+            ->where('id', $studentId)
             ->whereHas('studentInstitutions', function ($query) use ($institutionId) {
                 $query->where('institution_id', $institutionId);
             })
@@ -176,8 +181,26 @@ class StudentOnlinePaymentController extends Controller
             ],
         ]);
 
-        $description = 'Student balance payment for ' . $validated['academic_year'];
+        $defaultDescription = 'Student balance payment for ' . $validated['academic_year'];
+        $description = !empty($validated['item_description'])
+            ? $validated['item_description']
+            : $defaultDescription;
+        $itemName = !empty($validated['item_name'])
+            ? $validated['item_name']
+            : 'Student Account Balance';
         $amountValue = (float) $validated['amount'];
+
+        // If frontend provides a discount breakdown that reconciles with the
+        // charged amount, surface it on the Maya receipt as Subtotal / Discount.
+        $originalAmount = isset($validated['original_amount']) ? (float) $validated['original_amount'] : null;
+        $discountAmount = isset($validated['discount_amount']) ? (float) $validated['discount_amount'] : null;
+        $applyDiscount =
+            $originalAmount !== null
+            && $discountAmount !== null
+            && $discountAmount > 0
+            && abs(($originalAmount - $discountAmount) - $amountValue) < 0.01;
+
+        $buyer = $this->buildBuyerPayload($student);
 
         $gatewayPayload = [
             'request_reference_number' => $requestReferenceNumber,
@@ -187,13 +210,9 @@ class StudentOnlinePaymentController extends Controller
             'success_url' => $validated['redirect_url']['success'],
             'failure_url' => $validated['redirect_url']['failure'],
             'cancel_url' => $validated['redirect_url']['cancel'],
-            'buyer' => [
-                'first_name' => $student->first_name,
-                'last_name' => $student->last_name,
-            ],
             'items' => [
                 [
-                    'name' => 'Student Account Balance',
+                    'name' => $itemName,
                     'code' => $requestReferenceNumber,
                     'description' => $description,
                     'quantity' => '1',
@@ -208,6 +227,17 @@ class StudentOnlinePaymentController extends Controller
                 'academic_year' => $validated['academic_year'],
             ],
         ];
+
+        if ($applyDiscount) {
+            $gatewayPayload['amount_details'] = [
+                'subtotal' => round($originalAmount, 2),
+                'discount' => round($discountAmount, 2),
+            ];
+        }
+
+        if ($buyer !== null) {
+            $gatewayPayload['buyer'] = $buyer;
+        }
 
         try {
             $gatewayResponse = $this->gatewayClient->createCharge($gatewayPayload);
@@ -268,6 +298,60 @@ class StudentOnlinePaymentController extends Controller
                 'redirect_url' => $checkoutUrl,
             ],
         ], 201);
+    }
+
+    /**
+     * Record the outcome reported by Maya's redirect (failure/cancel) for a transaction
+     * that is still locally pending. Only narrows pending → failed/cancelled — does not
+     * promote anything to "completed" (that is reserved for the Maya callback/webhook).
+     */
+    public function recordOutcome(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'outcome' => ['required', 'in:failed,cancelled'],
+        ]);
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (!$institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned',
+            ], 400);
+        }
+
+        $transaction = StudentOnlinePaymentTransaction::where('institution_id', $institutionId)
+            ->find($id);
+
+        if (!$transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payment transaction not found',
+            ], 404);
+        }
+
+        if ($this->isStudentActor($request)) {
+            $selfStudentId = $this->resolveSelfStudentId($request);
+            if (!$selfStudentId || $selfStudentId !== $transaction->student_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can only update your own online payment transactions',
+                ], 403);
+            }
+        }
+
+        if (in_array($transaction->status, ['pending', 'authorized'], true)) {
+            $transaction->update([
+                'status' => $validated['outcome'],
+                'failure_reason' => $validated['outcome'] === 'cancelled'
+                    ? 'Cancelled by user'
+                    : ($transaction->failure_reason ?? 'Reported failed by gateway redirect'),
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $transaction->fresh(['schoolFee', 'completedPayment']),
+        ]);
     }
 
     /**
@@ -370,6 +454,41 @@ class StudentOnlinePaymentController extends Controller
 
         $role = method_exists($user, 'getRole') ? $user->getRole() : null;
         return (string) ($role->slug ?? '') === 'student';
+    }
+
+    /**
+     * Build Maya buyer payload with the camelCase keys Maya requires.
+     * Returns null if we cannot produce a contact object — Maya rejects a
+     * partial buyer (firstName/lastName/contact are all required when buyer
+     * is present), so omitting it is safer than sending it incomplete.
+     */
+    private function buildBuyerPayload(Student $student): ?array
+    {
+        $firstName = trim((string) $student->first_name);
+        $lastName = trim((string) $student->last_name);
+        if ($firstName === '' || $lastName === '') {
+            return null;
+        }
+
+        $email = trim((string) ($student->studentAuth?->email ?? $student->user?->email ?? ''));
+        if ($email === '') {
+            return null;
+        }
+
+        $contact = ['email' => $email];
+
+        $buyer = [
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'contact' => $contact,
+        ];
+
+        $middleName = trim((string) $student->middle_name);
+        if ($middleName !== '') {
+            $buyer['middleName'] = $middleName;
+        }
+
+        return $buyer;
     }
 
     private function resolveSelfStudentId(Request $request): ?string

@@ -10,10 +10,17 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function () {
+            // ZKTeco ADMS (iClock) routes — no /api/ prefix, no auth middleware
+            \Illuminate\Support\Facades\Route::prefix('iclock')
+                ->middleware([])
+                ->group(base_path('routes/iclock.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'auth.token' => \App\Http\Middleware\AuthenticateToken::class,
+            'auth.token'        => \App\Http\Middleware\AuthenticateToken::class,
+            'auth.bridge.token' => \App\Http\Middleware\AuthenticateBridgeToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -1,9 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+
+  if (user?.role?.slug === 'finance') {
+    return <Navigate to="/finance" replace />;
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },

@@ -31,6 +31,9 @@ import {
   ClipboardList,
   CalendarDays,
   ScanLine,
+  Fingerprint,
+  Monitor,
+  Clock,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -207,7 +210,33 @@ const menuGroups: MenuGroup[] = [
         label: 'Finance',
         icon: <Wallet className="w-5 h-5" />,
         path: '/finance',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+      },
+    ],
+  },
+  {
+    label: 'HRIS',
+    items: [
+      {
+        id: 'hris-devices',
+        label: 'Biometric Devices',
+        icon: <Fingerprint className="w-5 h-5" />,
+        path: '/hris/devices',
+        allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'hris-zk-users',
+        label: 'ZK Users',
+        icon: <Monitor className="w-5 h-5" />,
+        path: '/hris/zk-users',
+        allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'hris-attendance',
+        label: 'Attendance Logs',
+        icon: <Clock className="w-5 h-5" />,
+        path: '/hris/attendance',
+        allowedRoles: ['principal', 'institution-administrator'],
       },
     ],
   },
@@ -309,8 +338,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   const sidebarLabel = institution?.title ?? 'ScholasticCloud';
   const sidebarLogo = institution?.logo;
 
-  const filteredGroups = useMemo(() =>
-    menuGroups
+  const filteredGroups = useMemo(() => {
+    if (userRoleSlug === 'finance') {
+      return menuGroups.filter((group) => group.label === 'Finance');
+    }
+    return menuGroups
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
@@ -319,9 +351,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
           return item.allowedRoles.includes(userRoleSlug);
         }),
       }))
-      .filter((group) => group.items.length > 0),
-    [userRoleSlug],
-  );
+      .filter((group) => group.items.length > 0);
+  }, [userRoleSlug]);
 
   return (
     <motion.div

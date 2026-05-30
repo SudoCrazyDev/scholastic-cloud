@@ -47,6 +47,9 @@ import PublicAdmissionForm from './pages/PublicAdmission/PublicAdmissionForm';
 import AdmissionForms from './pages/AdmissionForms/AdmissionForms';
 import Timetable from './pages/Timetable/Timetable';
 import GateEntries from './pages/GateEntries/GateEntries';
+import HrisDevices from './pages/HRIS/Devices';
+import HrisZkUsers from './pages/HRIS/ZkUsers';
+import HrisAttendance from './pages/HRIS/Attendance';
 
 
 function App() {
@@ -137,6 +140,9 @@ function App() {
               <Route path="finance/discounts" element={<Finance />} />
               <Route path="finance/receipt-builder" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="hris/devices" element={<HrisDevices />} />
+              <Route path="hris/zk-users" element={<HrisZkUsers />} />
+              <Route path="hris/attendance" element={<HrisAttendance />} />
 
             </Route>
 

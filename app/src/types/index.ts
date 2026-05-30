@@ -210,6 +210,10 @@ export interface CreateStudentOnlinePaymentCheckoutData {
   amount: number;
   currency?: string;
   school_fee_id?: string;
+  item_name?: string;
+  item_description?: string;
+  original_amount?: number;
+  discount_amount?: number;
   redirect_url: {
     success: string;
     failure: string;
@@ -268,6 +272,28 @@ export interface StudentLedgerEntry {
   processed_by?: string | null;
 }
 
+export type StudentPaymentPlanType = 'monthly' | 'quarterly';
+
+export interface StudentPaymentPlan {
+  id: string;
+  academic_year: string;
+  plan_type: StudentPaymentPlanType;
+  installment_count: number;
+  selected_at?: string | null;
+  selected_by_student: boolean;
+}
+
+export interface StudentInstallment {
+  sequence: number;
+  label: string;
+  due_date: string;
+  amount: number;
+  original_amount: number;
+  discount_amount: number;
+  paid_amount: number;
+  status: 'paid' | 'partial' | 'pending';
+}
+
 export interface StudentLedgerResponse {
   student: Student;
   academic_year: string;
@@ -280,6 +306,8 @@ export interface StudentLedgerResponse {
     balance_forward: number;
     balance: number;
   };
+  payment_plan?: StudentPaymentPlan | null;
+  installments?: StudentInstallment[];
   available_academic_years?: string[];
 }
 
@@ -317,6 +345,8 @@ export interface StudentNOAResponse {
     balance_forward: number;
     balance: number;
   };
+  payment_plan?: StudentPaymentPlan | null;
+  installments?: StudentInstallment[];
   available_academic_years?: string[];
 }
 
@@ -1297,4 +1327,58 @@ export interface BulkUpsertSchoolDayData {
     month: number;
     total_days: number;
   }>;
-} 
+}
+
+// HRIS — Biometric / ZKTeco types
+
+export interface BiometricDevice {
+  id: string;
+  institution_id: string;
+  name: string;
+  serial_number: string | null;
+  mac_address: string | null;
+  firmware_version: string | null;
+  status: 'online' | 'offline' | 'unknown';
+  is_paired: boolean;
+  last_seen_at: string | null;
+  pairing_code?: string;
+  pairing_code_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ZkUserMapping {
+  id: string;
+  institution_id: string;
+  device_id: string;
+  device?: BiometricDevice;
+  zk_user_id: string;
+  zk_name: string | null;
+  zk_card_no: string | null;
+  zk_privilege: string | null;
+  user_id: string | null;
+  user?: User;
+  last_synced_at: string | null;
+  push_status: 'pending' | 'done' | 'failed' | null;
+  push_action: 'enroll_user' | 'enroll_fingerprint' | null;
+  push_error: string | null;
+  push_queued_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AttendanceLog {
+  id: string;
+  institution_id: string;
+  device_id: string;
+  device?: BiometricDevice;
+  zk_user_id: string;
+  user_id: string | null;
+  user?: User;
+  punched_at: string;
+  punch_type: 'check_in' | 'check_out' | 'break_out' | 'break_in' | 'ot_in' | 'ot_out' | 'unknown';
+  punch_type_code: number;
+  verify_type: 'fingerprint' | 'card' | 'face' | 'password' | 'unknown';
+  created_at: string;
+  updated_at: string;
+}

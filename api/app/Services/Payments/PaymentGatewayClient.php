@@ -104,16 +104,36 @@ class PaymentGatewayClient
             ]];
         }
 
+        // Default details: no discount, subtotal == total.
+        $discount = 0.0;
+        $subtotal = $amountValue;
+
+        // If caller supplied an amount_details breakdown that reconciles
+        // (subtotal − discount + tax + svc + shipping == total), use it so
+        // Maya's receipt shows the discount line.
+        $detailsInput = is_array($payload['amount_details'] ?? null) ? $payload['amount_details'] : [];
+        $providedSubtotal = isset($detailsInput['subtotal']) ? round((float) $detailsInput['subtotal'], 2) : null;
+        $providedDiscount = isset($detailsInput['discount']) ? round((float) $detailsInput['discount'], 2) : null;
+        if (
+            $providedSubtotal !== null
+            && $providedDiscount !== null
+            && $providedDiscount > 0
+            && abs(($providedSubtotal - $providedDiscount) - $amountValue) < 0.01
+        ) {
+            $subtotal = $providedSubtotal;
+            $discount = $providedDiscount;
+        }
+
         $mayaPayload = [
             'totalAmount' => [
                 'value' => $amountValue,
                 'currency' => $currency,
                 'details' => [
-                    'discount' => 0,
+                    'discount' => $discount,
                     'serviceCharge' => 0,
                     'shippingFee' => 0,
                     'tax' => 0,
-                    'subtotal' => $amountValue,
+                    'subtotal' => $subtotal,
                 ],
             ],
             'requestReferenceNumber' => $requestReferenceNumber,
@@ -237,18 +257,21 @@ class PaymentGatewayClient
         }
 
         if (
-            in_array($status, ['FAILED', 'DECLINED'], true) ||
+            in_array($status, ['FAILED', 'DECLINED', 'PAYMENT_FAILED'], true) ||
             $paymentStatus === 'PAYMENT_FAILED'
         ) {
             return 'failed';
         }
 
-        if ($status === 'EXPIRED' || $paymentStatus === 'PAYMENT_EXPIRED') {
+        if (
+            in_array($status, ['EXPIRED', 'PAYMENT_EXPIRED'], true) ||
+            $paymentStatus === 'PAYMENT_EXPIRED'
+        ) {
             return 'expired';
         }
 
         if (
-            in_array($status, ['CANCELLED', 'VOIDED'], true) ||
+            in_array($status, ['CANCELLED', 'VOIDED', 'PAYMENT_CANCELLED'], true) ||
             $paymentStatus === 'PAYMENT_CANCELLED'
         ) {
             return 'cancelled';

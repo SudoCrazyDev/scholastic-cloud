@@ -29,6 +29,7 @@ use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\StudentFinanceController;
+use App\Http\Controllers\StudentPaymentPlanController;
 use App\Http\Controllers\StudentOnlinePaymentController;
 use App\Http\Controllers\InternalPaymentCallbackController;
 use App\Http\Controllers\GradeLevelDiscountController;
@@ -42,6 +43,9 @@ use App\Http\Controllers\TrackController;
 use App\Http\Controllers\StrandController;
 use App\Http\Controllers\StudentDocumentController;
 use App\Http\Controllers\AdmissionFormSubmissionController;
+use App\Http\Controllers\BridgeController;
+use App\Http\Controllers\BiometricDeviceController;
+use App\Http\Controllers\ZkUserMappingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -53,6 +57,17 @@ use App\Http\Controllers\AdmissionFormSubmissionController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+
+// Bridge pairing (public — no auth; just a one-time code)
+Route::post('/bridge/pair', [BridgeController::class, 'pair']);
+
+// Bridge endpoints (authenticated with per-device bridge token)
+Route::middleware('auth.bridge.token')->group(function () {
+    Route::post('/bridge/heartbeat', [BridgeController::class, 'heartbeat']);
+    Route::post('/bridge/zk-users/sync', [BridgeController::class, 'syncUsers']);
+    Route::get('/bridge/pending-enrollments', [BridgeController::class, 'pendingEnrollments']);
+    Route::post('/bridge/enrollment-done', [BridgeController::class, 'enrollmentDone']);
+});
 
 // Public routes (no authentication required)
 Route::post('/login', [AuthController::class, 'login']);
@@ -153,6 +168,8 @@ Route::middleware('auth.token')->group(function () {
     Route::get('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'show']);
     Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger']);
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
+    Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show']);
+    Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store']);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
     Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
     Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index']);
@@ -268,6 +285,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('student-online-payments', [StudentOnlinePaymentController::class, 'index']);
     Route::post('student-online-payments/checkout', [StudentOnlinePaymentController::class, 'createCheckout']);
     Route::get('student-online-payments/{id}', [StudentOnlinePaymentController::class, 'show']);
+    Route::post('student-online-payments/{id}/outcome', [StudentOnlinePaymentController::class, 'recordOutcome']);
     Route::get('student-discounts', [StudentDiscountController::class, 'index']);
     Route::post('student-discounts', [StudentDiscountController::class, 'store']);
     Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update']);
@@ -313,6 +331,25 @@ Route::middleware('auth.token')->group(function () {
 
     // Certificate routes
     Route::apiResource('certificates', CertificateController::class);
+
+    // HRIS — Attendance logs
+    Route::get('attendance/logs', [\App\Http\Controllers\AttendanceLogController::class, 'index']);
+
+    // HRIS — Biometric devices
+    Route::get('biometric/devices', [BiometricDeviceController::class, 'index']);
+    Route::post('biometric/devices', [BiometricDeviceController::class, 'store']);
+    Route::get('biometric/devices/{id}', [BiometricDeviceController::class, 'show']);
+    Route::delete('biometric/devices/{id}', [BiometricDeviceController::class, 'destroy']);
+    Route::post('biometric/devices/{id}/refresh-pairing-code', [BiometricDeviceController::class, 'refreshPairingCode']);
+
+    // HRIS — ZK user mappings
+    Route::get('biometric/zk-users', [ZkUserMappingController::class, 'index']);
+    Route::post('biometric/zk-users', [ZkUserMappingController::class, 'store']);
+    Route::post('biometric/zk-users/{id}/link', [ZkUserMappingController::class, 'link']);
+    Route::delete('biometric/zk-users/{id}/link', [ZkUserMappingController::class, 'unlink']);
+    Route::delete('biometric/zk-users/{id}', [ZkUserMappingController::class, 'destroy']);
+    Route::post('biometric/zk-users/{id}/enroll', [ZkUserMappingController::class, 'enroll']);
+    Route::post('biometric/zk-users/{id}/trigger-fingerprint', [ZkUserMappingController::class, 'triggerFingerprint']);
 
     // Online admission form submissions (admin list/detail/accept/reject)
     Route::get('admission-form-submissions', [AdmissionFormSubmissionController::class, 'index']);

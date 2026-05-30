@@ -14,13 +14,14 @@ import { financeDashboardService } from '../../services/financeDashboardService'
 import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
+import { studentDiscountService } from '../../services/studentDiscountService'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import DashboardCharts from './DashboardCharts'
 import CollectionsView from './CollectionsView'
 import DiscountsView from './DiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
-import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentPaymentData, StudentPayment } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentPaymentData, CreateStudentDiscountData, StudentPayment } from '../../types'
 
 const Finance: React.FC = () => {
   const queryClient = useQueryClient()
@@ -99,6 +100,59 @@ const Finance: React.FC = () => {
   const [selectedLedgerStudent, setSelectedLedgerStudent] = useState<Student | null>(null)
   const [ledgerAcademicYear, setLedgerAcademicYear] = useState(defaultAcademicYear)
   const [ledgerViewMode, setLedgerViewMode] = useState<'entries' | 'monthly' | 'quarterly'>('entries')
+  const [showLedgerDiscount, setShowLedgerDiscount] = useState(false)
+  const [ledgerDiscountForm, setLedgerDiscountForm] = useState({
+    discount_type: 'fixed' as 'fixed' | 'percentage',
+    value: '',
+    school_fee_id: '',
+    description: '',
+  })
+  const [ledgerDiscountError, setLedgerDiscountError] = useState<string | null>(null)
+
+  const createLedgerDiscountMutation = useMutation({
+    mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
+    onSuccess: () => {
+      setLedgerDiscountForm({
+        discount_type: 'fixed',
+        value: '',
+        school_fee_id: '',
+        description: '',
+      })
+      setLedgerDiscountError(null)
+      setShowLedgerDiscount(false)
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', selectedLedgerStudent?.id] })
+      toast.success('Discount applied.')
+    },
+    onError: (error: any) => {
+      setLedgerDiscountError(error.response?.data?.message || 'Failed to save discount.')
+    },
+  })
+
+  const handleLedgerDiscountSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setLedgerDiscountError(null)
+    if (!selectedLedgerStudent) return
+
+    const value = Number(ledgerDiscountForm.value)
+    if (!value || value <= 0) {
+      setLedgerDiscountError('Discount value must be greater than zero.')
+      return
+    }
+    if (ledgerDiscountForm.discount_type === 'percentage' && value > 100) {
+      setLedgerDiscountError('Percentage discount cannot exceed 100%.')
+      return
+    }
+
+    createLedgerDiscountMutation.mutate({
+      student_id: selectedLedgerStudent.id,
+      academic_year: ledgerAcademicYear,
+      discount_type: ledgerDiscountForm.discount_type,
+      value,
+      school_fee_id: ledgerDiscountForm.school_fee_id || undefined,
+      description: ledgerDiscountForm.description || undefined,
+    })
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedStudentSearch(studentSearchTerm), 300)
@@ -1408,6 +1462,111 @@ const Finance: React.FC = () => {
                       })}
                     </p>
                   </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">Apply Discount</h3>
+                      <p className="text-xs text-gray-500">
+                        Add a one-off discount for this student for{' '}
+                        <span className="font-medium">{ledgerAcademicYear}</span>.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowLedgerDiscount((prev) => !prev)}
+                    >
+                      {showLedgerDiscount ? 'Cancel' : 'New Discount'}
+                    </Button>
+                  </div>
+                  {showLedgerDiscount && (
+                    <form
+                      className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4"
+                      onSubmit={handleLedgerDiscountSubmit}
+                    >
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Discount Type
+                        </label>
+                        <Select
+                          value={ledgerDiscountForm.discount_type}
+                          onChange={(e) =>
+                            setLedgerDiscountForm((prev) => ({
+                              ...prev,
+                              discount_type: e.target.value as 'fixed' | 'percentage',
+                            }))
+                          }
+                          options={[
+                            { value: 'fixed', label: 'Fixed Amount' },
+                            { value: 'percentage', label: 'Percentage' },
+                          ]}
+                          className="w-full"
+                        />
+                      </div>
+                      <Input
+                        label={
+                          ledgerDiscountForm.discount_type === 'percentage'
+                            ? 'Percentage (%)'
+                            : 'Discount Amount'
+                        }
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={ledgerDiscountForm.value}
+                        onChange={(e) =>
+                          setLedgerDiscountForm((prev) => ({ ...prev, value: e.target.value }))
+                        }
+                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Apply To
+                        </label>
+                        <Select
+                          value={ledgerDiscountForm.school_fee_id}
+                          onChange={(e) =>
+                            setLedgerDiscountForm((prev) => ({
+                              ...prev,
+                              school_fee_id: e.target.value,
+                            }))
+                          }
+                          options={[
+                            { value: '', label: 'All charges (whole year)' },
+                            ...(feesQuery.data?.data || []).map((fee: SchoolFee) => ({
+                              value: fee.id,
+                              label: fee.name,
+                            })),
+                          ]}
+                          className="w-full"
+                        />
+                      </div>
+                      <Input
+                        label="Description (optional)"
+                        value={ledgerDiscountForm.description}
+                        onChange={(e) =>
+                          setLedgerDiscountForm((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g. Sibling discount, Scholarship"
+                      />
+                      {ledgerDiscountError && (
+                        <p className="md:col-span-2 text-sm text-red-600">{ledgerDiscountError}</p>
+                      )}
+                      <div className="md:col-span-2 flex justify-end">
+                        <Button
+                          type="submit"
+                          loading={createLedgerDiscountMutation.isPending}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                          Save Discount
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                 </div>
 
                 <div>

@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PDFDownloadLink } from '@react-pdf/renderer'
-import { CreditCardIcon, DocumentTextIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import {
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  CreditCardIcon,
+  DocumentTextIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
@@ -21,6 +29,7 @@ import type {
   CreateStudentAdditionalFeeData,
   Student,
   StudentPayment,
+  StudentPaymentPlanType,
 } from '../../../types'
 
 interface StudentFinanceTabProps {
@@ -63,6 +72,8 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     amount: '',
   })
   const [additionalFeeError, setAdditionalFeeError] = useState<string | null>(null)
+  const [showPlanOverride, setShowPlanOverride] = useState(false)
+  const [payingInstallment, setPayingInstallment] = useState<number | null>(null)
 
   const feesQuery = useQuery({
     queryKey: ['school-fees'],
@@ -106,36 +117,42 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
     const params = new URLSearchParams(window.location.search)
     const paymentResult = params.get('payment_result')
+    if (!paymentResult) return
+
+    const invalidateAll = () => {
+      queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+    }
 
     if (paymentResult === 'success') {
       setOnlinePaymentMessage('Payment completed. We are syncing your ledger now.')
       setOnlinePaymentError(null)
-      const pendingId = sessionStorage.getItem('pendingMayaTransactionId')
-      if (pendingId) {
-        sessionStorage.removeItem('pendingMayaTransactionId')
-        studentOnlinePaymentService
-          .getTransaction(pendingId)
-          .then(() => {
-            queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
-            queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
-            queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
-          })
-          .catch(() => {
-            queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
-            queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
-            queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
-          })
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
-        queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
-        queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
-      }
     } else if (paymentResult === 'failure') {
       setOnlinePaymentError('Payment failed. You may retry the checkout.')
       setOnlinePaymentMessage(null)
     } else if (paymentResult === 'cancel') {
       setOnlinePaymentMessage('Payment was cancelled.')
       setOnlinePaymentError(null)
+    }
+
+    const pendingId = sessionStorage.getItem('pendingMayaTransactionId')
+    if (pendingId) {
+      sessionStorage.removeItem('pendingMayaTransactionId')
+      const outcome =
+        paymentResult === 'failure'
+          ? 'failed'
+          : paymentResult === 'cancel'
+            ? 'cancelled'
+            : null
+
+      const work = outcome
+        ? studentOnlinePaymentService.recordOutcome(pendingId, outcome).catch(() => undefined)
+        : studentOnlinePaymentService.getTransaction(pendingId).catch(() => undefined)
+
+      work.finally(invalidateAll)
+    } else {
+      invalidateAll()
     }
   }, [isStudentUser, queryClient, studentId])
 
@@ -246,6 +263,22 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     },
   })
 
+  const setPaymentPlanMutation = useMutation({
+    mutationFn: (planType: StudentPaymentPlanType) =>
+      studentFinanceService.setPaymentPlan(studentId, {
+        academic_year: resolvedAcademicYear,
+        plan_type: planType,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+      toast.success('Payment plan saved.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to save payment plan.')
+    },
+  })
+
   const deleteAdditionalFeeMutation = useMutation({
     mutationFn: (id: string) => studentAdditionalFeeService.deleteFee(id),
     onSuccess: () => {
@@ -261,7 +294,12 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
   const formatAmount = (amount?: number | null) => {
     const value = Number(amount || 0)
-    return value.toFixed(2)
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
   }
 
   const handlePaymentSubmit = (event: React.FormEvent) => {
@@ -289,6 +327,96 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     createPaymentMutation.mutate(payload)
   }
 
+  const studentFullName = [student.first_name, student.last_name]
+    .map((part) => (part || '').trim())
+    .filter(Boolean)
+    .join(' ')
+
+  const startMayaCheckout = (
+    amount: number,
+    extras?: {
+      item_name?: string
+      item_description?: string
+      original_amount?: number
+      discount_amount?: number
+    }
+  ) => {
+    const basePath = `${window.location.origin}${window.location.pathname}`
+    createOnlinePaymentMutation.mutate({
+      academic_year: resolvedAcademicYear,
+      amount,
+      ...(extras?.item_name ? { item_name: extras.item_name } : {}),
+      ...(extras?.item_description ? { item_description: extras.item_description } : {}),
+      ...(extras?.original_amount !== undefined ? { original_amount: extras.original_amount } : {}),
+      ...(extras?.discount_amount !== undefined ? { discount_amount: extras.discount_amount } : {}),
+      redirect_url: {
+        success: `${basePath}?payment_result=success`,
+        failure: `${basePath}?payment_result=failure`,
+        cancel: `${basePath}?payment_result=cancel`,
+      },
+    })
+  }
+
+  const buildInstallmentItemName = (installment: { label: string; due_date: string }) => {
+    if (paymentPlan?.plan_type === 'quarterly') {
+      return `${installment.label} Quarterly Payment`
+    }
+    const monthAbbr = new Date(installment.due_date).toLocaleDateString('en-PH', {
+      month: 'short',
+    })
+    return `${monthAbbr} Monthly Payment`
+  }
+
+  const handlePayInstallment = (installment: {
+    sequence: number
+    label: string
+    due_date: string
+    amount: number
+    original_amount?: number
+    discount_amount?: number
+  }) => {
+    setOnlinePaymentError(null)
+    setOnlinePaymentMessage(null)
+
+    const { sequence, amount } = installment
+    if (!amount || amount <= 0) {
+      setOnlinePaymentError('Installment amount must be greater than zero.')
+      return
+    }
+
+    const currentBalance = Number(ledgerData?.totals?.balance ?? 0)
+    if (currentBalance <= 0) {
+      setOnlinePaymentError('Your balance is already settled.')
+      return
+    }
+    if (amount > currentBalance) {
+      setOnlinePaymentError(
+        `Installment exceeds remaining balance (${new Intl.NumberFormat('en-PH', {
+          style: 'currency',
+          currency: 'PHP',
+        }).format(currentBalance)}). Use the Pay Online form to pay a partial amount.`
+      )
+      return
+    }
+
+    // Forward the discount breakdown only when paying the full installment
+    // amount (so Maya's reconciliation: subtotal - discount == amount holds).
+    const original = installment.original_amount
+    const discount = installment.discount_amount
+    const includeBreakdown =
+      typeof original === 'number' &&
+      typeof discount === 'number' &&
+      discount > 0 &&
+      Math.abs(original - discount - amount) < 0.01
+
+    setPayingInstallment(sequence)
+    startMayaCheckout(amount, {
+      item_name: buildInstallmentItemName(installment),
+      item_description: studentFullName || undefined,
+      ...(includeBreakdown ? { original_amount: original, discount_amount: discount } : {}),
+    })
+  }
+
   const handleOnlinePaymentSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     setOnlinePaymentError(null)
@@ -306,22 +434,8 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       return
     }
 
-    const basePath = `${window.location.origin}${window.location.pathname}`
-    const successUrl = `${basePath}?payment_result=success`
-    const failureUrl = `${basePath}?payment_result=failure`
-    const cancelUrl = `${basePath}?payment_result=cancel`
-
-    const payload: CreateStudentOnlinePaymentCheckoutData = {
-      academic_year: resolvedAcademicYear,
-      amount: amountValue,
-      redirect_url: {
-        success: successUrl,
-        failure: failureUrl,
-        cancel: cancelUrl,
-      },
-    }
-
-    createOnlinePaymentMutation.mutate(payload)
+    setPayingInstallment(null)
+    startMayaCheckout(amountValue)
   }
 
   const handleDiscountSubmit = (event: React.FormEvent) => {
@@ -377,6 +491,44 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const totals = ledgerData?.totals
   const noaData = noaQuery.data?.data
   const onlineTransactions = onlinePaymentsQuery.data?.data || []
+  const paymentPlan = ledgerData?.payment_plan ?? null
+  const installments = ledgerData?.installments ?? []
+  const needsPlanSelection = isStudentUser && !paymentPlan && !ledgerQuery.isLoading
+
+  const handlePlanSubmit = (planType: StudentPaymentPlanType) => {
+    setPaymentPlanMutation.mutate(planType, {
+      onSuccess: () => setShowPlanOverride(false),
+    })
+  }
+
+  if (isStudentUser && ledgerQuery.isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <span className="ml-3 text-gray-600">Loading your finance page...</span>
+      </div>
+    )
+  }
+
+  if (needsPlanSelection) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900">Choose your payment plan</h3>
+          <p className="text-gray-600 mt-1">
+            Before viewing your finance page, please choose how you would like to pay your fees for
+            academic year <span className="font-medium">{resolvedAcademicYear}</span>. This selection
+            is permanent for the school year — contact your school registrar if you need to change it
+            later.
+          </p>
+        </div>
+        <PaymentPlanPicker
+          loading={setPaymentPlanMutation.isPending}
+          onSelect={handlePlanSubmit}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -384,6 +536,26 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         <div>
           <h3 className="text-xl font-semibold text-gray-900">Student Finance</h3>
           <p className="text-gray-600">Ledger, payments, discounts, and Notice of Account (NOA).</p>
+          {paymentPlan && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                <CalendarDaysIcon className="w-3.5 h-3.5" />
+                {paymentPlan.plan_type === 'quarterly' ? 'Quarterly' : 'Monthly'} plan
+                <span className="text-indigo-500">·</span>
+                {paymentPlan.installment_count} installments
+              </span>
+              {!isStudentUser && (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  onClick={() => setShowPlanOverride((prev) => !prev)}
+                >
+                  <PencilSquareIcon className="w-3.5 h-3.5" />
+                  {showPlanOverride ? 'Cancel' : 'Change plan'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="w-full lg:w-64">
           <Select
@@ -394,6 +566,24 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           />
         </div>
       </div>
+
+      {!isStudentUser && (showPlanOverride || !paymentPlan) && (
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-6">
+          <h4 className="text-base font-semibold text-gray-900 mb-1">
+            {paymentPlan ? 'Override payment plan' : 'Set payment plan'}
+          </h4>
+          <p className="text-sm text-gray-600 mb-4">
+            {paymentPlan
+              ? 'Choosing a different plan will overwrite the student’s current selection for this academic year.'
+              : 'The student has not yet picked a plan. You may set one on their behalf.'}
+          </p>
+          <PaymentPlanPicker
+            loading={setPaymentPlanMutation.isPending}
+            currentPlan={paymentPlan?.plan_type}
+            onSelect={handlePlanSubmit}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -845,6 +1035,191 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         )}
       </div>
 
+      {paymentPlan && installments.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3 sm:mb-4">
+            <h4 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarDaysIcon className="w-5 h-5 text-indigo-600" />
+              Installment Schedule
+            </h4>
+            <span className="text-xs text-gray-500">
+              {paymentPlan.plan_type === 'quarterly' ? 'Quarterly' : 'Monthly'} ·{' '}
+              {paymentPlan.installment_count} installments
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Net charges (after discounts) divided across {paymentPlan.installment_count}{' '}
+            {paymentPlan.plan_type === 'quarterly' ? 'quarters' : 'months'} for academic year{' '}
+            {resolvedAcademicYear}.
+          </p>
+
+          {/* Mobile: stacked cards */}
+          <ul className="space-y-3 sm:hidden">
+            {installments.map((installment) => {
+              const isPaying =
+                createOnlinePaymentMutation.isPending && payingInstallment === installment.sequence
+              const isPaid = installment.status === 'paid'
+              const remaining = Math.max(0, installment.amount - installment.paid_amount)
+              return (
+                <li
+                  key={installment.sequence}
+                  className={`rounded-xl border bg-white overflow-hidden ${
+                    isPaid ? 'border-green-200' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="p-4 flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <span
+                        className={`flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-semibold ${
+                          isPaid ? 'bg-green-50 text-green-700' : 'bg-indigo-50 text-indigo-700'
+                        }`}
+                      >
+                        {installment.sequence}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {installment.label}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Due{' '}
+                          {new Date(installment.due_date).toLocaleDateString('en-PH', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-base font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                      {formatAmount(installment.amount)}
+                    </p>
+                  </div>
+                  {isPaid ? (
+                    <div className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-green-700 bg-green-50 border-t border-green-100">
+                      <CheckCircleIcon className="w-4 h-4" />
+                      Paid
+                    </div>
+                  ) : (
+                    isStudentUser && (
+                      <button
+                        type="button"
+                        disabled={createOnlinePaymentMutation.isPending}
+                        onClick={() =>
+                          handlePayInstallment({ ...installment, amount: remaining })
+                        }
+                        className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                      >
+                        {isPaying ? (
+                          <>
+                            <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCardIcon className="w-4 h-4" />
+                            Pay {formatAmount(remaining)}
+                            {installment.status === 'partial' && (
+                              <span className="ml-1 text-[10px] uppercase tracking-wide bg-white/20 rounded px-1.5 py-0.5">
+                                Remaining
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </button>
+                    )
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Tablet/desktop: table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-12">
+                    #
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Period
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Due Date
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                    Amount Due
+                  </th>
+                  {isStudentUser && (
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-28">
+                      Action
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {installments.map((installment) => {
+                  const isPaying =
+                    createOnlinePaymentMutation.isPending &&
+                    payingInstallment === installment.sequence
+                  const isPaid = installment.status === 'paid'
+                  const remaining = Math.max(0, installment.amount - installment.paid_amount)
+                  return (
+                    <tr key={installment.sequence} className={isPaid ? 'bg-green-50/30' : undefined}>
+                      <td className="px-4 py-2 text-sm text-gray-600">{installment.sequence}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{installment.label}</td>
+                      <td className="px-4 py-2 text-sm text-gray-600">
+                        {new Date(installment.due_date).toLocaleDateString('en-PH', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
+                        {formatAmount(installment.amount)}
+                      </td>
+                      {isStudentUser && (
+                        <td className="px-4 py-2 text-right">
+                          {isPaid ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-700 px-2.5 py-1 text-xs font-medium">
+                              <CheckCircleIcon className="w-3.5 h-3.5" />
+                              Paid
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              loading={isPaying}
+                              disabled={createOnlinePaymentMutation.isPending}
+                              onClick={() =>
+                                handlePayInstallment({ ...installment, amount: remaining })
+                              }
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                              {installment.status === 'partial'
+                                ? `Pay ${formatAmount(remaining)}`
+                                : 'Pay'}
+                            </Button>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {isStudentUser && (onlinePaymentError || onlinePaymentMessage) && (
+            <div className="mt-3 space-y-1">
+              {onlinePaymentError && <p className="text-sm text-red-600">{onlinePaymentError}</p>}
+              {onlinePaymentMessage && (
+                <p className="text-sm text-indigo-700">{onlinePaymentMessage}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <h4 className="text-lg font-semibold text-gray-900 mb-4">Ledger</h4>
         {ledgerQuery.isLoading ? (
@@ -945,6 +1320,72 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+interface PaymentPlanPickerProps {
+  loading: boolean
+  currentPlan?: StudentPaymentPlanType
+  onSelect: (plan: StudentPaymentPlanType) => void
+}
+
+const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({ loading, currentPlan, onSelect }) => {
+  const [choice, setChoice] = useState<StudentPaymentPlanType | null>(currentPlan ?? null)
+
+  const cardClass = (active: boolean) =>
+    `flex-1 text-left cursor-pointer rounded-xl border p-5 transition shadow-sm ${
+      active
+        ? 'border-indigo-500 ring-2 ring-indigo-200 bg-white'
+        : 'border-gray-200 bg-white hover:border-indigo-300'
+    }`
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col md:flex-row gap-4">
+        <button
+          type="button"
+          className={cardClass(choice === 'monthly')}
+          onClick={() => setChoice('monthly')}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h5 className="text-base font-semibold text-gray-900">Monthly</h5>
+            <span className="text-xs font-medium text-indigo-600 bg-indigo-50 rounded-full px-2 py-0.5">
+              10 installments
+            </span>
+          </div>
+          <p className="text-sm text-gray-600">
+            Pay your net fees in 10 monthly installments from August to May.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          className={cardClass(choice === 'quarterly')}
+          onClick={() => setChoice('quarterly')}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h5 className="text-base font-semibold text-gray-900">Quarterly</h5>
+            <span className="text-xs font-medium text-indigo-600 bg-indigo-50 rounded-full px-2 py-0.5">
+              4 installments
+            </span>
+          </div>
+          <p className="text-sm text-gray-600">
+            Pay your net fees in 4 quarterly installments aligned to grading periods.
+          </p>
+        </button>
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          disabled={!choice || loading || choice === currentPlan}
+          loading={loading}
+          onClick={() => choice && onSelect(choice)}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          {currentPlan ? 'Update plan' : 'Confirm plan'}
+        </Button>
+      </div>
     </div>
   )
 }

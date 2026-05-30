@@ -30,6 +30,14 @@ class StudentOnlinePaymentService {
     const response = await api.get<ApiResponse<StudentOnlinePaymentTransaction>>(`${this.baseUrl}/${id}`)
     return response.data
   }
+
+  async recordOutcome(id: string, outcome: 'failed' | 'cancelled') {
+    const response = await api.post<ApiResponse<StudentOnlinePaymentTransaction>>(
+      `${this.baseUrl}/${id}/outcome`,
+      { outcome }
+    )
+    return response.data
+  }
 }
 
 export const studentOnlinePaymentService = new StudentOnlinePaymentService()

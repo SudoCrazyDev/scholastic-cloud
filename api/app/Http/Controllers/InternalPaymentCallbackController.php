@@ -164,19 +164,23 @@ class InternalPaymentCallbackController extends Controller
         }
 
         if (
-            in_array($status, ['FAILED', 'DECLINED'], true) ||
+            in_array($status, ['FAILED', 'DECLINED', 'PAYMENT_FAILED'], true) ||
             $paymentStatus === 'PAYMENT_FAILED' ||
             $event === 'PAYMENT_FAILED'
         ) {
             return 'failed';
         }
 
-        if ($status === 'EXPIRED' || $paymentStatus === 'PAYMENT_EXPIRED' || $event === 'PAYMENT_EXPIRED') {
+        if (
+            in_array($status, ['EXPIRED', 'PAYMENT_EXPIRED'], true) ||
+            $paymentStatus === 'PAYMENT_EXPIRED' ||
+            $event === 'PAYMENT_EXPIRED'
+        ) {
             return 'expired';
         }
 
         if (
-            in_array($status, ['CANCELLED', 'VOIDED'], true) ||
+            in_array($status, ['CANCELLED', 'VOIDED', 'PAYMENT_CANCELLED'], true) ||
             $paymentStatus === 'PAYMENT_CANCELLED' ||
             $event === 'PAYMENT_CANCELLED'
         ) {
