@@ -28,6 +28,7 @@ use App\Http\Controllers\SchoolFeeDefaultController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentPaymentController;
+use App\Http\Controllers\PaymentTransactionController;
 use App\Http\Controllers\StudentFinanceController;
 use App\Http\Controllers\StudentPaymentPlanController;
 use App\Http\Controllers\StudentOnlinePaymentController;
@@ -282,6 +283,8 @@ Route::middleware('auth.token')->group(function () {
     Route::post('student-payments', [StudentPaymentController::class, 'store']);
     Route::get('student-payments/{id}', [StudentPaymentController::class, 'show']);
     Route::get('student-payments/{id}/receipt', [StudentPaymentController::class, 'receipt']);
+    Route::get('payment-transactions/{id}', [PaymentTransactionController::class, 'show']);
+    Route::get('payment-transactions/{id}/receipt', [PaymentTransactionController::class, 'receipt']);
     Route::get('student-online-payments', [StudentOnlinePaymentController::class, 'index']);
     Route::post('student-online-payments/checkout', [StudentOnlinePaymentController::class, 'createCheckout']);
     Route::get('student-online-payments/{id}', [StudentOnlinePaymentController::class, 'show']);

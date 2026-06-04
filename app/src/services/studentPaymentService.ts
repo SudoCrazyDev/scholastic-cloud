@@ -1,5 +1,13 @@
 import { api } from '../lib/api'
-import type { ApiResponse, StudentPayment, CreateStudentPaymentData, StudentReceipt } from '../types'
+import type {
+  ApiResponse,
+  StudentPayment,
+  CreateStudentPaymentData,
+  StudentReceipt,
+  PaymentTransaction,
+  CreatePaymentTransactionData,
+  TransactionReceipt,
+} from '../types'
 
 class StudentPaymentService {
   private baseUrl = '/student-payments'
@@ -16,6 +24,23 @@ class StudentPaymentService {
 
   async createPayment(data: CreateStudentPaymentData) {
     const response = await api.post<ApiResponse<StudentPayment>>(this.baseUrl, data)
+    return response.data
+  }
+
+  async createTransaction(data: CreatePaymentTransactionData) {
+    const response = await api.post<ApiResponse<PaymentTransaction>>(this.baseUrl, data)
+    return response.data
+  }
+
+  async getTransaction(id: string) {
+    const response = await api.get<ApiResponse<PaymentTransaction>>(`/payment-transactions/${id}`)
+    return response.data
+  }
+
+  async getTransactionReceipt(id: string) {
+    const response = await api.get<ApiResponse<TransactionReceipt>>(
+      `/payment-transactions/${id}/receipt`
+    )
     return response.data
   }
 

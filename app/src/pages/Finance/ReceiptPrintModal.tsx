@@ -2,28 +2,76 @@ import React, { useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '../../components/button'
 import { receiptTemplateService } from '../../services/receiptTemplateService'
-import type { StudentPayment, ReceiptTemplateElement } from '../../types'
+import type { PaymentTransaction, ReceiptTemplateElement } from '../../types'
 
 interface ReceiptPrintModalProps {
-  payment: StudentPayment
+  transaction: PaymentTransaction
   studentName: string
   studentLrn?: string
   onClose: () => void
 }
 
-function ReceiptElement({ element, payment, studentName, studentLrn }: {
+const formatAmount = (amount: number) =>
+  new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(amount)
+
+function ItemsTable({ transaction }: { transaction: PaymentTransaction }) {
+  const items = transaction.items ?? []
+  return (
+    <table className="items-table w-full text-sm my-1">
+      <tbody>
+        {items.map((item) => (
+          <tr key={item.id}>
+            <td className="py-0.5 pr-2">{item.school_fee?.name || 'General / Other'}</td>
+            <td className="py-0.5 text-right tabular-nums whitespace-nowrap">
+              {formatAmount(Number(item.amount))}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function TotalsBlock({ transaction }: { transaction: PaymentTransaction }) {
+  const tendered = transaction.amount_tendered != null ? Number(transaction.amount_tendered) : null
+  const change = transaction.change_due != null ? Number(transaction.change_due) : null
+  return (
+    <div className="space-y-0.5">
+      <div className="flex justify-between font-bold text-base">
+        <span>Total</span>
+        <span className="tabular-nums">{formatAmount(Number(transaction.total_amount))}</span>
+      </div>
+      {tendered != null && (
+        <div className="flex justify-between text-sm">
+          <span>Tendered</span>
+          <span className="tabular-nums">{formatAmount(tendered)}</span>
+        </div>
+      )}
+      {change != null && (
+        <div className="flex justify-between text-sm">
+          <span>Change</span>
+          <span className="tabular-nums">{formatAmount(change)}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ReceiptElement({
+  element,
+  transaction,
+  studentName,
+  studentLrn,
+}: {
   element: ReceiptTemplateElement
-  payment: StudentPayment
+  transaction: PaymentTransaction
   studentName: string
   studentLrn?: string
 }) {
-  const formatAmount = (amount: number) =>
-    new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 2,
-    }).format(amount)
-
   switch (element.type) {
     case 'institution_logo':
       return <div className="w-14 h-14 bg-gray-200 rounded mx-auto flex items-center justify-center text-xs text-gray-400 print:bg-gray-100">Logo</div>
@@ -32,23 +80,31 @@ function ReceiptElement({ element, payment, studentName, studentLrn }: {
     case 'institution_address':
       return <p className="text-center text-xs text-gray-500" />
     case 'receipt_number':
-      return <p className="text-sm"><span className="font-medium">Receipt #:</span> {payment.receipt_number || payment.id}</p>
+      return (
+        <>
+          <p className="text-sm"><span className="font-medium">Receipt #:</span> {transaction.receipt_number}</p>
+          {transaction.or_number && (
+            <p className="text-sm"><span className="font-medium">OR #:</span> {transaction.or_number}</p>
+          )}
+        </>
+      )
     case 'payment_date':
-      return <p className="text-sm"><span className="font-medium">Date:</span> {payment.payment_date}</p>
+      return <p className="text-sm"><span className="font-medium">Date:</span> {transaction.payment_date}</p>
     case 'student_name':
       return <p className="text-sm"><span className="font-medium">Student:</span> {studentName}</p>
     case 'student_lrn':
       return <p className="text-sm"><span className="font-medium">LRN:</span> {studentLrn || 'N/A'}</p>
     case 'grade_level':
-      return <p className="text-sm"><span className="font-medium">Grade:</span> {payment.academic_year}</p>
+      return <p className="text-sm"><span className="font-medium">Grade:</span> {transaction.academic_year}</p>
     case 'academic_year':
-      return <p className="text-sm"><span className="font-medium">S.Y.:</span> {payment.academic_year}</p>
+      return <p className="text-sm"><span className="font-medium">S.Y.:</span> {transaction.academic_year}</p>
     case 'fee_name':
-      return <p className="text-sm"><span className="font-medium">Fee:</span> {payment.school_fee?.name || 'General'}</p>
+      // Itemized list of fees paid in this transaction.
+      return <ItemsTable transaction={transaction} />
     case 'payment_amount':
-      return <p className="text-lg font-bold text-center">{formatAmount(Number(payment.amount))}</p>
+      return <TotalsBlock transaction={transaction} />
     case 'payment_method':
-      return <p className="text-sm"><span className="font-medium">Method:</span> {payment.payment_method || 'N/A'}</p>
+      return <p className="text-sm"><span className="font-medium">Method:</span> {transaction.payment_method || 'N/A'}</p>
     case 'received_by':
       return <p className="text-sm"><span className="font-medium">Received by:</span> Cashier</p>
     case 'divider':
@@ -70,7 +126,7 @@ function ReceiptElement({ element, payment, studentName, studentLrn }: {
 }
 
 const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({
-  payment,
+  transaction,
   studentName,
   studentLrn,
   onClose,
@@ -107,6 +163,10 @@ const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({
         .small { font-size: 12px; }
         .logo { width: 56px; height: 56px; background: #eee; border-radius: 4px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #999; }
         .spacer { height: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        table td { padding: 2px 0; font-size: 13px; vertical-align: top; }
+        .ta-right { text-align: right; }
+        .row { display: flex; justify-content: space-between; }
         @media print { body { padding: 0; } }
       </style></head><body>
       <div class="receipt">${printRef.current.innerHTML}</div>
@@ -115,13 +175,6 @@ const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({
     `)
     printWindow.document.close()
   }
-
-  const formatAmount = (amount: number) =>
-    new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 2,
-    }).format(amount)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -156,7 +209,7 @@ const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({
                   <ReceiptElement
                     key={el.id}
                     element={el}
-                    payment={payment}
+                    transaction={transaction}
                     studentName={studentName}
                     studentLrn={studentLrn}
                   />
@@ -166,15 +219,24 @@ const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({
               <div className="space-y-2 text-sm">
                 <p className="text-center font-bold text-base">Payment Receipt</p>
                 <hr className="border-dashed border-gray-400" />
-                <p><span className="font-medium">Receipt #:</span> {payment.receipt_number || payment.id}</p>
-                <p><span className="font-medium">Date:</span> {payment.payment_date}</p>
+                <p><span className="font-medium">Receipt #:</span> {transaction.receipt_number}</p>
+                {transaction.or_number && (
+                  <p><span className="font-medium">OR #:</span> {transaction.or_number}</p>
+                )}
+                <p><span className="font-medium">Date:</span> {transaction.payment_date}</p>
                 <p><span className="font-medium">Student:</span> {studentName}</p>
                 {studentLrn && <p><span className="font-medium">LRN:</span> {studentLrn}</p>}
-                <p><span className="font-medium">S.Y.:</span> {payment.academic_year}</p>
-                {payment.school_fee?.name && <p><span className="font-medium">Fee:</span> {payment.school_fee.name}</p>}
+                <p><span className="font-medium">S.Y.:</span> {transaction.academic_year}</p>
                 <hr className="border-dashed border-gray-400" />
-                <p className="text-lg font-bold text-center">{formatAmount(Number(payment.amount))}</p>
-                {payment.payment_method && <p><span className="font-medium">Method:</span> {payment.payment_method}</p>}
+                <ItemsTable transaction={transaction} />
+                <hr className="border-dashed border-gray-400" />
+                <TotalsBlock transaction={transaction} />
+                {transaction.payment_method && (
+                  <p><span className="font-medium">Method:</span> {transaction.payment_method}</p>
+                )}
+                {transaction.reference_number && (
+                  <p><span className="font-medium">Ref #:</span> {transaction.reference_number}</p>
+                )}
                 <hr className="border-dashed border-gray-400" />
                 <div className="pt-8 text-center">
                   <div className="border-t border-gray-400 w-40 mx-auto" />

@@ -65,6 +65,7 @@ class StudentFinanceController extends Controller
         }
 
         $gradeLevel = $this->resolveGradeLevel($studentSections, $academicYear);
+        $section = $this->resolveSection($studentSections, $academicYear);
 
         $feeDefaults = collect();
         if ($gradeLevel) {
@@ -273,6 +274,54 @@ class StudentFinanceController extends Controller
 
         $balance = $balanceForward + $chargesTotal - $discountsTotal - $paymentsTotal;
 
+        // Per-fee breakdown used by the cashiering (POS) screen to show the
+        // outstanding amount for each fee so the cashier can pay toward each.
+        $paidByFee = $payments
+            ->filter(fn ($payment) => $payment->school_fee_id)
+            ->groupBy('school_fee_id')
+            ->map(fn ($group) => (float) $group->sum('amount'));
+
+        $discountByFee = $discountsWithAmount
+            ->merge($gradeLevelDiscountsWithAmount)
+            ->filter(fn ($payload) => $payload['discount']->school_fee_id)
+            ->groupBy(fn ($payload) => $payload['discount']->school_fee_id)
+            ->map(fn ($group) => (float) collect($group)->sum('amount'));
+
+        $feeBreakdown = $feeDefaults->map(function ($default) use ($paidByFee, $discountByFee) {
+            $feeId = $default->school_fee_id;
+            $charge = (float) $default->amount;
+            $discount = (float) ($discountByFee[$feeId] ?? 0);
+            $paid = (float) ($paidByFee[$feeId] ?? 0);
+
+            return [
+                'fee_id' => $feeId,
+                'fee_name' => $default->schoolFee?->name ?? 'School Fee',
+                'is_additional' => false,
+                'charge' => round($charge, 2),
+                'discount' => round($discount, 2),
+                'paid' => round($paid, 2),
+                'outstanding' => round($charge - $discount - $paid, 2),
+            ];
+        })->merge($additionalFees->map(function ($af) use ($paidByFee, $discountByFee) {
+            $charge = (float) $af->amount;
+            $discount = (float) ($discountByFee[$af->id] ?? 0);
+            $paid = (float) ($paidByFee[$af->id] ?? 0);
+
+            return [
+                'fee_id' => $af->id,
+                'fee_name' => $af->name,
+                'is_additional' => true,
+                'charge' => round($charge, 2),
+                'discount' => round($discount, 2),
+                'paid' => round($paid, 2),
+                'outstanding' => round($charge - $discount - $paid, 2),
+            ];
+        }))->values();
+
+        $unallocatedPayments = (float) $payments
+            ->filter(fn ($payment) => !$payment->school_fee_id)
+            ->sum('amount');
+
         $paymentPlan = StudentPaymentPlan::where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -292,6 +341,7 @@ class StudentFinanceController extends Controller
                 'student' => $student,
                 'academic_year' => $academicYear,
                 'grade_level' => $gradeLevel,
+                'section' => $section,
                 'entries' => $entries,
                 'totals' => [
                     'charges' => round($chargesTotal, 2),
@@ -300,6 +350,8 @@ class StudentFinanceController extends Controller
                     'balance_forward' => round($balanceForward, 2),
                     'balance' => round($balance, 2),
                 ],
+                'fee_breakdown' => $feeBreakdown,
+                'unallocated_payments' => round($unallocatedPayments, 2),
                 'payment_plan' => $this->planService->serializePlan($paymentPlan),
                 'installments' => $installments,
                 'available_academic_years' => $availableAcademicYears,
@@ -613,6 +665,16 @@ class StudentFinanceController extends Controller
 
         $selected = $sectionsForYear->firstWhere('is_active', true) ?? $sectionsForYear->first();
         return $selected?->classSection?->grade_level;
+    }
+
+    private function resolveSection($studentSections, string $academicYear): ?string
+    {
+        $sectionsForYear = $studentSections->filter(function ($section) use ($academicYear) {
+            return $section->academic_year === $academicYear;
+        });
+
+        $selected = $sectionsForYear->firstWhere('is_active', true) ?? $sectionsForYear->first();
+        return $selected?->classSection?->title;
     }
 
     private function calculateBalanceForward($studentSections, string $academicYear, string $institutionId, string $studentId): float

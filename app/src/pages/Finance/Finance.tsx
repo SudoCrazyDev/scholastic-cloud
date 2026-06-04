@@ -21,7 +21,7 @@ import CollectionsView from './CollectionsView'
 import DiscountsView from './DiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
-import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentPaymentData, CreateStudentDiscountData, StudentPayment } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentDiscountData, CreatePaymentTransactionData, PaymentTransaction } from '../../types'
 
 const Finance: React.FC = () => {
   const queryClient = useQueryClient()
@@ -84,15 +84,19 @@ const Finance: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [cashierPaymentForm, setCashierPaymentForm] = useState({
     academic_year: defaultAcademicYear,
-    school_fee_id: '',
-    amount: '',
     payment_date: new Date().toISOString().split('T')[0],
     payment_method: '',
+    or_number: '',
     reference_number: '',
     remarks: '',
   })
+  // Per-fee amounts the cashier is paying toward, keyed by fee_id.
+  const [cashierLineAmounts, setCashierLineAmounts] = useState<Record<string, string>>({})
+  // Optional free-form payment not tied to a specific fee.
+  const [cashierGeneralAmount, setCashierGeneralAmount] = useState('')
+  const [cashierTendered, setCashierTendered] = useState('')
   const [cashierError, setCashierError] = useState<string | null>(null)
-  const [lastReceipt, setLastReceipt] = useState<StudentPayment | null>(null)
+  const [lastReceipt, setLastReceipt] = useState<PaymentTransaction | null>(null)
   const [showReceiptModal, setShowReceiptModal] = useState(false)
 
   const [ledgerSearchTerm, setLedgerSearchTerm] = useState('')
@@ -228,21 +232,36 @@ const Finance: React.FC = () => {
     enabled: view === 'ledger' && Boolean(selectedLedgerStudent?.id && ledgerAcademicYear),
   })
 
-  const createPaymentMutation = useMutation({
-    mutationFn: (payload: CreateStudentPaymentData) => studentPaymentService.createPayment(payload),
+  const cashierLedgerQuery = useQuery({
+    queryKey: ['cashier-ledger', selectedStudent?.id, cashierPaymentForm.academic_year],
+    queryFn: () =>
+      studentFinanceService.getLedger(selectedStudent!.id, cashierPaymentForm.academic_year),
+    enabled:
+      view === 'cashiering' &&
+      Boolean(selectedStudent?.id) &&
+      Boolean(cashierPaymentForm.academic_year),
+  })
+
+  const createTransactionMutation = useMutation({
+    mutationFn: (payload: CreatePaymentTransactionData) =>
+      studentPaymentService.createTransaction(payload),
     onSuccess: (response) => {
       setLastReceipt(response.data)
       setShowReceiptModal(true)
+      setCashierLineAmounts({})
+      setCashierGeneralAmount('')
+      setCashierTendered('')
       setCashierPaymentForm((prev) => ({
         ...prev,
-        amount: '',
+        or_number: '',
         reference_number: '',
         remarks: '',
       }))
       setCashierError(null)
       queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
-      toast.success(`Payment recorded. Receipt: ${response.data.receipt_number ?? response.data.id}`)
+      queryClient.invalidateQueries({ queryKey: ['cashier-ledger'] })
+      toast.success(`Payment recorded. Receipt: ${response.data.receipt_number}`)
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to record payment.'
@@ -466,7 +485,41 @@ const Finance: React.FC = () => {
   const getStudentFullName = (s: Student) =>
     [s.first_name, s.middle_name, s.last_name, s.ext_name].filter(Boolean).join(' ')
 
-  const handleCashierPaymentSubmit = (event: React.FormEvent) => {
+  const cashierFeeBreakdown = cashierLedgerQuery.data?.data?.fee_breakdown ?? []
+  const cashierGradeLevel = cashierLedgerQuery.data?.data?.grade_level
+  const cashierSection = cashierLedgerQuery.data?.data?.section
+
+  // Build the list of fee lines the cashier has entered an amount for.
+  const cashierLineItems = useMemo(() => {
+    const items: { school_fee_id: string | null; fee_name: string; amount: number }[] = []
+    for (const fee of cashierFeeBreakdown) {
+      const raw = cashierLineAmounts[fee.fee_id]
+      const amount = Number(raw)
+      if (raw && amount > 0) {
+        // Additional fees are not real school_fees; record them as general lines.
+        items.push({
+          school_fee_id: fee.is_additional ? null : fee.fee_id,
+          fee_name: fee.fee_name,
+          amount,
+        })
+      }
+    }
+    const generalAmount = Number(cashierGeneralAmount)
+    if (cashierGeneralAmount && generalAmount > 0) {
+      items.push({ school_fee_id: null, fee_name: 'General / Other', amount: generalAmount })
+    }
+    return items
+  }, [cashierFeeBreakdown, cashierLineAmounts, cashierGeneralAmount])
+
+  const cashierTotal = useMemo(
+    () => cashierLineItems.reduce((sum, item) => sum + item.amount, 0),
+    [cashierLineItems]
+  )
+
+  const cashierTenderedValue = Number(cashierTendered) || 0
+  const cashierChangeDue = cashierTendered ? Math.max(cashierTenderedValue - cashierTotal, 0) : 0
+
+  const handleCashierTransactionSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     setCashierError(null)
     if (!selectedStudent) {
@@ -474,23 +527,43 @@ const Finance: React.FC = () => {
       toast.error('Please select a student.')
       return
     }
-    const amountValue = Number(cashierPaymentForm.amount)
-    if (!amountValue || amountValue <= 0) {
-      setCashierError('Payment amount must be greater than zero.')
-      toast.error('Payment amount must be greater than zero.')
+    if (cashierLineItems.length === 0) {
+      setCashierError('Enter an amount for at least one fee.')
+      toast.error('Enter an amount for at least one fee.')
       return
     }
-    const payload: CreateStudentPaymentData = {
+    if (cashierTendered && cashierTenderedValue < cashierTotal) {
+      setCashierError('Amount tendered is less than the total to pay.')
+      toast.error('Amount tendered is less than the total to pay.')
+      return
+    }
+
+    // Soft warning for paying more than a fee's outstanding balance.
+    const overpaid = cashierFeeBreakdown.find((fee) => {
+      const amount = Number(cashierLineAmounts[fee.fee_id])
+      return amount > 0 && fee.outstanding > 0 && amount > fee.outstanding + 0.001
+    })
+    if (overpaid) {
+      toast(`Note: payment for ${overpaid.fee_name} exceeds its balance (advance payment).`, {
+        icon: '⚠️',
+      })
+    }
+
+    const payload: CreatePaymentTransactionData = {
       student_id: selectedStudent.id,
       academic_year: cashierPaymentForm.academic_year,
-      amount: amountValue,
       payment_date: cashierPaymentForm.payment_date || new Date().toISOString().split('T')[0],
       payment_method: cashierPaymentForm.payment_method || undefined,
+      or_number: cashierPaymentForm.or_number || undefined,
       reference_number: cashierPaymentForm.reference_number || undefined,
       remarks: cashierPaymentForm.remarks || undefined,
-      school_fee_id: cashierPaymentForm.school_fee_id || undefined,
+      amount_tendered: cashierTendered ? cashierTenderedValue : undefined,
+      items: cashierLineItems.map((item) => ({
+        school_fee_id: item.school_fee_id,
+        amount: item.amount,
+      })),
     }
-    createPaymentMutation.mutate(payload)
+    createTransactionMutation.mutate(payload)
   }
 
   const resetDefaultForm = () => {
@@ -1085,72 +1158,126 @@ const Finance: React.FC = () => {
             </p>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <label className="block text-sm font-medium text-gray-700">Student</label>
-                <div className="relative">
-                  <Input
-                    value={studentSearchTerm}
-                    onChange={(e) => {
-                      setStudentSearchTerm(e.target.value)
-                      if (!e.target.value) setSelectedStudent(null)
-                    }}
-                    placeholder="Search by name or LRN (min 2 characters)"
-                    className="w-full"
-                  />
-                  {studentSearchQuery.isFetching && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                      Searching...
+          {lastReceipt && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-700">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-green-800">
+                    Payment recorded · Receipt #{lastReceipt.receipt_number}
+                  </p>
+                  <p className="text-sm text-green-700">
+                    {lastReceipt.items?.length ?? 0} item
+                    {(lastReceipt.items?.length ?? 0) === 1 ? '' : 's'} · Total{' '}
+                    <span className="font-semibold">{formatCurrency(Number(lastReceipt.total_amount))}</span>
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowReceiptModal(true)}
+                className="border-green-300 text-green-700 hover:bg-green-100"
+              >
+                Print Receipt
+              </Button>
+            </div>
+          )}
+
+          <form onSubmit={handleCashierTransactionSubmit} className="space-y-6">
+            {/* Customer + context */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+                <div className="flex-1 min-w-0">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
+                  {selectedStudent ? (
+                    <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white">
+                          {`${selectedStudent.first_name?.[0] ?? ''}${selectedStudent.last_name?.[0] ?? ''}`.toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-indigo-900">
+                            {getStudentFullName(selectedStudent)}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-indigo-700/80">
+                            {selectedStudent.lrn && <span>LRN: {selectedStudent.lrn}</span>}
+                            {(cashierGradeLevel || cashierSection) && (
+                              <>
+                                {selectedStudent.lrn && <span className="text-indigo-300">•</span>}
+                                <span>
+                                  {[cashierGradeLevel, cashierSection].filter(Boolean).join(' — ')}
+                                </span>
+                              </>
+                            )}
+                            {cashierLedgerQuery.isFetching && !cashierGradeLevel && (
+                              <span className="text-indigo-400">Loading…</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedStudent(null)
+                          setStudentSearchTerm('')
+                          setCashierLineAmounts({})
+                          setCashierGeneralAmount('')
+                        }}
+                      >
+                        Change
+                      </Button>
                     </div>
-                  )}
-                  {debouncedStudentSearch.length >= 2 && !selectedStudent && (
-                    <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-auto">
-                      {studentSearchQuery.data?.data?.length ? (
-                        studentSearchQuery.data.data.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedStudent(s)
-                              setStudentSearchTerm(getStudentFullName(s))
-                              setDebouncedStudentSearch('')
-                            }}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 flex flex-col"
-                          >
-                            <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
-                            {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-4 py-3 text-sm text-gray-500">No students found.</div>
+                  ) : (
+                    <div className="relative">
+                      <Input
+                        value={studentSearchTerm}
+                        onChange={(e) => {
+                          setStudentSearchTerm(e.target.value)
+                          if (!e.target.value) setSelectedStudent(null)
+                        }}
+                        placeholder="Search by name or LRN (min 2 characters)"
+                        className="w-full"
+                      />
+                      {studentSearchQuery.isFetching && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                          Searching...
+                        </div>
+                      )}
+                      {debouncedStudentSearch.length >= 2 && !selectedStudent && (
+                        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-auto">
+                          {studentSearchQuery.data?.data?.length ? (
+                            studentSearchQuery.data.data.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedStudent(s)
+                                  setStudentSearchTerm(getStudentFullName(s))
+                                  setDebouncedStudentSearch('')
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 flex flex-col"
+                              >
+                                <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
+                                {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-gray-500">No students found.</div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-                {selectedStudent && (
-                  <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
-                    <span className="text-sm font-medium text-indigo-900">
-                      {getStudentFullName(selectedStudent)}
-                      {selectedStudent.lrn && ` (LRN: ${selectedStudent.lrn})`}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedStudent(null)
-                        setStudentSearchTerm('')
-                      }}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <form onSubmit={handleCashierPaymentSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 lg:w-[320px] shrink-0">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Academic year</label>
                     <Select
@@ -1160,7 +1287,7 @@ const Finance: React.FC = () => {
                       }
                       options={academicYearOptions}
                       className="w-full"
-                      disabled={createPaymentMutation.isPending}
+                      disabled={createTransactionMutation.isPending}
                     />
                   </div>
                   <div>
@@ -1171,142 +1298,294 @@ const Finance: React.FC = () => {
                       onChange={(e) =>
                         setCashierPaymentForm((prev) => ({ ...prev, payment_date: e.target.value }))
                       }
-                      disabled={createPaymentMutation.isPending}
+                      disabled={createTransactionMutation.isPending}
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fee type (optional)
-                  </label>
-                  <Select
-                    value={cashierPaymentForm.school_fee_id}
-                    onChange={(e) =>
-                      setCashierPaymentForm((prev) => ({ ...prev, school_fee_id: e.target.value }))
-                    }
-                    options={[
-                      { value: '', label: '— Any / General' },
-                      ...(feesQuery.data?.data ?? []).map((f) => ({ value: f.id, label: f.name })),
-                    ]}
-                    className="w-full"
-                    disabled={createPaymentMutation.isPending}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₱) *</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={cashierPaymentForm.amount}
-                    onChange={(e) =>
-                      setCashierPaymentForm((prev) => ({ ...prev, amount: e.target.value }))
-                    }
-                    placeholder="0.00"
-                    disabled={createPaymentMutation.isPending}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mode of Payment
-                  </label>
-                  <Select
-                    value={cashierPaymentForm.payment_method}
-                    onChange={(e) =>
-                      setCashierPaymentForm((prev) => ({ ...prev, payment_method: e.target.value }))
-                    }
-                    options={[
-                      { value: '', label: '— Select payment mode' },
-                      { value: 'Cash', label: 'Cash' },
-                      { value: 'Check', label: 'Check' },
-                      { value: 'Bank Transfer', label: 'Bank Transfer' },
-                      { value: 'GCash', label: 'GCash' },
-                      { value: 'Maya', label: 'Maya' },
-                      { value: 'Credit Card', label: 'Credit Card' },
-                      { value: 'Debit Card', label: 'Debit Card' },
-                      { value: 'Online Banking', label: 'Online Banking' },
-                      { value: 'Money Order', label: 'Money Order' },
-                      { value: 'Other', label: 'Other' },
-                    ]}
-                    className="w-full"
-                    disabled={createPaymentMutation.isPending}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Reference number (optional)
-                  </label>
-                  <Input
-                    value={cashierPaymentForm.reference_number}
-                    onChange={(e) =>
-                      setCashierPaymentForm((prev) => ({ ...prev, reference_number: e.target.value }))
-                    }
-                    placeholder="e.g. check no., transaction id"
-                    disabled={createPaymentMutation.isPending}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Remarks (optional)</label>
-                  <Input
-                    value={cashierPaymentForm.remarks}
-                    onChange={(e) =>
-                      setCashierPaymentForm((prev) => ({ ...prev, remarks: e.target.value }))
-                    }
-                    placeholder="Optional notes"
-                    disabled={createPaymentMutation.isPending}
-                  />
-                </div>
-                {cashierError && (
-                  <p className="text-sm text-red-600">{cashierError}</p>
-                )}
-                <Button
-                  type="submit"
-                  loading={createPaymentMutation.isPending}
-                  disabled={!selectedStudent}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto"
-                >
-                  {createPaymentMutation.isPending ? 'Recording...' : 'Record payment'}
-                </Button>
-              </form>
+              </div>
             </div>
 
-            {lastReceipt && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-800">Last receipt</p>
-                    <p className="text-lg font-semibold text-green-900 mt-1">
-                      Receipt # {lastReceipt.receipt_number ?? lastReceipt.id}
-                    </p>
-                    <p className="text-sm text-green-700 mt-1">
-                      Amount: ₱ {Number(lastReceipt.amount).toLocaleString('en-PH', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
+            {/* Cart + checkout */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              {/* Fees cart */}
+              <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900">Fees to pay</h3>
+                    {cashierLedgerQuery.isFetching && (
+                      <span className="text-xs text-gray-400">Loading balances…</span>
+                    )}
                   </div>
+                  {selectedStudent && cashierFeeBreakdown.some((f) => f.outstanding > 0) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCashierLineAmounts((prev) => {
+                          const next = { ...prev }
+                          for (const fee of cashierFeeBreakdown) {
+                            if (fee.outstanding > 0) next[fee.fee_id] = String(fee.outstanding)
+                          }
+                          return next
+                        })
+                      }
+                      disabled={createTransactionMutation.isPending}
+                    >
+                      Pay all balances
+                    </Button>
+                  )}
+                </div>
+
+                {!selectedStudent ? (
+                  <div className="px-5 py-16 text-center">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 0115 0v.75H4.5v-.75z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-gray-600">No student selected</p>
+                    <p className="text-sm text-gray-400">Search for a student above to load their outstanding fees.</p>
+                  </div>
+                ) : cashierFeeBreakdown.length === 0 && !cashierLedgerQuery.isFetching ? (
+                  <div className="px-5 py-12 text-center text-sm text-gray-500">
+                    No fees charged for {cashierPaymentForm.academic_year}.
+                    <br />
+                    Use the <span className="font-medium">General / Other payment</span> field below.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {cashierFeeBreakdown.map((fee) => {
+                      const entered = Number(cashierLineAmounts[fee.fee_id]) || 0
+                      const settled = fee.outstanding <= 0
+                      return (
+                        <div
+                          key={fee.fee_id}
+                          className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50/60"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-gray-900">
+                              {fee.fee_name}
+                              {fee.is_additional && (
+                                <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                  Additional
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {settled ? (
+                                <span className="text-green-600">Fully paid</span>
+                              ) : (
+                                <>Balance: <span className="font-medium text-gray-700">{formatCurrency(fee.outstanding)}</span></>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="relative">
+                              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">₱</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={cashierLineAmounts[fee.fee_id] ?? ''}
+                                onChange={(e) =>
+                                  setCashierLineAmounts((prev) => ({
+                                    ...prev,
+                                    [fee.fee_id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="0.00"
+                                className={`w-32 pl-6 text-right ${entered > 0 ? 'border-indigo-300 ring-1 ring-indigo-100' : ''}`}
+                                disabled={createTransactionMutation.isPending}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setCashierLineAmounts((prev) => ({
+                                  ...prev,
+                                  [fee.fee_id]: fee.outstanding > 0 ? String(fee.outstanding) : '',
+                                }))
+                              }
+                              disabled={fee.outstanding <= 0 || createTransactionMutation.isPending}
+                              title="Pay full balance"
+                            >
+                              Full
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="border-t border-gray-100 px-5 py-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    General / Other payment <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <div className="relative max-w-xs">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₱</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={cashierGeneralAmount}
+                      onChange={(e) => setCashierGeneralAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-7"
+                      disabled={createTransactionMutation.isPending}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Not tied to a specific fee — reduces the overall balance.
+                  </p>
+                </div>
+              </div>
+
+              {/* Checkout summary */}
+              <div className="lg:col-span-1 lg:sticky lg:top-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="border-b border-gray-100 px-5 py-3.5">
+                  <h3 className="text-sm font-semibold text-gray-900">Payment summary</h3>
+                </div>
+                <div className="space-y-4 px-5 py-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mode of payment</label>
+                    <Select
+                      value={cashierPaymentForm.payment_method}
+                      onChange={(e) =>
+                        setCashierPaymentForm((prev) => ({ ...prev, payment_method: e.target.value }))
+                      }
+                      options={[
+                        { value: '', label: '— Select payment mode' },
+                        { value: 'Cash', label: 'Cash' },
+                        { value: 'Check', label: 'Check' },
+                        { value: 'Bank Transfer', label: 'Bank Transfer' },
+                        { value: 'GCash', label: 'GCash' },
+                        { value: 'Maya', label: 'Maya' },
+                        { value: 'Credit Card', label: 'Credit Card' },
+                        { value: 'Debit Card', label: 'Debit Card' },
+                        { value: 'Online Banking', label: 'Online Banking' },
+                        { value: 'Money Order', label: 'Money Order' },
+                        { value: 'Other', label: 'Other' },
+                      ]}
+                      className="w-full"
+                      disabled={createTransactionMutation.isPending}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        OR number <span className="font-normal text-gray-400">(optional)</span>
+                      </label>
+                      <Input
+                        value={cashierPaymentForm.or_number}
+                        onChange={(e) =>
+                          setCashierPaymentForm((prev) => ({ ...prev, or_number: e.target.value }))
+                        }
+                        placeholder="Official Receipt no."
+                        disabled={createTransactionMutation.isPending}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Reference number <span className="font-normal text-gray-400">(optional)</span>
+                      </label>
+                      <Input
+                        value={cashierPaymentForm.reference_number}
+                        onChange={(e) =>
+                          setCashierPaymentForm((prev) => ({ ...prev, reference_number: e.target.value }))
+                        }
+                        placeholder="e.g. check no., transaction id"
+                        disabled={createTransactionMutation.isPending}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Remarks <span className="font-normal text-gray-400">(optional)</span>
+                      </label>
+                      <Input
+                        value={cashierPaymentForm.remarks}
+                        onChange={(e) =>
+                          setCashierPaymentForm((prev) => ({ ...prev, remarks: e.target.value }))
+                        }
+                        placeholder="Optional notes"
+                        disabled={createTransactionMutation.isPending}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-gray-50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">
+                        {cashierLineItems.length} item{cashierLineItems.length === 1 ? '' : 's'}
+                      </span>
+                      <span className="text-xs text-gray-400">Total due</span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-medium text-gray-700">Total to pay</span>
+                      <span className="text-2xl font-bold text-gray-900 tabular-nums">
+                        {formatCurrency(cashierTotal)}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount tendered</label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₱</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={cashierTendered}
+                          onChange={(e) => setCashierTendered(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full pl-7 text-right"
+                          disabled={createTransactionMutation.isPending}
+                        />
+                      </div>
+                    </div>
+                    {cashierTendered && (
+                      <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+                        <span className="text-sm font-medium text-gray-700">Change due</span>
+                        <span
+                          className={`text-lg font-bold tabular-nums ${
+                            cashierTenderedValue < cashierTotal ? 'text-red-600' : 'text-green-700'
+                          }`}
+                        >
+                          {cashierTenderedValue < cashierTotal
+                            ? 'Insufficient'
+                            : formatCurrency(cashierChangeDue)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {cashierError && <p className="text-sm text-red-600">{cashierError}</p>}
+
                   <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowReceiptModal(true)}
-                    className="border-green-300 text-green-700 hover:bg-green-100"
+                    type="submit"
+                    loading={createTransactionMutation.isPending}
+                    disabled={!selectedStudent || cashierLineItems.length === 0}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
-                    Print Receipt
+                    {createTransactionMutation.isPending
+                      ? 'Recording...'
+                      : `Record payment${cashierTotal > 0 ? ` · ${formatCurrency(cashierTotal)}` : ''}`}
                   </Button>
                 </div>
               </div>
-            )}
+            </div>
+          </form>
 
-            {showReceiptModal && lastReceipt && selectedStudent && (
-              <ReceiptPrintModal
-                payment={lastReceipt}
-                studentName={getStudentFullName(selectedStudent)}
-                studentLrn={selectedStudent.lrn}
-                onClose={() => setShowReceiptModal(false)}
-              />
-            )}
-          </div>
+          {showReceiptModal && lastReceipt && selectedStudent && (
+            <ReceiptPrintModal
+              transaction={lastReceipt}
+              studentName={getStudentFullName(selectedStudent)}
+              studentLrn={selectedStudent.lrn}
+              onClose={() => setShowReceiptModal(false)}
+            />
+          )}
         </div>
       )}
 

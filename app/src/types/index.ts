@@ -167,12 +167,59 @@ export interface StudentPayment {
   payment_date: string;
   payment_method?: string | null;
   reference_number?: string | null;
+  or_number?: string | null;
   receipt_number?: string | null;
   remarks?: string | null;
   created_at: string;
   updated_at: string;
   school_fee?: SchoolFee;
   student?: Student;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  institution_id: string;
+  student_id: string;
+  academic_year: string;
+  payment_date: string;
+  payment_method?: string | null;
+  reference_number?: string | null;
+  or_number?: string | null;
+  receipt_number: string;
+  remarks?: string | null;
+  total_amount: number;
+  amount_tendered?: number | null;
+  change_due?: number | null;
+  received_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: StudentPayment[];
+  student?: Student;
+}
+
+export interface CreatePaymentTransactionItem {
+  school_fee_id?: string | null;
+  amount: number;
+  remarks?: string;
+}
+
+export interface CreatePaymentTransactionData {
+  student_id: string;
+  academic_year: string;
+  payment_date?: string;
+  payment_method?: string;
+  reference_number?: string;
+  or_number?: string;
+  remarks?: string;
+  amount_tendered?: number;
+  items: CreatePaymentTransactionItem[];
+}
+
+export interface TransactionReceipt {
+  transaction: PaymentTransaction;
+  student: Student;
+  institution?: Institution;
+  received_by?: User;
 }
 
 export interface StudentOnlinePaymentTransaction {
@@ -294,10 +341,21 @@ export interface StudentInstallment {
   status: 'paid' | 'partial' | 'pending';
 }
 
+export interface LedgerFeeBreakdown {
+  fee_id: string;
+  fee_name: string;
+  is_additional: boolean;
+  charge: number;
+  discount: number;
+  paid: number;
+  outstanding: number;
+}
+
 export interface StudentLedgerResponse {
   student: Student;
   academic_year: string;
   grade_level?: string;
+  section?: string;
   entries: StudentLedgerEntry[];
   totals: {
     charges: number;
@@ -306,6 +364,8 @@ export interface StudentLedgerResponse {
     balance_forward: number;
     balance: number;
   };
+  fee_breakdown?: LedgerFeeBreakdown[];
+  unallocated_payments?: number;
   payment_plan?: StudentPaymentPlan | null;
   installments?: StudentInstallment[];
   available_academic_years?: string[];

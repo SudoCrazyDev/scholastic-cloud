@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use App\Models\SchoolFee;
 use App\Models\StudentPayment;
+use App\Models\PaymentTransaction;
 use App\Auth\StudentPortalUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class StudentPaymentController extends Controller
@@ -95,6 +97,11 @@ class StudentPaymentController extends Controller
             ], 400);
         }
 
+        // Multi-fee transaction path: a single transaction settles several fees.
+        if ($request->has('items')) {
+            return $this->storeTransaction($request, $institutionId);
+        }
+
         $validated = $request->validate([
             'student_id' => 'required|uuid|exists:students,id',
             'academic_year' => 'required|string|max:255',
@@ -139,7 +146,7 @@ class StudentPaymentController extends Controller
             'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
             'payment_method' => $validated['payment_method'] ?? null,
             'reference_number' => $validated['reference_number'] ?? null,
-            'receipt_number' => StudentPayment::generateUniqueReceiptNumber(),
+            'receipt_number' => PaymentTransaction::generateUniqueReceiptNumber(),
             'remarks' => $validated['remarks'] ?? null,
             'received_by' => $request->user()?->id,
         ]);
@@ -150,6 +157,120 @@ class StudentPaymentController extends Controller
             'success' => true,
             'message' => 'Payment recorded successfully',
             'data' => $payment
+        ], 201);
+    }
+
+    /**
+     * Store a multi-fee payment as a single transaction (header + line items).
+     */
+    private function storeTransaction(Request $request, string $institutionId): JsonResponse
+    {
+        $validated = $request->validate([
+            'student_id' => 'required|uuid|exists:students,id',
+            'academic_year' => 'required|string|max:255',
+            'payment_date' => 'nullable|date',
+            'payment_method' => 'nullable|string|max:255',
+            'reference_number' => 'nullable|string|max:255',
+            'or_number' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string',
+            'amount_tendered' => 'nullable|numeric|min:0',
+            'items' => 'required|array|min:1',
+            'items.*.school_fee_id' => 'nullable|uuid|exists:school_fees,id',
+            'items.*.amount' => 'required|numeric|min:0.01',
+            'items.*.remarks' => 'nullable|string',
+        ]);
+
+        $student = Student::whereHas('studentInstitutions', function ($query) use ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        })->find($validated['student_id']);
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student not found in this institution'
+            ], 404);
+        }
+
+        // Validate every referenced fee belongs to this institution.
+        $feeIds = collect($validated['items'])
+            ->pluck('school_fee_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($feeIds->isNotEmpty()) {
+            $foundCount = SchoolFee::where('institution_id', $institutionId)
+                ->whereIn('id', $feeIds)
+                ->count();
+
+            if ($foundCount !== $feeIds->count()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'One or more school fees were not found for this institution'
+                ], 404);
+            }
+        }
+
+        $totalAmount = collect($validated['items'])->sum(fn ($item) => (float) $item['amount']);
+        $totalAmount = round($totalAmount, 2);
+        $tendered = isset($validated['amount_tendered']) ? round((float) $validated['amount_tendered'], 2) : null;
+        $changeDue = $tendered !== null ? round(max($tendered - $totalAmount, 0), 2) : null;
+        $paymentDate = $validated['payment_date'] ?? now()->toDateString();
+        $receiptNumber = PaymentTransaction::generateUniqueReceiptNumber();
+
+        $transaction = DB::transaction(function () use (
+            $validated,
+            $institutionId,
+            $request,
+            $totalAmount,
+            $tendered,
+            $changeDue,
+            $paymentDate,
+            $receiptNumber
+        ) {
+            $transaction = PaymentTransaction::create([
+                'institution_id' => $institutionId,
+                'student_id' => $validated['student_id'],
+                'academic_year' => $validated['academic_year'],
+                'payment_date' => $paymentDate,
+                'payment_method' => $validated['payment_method'] ?? null,
+                'reference_number' => $validated['reference_number'] ?? null,
+                'or_number' => $validated['or_number'] ?? null,
+                'receipt_number' => $receiptNumber,
+                'remarks' => $validated['remarks'] ?? null,
+                'total_amount' => $totalAmount,
+                'amount_tendered' => $tendered,
+                'change_due' => $changeDue,
+                'received_by' => $request->user()?->id,
+            ]);
+
+            foreach ($validated['items'] as $item) {
+                StudentPayment::create([
+                    'institution_id' => $institutionId,
+                    'student_id' => $validated['student_id'],
+                    'payment_transaction_id' => $transaction->id,
+                    'school_fee_id' => $item['school_fee_id'] ?? null,
+                    'academic_year' => $validated['academic_year'],
+                    'amount' => $item['amount'],
+                    'payment_date' => $paymentDate,
+                    'payment_method' => $validated['payment_method'] ?? null,
+                    'reference_number' => $validated['reference_number'] ?? null,
+                    'or_number' => $validated['or_number'] ?? null,
+                    'receipt_number' => $receiptNumber,
+                    'remarks' => $item['remarks'] ?? ($validated['remarks'] ?? null),
+                    'received_by' => $request->user()?->id,
+                ]);
+            }
+
+            return $transaction;
+        });
+
+        $transaction->load(['items.schoolFee', 'student', 'receivedBy']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment recorded successfully',
+            'data' => $transaction
         ], 201);
     }
 
