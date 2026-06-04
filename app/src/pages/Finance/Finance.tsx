@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PDFDownloadLink } from '@react-pdf/renderer'
-import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { PencilSquareIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { NavLink, useLocation } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../components/button'
@@ -15,13 +15,14 @@ import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import { studentDiscountService } from '../../services/studentDiscountService'
+import { studentAdditionalFeeService } from '../../services/studentAdditionalFeeService'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import DashboardCharts from './DashboardCharts'
 import CollectionsView from './CollectionsView'
 import DiscountsView from './DiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
-import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentDiscountData, CreatePaymentTransactionData, PaymentTransaction } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction } from '../../types'
 
 const Finance: React.FC = () => {
   const queryClient = useQueryClient()
@@ -112,6 +113,13 @@ const Finance: React.FC = () => {
     description: '',
   })
   const [ledgerDiscountError, setLedgerDiscountError] = useState<string | null>(null)
+  const [showLedgerAdditionalFee, setShowLedgerAdditionalFee] = useState(false)
+  const [ledgerAdditionalFeeForm, setLedgerAdditionalFeeForm] = useState({
+    name: '',
+    description: '',
+    amount: '',
+  })
+  const [ledgerAdditionalFeeError, setLedgerAdditionalFeeError] = useState<string | null>(null)
 
   const createLedgerDiscountMutation = useMutation({
     mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
@@ -155,6 +163,72 @@ const Finance: React.FC = () => {
       value,
       school_fee_id: ledgerDiscountForm.school_fee_id || undefined,
       description: ledgerDiscountForm.description || undefined,
+    })
+  }
+
+  const ledgerAdditionalFeesQuery = useQuery({
+    queryKey: ['student-additional-fees', selectedLedgerStudent?.id, ledgerAcademicYear],
+    queryFn: () =>
+      studentAdditionalFeeService.getFees({
+        student_id: selectedLedgerStudent!.id,
+        academic_year: ledgerAcademicYear,
+      }),
+    enabled: view === 'ledger' && Boolean(selectedLedgerStudent?.id && ledgerAcademicYear),
+  })
+
+  const createLedgerAdditionalFeeMutation = useMutation({
+    mutationFn: (payload: CreateStudentAdditionalFeeData) =>
+      studentAdditionalFeeService.createFee(payload),
+    onSuccess: () => {
+      setLedgerAdditionalFeeForm({ name: '', description: '', amount: '' })
+      setLedgerAdditionalFeeError(null)
+      setShowLedgerAdditionalFee(false)
+      queryClient.invalidateQueries({ queryKey: ['student-additional-fees', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', selectedLedgerStudent?.id] })
+      toast.success('Additional fee added.')
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to add fee.'
+      setLedgerAdditionalFeeError(message)
+      toast.error(message)
+    },
+  })
+
+  const deleteLedgerAdditionalFeeMutation = useMutation({
+    mutationFn: (id: string) => studentAdditionalFeeService.deleteFee(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-additional-fees', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', selectedLedgerStudent?.id] })
+      toast.success('Additional fee removed.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to remove fee.')
+    },
+  })
+
+  const handleLedgerAdditionalFeeSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setLedgerAdditionalFeeError(null)
+    if (!selectedLedgerStudent) return
+
+    if (!ledgerAdditionalFeeForm.name.trim()) {
+      setLedgerAdditionalFeeError('Fee name is required.')
+      return
+    }
+    const amount = Number(ledgerAdditionalFeeForm.amount)
+    if (!amount || amount <= 0) {
+      setLedgerAdditionalFeeError('Amount must be greater than zero.')
+      return
+    }
+
+    createLedgerAdditionalFeeMutation.mutate({
+      student_id: selectedLedgerStudent.id,
+      academic_year: ledgerAcademicYear,
+      name: ledgerAdditionalFeeForm.name,
+      description: ledgerAdditionalFeeForm.description || undefined,
+      amount,
     })
   }
 
@@ -1845,6 +1919,118 @@ const Finance: React.FC = () => {
                         </Button>
                       </div>
                     </form>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-white">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                        <PlusIcon className="w-4 h-4 text-indigo-600" />
+                        Additional Fees
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        Extra fees specific to this student for{' '}
+                        <span className="font-medium">{ledgerAcademicYear}</span>, beyond the standard
+                        grade-level fees.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowLedgerAdditionalFee((prev) => !prev)}
+                    >
+                      {showLedgerAdditionalFee ? 'Cancel' : 'New Fee'}
+                    </Button>
+                  </div>
+                  {showLedgerAdditionalFee && (
+                    <form
+                      className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4"
+                      onSubmit={handleLedgerAdditionalFeeSubmit}
+                    >
+                      <Input
+                        label="Fee Name"
+                        value={ledgerAdditionalFeeForm.name}
+                        onChange={(e) =>
+                          setLedgerAdditionalFeeForm((prev) => ({ ...prev, name: e.target.value }))
+                        }
+                        placeholder="e.g. Lab Fee, Field Trip"
+                      />
+                      <Input
+                        label="Amount (PHP)"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={ledgerAdditionalFeeForm.amount}
+                        onChange={(e) =>
+                          setLedgerAdditionalFeeForm((prev) => ({ ...prev, amount: e.target.value }))
+                        }
+                        placeholder="0.00"
+                      />
+                      <Input
+                        label="Description (optional)"
+                        value={ledgerAdditionalFeeForm.description}
+                        onChange={(e) =>
+                          setLedgerAdditionalFeeForm((prev) => ({ ...prev, description: e.target.value }))
+                        }
+                        placeholder="Optional note"
+                      />
+                      {ledgerAdditionalFeeError && (
+                        <p className="sm:col-span-3 text-sm text-red-600">{ledgerAdditionalFeeError}</p>
+                      )}
+                      <div className="sm:col-span-3 flex justify-end">
+                        <Button
+                          type="submit"
+                          loading={createLedgerAdditionalFeeMutation.isPending}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                          Add Additional Fee
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                  {(ledgerAdditionalFeesQuery.data?.data?.length ?? 0) > 0 && (
+                    <div className="px-4 pb-4 overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {ledgerAdditionalFeesQuery.data?.data?.map((fee) => (
+                            <tr key={fee.id}>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{fee.name}</td>
+                              <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
+                                {formatCurrency(fee.amount)}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-600">{fee.description || '—'}</td>
+                              <td className="px-4 py-2">
+                                <div className="flex justify-end">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (window.confirm('Remove this additional fee?')) {
+                                        deleteLedgerAdditionalFeeMutation.mutate(fee.id)
+                                      }
+                                    }}
+                                    className="text-red-600 border-red-200 hover:bg-red-50"
+                                    title="Remove fee"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
 

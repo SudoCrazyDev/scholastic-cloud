@@ -5,3 +5,4 @@ desktop-app/node_modules
 node_modules
 recordings/
 .playwright-mcp/
+.claude
