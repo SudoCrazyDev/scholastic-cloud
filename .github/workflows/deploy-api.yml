@@ -76,7 +76,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        deployment_target: [prod, maranatha]
+        deployment_target: [prod, maranatha, mcadavao]
     environment: ${{ matrix.deployment_target }}
     steps:
       - name: Download deployment artifact

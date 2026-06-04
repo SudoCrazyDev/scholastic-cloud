@@ -19,7 +19,7 @@ jobs:
       fail-fast: false  # Deploy to other targets even if one fails
       matrix:
         # Your production + each VIP/self-hosting client. Add new clients here.
-        deployment_target: [prod, maranatha]
+        deployment_target: [prod, maranatha, mcadavao]
     environment: ${{ matrix.deployment_target }}
     steps:
       - name: Checkout repository
