@@ -139,6 +139,7 @@ function App() {
               <Route path="finance/collections" element={<Finance />} />
               <Route path="finance/discounts" element={<Finance />} />
               <Route path="finance/receipt-builder" element={<Finance />} />
+              <Route path="finance/void-requests" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
               <Route path="hris/devices" element={<HrisDevices />} />
               <Route path="hris/zk-users" element={<HrisZkUsers />} />

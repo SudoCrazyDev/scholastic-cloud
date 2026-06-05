@@ -16,13 +16,17 @@ import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import { studentDiscountService } from '../../services/studentDiscountService'
 import { studentAdditionalFeeService } from '../../services/studentAdditionalFeeService'
+import { paymentVoidService } from '../../services/paymentVoidService'
+import { useAuth } from '../../hooks/useAuth'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import DashboardCharts from './DashboardCharts'
 import CollectionsView from './CollectionsView'
 import DiscountsView from './DiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
-import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
+
+const VOID_APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator']
 
 const Finance: React.FC = () => {
   const queryClient = useQueryClient()
@@ -36,8 +40,14 @@ const Finance: React.FC = () => {
     if (pathname.endsWith('/collections')) return 'collections'
     if (pathname.endsWith('/discounts')) return 'discounts'
     if (pathname.endsWith('/receipt-builder')) return 'receipt-builder'
+    if (pathname.endsWith('/void-requests')) return 'void-requests'
     return 'dashboard'
   }, [location.pathname])
+
+  const { user } = useAuth()
+  const roleSlug: string | undefined = user?.role?.slug
+  const isVoidApprover = Boolean(roleSlug && VOID_APPROVER_ROLES.includes(roleSlug))
+  const canRequestVoid = roleSlug === 'finance' || isVoidApprover
 
   const currentYear = new Date().getFullYear()
   const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
@@ -207,6 +217,80 @@ const Finance: React.FC = () => {
       toast.error(error.response?.data?.message || 'Failed to remove fee.')
     },
   })
+
+  // ---- Payment void workflow ----
+  const [voidEntry, setVoidEntry] = useState<StudentLedgerEntry | null>(null)
+  const [voidNote, setVoidNote] = useState('')
+  const [voidStatusFilter, setVoidStatusFilter] = useState<PaymentVoidStatus>('pending')
+  const [disapproveTarget, setDisapproveTarget] = useState<string | null>(null)
+  const [disapproveNote, setDisapproveNote] = useState('')
+
+  const voidRequestsQuery = useQuery({
+    queryKey: ['payment-void-requests', voidStatusFilter],
+    queryFn: () => paymentVoidService.list(voidStatusFilter),
+    enabled: view === 'void-requests' && canRequestVoid,
+  })
+
+  const invalidateAfterVoid = () => {
+    queryClient.invalidateQueries({ queryKey: ['payment-void-requests'] })
+    queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+    queryClient.invalidateQueries({ queryKey: ['student-noa'] })
+  }
+
+  const createVoidMutation = useMutation({
+    mutationFn: (payload: { receipt_number: string; request_note: string }) =>
+      paymentVoidService.create(payload),
+    onSuccess: (response) => {
+      setVoidEntry(null)
+      setVoidNote('')
+      invalidateAfterVoid()
+      toast.success(response.message || 'Void request submitted.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to submit void request.')
+    },
+  })
+
+  const approveVoidMutation = useMutation({
+    mutationFn: (id: string) => paymentVoidService.approve(id),
+    onSuccess: () => {
+      invalidateAfterVoid()
+      toast.success('Void request approved.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to approve void request.')
+    },
+  })
+
+  const disapproveVoidMutation = useMutation({
+    mutationFn: (payload: { id: string; review_note: string }) =>
+      paymentVoidService.disapprove(payload.id, payload.review_note),
+    onSuccess: () => {
+      setDisapproveTarget(null)
+      setDisapproveNote('')
+      invalidateAfterVoid()
+      toast.success('Void request disapproved.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to disapprove void request.')
+    },
+  })
+
+  const handleVoidSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!voidEntry?.receipt_number) {
+      toast.error('This payment has no receipt number and cannot be voided.')
+      return
+    }
+    if (!voidNote.trim()) {
+      toast.error('A note is required to void a payment.')
+      return
+    }
+    createVoidMutation.mutate({
+      receipt_number: voidEntry.receipt_number,
+      request_note: voidNote.trim(),
+    })
+  }
 
   const handleLedgerAdditionalFeeSubmit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -747,6 +831,18 @@ const Finance: React.FC = () => {
           >
             Receipt Builder
           </NavLink>
+          {canRequestVoid && (
+            <NavLink
+              to="/finance/void-requests"
+              className={({ isActive }) =>
+                `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+                }`
+              }
+            >
+              Void Requests
+            </NavLink>
+          )}
         </div>
       </div>
 
@@ -2101,6 +2197,11 @@ const Finance: React.FC = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                               Processed By
                             </th>
+                            {canRequestVoid && (
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                Action
+                              </th>
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 bg-white">
@@ -2109,17 +2210,34 @@ const Finance: React.FC = () => {
                               key={
                                 `${entry.type}-${entry.payment_id ?? entry.discount_id ?? entry.fee_id ?? index}`
                               }
+                              className={entry.voided ? 'bg-gray-50' : undefined}
                             >
                               <td className="px-4 py-3 text-sm text-gray-600 capitalize">
                                 {entry.type.replace('_', ' ')}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-700">{entry.description}</td>
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                <span className={entry.voided ? 'line-through text-gray-400' : undefined}>
+                                  {entry.description}
+                                </span>
+                                {entry.voided && (
+                                  <span
+                                    className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
+                                    title={entry.void_note ? `Reason: ${entry.void_note}${entry.voided_by ? ` — by ${entry.voided_by}` : ''}` : 'Voided'}
+                                  >
+                                    Voided
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-sm text-gray-600">
                                 {entry.date ?? '—'}
                               </td>
                               <td
                                 className={`px-4 py-3 text-sm text-right tabular-nums ${
-                                  entry.amount < 0 ? 'text-red-600' : 'text-gray-900'
+                                  entry.voided
+                                    ? 'text-gray-400 line-through'
+                                    : entry.amount < 0
+                                    ? 'text-red-600'
+                                    : 'text-gray-900'
                                 }`}
                               >
                                 ₱ {Number(entry.amount).toLocaleString('en-PH', {
@@ -2136,12 +2254,30 @@ const Finance: React.FC = () => {
                               <td className="px-4 py-3 text-sm text-gray-600">
                                 {entry.processed_by ?? '—'}
                               </td>
+                              {canRequestVoid && (
+                                <td className="px-4 py-3 text-sm text-right">
+                                  {entry.type === 'payment' && !entry.voided && entry.receipt_number ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setVoidEntry(entry)
+                                        setVoidNote('')
+                                      }}
+                                      className="text-red-600 hover:text-red-700 font-medium"
+                                    >
+                                      Void
+                                    </button>
+                                  ) : (
+                                    <span className="text-gray-300">—</span>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           ))}
                           {!ledgerQuery.data?.data?.entries?.length && (
                             <tr>
                               <td
-                                colSpan={6}
+                                colSpan={canRequestVoid ? 7 : 6}
                                 className="px-4 py-8 text-center text-gray-500"
                               >
                                 No ledger entries for this academic year.
@@ -2386,6 +2522,266 @@ const Finance: React.FC = () => {
       )}
 
       {view === 'receipt-builder' && <ReceiptBuilderView />}
+
+      {view === 'void-requests' && canRequestVoid && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Payment Void Requests</h2>
+              <p className="text-sm text-gray-500">
+                {isVoidApprover
+                  ? 'Review and approve or disapprove void requests submitted by finance.'
+                  : 'Track the status of payment void requests you have submitted.'}
+              </p>
+            </div>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              {(['pending', 'approved', 'disapproved'] as PaymentVoidStatus[]).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setVoidStatusFilter(status)}
+                  className={`px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                    voidStatusFilter === status
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receipt</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requested By</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  {isVoidApprover && (
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {voidRequestsQuery.isLoading && (
+                  <tr>
+                    <td colSpan={isVoidApprover ? 7 : 6} className="px-4 py-8 text-center text-gray-500">
+                      Loading void requests...
+                    </td>
+                  </tr>
+                )}
+                {!voidRequestsQuery.isLoading &&
+                  voidRequestsQuery.data?.data?.map((req) => {
+                    const studentName = req.student
+                      ? `${req.student.first_name} ${req.student.last_name}`
+                      : '—'
+                    const requesterName = req.requester
+                      ? `${req.requester.first_name} ${req.requester.last_name}`
+                      : '—'
+                    return (
+                      <tr key={req.id}>
+                        <td className="px-4 py-3 text-sm font-mono text-gray-700">{req.receipt_number}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{studentName}</td>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-900">
+                          ₱ {Number(req.amount).toLocaleString('en-PH', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                          <span title={req.request_note}>{req.request_note}</span>
+                          {req.review_note && (
+                            <span className="block text-xs text-gray-400 mt-1">
+                              Review: {req.review_note}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{requesterName}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
+                              req.status === 'approved'
+                                ? 'bg-green-100 text-green-700'
+                                : req.status === 'disapproved'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </td>
+                        {isVoidApprover && (
+                          <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
+                            {req.status === 'pending' ? (
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => approveVoidMutation.mutate(req.id)}
+                                  loading={approveVoidMutation.isPending}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setDisapproveTarget(req.id)
+                                    setDisapproveNote('')
+                                  }}
+                                >
+                                  Disapprove
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
+                {!voidRequestsQuery.isLoading && !voidRequestsQuery.data?.data?.length && (
+                  <tr>
+                    <td colSpan={isVoidApprover ? 7 : 6} className="px-4 py-8 text-center text-gray-500">
+                      No {voidStatusFilter} void requests.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Void request modal (from the ledger) */}
+      {voidEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <form onSubmit={handleVoidSubmit}>
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="text-base font-semibold text-gray-900">Void Payment</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {isVoidApprover
+                    ? 'This will void the payment immediately. A note is required.'
+                    : 'This submits a void request for admin approval. A note is required.'}
+                </p>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Receipt</span>
+                    <span className="font-mono">{voidEntry.receipt_number}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Amount</span>
+                    <span className="tabular-nums">
+                      ₱ {Math.abs(Number(voidEntry.amount)).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Reason / Note <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={voidNote}
+                    onChange={(e) => setVoidNote(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="e.g. Duplicate entry, wrong amount, payment reversed"
+                  />
+                </div>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setVoidEntry(null)
+                    setVoidNote('')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={createVoidMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {isVoidApprover ? 'Void Payment' : 'Submit Request'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Disapprove modal */}
+      {disapproveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!disapproveNote.trim()) {
+                  toast.error('A reason is required to disapprove.')
+                  return
+                }
+                disapproveVoidMutation.mutate({ id: disapproveTarget, review_note: disapproveNote.trim() })
+              }}
+            >
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="text-base font-semibold text-gray-900">Disapprove Void Request</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  The payment will remain active. Provide a reason for the requester.
+                </p>
+              </div>
+              <div className="px-5 py-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={disapproveNote}
+                  onChange={(e) => setDisapproveNote(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  placeholder="e.g. Payment is valid, please verify with the receipt"
+                />
+              </div>
+              <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDisapproveTarget(null)
+                    setDisapproveNote('')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={disapproveVoidMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Disapprove
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }

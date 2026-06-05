@@ -77,13 +77,17 @@ class StudentFinanceController extends Controller
                 ->get();
         }
 
-        $payments = StudentPayment::with(['schoolFee', 'receivedBy'])
+        $payments = StudentPayment::with(['schoolFee', 'receivedBy', 'voidedBy'])
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
             ->orderBy('payment_date')
             ->orderBy('created_at')
             ->get();
+
+        // Voided payments stay visible in the ledger for audit, but they are
+        // excluded from all totals / running balance and per-fee breakdowns.
+        $activePayments = $payments->whereNull('voided_at');
 
         $discounts = StudentDiscount::with(['schoolFee', 'creator'])
             ->where('institution_id', $institutionId)
@@ -117,7 +121,7 @@ class StudentFinanceController extends Controller
         $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
         $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
         $discountsTotal = (float) $discountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
-        $paymentsTotal = (float) $payments->sum('amount');
+        $paymentsTotal = (float) $activePayments->sum('amount');
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
             $academicYear,
@@ -231,6 +235,11 @@ class StudentFinanceController extends Controller
             $processedByName = $receivedBy
                 ? trim(($receivedBy->first_name ?? '') . ' ' . ($receivedBy->last_name ?? ''))
                 : null;
+            $isVoided = $payment->voided_at !== null;
+            $voidedByUser = $payment->voidedBy;
+            $voidedByName = $voidedByUser
+                ? trim(($voidedByUser->first_name ?? '') . ' ' . ($voidedByUser->last_name ?? ''))
+                : null;
 
             return [
                 'type' => 'payment',
@@ -243,6 +252,10 @@ class StudentFinanceController extends Controller
                 'fee_id' => $payment->school_fee_id,
                 'fee_name' => $feeName,
                 'processed_by' => $processedByName,
+                'voided' => $isVoided,
+                'voided_at' => $payment->voided_at?->toDateTimeString(),
+                'voided_by' => $voidedByName,
+                'void_note' => $payment->void_note,
             ];
         });
 
@@ -267,7 +280,10 @@ class StudentFinanceController extends Controller
 
         $runningBalance = 0.0;
         $entries = $entries->map(function ($entry) use (&$runningBalance) {
-            $runningBalance += (float) $entry['amount'];
+            // Voided payments are shown for audit but must not move the balance.
+            if (empty($entry['voided'])) {
+                $runningBalance += (float) $entry['amount'];
+            }
             $entry['running_balance'] = round($runningBalance, 2);
             return $entry;
         });
@@ -276,7 +292,7 @@ class StudentFinanceController extends Controller
 
         // Per-fee breakdown used by the cashiering (POS) screen to show the
         // outstanding amount for each fee so the cashier can pay toward each.
-        $paidByFee = $payments
+        $paidByFee = $activePayments
             ->filter(fn ($payment) => $payment->school_fee_id)
             ->groupBy('school_fee_id')
             ->map(fn ($group) => (float) $group->sum('amount'));
@@ -318,7 +334,7 @@ class StudentFinanceController extends Controller
             ];
         }))->values();
 
-        $unallocatedPayments = (float) $payments
+        $unallocatedPayments = (float) $activePayments
             ->filter(fn ($payment) => !$payment->school_fee_id)
             ->sum('amount');
 
@@ -441,6 +457,7 @@ class StudentFinanceController extends Controller
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
+            ->whereNull('voided_at')
             ->orderBy('payment_date')
             ->orderBy('created_at')
             ->get();

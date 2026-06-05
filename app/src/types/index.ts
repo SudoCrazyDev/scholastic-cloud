@@ -317,6 +317,34 @@ export interface StudentLedgerEntry {
   discount_value?: number;
   running_balance?: number;
   processed_by?: string | null;
+  voided?: boolean;
+  voided_at?: string | null;
+  voided_by?: string | null;
+  void_note?: string | null;
+}
+
+export type PaymentVoidStatus = 'pending' | 'approved' | 'disapproved';
+
+export interface PaymentVoidRequest {
+  id: string;
+  institution_id: string;
+  student_id: string;
+  academic_year: string;
+  receipt_number: string;
+  payment_transaction_id?: string | null;
+  target_payment_id?: string | null;
+  amount: number | string;
+  status: PaymentVoidStatus;
+  request_note: string;
+  review_note?: string | null;
+  requested_by?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  student?: { id: string; first_name: string; middle_name?: string | null; last_name: string };
+  requester?: { id: string; first_name: string; last_name: string } | null;
+  reviewer?: { id: string; first_name: string; last_name: string } | null;
 }
 
 export type StudentPaymentPlanType = 'monthly' | 'quarterly';

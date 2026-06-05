@@ -25,12 +25,21 @@ class StudentPayment extends Model
         'receipt_number',
         'remarks',
         'received_by',
+        'voided_at',
+        'voided_by',
+        'void_note',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'payment_date' => 'date',
+        'voided_at' => 'datetime',
     ];
+
+    public function voidedBy()
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
 
     public function student()
     {
