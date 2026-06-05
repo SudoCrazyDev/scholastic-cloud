@@ -29,6 +29,7 @@ use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\PaymentTransactionController;
+use App\Http\Controllers\PaymentVoidRequestController;
 use App\Http\Controllers\StudentFinanceController;
 use App\Http\Controllers\StudentPaymentPlanController;
 use App\Http\Controllers\StudentOnlinePaymentController;
@@ -308,6 +309,12 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::patch('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::delete('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'destroy']);
+
+    // Payment void requests (finance requests, admin approves/disapproves)
+    Route::get('payment-void-requests', [PaymentVoidRequestController::class, 'index']);
+    Route::post('payment-void-requests', [PaymentVoidRequestController::class, 'store']);
+    Route::post('payment-void-requests/{id}/approve', [PaymentVoidRequestController::class, 'approve']);
+    Route::post('payment-void-requests/{id}/disapprove', [PaymentVoidRequestController::class, 'disapprove']);
 
     // Receipt templates
     Route::apiResource('receipt-templates', ReceiptTemplateController::class);
