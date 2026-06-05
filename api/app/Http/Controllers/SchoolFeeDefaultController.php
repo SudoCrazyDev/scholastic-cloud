@@ -255,6 +255,89 @@ class SchoolFeeDefaultController extends Controller
     }
 
     /**
+     * Apply a single fee's default amount to every provided grade level
+     * for the given academic year.
+     */
+    public function applyToAll(Request $request): JsonResponse
+    {
+        if ($this->isStudentUser($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students are not allowed to manage default amounts'
+            ], 403);
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (!$institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned'
+            ], 400);
+        }
+
+        $validated = $request->validate([
+            'school_fee_id' => 'required|uuid|exists:school_fees,id',
+            'academic_year' => 'required|string|max:255',
+            'amount' => 'required|numeric|min:0',
+            'grade_levels' => 'required|array|min:1',
+            'grade_levels.*' => 'required|string|max:255',
+        ]);
+
+        $schoolFee = SchoolFee::where('institution_id', $institutionId)
+            ->where('id', $validated['school_fee_id'])
+            ->first();
+
+        if (!$schoolFee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'School fee not found for this institution'
+            ], 404);
+        }
+
+        $gradeLevels = collect($validated['grade_levels'])
+            ->map(fn ($level) => trim($level))
+            ->filter()
+            ->unique()
+            ->values();
+
+        DB::beginTransaction();
+        try {
+            $saved = 0;
+            foreach ($gradeLevels as $gradeLevel) {
+                SchoolFeeDefault::updateOrCreate(
+                    [
+                        'school_fee_id' => $validated['school_fee_id'],
+                        'grade_level' => $gradeLevel,
+                        'academic_year' => $validated['academic_year'],
+                    ],
+                    [
+                        'institution_id' => $institutionId,
+                        'amount' => $validated['amount'],
+                    ]
+                );
+                $saved++;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Default amount applied to all grade levels successfully',
+                'data' => [
+                    'saved' => $saved
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to apply default amount to all grade levels',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Remove the specified school fee default.
      */
     public function destroy(Request $request, string $id): JsonResponse

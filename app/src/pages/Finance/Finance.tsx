@@ -81,6 +81,7 @@ const Finance: React.FC = () => {
     grade_level: '',
     academic_year: defaultAcademicYear,
     amount: '',
+    apply_to_all: false,
   })
   const [editingDefault, setEditingDefault] = useState<SchoolFeeDefault | null>(null)
   const [defaultError, setDefaultError] = useState<string | null>(null)
@@ -487,12 +488,41 @@ const Finance: React.FC = () => {
         grade_level: defaultForm.grade_level,
         academic_year: defaultForm.academic_year,
         amount: '',
+        apply_to_all: false,
       })
       setDefaultError(null)
       toast.success('Default amount saved.')
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to save default amount.'
+      setDefaultError(message)
+      toast.error(message)
+    },
+  })
+
+  const applyAllDefaultMutation = useMutation({
+    mutationFn: () =>
+      schoolFeeDefaultService.applyToAll({
+        school_fee_id: defaultForm.school_fee_id,
+        academic_year: defaultForm.academic_year,
+        amount: Number(defaultForm.amount),
+        grade_levels: gradeLevelOptions.map((option) => option.value),
+      }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['school-fee-defaults'] })
+      setDefaultForm({
+        school_fee_id: '',
+        grade_level: defaultForm.grade_level,
+        academic_year: defaultForm.academic_year,
+        amount: '',
+        apply_to_all: false,
+      })
+      setDefaultError(null)
+      const saved = response.data?.saved ?? gradeLevelOptions.length
+      toast.success(`Default amount applied to ${saved} grade levels.`)
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to apply default amount to all grade levels.'
       setDefaultError(message)
       toast.error(message)
     },
@@ -509,6 +539,7 @@ const Finance: React.FC = () => {
         grade_level: filters.grade_level,
         academic_year: filters.academic_year,
         amount: '',
+        apply_to_all: false,
       })
       setDefaultError(null)
       toast.success('Default amount updated.')
@@ -579,7 +610,7 @@ const Finance: React.FC = () => {
     }).format(value)
   }
 
-  const isSavingDefault = upsertDefaultMutation.isPending || updateDefaultMutation.isPending
+  const isSavingDefault = upsertDefaultMutation.isPending || updateDefaultMutation.isPending || applyAllDefaultMutation.isPending
 
   const handleDefaultSubmit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -587,7 +618,7 @@ const Finance: React.FC = () => {
       setDefaultError('Please select a fee.')
       return
     }
-    if (!defaultForm.grade_level.trim()) {
+    if (!defaultForm.apply_to_all && !defaultForm.grade_level.trim()) {
       setDefaultError('Grade level is required.')
       return
     }
@@ -602,6 +633,8 @@ const Finance: React.FC = () => {
 
     if (editingDefault) {
       updateDefaultMutation.mutate({ id: editingDefault.id, amount: defaultForm.amount })
+    } else if (defaultForm.apply_to_all) {
+      applyAllDefaultMutation.mutate()
     } else {
       upsertDefaultMutation.mutate()
     }
@@ -630,6 +663,7 @@ const Finance: React.FC = () => {
       grade_level: feeDefault.grade_level,
       academic_year: feeDefault.academic_year,
       amount: feeDefault.amount.toString(),
+      apply_to_all: false,
     })
     setDefaultError(null)
   }
@@ -731,6 +765,7 @@ const Finance: React.FC = () => {
       grade_level: filters.grade_level,
       academic_year: filters.academic_year,
       amount: '',
+      apply_to_all: false,
     })
   }
 
@@ -1119,37 +1154,6 @@ const Finance: React.FC = () => {
             </p>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3">
-            <div className="min-w-[140px]">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                Grade level
-              </label>
-              <Select
-                value={filters.grade_level}
-                onChange={(e) => setFilters(prev => ({ ...prev, grade_level: e.target.value }))}
-                options={filterGradeOptions}
-                className="w-full"
-              />
-            </div>
-            <div className="min-w-[140px]">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                Academic year
-              </label>
-              <Select
-                value={filters.academic_year}
-                onChange={(e) => setFilters(prev => ({ ...prev, academic_year: e.target.value }))}
-                options={academicYearOptions}
-                className="w-full"
-              />
-            </div>
-            <p className="text-sm text-gray-500 ml-auto self-center">
-              {defaultsQuery.isLoading
-                ? 'Loading…'
-                : `${defaults.length} default${defaults.length === 1 ? '' : 's'}`}
-            </p>
-          </div>
-
           {/* Add / Edit form */}
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900 mb-4">
@@ -1176,8 +1180,20 @@ const Finance: React.FC = () => {
                     options={gradeLevelOptions}
                     placeholder="Select grade"
                     className="w-full"
-                    disabled={Boolean(editingDefault) || isSavingDefault}
+                    disabled={Boolean(editingDefault) || isSavingDefault || defaultForm.apply_to_all}
                   />
+                  {!editingDefault && (
+                    <label className="mt-2 flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        checked={defaultForm.apply_to_all}
+                        onChange={(e) => setDefaultForm(prev => ({ ...prev, apply_to_all: e.target.checked }))}
+                        disabled={isSavingDefault}
+                      />
+                      Apply to all grade levels
+                    </label>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Academic year</label>
@@ -1219,7 +1235,9 @@ const Finance: React.FC = () => {
                       : 'Update amount'
                     : isSavingDefault
                       ? 'Saving…'
-                      : 'Save default'}
+                      : defaultForm.apply_to_all
+                        ? 'Apply to all grade levels'
+                        : 'Save default'}
                 </Button>
                 {editingDefault && (
                   <Button
@@ -1239,6 +1257,39 @@ const Finance: React.FC = () => {
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
               <h3 className="text-base font-semibold text-gray-900">Default amounts list</h3>
+            </div>
+            {/* Filters */}
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filters</p>
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="min-w-[140px]">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    Grade level
+                  </label>
+                  <Select
+                    value={filters.grade_level}
+                    onChange={(e) => setFilters(prev => ({ ...prev, grade_level: e.target.value }))}
+                    options={filterGradeOptions}
+                    className="w-full"
+                  />
+                </div>
+                <div className="min-w-[140px]">
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                    Academic year
+                  </label>
+                  <Select
+                    value={filters.academic_year}
+                    onChange={(e) => setFilters(prev => ({ ...prev, academic_year: e.target.value }))}
+                    options={academicYearOptions}
+                    className="w-full"
+                  />
+                </div>
+                <p className="text-sm text-gray-500 ml-auto self-center">
+                  {defaultsQuery.isLoading
+                    ? 'Loading…'
+                    : `${defaults.length} default${defaults.length === 1 ? '' : 's'}`}
+                </p>
+              </div>
             </div>
             {defaultsQuery.isLoading ? (
               <div className="p-8 text-center text-gray-500">
