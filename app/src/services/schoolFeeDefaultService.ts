@@ -4,7 +4,8 @@ import type {
   SchoolFeeDefault,
   CreateSchoolFeeDefaultData,
   UpdateSchoolFeeDefaultData,
-  BulkSchoolFeeDefaultData
+  BulkSchoolFeeDefaultData,
+  ApplyAllSchoolFeeDefaultData
 } from '../types'
 
 class SchoolFeeDefaultService {
@@ -33,6 +34,11 @@ class SchoolFeeDefaultService {
 
   async bulkUpsert(data: BulkSchoolFeeDefaultData) {
     const response = await api.post<ApiResponse<{ saved: number }>>(`${this.baseUrl}/bulk-upsert`, data)
+    return response.data
+  }
+
+  async applyToAll(data: ApplyAllSchoolFeeDefaultData) {
+    const response = await api.post<ApiResponse<{ saved: number }>>(`${this.baseUrl}/apply-all`, data)
     return response.data
   }
 

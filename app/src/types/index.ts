@@ -157,6 +157,13 @@ export interface BulkSchoolFeeDefaultData {
   }>;
 }
 
+export interface ApplyAllSchoolFeeDefaultData {
+  school_fee_id: string;
+  academic_year: string;
+  amount: number;
+  grade_levels: string[];
+}
+
 export interface StudentPayment {
   id: string;
   institution_id: string;

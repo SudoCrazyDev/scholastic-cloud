@@ -275,6 +275,7 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('school-fees', SchoolFeeController::class);
     Route::get('finance/dashboard', [FinanceDashboardController::class, 'summary']);
     Route::post('school-fee-defaults/bulk-upsert', [SchoolFeeDefaultController::class, 'bulkUpsert']);
+    Route::post('school-fee-defaults/apply-all', [SchoolFeeDefaultController::class, 'applyToAll']);
     Route::get('school-fee-defaults', [SchoolFeeDefaultController::class, 'index']);
     Route::post('school-fee-defaults', [SchoolFeeDefaultController::class, 'store']);
     Route::put('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'update']);
