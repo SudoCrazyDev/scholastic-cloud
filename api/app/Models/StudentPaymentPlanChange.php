@@ -6,28 +6,25 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class StudentPaymentPlan extends Model
+class StudentPaymentPlanChange extends Model
 {
     use HasFactory, HasUuids;
-
-    public const TYPE_MONTHLY = 'monthly';
-
-    public const TYPE_QUARTERLY = 'quarterly';
 
     protected $fillable = [
         'institution_id',
         'student_id',
         'academic_year',
         'payment_plan_id',
-        'plan_type',
-        'selected_at',
-        'selected_by',
-        'selected_by_student',
+        'previous_payment_plan_id',
+        'changed_at',
+        'changed_by',
+        'changed_by_student',
+        'note',
     ];
 
     protected $casts = [
-        'selected_at' => 'datetime',
-        'selected_by_student' => 'boolean',
+        'changed_at' => 'datetime',
+        'changed_by_student' => 'boolean',
     ];
 
     public function institution()
@@ -40,13 +37,18 @@ class StudentPaymentPlan extends Model
         return $this->belongsTo(Student::class);
     }
 
-    public function selectedBy()
-    {
-        return $this->belongsTo(User::class, 'selected_by');
-    }
-
     public function paymentPlan()
     {
         return $this->belongsTo(PaymentPlan::class);
+    }
+
+    public function previousPaymentPlan()
+    {
+        return $this->belongsTo(PaymentPlan::class, 'previous_payment_plan_id');
+    }
+
+    public function changedBy()
+    {
+        return $this->belongsTo(User::class, 'changed_by');
     }
 }

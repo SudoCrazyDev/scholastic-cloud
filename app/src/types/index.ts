@@ -354,15 +354,64 @@ export interface PaymentVoidRequest {
   reviewer?: { id: string; first_name: string; last_name: string } | null;
 }
 
+// Legacy enum kept for back-compat; plans are now identified by payment_plan_id + name.
 export type StudentPaymentPlanType = 'monthly' | 'quarterly';
 
 export interface StudentPaymentPlan {
   id: string;
   academic_year: string;
-  plan_type: StudentPaymentPlanType;
+  payment_plan_id?: string | null;
+  name?: string | null;
+  plan_type?: StudentPaymentPlanType | null;
   installment_count: number;
   selected_at?: string | null;
   selected_by_student: boolean;
+}
+
+// Admin-managed payment plan definitions (Finance > Payment Plans module).
+export interface PaymentPlanInstallmentTemplate {
+  id?: string;
+  sequence: number;
+  label?: string | null;
+  due_month: number; // 1-12
+  due_day: number; // 1-31
+  share_percentage?: number | null;
+}
+
+export interface PaymentPlan {
+  id: string;
+  institution_id?: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  installment_count: number;
+  installments: PaymentPlanInstallmentTemplate[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreatePaymentPlanData {
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+  installments: Array<Omit<PaymentPlanInstallmentTemplate, 'id' | 'sequence'> & { sequence?: number }>;
+}
+
+export interface PaymentPlanChange {
+  id: string;
+  student_id: string;
+  academic_year: string;
+  payment_plan_id?: string | null;
+  plan_name?: string | null;
+  previous_payment_plan_id?: string | null;
+  previous_plan_name?: string | null;
+  changed_at?: string | null;
+  changed_by?: string | null;
+  changed_by_name?: string | null;
+  changed_by_student: boolean;
+  note?: string | null;
 }
 
 export interface StudentInstallment {

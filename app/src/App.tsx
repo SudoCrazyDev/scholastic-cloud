@@ -34,6 +34,7 @@ import GradeLevels from './pages/GradeLevels/GradeLevels';
 import Settings from './pages/Settings/Settings';
 import TracksStrands from './pages/TracksStrands/TracksStrands';
 import Finance from './pages/Finance';
+import PaymentPlansView from './pages/Finance/PaymentPlansView';
 import Login from './pages/Login';
 import MyAssessments from './pages/MyAssessments';
 import { TakeAssessment } from './pages/MyAssessments';
@@ -133,6 +134,7 @@ function App() {
               <Route path="tracks-strands" element={<TracksStrands />} />
               <Route path="finance" element={<Finance />} />
               <Route path="finance/school-fees" element={<Finance />} />
+              <Route path="payment-plans" element={<PaymentPlansView />} />
               <Route path="finance/default-amounts" element={<Finance />} />
               <Route path="finance/cashiering" element={<Finance />} />
               <Route path="finance/ledger" element={<Finance />} />

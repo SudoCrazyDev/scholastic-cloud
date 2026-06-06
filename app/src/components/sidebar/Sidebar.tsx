@@ -212,6 +212,13 @@ const menuGroups: MenuGroup[] = [
         path: '/finance',
         allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
       },
+      {
+        id: 'payment-plans',
+        label: 'Payment Plans',
+        icon: <CalendarDays className="w-5 h-5" />,
+        path: '/payment-plans',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+      },
     ],
   },
   {
