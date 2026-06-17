@@ -21,20 +21,24 @@ class AttendanceLogController extends Controller
         $query = AttendanceLog::where('institution_id', $institutionId)
             ->with(['user', 'device']);
 
-        if ($request->has('device_id')) {
+        if ($request->filled('device_id')) {
             $query->where('device_id', $request->get('device_id'));
         }
-        if ($request->has('user_id')) {
+        if ($request->filled('user_id')) {
             $query->where('user_id', $request->get('user_id'));
         }
-        if ($request->has('date')) {
+        if ($request->filled('date')) {
             $query->whereDate('punched_at', $request->get('date'));
         }
-        if ($request->has('from')) {
-            $query->where('punched_at', '>=', $request->get('from'));
+        if ($request->filled('from')) {
+            $from = $request->get('from');
+            // A date-only value (YYYY-MM-DD) means "from the start of that day".
+            $query->where('punched_at', '>=', strlen($from) === 10 ? "{$from} 00:00:00" : $from);
         }
-        if ($request->has('to')) {
-            $query->where('punched_at', '<=', $request->get('to'));
+        if ($request->filled('to')) {
+            $to = $request->get('to');
+            // A date-only value means "through the end of that day" (inclusive).
+            $query->where('punched_at', '<=', strlen($to) === 10 ? "{$to} 23:59:59" : $to);
         }
 
         $perPage = $request->get('per_page', 50);

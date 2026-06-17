@@ -1484,6 +1484,7 @@ export interface BiometricDevice {
   firmware_version: string | null;
   status: 'online' | 'offline' | 'unknown';
   is_paired: boolean;
+  connection: 'bridge' | 'adms' | 'pending';
   last_seen_at: string | null;
   pairing_code?: string;
   pairing_code_expires_at: string | null;

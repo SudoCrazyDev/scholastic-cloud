@@ -354,6 +354,8 @@ Route::middleware('auth.token')->group(function () {
     Route::get('biometric/devices/{id}', [BiometricDeviceController::class, 'show']);
     Route::delete('biometric/devices/{id}', [BiometricDeviceController::class, 'destroy']);
     Route::post('biometric/devices/{id}/refresh-pairing-code', [BiometricDeviceController::class, 'refreshPairingCode']);
+    Route::post('biometric/devices/{id}/fetch-users', [BiometricDeviceController::class, 'fetchUsers']);
+    Route::post('biometric/devices/{id}/fetch-attendance', [BiometricDeviceController::class, 'fetchAttendance']);
 
     // HRIS — ZK user mappings
     Route::get('biometric/zk-users', [ZkUserMappingController::class, 'index']);

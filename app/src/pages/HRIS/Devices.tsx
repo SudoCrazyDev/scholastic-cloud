@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
-import { Fingerprint, Plus, Trash2, RefreshCw, Wifi, WifiOff, HelpCircle, Copy, Check } from 'lucide-react'
+import { Fingerprint, Plus, Trash2, RefreshCw, Wifi, WifiOff, HelpCircle, Copy, Check, DownloadCloud } from 'lucide-react'
 import { biometricService } from '../../services/biometricService'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
@@ -68,6 +68,7 @@ const Devices: React.FC = () => {
   const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
   const [newDeviceName, setNewDeviceName] = useState('')
+  const [newDeviceSerial, setNewDeviceSerial] = useState('')
   const [newDeviceResult, setNewDeviceResult] = useState<{ pairing_code: string; expires_at: string | null } | null>(null)
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
   const [refreshedCode, setRefreshedCode] = useState<{ id: string; code: string; expires_at: string | null } | null>(null)
@@ -81,14 +82,22 @@ const Devices: React.FC = () => {
   const devices: BiometricDevice[] = data?.data ?? []
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => biometricService.createDevice(name),
+    mutationFn: ({ name, serial }: { name: string; serial: string }) =>
+      biometricService.createDevice(name, serial || undefined),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['biometric-devices'] })
-      setNewDeviceResult({ pairing_code: res.data.pairing_code!, expires_at: res.data.pairing_code_expires_at })
       setNewDeviceName('')
-      toast.success('Device registered')
+      setNewDeviceSerial('')
+      if (res.data.pairing_code) {
+        // Bridge flow — surface the one-time pairing code.
+        setNewDeviceResult({ pairing_code: res.data.pairing_code, expires_at: res.data.pairing_code_expires_at })
+      } else {
+        // Direct-ADMS flow — no pairing code; the device connects on its own.
+        setShowAddForm(false)
+        toast.success(res.message ?? 'Device registered')
+      }
     },
-    onError: () => toast.error('Failed to register device'),
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? 'Failed to register device'),
   })
 
   const deleteMutation = useMutation({
@@ -100,11 +109,20 @@ const Devices: React.FC = () => {
     onError: () => toast.error('Failed to remove device'),
   })
 
+  const fetchUsersMutation = useMutation({
+    mutationFn: (id: string) => biometricService.fetchUsersFromDevice(id),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['zk-users'] })
+      toast.success(res.message ?? 'Fetch queued')
+    },
+    onError: () => toast.error('Failed to queue user fetch'),
+  })
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newDeviceName.trim()) return
     setNewDeviceResult(null)
-    createMutation.mutate(newDeviceName.trim())
+    createMutation.mutate({ name: newDeviceName.trim(), serial: newDeviceSerial.trim() })
   }
 
   const handleRefreshCode = async (id: string) => {
@@ -163,10 +181,22 @@ const Devices: React.FC = () => {
                 placeholder="e.g. Main Gate — Building A"
               />
             </div>
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Serial number <span className="text-gray-400">(direct ADMS)</span></label>
+              <Input
+                value={newDeviceSerial}
+                onChange={(e) => setNewDeviceSerial(e.target.value)}
+                placeholder="e.g. UDP3253900609"
+              />
+            </div>
             <Button type="submit" disabled={createMutation.isPending || !newDeviceName.trim()}>
               {createMutation.isPending ? 'Registering…' : 'Register'}
             </Button>
           </form>
+          <p className="text-xs text-gray-400 mt-2">
+            Enter the device <strong>serial number</strong> for a ZKTeco device that pushes directly via ADMS (e.g. MB-10VL) — it registers under your institution and connects automatically.
+            Leave it blank only if you're using the on-prem bridge app (you'll get a pairing code instead).
+          </p>
           {newDeviceResult && (
             <PairingCodeDisplay code={newDeviceResult.pairing_code} expiresAt={newDeviceResult.expires_at} />
           )}
@@ -187,7 +217,7 @@ const Devices: React.FC = () => {
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Name</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500">Paired</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Mode</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Serial / MAC</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Last seen</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
@@ -199,10 +229,12 @@ const Devices: React.FC = () => {
                   <td className="px-4 py-3 font-medium text-gray-800">{device.name}</td>
                   <td className="px-4 py-3"><StatusBadge status={device.status} /></td>
                   <td className="px-4 py-3">
-                    {device.is_paired ? (
-                      <span className="text-xs text-green-700 font-medium">Yes</span>
+                    {device.connection === 'bridge' ? (
+                      <span className="text-xs text-green-700 font-medium">Bridge</span>
+                    ) : device.connection === 'adms' ? (
+                      <span className="text-xs text-indigo-600 font-medium">ADMS</span>
                     ) : (
-                      <span className="text-xs text-amber-600 font-medium">Pending</span>
+                      <span className="text-xs text-amber-600 font-medium">Awaiting device</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">
@@ -215,6 +247,14 @@ const Devices: React.FC = () => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => fetchUsersMutation.mutate(device.id)}
+                        disabled={fetchUsersMutation.isPending}
+                        className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-indigo-600 disabled:opacity-40"
+                        title="Fetch enrolled users from this device"
+                      >
+                        <DownloadCloud className={`w-4 h-4 ${fetchUsersMutation.isPending && fetchUsersMutation.variables === device.id ? 'animate-pulse' : ''}`} />
+                      </button>
                       {!device.is_paired && (
                         <button
                           onClick={() => handleRefreshCode(device.id)}

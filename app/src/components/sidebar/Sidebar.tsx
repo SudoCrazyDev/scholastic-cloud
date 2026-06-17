@@ -165,18 +165,6 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    label: 'People',
-    items: [
-      {
-        id: 'staffs',
-        label: 'Staffs',
-        icon: <UserCheck className="w-5 h-5" />,
-        path: '/staffs',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
-      },
-    ],
-  },
-  {
     label: 'Students',
     items: [
       {
@@ -244,6 +232,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Clock className="w-5 h-5" />,
         path: '/hris/attendance',
         allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'staffs',
+        label: 'Staffs',
+        icon: <UserCheck className="w-5 h-5" />,
+        path: '/staffs',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
       },
     ],
   },

@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useQuery } from '@tanstack/react-query'
-import { RefreshCw, Clock, Fingerprint, CreditCard, Scan, KeyRound, HelpCircle } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'react-hot-toast'
+import { RefreshCw, Clock, Fingerprint, CreditCard, Scan, KeyRound, HelpCircle, DownloadCloud } from 'lucide-react'
 import { attendanceLogService } from '../../services/attendanceService'
 import { biometricService } from '../../services/biometricService'
 import { Select } from '../../components/select'
@@ -27,8 +28,10 @@ const VerifyIcon: React.FC<{ type: string }> = ({ type }) => {
 }
 
 const Attendance: React.FC = () => {
-  const [deviceId, setDeviceId]   = useState('')
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10))
+  const today = new Date().toISOString().slice(0, 10)
+  const [deviceId, setDeviceId] = useState('')
+  const [fromDate, setFromDate] = useState(today)
+  const [toDate, setToDate]     = useState(today)
   const [page, setPage] = useState(1)
 
   const devicesQuery = useQuery({
@@ -42,10 +45,11 @@ const Attendance: React.FC = () => {
   ]
 
   const logsQuery = useQuery({
-    queryKey: ['attendance-logs', deviceId, dateFilter, page],
+    queryKey: ['attendance-logs', deviceId, fromDate, toDate, page],
     queryFn: () => attendanceLogService.getLogs({
       device_id: deviceId || undefined,
-      date: dateFilter || undefined,
+      from: fromDate || undefined,
+      to: toDate || undefined,
       page,
       per_page: 50,
     }),
@@ -54,6 +58,24 @@ const Attendance: React.FC = () => {
 
   const logs: AttendanceLog[] = logsQuery.data?.data ?? []
   const pagination = logsQuery.data?.pagination
+
+  const queryClient = useQueryClient()
+  const fetchMutation = useMutation({
+    mutationFn: async () => {
+      // Fetch for the selected device, or every device when "All devices" is chosen.
+      const targets = deviceId ? [deviceId] : devices.map((d) => d.id)
+      if (targets.length === 0) throw new Error('No device to fetch from')
+      const results = await Promise.all(
+        targets.map((id) => biometricService.fetchAttendanceFromDevice(id, fromDate || undefined, toDate || undefined)),
+      )
+      return results[0]
+    },
+    onSuccess: (res) => {
+      toast.success(res?.message ?? 'Fetch queued')
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['attendance-logs'] }), 30_000)
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? e?.message ?? 'Failed to fetch from device'),
+  })
 
   return (
     <motion.div
@@ -71,13 +93,24 @@ const Attendance: React.FC = () => {
             <p className="text-sm text-gray-500">Biometric punch records from ZKTeco devices</p>
           </div>
         </div>
-        <button
-          onClick={() => logsQuery.refetch()}
-          className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className={`w-4 h-4 ${logsQuery.isFetching ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchMutation.mutate()}
+            disabled={fetchMutation.isPending || devices.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-40"
+            title="Pull stored punches from the device for the selected date range"
+          >
+            <DownloadCloud className={`w-4 h-4 ${fetchMutation.isPending ? 'animate-pulse' : ''}`} />
+            {fetchMutation.isPending ? 'Fetching…' : 'Fetch from device'}
+          </button>
+          <button
+            onClick={() => logsQuery.refetch()}
+            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${logsQuery.isFetching ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -89,17 +122,29 @@ const Attendance: React.FC = () => {
             options={deviceOptions}
           />
         </div>
-        <input
-          type="date"
-          value={dateFilter}
-          onChange={(e) => { setDateFilter(e.target.value); setPage(1) }}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
-        />
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500">From</label>
+          <input
+            type="date"
+            value={fromDate}
+            max={toDate || undefined}
+            onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+          />
+          <label className="text-xs font-medium text-gray-500">To</label>
+          <input
+            type="date"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+          />
+        </div>
         <button
-          onClick={() => setDateFilter('')}
+          onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
           className="text-xs text-indigo-600 hover:underline"
         >
-          Clear date
+          Clear dates
         </button>
       </div>
 
