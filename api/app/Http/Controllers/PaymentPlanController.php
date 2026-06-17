@@ -16,16 +16,17 @@ class PaymentPlanController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        if ($this->isStudentUser($request)) {
-            return $this->studentForbidden();
-        }
-
         $institutionId = $this->resolveInstitutionId($request);
         if (! $institutionId) {
             return $this->noInstitution();
         }
 
         $query = PaymentPlan::with('installments')->where('institution_id', $institutionId);
+
+        // Students may list plans (needed for first-time plan selection) but only active ones.
+        if ($this->isStudentUser($request)) {
+            $query->where('is_active', true);
+        }
 
         if ($request->filled('search')) {
             $query->where('name', 'like', '%'.$request->get('search').'%');
@@ -261,6 +262,14 @@ class PaymentPlanController extends Controller
         $user = $request->user();
         if (! $user) {
             return null;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return $user->student
+                ->studentInstitutions()
+                ->where('is_active', true)
+                ->value('institution_id')
+                ?? $user->student->studentInstitutions()->value('institution_id');
         }
 
         $institutionId = $user->getDefaultInstitutionId();
