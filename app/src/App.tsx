@@ -51,6 +51,7 @@ import GateEntries from './pages/GateEntries/GateEntries';
 import HrisDevices from './pages/HRIS/Devices';
 import HrisZkUsers from './pages/HRIS/ZkUsers';
 import HrisAttendance from './pages/HRIS/Attendance';
+import HrisStaffSchedules from './pages/HRIS/StaffSchedules';
 
 
 function App() {
@@ -146,6 +147,7 @@ function App() {
               <Route path="hris/devices" element={<HrisDevices />} />
               <Route path="hris/zk-users" element={<HrisZkUsers />} />
               <Route path="hris/attendance" element={<HrisAttendance />} />
+              <Route path="hris/staff-schedules" element={<HrisStaffSchedules />} />
 
             </Route>
 

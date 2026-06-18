@@ -414,6 +414,87 @@ export interface PaymentPlanChange {
   note?: string | null;
 }
 
+export type DayOfWeek =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+export interface StaffScheduleDay {
+  id?: string;
+  day_of_week: DayOfWeek;
+  start_time: string; // "HH:MM"
+  end_time: string; // "HH:MM"
+  lunch_start?: string | null; // "HH:MM"
+  lunch_end?: string | null; // "HH:MM"
+}
+
+// A schedule is a reusable template (name + description + weekly hours).
+export interface StaffSchedule {
+  id: string;
+  institution_id?: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  assigned_count: number;
+  day_count: number;
+  days: StaffScheduleDay[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreateStaffScheduleData {
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  days: StaffScheduleDay[];
+}
+
+// Assigning a schedule template to staff.
+export interface StaffScheduleAssignment {
+  id: string;
+  user_id: string;
+  staff_name?: string | null;
+  staff_email?: string | null;
+  staff_schedule_id: string;
+  schedule_name?: string | null;
+  created_at?: string | null;
+}
+
+export interface AssignStaffScheduleData {
+  user_ids: string[];
+}
+
+export interface AssignStaffScheduleResult {
+  created: number;
+  reassigned: number;
+  total: number;
+}
+
+// Calendar — holidays & events
+export type CalendarEventType = 'holiday' | 'event';
+
+export interface StaffCalendarEvent {
+  id: string;
+  institution_id?: string;
+  title: string;
+  description?: string | null;
+  type: CalendarEventType;
+  event_date: string; // YYYY-MM-DD
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreateStaffCalendarEventData {
+  title: string;
+  description?: string | null;
+  type: CalendarEventType;
+  event_date: string;
+}
+
 export interface StudentInstallment {
   sequence: number;
   label: string;

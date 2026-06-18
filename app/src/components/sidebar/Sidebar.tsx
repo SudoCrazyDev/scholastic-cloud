@@ -34,6 +34,7 @@ import {
   Fingerprint,
   Monitor,
   Clock,
+  CalendarClock,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -231,6 +232,13 @@ const menuGroups: MenuGroup[] = [
         label: 'Attendance Logs',
         icon: <Clock className="w-5 h-5" />,
         path: '/hris/attendance',
+        allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'hris-staff-schedules',
+        label: 'Staff Schedules',
+        icon: <CalendarClock className="w-5 h-5" />,
+        path: '/hris/staff-schedules',
         allowedRoles: ['principal', 'institution-administrator'],
       },
       {

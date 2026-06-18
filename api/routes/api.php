@@ -348,6 +348,16 @@ Route::middleware('auth.token')->group(function () {
     // HRIS — Attendance logs
     Route::get('attendance/logs', [\App\Http\Controllers\AttendanceLogController::class, 'index']);
 
+    // HRIS — Staff schedules (templates + assignments)
+    Route::get('staff-schedule-assignments', [\App\Http\Controllers\StaffScheduleController::class, 'assignments']);
+    Route::delete('staff-schedule-assignments/{assignmentId}', [\App\Http\Controllers\StaffScheduleController::class, 'unassign']);
+    Route::post('staff-schedules/{id}/assign', [\App\Http\Controllers\StaffScheduleController::class, 'assign']);
+    Route::apiResource('staff-schedules', \App\Http\Controllers\StaffScheduleController::class);
+
+    // HRIS — Staff calendar (holidays & events)
+    Route::apiResource('staff-calendar-events', \App\Http\Controllers\StaffCalendarEventController::class)
+        ->only(['index', 'store', 'update', 'destroy']);
+
     // HRIS — Biometric devices
     Route::get('biometric/devices', [BiometricDeviceController::class, 'index']);
     Route::post('biometric/devices', [BiometricDeviceController::class, 'store']);
