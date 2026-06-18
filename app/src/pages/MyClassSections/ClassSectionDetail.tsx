@@ -13,6 +13,7 @@ import { ReportCardModal } from '../../components/ReportCardModal'
 import { StudentReportCardModal } from '../../components/StudentReportCardModal'
 import { StudentAssignmentModal } from './components/StudentAssignmentModal'
 import { CreateStudentModal } from './components/CreateStudentModal'
+import { TransferStudentModal } from './components/TransferStudentModal'
 import { StudentModal } from '../Students/components/StudentModal'
 import { ClassSectionSubjectModal } from '../ClassSections/components/ClassSectionSubjectModal'
 import { useAuth } from '../../hooks/useAuth'
@@ -62,6 +63,8 @@ const ClassSectionDetail: React.FC = () => {
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
   const [showRemoveModal, setShowRemoveModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [studentToTransfer, setStudentToTransfer] = useState<Student | null>(null)
   const [studentToRemove, setStudentToRemove] = useState<{ id: string; name: string; assignmentId: string } | null>(null)
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null)
   const [editModalError, setEditModalError] = useState<string | null>(null)
@@ -136,6 +139,20 @@ const ClassSectionDetail: React.FC = () => {
     queryFn: () => studentService.getStudentsByClassSection(id!),
     enabled: !!id,
   })
+
+  // Other sections in the institution the student can be transferred to
+  const {
+    data: institutionSectionsResponse,
+  } = useQuery({
+    queryKey: ['class-sections-by-institution', effectiveInstitutionId],
+    queryFn: () => classSectionService.getClassSectionsByInstitution(effectiveInstitutionId, { per_page: 1000 }),
+    enabled: !!effectiveInstitutionId && activeTab === 'students',
+  })
+
+  const availableTransferSections = useMemo(() => {
+    const all = institutionSectionsResponse?.data || []
+    return all.filter((section: any) => section.id !== id && section.status !== 'dissolve')
+  }, [institutionSectionsResponse?.data, id])
 
   const subjects = useMemo(() => subjectsResponse?.data || [], [subjectsResponse?.data])
   
@@ -379,6 +396,11 @@ const ClassSectionDetail: React.FC = () => {
     setShowEditModal(true)
   }, [])
 
+  const handleTransferStudent = useCallback((student: Student & { assignmentId: string }) => {
+    setStudentToTransfer(student)
+    setShowTransferModal(true)
+  }, [])
+
   const handleEditSuccess = useCallback(() => {
     refetchStudents()
     setEditModalSuccess('Student updated successfully!')
@@ -566,6 +588,7 @@ const ClassSectionDetail: React.FC = () => {
                   onCreateStudent={() => setShowCreateStudentModal(true)}
                   onAssignStudents={() => setShowAssignmentModal(true)}
                   onEditStudent={handleEditStudent}
+                  onTransferStudent={handleTransferStudent}
                   onRemoveStudent={handleRemoveStudent}
                   studentsLoading={studentsLoading}
                   studentsError={studentsError}
@@ -738,6 +761,21 @@ const ClassSectionDetail: React.FC = () => {
           onSuccess={handleAssignmentSuccess}
         />
       )}
+
+      {/* Transfer Student Modal */}
+      <TransferStudentModal
+        isOpen={showTransferModal}
+        onClose={() => {
+          setShowTransferModal(false)
+          setStudentToTransfer(null)
+        }}
+        student={studentToTransfer}
+        sectionId={id!}
+        sectionTitle={classSectionData?.title}
+        currentSubjects={subjects}
+        availableSections={availableTransferSections}
+        onSuccess={refetchStudents}
+      />
 
       {/* Student Edit Modal */}
       <StudentModal

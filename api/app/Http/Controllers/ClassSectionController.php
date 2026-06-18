@@ -391,4 +391,157 @@ class ClassSectionController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Transfer a single student from this section to another section.
+     * Mirrors the dissolve grade-mapping behaviour for one student, but leaves
+     * the source section intact and leaves unmapped grades untouched.
+     */
+    public function transferStudent(Request $request, $id)
+    {
+        $user = $request->user();
+        $institutionId = $user->getDefaultInstitutionId();
+
+        // Find the source section (scoped to the user's institution)
+        $section = ClassSection::where('institution_id', $institutionId)->findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'student_id' => 'required|uuid|exists:students,id',
+            'target_section_id' => 'required|uuid|exists:class_sections,id',
+            'subject_mappings' => 'nullable|array', // Optional - only subjects with grades need mapping
+            'subject_mappings.*.source_subject_id' => 'required_with:subject_mappings|uuid|exists:subjects,id',
+            'subject_mappings.*.target_subject_id' => 'required_with:subject_mappings|uuid|exists:subjects,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $studentId = $request->student_id;
+        $targetSectionId = $request->target_section_id;
+
+        if ($targetSectionId === $section->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot transfer a student to the same section.',
+            ], 422);
+        }
+
+        // Ensure the target section belongs to the same institution
+        $targetSection = ClassSection::where('institution_id', $institutionId)->find($targetSectionId);
+        if (!$targetSection) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Target section not found in this institution.',
+            ], 404);
+        }
+
+        $subjectMappings = $request->subject_mappings ?? [];
+
+        // Map for quick lookup: source_subject_id -> target_subject_id
+        $subjectMappingMap = [];
+        foreach ($subjectMappings as $mapping) {
+            $subjectMappingMap[$mapping['source_subject_id']] = $mapping['target_subject_id'];
+        }
+
+        DB::beginTransaction();
+        try {
+            // Find the student's active enrollment in the source section
+            $oldStudentSection = StudentSection::where('student_id', $studentId)
+                ->where('section_id', $section->id)
+                ->where('is_active', true)
+                ->first();
+
+            if (!$oldStudentSection) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student is not actively enrolled in this section.',
+                ], 422);
+            }
+
+            $oldAcademicYear = $oldStudentSection->academic_year;
+
+            // Deactivate the old enrollment
+            $oldStudentSection->update([
+                'is_active' => false,
+            ]);
+
+            // Create (or reactivate) the enrollment in the target section
+            $existingNewSection = StudentSection::where('student_id', $studentId)
+                ->where('section_id', $targetSectionId)
+                ->where('academic_year', $oldAcademicYear)
+                ->first();
+
+            if (!$existingNewSection) {
+                StudentSection::create([
+                    'student_id' => $studentId,
+                    'section_id' => $targetSectionId,
+                    'academic_year' => $oldAcademicYear,
+                    'is_active' => true,
+                    'is_promoted' => false,
+                ]);
+            } else {
+                $existingNewSection->update([
+                    'is_active' => true,
+                ]);
+            }
+
+            $targetAcademicYear = $targetSection->academic_year ?? $oldAcademicYear;
+
+            // Subjects belonging to the source section
+            $sectionSubjects = Subject::where('class_section_id', $section->id)->pluck('id')->toArray();
+
+            // Transfer grades for mapped subjects only (unmapped grades are left as-is)
+            if (!empty($subjectMappingMap)) {
+                $studentGrades = StudentRunningGrade::where('student_id', $studentId)
+                    ->whereIn('subject_id', array_keys($subjectMappingMap))
+                    ->whereIn('subject_id', $sectionSubjects)
+                    ->whereNull('deleted_at')
+                    ->get();
+
+                foreach ($studentGrades as $grade) {
+                    $targetSubjectId = $subjectMappingMap[$grade->subject_id];
+
+                    $grade->update([
+                        'deleted_at' => now(),
+                        'note' => 'Transfer - Grade Transferred',
+                    ]);
+
+                    StudentRunningGrade::create([
+                        'student_id' => $studentId,
+                        'subject_id' => $targetSubjectId,
+                        'quarter' => $grade->quarter,
+                        'grade' => $grade->grade,
+                        'final_grade' => $grade->final_grade,
+                        'academic_year' => $targetAcademicYear,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student transferred successfully',
+                'data' => [
+                    'student_id' => $studentId,
+                    'from_section_id' => $section->id,
+                    'target_section_id' => $targetSectionId,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to transfer student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 } 

@@ -198,6 +198,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
     Route::get('class-sections/academic-years', [ClassSectionController::class, 'getAcademicYears']);
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);
+    Route::post('class-sections/{id}/transfer-student', [ClassSectionController::class, 'transferStudent']);
     Route::apiResource('class-sections', ClassSectionController::class);
 
     // Timetable routes
