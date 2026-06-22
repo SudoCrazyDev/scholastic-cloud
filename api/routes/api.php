@@ -11,6 +11,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\GradeLevelDiscountController;
+use App\Http\Controllers\IdCardTemplateController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\InternalPaymentCallbackController;
 use App\Http\Controllers\PaymentPlanController;
@@ -345,6 +346,10 @@ Route::middleware('auth.token')->group(function () {
 
     // Certificate routes
     Route::apiResource('certificates', CertificateController::class);
+
+    // Student ID card template routes
+    Route::post('id-card-templates/assets', [IdCardTemplateController::class, 'uploadAsset']);
+    Route::apiResource('id-card-templates', IdCardTemplateController::class);
 
     // HRIS — Attendance logs
     Route::get('attendance/logs', [\App\Http\Controllers\AttendanceLogController::class, 'index']);

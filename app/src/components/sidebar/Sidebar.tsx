@@ -321,6 +321,13 @@ const menuGroups: MenuGroup[] = [
         path: '/form-builder',
         allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
       },
+      {
+        id: 'id-card-builder',
+        label: 'Student ID Builder',
+        icon: <CreditCard className="w-5 h-5" />,
+        path: '/id-card-builder',
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+      },
     ],
   },
 ];

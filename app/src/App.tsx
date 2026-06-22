@@ -28,6 +28,8 @@ import SetNewPassword from './pages/SetNewPassword';
 import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
 import CertificateBuilderPage from './pages/CertificateBuilder/CertificateBuilderPage';
 import CertificateList from './pages/CertificateBuilder/CertificateList';
+import IdCardBuilder from './pages/IdCardBuilder/IdCardBuilder';
+import IdCardBuilderPage from './pages/IdCardBuilder/IdCardBuilderPage';
 import SchoolDays from './pages/SchoolDays';
 import Departments from './pages/Departments/Departments';
 import GradeLevels from './pages/GradeLevels/GradeLevels';
@@ -128,6 +130,8 @@ function App() {
               <Route path="certificate-builder/new" element={<CertificateBuilder />} />
               <Route path="certificate-builder" element={<CertificateBuilderPage />} />
               <Route path="certificates" element={<CertificateList />} />
+              <Route path="id-card-builder/new" element={<IdCardBuilder />} />
+              <Route path="id-card-builder" element={<IdCardBuilderPage />} />
               <Route path="form-builder" element={<FormBuilderPage />} />
               <Route path="school-days" element={<SchoolDays />} />
               <Route path="departments" element={<Departments />} />
