@@ -224,7 +224,7 @@ const ZkUsers: React.FC = () => {
           <div className="p-8 text-center text-gray-400">Loading ZK users…</div>
         ) : zkUsers.length === 0 ? (
           <div className="p-8 text-center text-gray-400">
-            {filter !== 'all' ? `No ${filter} ZK users found.` : 'No ZK users yet. Sync a device using the bridge app.'}
+            {filter !== 'all' ? `No ${filter} ZK users found.` : 'No ZK users yet. Go to HRIS → Devices and click “Fetch enrolled users” to pull the roster from your ZKTeco device.'}
           </div>
         ) : (
           <table className="w-full text-sm">

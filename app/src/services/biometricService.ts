@@ -14,8 +14,11 @@ class BiometricService {
     return response.data
   }
 
-  async createDevice(name: string) {
-    const response = await api.post<ApiResponse<BiometricDevice & { pairing_code: string }>>('/biometric/devices', { name })
+  async createDevice(name: string, serialNumber?: string) {
+    const response = await api.post<ApiResponse<BiometricDevice & { pairing_code?: string }>>('/biometric/devices', {
+      name,
+      ...(serialNumber ? { serial_number: serialNumber } : {}),
+    })
     return response.data
   }
 
@@ -26,6 +29,21 @@ class BiometricService {
 
   async refreshPairingCode(id: string) {
     const response = await api.post<ApiResponse<{ pairing_code: string; expires_at: string }>>(`/biometric/devices/${id}/refresh-pairing-code`)
+    return response.data
+  }
+
+  /** Queue an ADMS command telling the device to upload its full enrolled-user roster. */
+  async fetchUsersFromDevice(id: string) {
+    const response = await api.post<ApiResponse<null>>(`/biometric/devices/${id}/fetch-users`)
+    return response.data
+  }
+
+  /** Queue an ADMS command telling the device to re-upload stored punches for a date range. */
+  async fetchAttendanceFromDevice(id: string, from?: string, to?: string) {
+    const response = await api.post<ApiResponse<null>>(`/biometric/devices/${id}/fetch-attendance`, {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    })
     return response.data
   }
 

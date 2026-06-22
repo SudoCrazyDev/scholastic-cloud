@@ -11,12 +11,14 @@ class StudentPaymentPlan extends Model
     use HasFactory, HasUuids;
 
     public const TYPE_MONTHLY = 'monthly';
+
     public const TYPE_QUARTERLY = 'quarterly';
 
     protected $fillable = [
         'institution_id',
         'student_id',
         'academic_year',
+        'payment_plan_id',
         'plan_type',
         'selected_at',
         'selected_by',
@@ -41,5 +43,10 @@ class StudentPaymentPlan extends Model
     public function selectedBy()
     {
         return $this->belongsTo(User::class, 'selected_by');
+    }
+
+    public function paymentPlan()
+    {
+        return $this->belongsTo(PaymentPlan::class);
     }
 }

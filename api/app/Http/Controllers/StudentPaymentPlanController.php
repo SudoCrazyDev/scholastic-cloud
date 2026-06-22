@@ -3,21 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Models\PaymentPlan;
 use App\Models\Student;
 use App\Models\StudentPaymentPlan;
+use App\Models\StudentPaymentPlanChange;
 use App\Services\PaymentPlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StudentPaymentPlanController extends Controller
 {
-    public function __construct(private PaymentPlanService $planService)
-    {
-    }
+    public function __construct(private PaymentPlanService $planService) {}
 
     public function show(Request $request, string $studentId): JsonResponse
     {
-        if ($this->isStudentActor($request) && !$this->isSelfStudent($request, $studentId)) {
+        if ($this->isStudentActor($request) && ! $this->isSelfStudent($request, $studentId)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Students can only access their own payment plan',
@@ -25,7 +26,7 @@ class StudentPaymentPlanController extends Controller
         }
 
         $institutionId = $this->resolveInstitutionId($request);
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json([
                 'success' => false,
                 'message' => 'User does not have any institution assigned',
@@ -33,14 +34,15 @@ class StudentPaymentPlanController extends Controller
         }
 
         $academicYear = $request->get('academic_year');
-        if (!$academicYear) {
+        if (! $academicYear) {
             return response()->json([
                 'success' => false,
                 'message' => 'academic_year is required',
             ], 422);
         }
 
-        $plan = StudentPaymentPlan::where('institution_id', $institutionId)
+        $plan = StudentPaymentPlan::with('paymentPlan.installments')
+            ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
             ->first();
@@ -55,12 +57,13 @@ class StudentPaymentPlanController extends Controller
     {
         $validated = $request->validate([
             'academic_year' => ['required', 'string'],
-            'plan_type' => ['required', 'in:monthly,quarterly'],
+            'payment_plan_id' => ['required', 'string'],
+            'note' => ['nullable', 'string', 'max:255'],
         ]);
 
         $isStudent = $this->isStudentActor($request);
 
-        if ($isStudent && !$this->isSelfStudent($request, $studentId)) {
+        if ($isStudent && ! $this->isSelfStudent($request, $studentId)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Students can only set their own payment plan',
@@ -68,7 +71,7 @@ class StudentPaymentPlanController extends Controller
         }
 
         $institutionId = $this->resolveInstitutionId($request);
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json([
                 'success' => false,
                 'message' => 'User does not have any institution assigned',
@@ -79,11 +82,23 @@ class StudentPaymentPlanController extends Controller
             $query->where('institution_id', $institutionId);
         })->find($studentId);
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'success' => false,
                 'message' => 'Student not found',
             ], 404);
+        }
+
+        // The chosen plan must belong to this institution and be active.
+        $definition = PaymentPlan::where('institution_id', $institutionId)
+            ->where('is_active', true)
+            ->find($validated['payment_plan_id']);
+
+        if (! $definition) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The selected payment plan is not available.',
+            ], 422);
         }
 
         $existing = StudentPaymentPlan::where('institution_id', $institutionId)
@@ -91,7 +106,8 @@ class StudentPaymentPlanController extends Controller
             ->where('academic_year', $validated['academic_year'])
             ->first();
 
-        // Students can only set the plan once per academic year. Admin/staff can override.
+        // Students may make their first selection only. Any change to an existing
+        // selection must go through admin/registrar staff.
         if ($existing && $isStudent) {
             return response()->json([
                 'success' => false,
@@ -100,26 +116,66 @@ class StudentPaymentPlanController extends Controller
         }
 
         $selectedById = $this->resolveActorUserId($request);
+        $previousPlanId = $existing?->payment_plan_id;
 
-        if ($existing) {
-            $existing->update([
-                'plan_type' => $validated['plan_type'],
-                'selected_at' => now(),
-                'selected_by' => $selectedById,
-                'selected_by_student' => $isStudent,
-            ]);
-            $plan = $existing->fresh();
-        } else {
-            $plan = StudentPaymentPlan::create([
-                'institution_id' => $institutionId,
-                'student_id' => $studentId,
-                'academic_year' => $validated['academic_year'],
-                'plan_type' => $validated['plan_type'],
-                'selected_at' => now(),
-                'selected_by' => $selectedById,
-                'selected_by_student' => $isStudent,
-            ]);
-        }
+        // plan_type kept for backward compatibility with legacy readers.
+        $legacyType = in_array(strtolower($definition->name), ['monthly', 'quarterly'], true)
+            ? strtolower($definition->name)
+            : null;
+
+        $plan = DB::transaction(function () use (
+            $existing,
+            $institutionId,
+            $studentId,
+            $validated,
+            $definition,
+            $legacyType,
+            $selectedById,
+            $isStudent,
+            $previousPlanId
+
+        ) {
+            if ($existing) {
+                $existing->update([
+                    'payment_plan_id' => $definition->id,
+                    'plan_type' => $legacyType,
+                    'selected_at' => now(),
+                    'selected_by' => $selectedById,
+                    'selected_by_student' => $isStudent,
+                ]);
+                $plan = $existing->fresh();
+            } else {
+                $plan = StudentPaymentPlan::create([
+                    'institution_id' => $institutionId,
+                    'student_id' => $studentId,
+                    'academic_year' => $validated['academic_year'],
+                    'payment_plan_id' => $definition->id,
+                    'plan_type' => $legacyType,
+                    'selected_at' => now(),
+                    'selected_by' => $selectedById,
+                    'selected_by_student' => $isStudent,
+                ]);
+            }
+
+            // Record history only on a real selection or change of plan.
+            if ($previousPlanId !== $definition->id) {
+                StudentPaymentPlanChange::create([
+                    'institution_id' => $institutionId,
+                    'student_id' => $studentId,
+                    'academic_year' => $validated['academic_year'],
+                    'payment_plan_id' => $definition->id,
+                    'previous_payment_plan_id' => $previousPlanId,
+                    'changed_at' => now(),
+                    'changed_by' => $selectedById,
+                    'changed_by_student' => $isStudent,
+                    'note' => $validated['note'] ?? null,
+                ]);
+            }
+
+            return $plan;
+        });
+
+        $plan->load('paymentPlan.installments');
 
         return response()->json([
             'success' => true,
@@ -130,7 +186,7 @@ class StudentPaymentPlanController extends Controller
     private function resolveInstitutionId(Request $request): ?string
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
@@ -143,7 +199,7 @@ class StudentPaymentPlanController extends Controller
         }
 
         $institutionId = $user->getDefaultInstitutionId();
-        if (!$institutionId) {
+        if (! $institutionId) {
             $firstUserInstitution = $user->userInstitutions()->first();
             if ($firstUserInstitution) {
                 $institutionId = $firstUserInstitution->institution_id;
@@ -156,7 +212,7 @@ class StudentPaymentPlanController extends Controller
     private function isStudentActor(Request $request): bool
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -165,6 +221,7 @@ class StudentPaymentPlanController extends Controller
         }
 
         $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+
         return (string) ($role->slug ?? '') === 'student';
     }
 
@@ -176,7 +233,7 @@ class StudentPaymentPlanController extends Controller
     private function resolveSelfStudentId(Request $request): ?string
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
@@ -190,7 +247,7 @@ class StudentPaymentPlanController extends Controller
     private function resolveActorUserId(Request $request): ?string
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 

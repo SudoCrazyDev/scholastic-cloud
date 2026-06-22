@@ -338,7 +338,8 @@ class StudentFinanceController extends Controller
             ->filter(fn ($payment) => !$payment->school_fee_id)
             ->sum('amount');
 
-        $paymentPlan = StudentPaymentPlan::where('institution_id', $institutionId)
+        $paymentPlan = StudentPaymentPlan::with('paymentPlan.installments')
+            ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
             ->first();
@@ -527,7 +528,8 @@ class StudentFinanceController extends Controller
             ];
         }));
 
-        $paymentPlan = StudentPaymentPlan::where('institution_id', $institutionId)
+        $paymentPlan = StudentPaymentPlan::with('paymentPlan.installments')
+            ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
             ->first();

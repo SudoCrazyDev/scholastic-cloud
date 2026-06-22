@@ -4,7 +4,6 @@ import type {
   StudentLedgerResponse,
   StudentNOAResponse,
   StudentPaymentPlan,
-  StudentPaymentPlanType,
 } from '../types'
 
 class StudentFinanceService {
@@ -39,7 +38,7 @@ class StudentFinanceService {
 
   async setPaymentPlan(
     studentId: string,
-    payload: { academic_year: string; plan_type: StudentPaymentPlanType }
+    payload: { academic_year: string; payment_plan_id: string; note?: string }
   ) {
     const response = await api.post<ApiResponse<StudentPaymentPlan>>(
       `/students/${studentId}/payment-plan`,
