@@ -6,6 +6,7 @@ import {
   UserIcon,
   AcademicCapIcon,
   HeartIcon,
+  UsersIcon,
   IdentificationIcon,
   PencilIcon,
   CameraIcon,
@@ -21,7 +22,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
-import { StudentFinanceTab, CrossCheckModal, StudentIdTab } from './components'
+import { StudentFinanceTab, CrossCheckModal, StudentIdTab, StudentFamilyTab, StudentMedicalTab } from './components'
 import { studentService } from '../../services/studentService'
 import { studentDocumentService } from '../../services/studentDocumentService'
 import { toast } from 'react-hot-toast'
@@ -29,6 +30,7 @@ import type { Student, StudentDocument } from '../../types'
 
 const tabs = [
   { id: 'personal', name: 'Personal Details', icon: UserIcon },
+  { id: 'family', name: 'Family & Background', icon: UsersIcon },
   { id: 'academic', name: 'Academic Information', icon: AcademicCapIcon },
   { id: 'medical', name: 'Medical Records', icon: HeartIcon },
   { id: 'documents', name: 'Documents', icon: IdentificationIcon },
@@ -399,16 +401,6 @@ export default function StudentDetail() {
     </div>
   )
 
-  const renderMedicalRecords = () => (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <div className="text-center py-12">
-        <HeartIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Medical Records</h3>
-        <p className="text-gray-500">Medical information will be available when connected to the backend API.</p>
-      </div>
-    </div>
-  )
-
   const DOCUMENT_TYPES = [
     { key: 'psa_birth_certificate', label: 'PSA/Birth Certificate' },
   ]
@@ -581,10 +573,12 @@ export default function StudentDetail() {
     switch (activeTab) {
       case 'personal':
         return renderPersonalDetails()
+      case 'family':
+        return <StudentFamilyTab student={student} onUpdated={setStudent} />
       case 'academic':
         return renderAcademicInfo()
       case 'medical':
-        return renderMedicalRecords()
+        return <StudentMedicalTab student={student} onUpdated={setStudent} />
       case 'documents':
         return renderDocuments()
       case 'finance':

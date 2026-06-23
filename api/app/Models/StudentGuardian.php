@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class StudentGuardian extends Model
+{
+    use HasFactory, HasUuids;
+
+    protected $fillable = [
+        'id',
+        'student_id',
+        'relation',
+        'name',
+        'age',
+        'occupation',
+    ];
+
+    protected $casts = [
+        'age' => 'integer',
+    ];
+
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
+    }
+}

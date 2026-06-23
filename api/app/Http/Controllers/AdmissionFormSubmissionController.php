@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\StudentInstitution;
 use App\Models\StudentSection;
 use App\Models\User;
+use App\Support\AdmissionPayloadMapper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -291,6 +292,10 @@ class AdmissionFormSubmissionController extends Controller
                 ['student_id' => $student->id, 'section_id' => $section->id, 'academic_year' => $academicYear],
                 ['is_active' => true, 'is_promoted' => false]
             );
+
+            // Fan the application payload out into the student's normalized,
+            // queryable records (profile, guardians, emergency contacts, health).
+            AdmissionPayloadMapper::syncToStudent($student, $submission->payload ?? []);
 
             $submission->update([
                 'status'     => 'accepted',

@@ -1067,6 +1067,73 @@ export interface Student {
   created_at?: string;
   updated_at?: string;
   student_section_id: string;
+  // Normalized admission records (loaded on GET /students/:id)
+  profile?: StudentProfile | null;
+  guardians?: StudentGuardian[];
+  emergency_contacts?: StudentEmergencyContact[];
+  health_record?: StudentHealthRecord | null;
+}
+
+/** Extended personal information from the admission form (1:1 with student). */
+export interface StudentProfile {
+  id?: string;
+  student_id?: string;
+  complete_address?: string | null;
+  mobile_number?: string | null;
+  place_of_birth?: string | null;
+  mother_tongue?: string | null;
+  last_school_attended?: string | null;
+  school_year?: string | null;
+  school_address?: string | null;
+  brothers_count?: number | null;
+  sisters_count?: number | null;
+}
+
+/** Family / guardian record from the admission form. */
+export interface StudentGuardian {
+  id?: string;
+  student_id?: string;
+  relation: 'father' | 'mother' | 'guardian';
+  name?: string | null;
+  age?: number | null;
+  occupation?: string | null;
+}
+
+/** Emergency contact from the admission form. */
+export interface StudentEmergencyContact {
+  id?: string;
+  student_id?: string;
+  name?: string | null;
+  address?: string | null;
+  relationship?: string | null;
+  age?: number | null;
+  contact_number?: string | null;
+}
+
+/** Health / medical record from the admission form (1:1 with student). */
+export interface StudentHealthRecord {
+  id?: string;
+  student_id?: string;
+  had_chicken_pox: boolean;
+  had_chicken_pox_note?: string | null;
+  had_chicken_pox_vaccine: boolean;
+  had_chicken_pox_vaccine_note?: string | null;
+  hospitalization_past_year: boolean;
+  hospitalization_past_year_note?: string | null;
+  chronic_condition: boolean;
+  chronic_condition_note?: string | null;
+  allergies: boolean;
+  allergies_note?: string | null;
+  other_medical_problems: boolean;
+  other_medical_problems_note?: string | null;
+}
+
+/** Payload for PUT /students/:id/admission-record (all sections optional). */
+export interface UpdateAdmissionRecordData {
+  profile?: StudentProfile;
+  guardians?: StudentGuardian[];
+  emergency_contacts?: StudentEmergencyContact[];
+  health_record?: StudentHealthRecord;
 }
 
 export interface CreateStudentData {
