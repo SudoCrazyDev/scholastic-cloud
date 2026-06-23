@@ -116,7 +116,44 @@ function getStudentVariableValue(
 		return lastName ? `${lastName}, ${afterComma}`.trimEnd() : afterComma;
 	}
 
+	// Family & Background variables resolve from the student's normalized
+	// admission relations (loaded by GET /students/{id}).
+	const familyValue = getFamilyVariableValue(student, variableKey);
+	if (familyValue !== undefined) return familyValue;
+
 	return s[variableKey] != null ? String(s[variableKey]) : '';
+}
+
+/**
+ * Resolves "Family & Background" variable keys from the student's normalized
+ * admission relations (profile / guardians / emergency_contacts).
+ * Returns `undefined` for keys it does not handle so the caller can fall through.
+ */
+function getFamilyVariableValue(student: Student, variableKey: string): string | undefined {
+	const str = (v: unknown): string => (v == null ? '' : String(v));
+	const profile = student.profile;
+	const father = student.guardians?.find((g) => g.relation === 'father');
+	const mother = student.guardians?.find((g) => g.relation === 'mother');
+	const emergency = student.emergency_contacts?.[0];
+
+	switch (variableKey) {
+		// Profile / background
+		case 'complete_address': return str(profile?.complete_address);
+		case 'mobile_number': return str(profile?.mobile_number);
+		case 'place_of_birth': return str(profile?.place_of_birth);
+		case 'mother_tongue': return str(profile?.mother_tongue);
+		case 'last_school_attended': return str(profile?.last_school_attended);
+		// Parents
+		case 'father_name': return str(father?.name);
+		case 'father_occupation': return str(father?.occupation);
+		case 'mother_name': return str(mother?.name);
+		case 'mother_occupation': return str(mother?.occupation);
+		// Emergency contact
+		case 'emergency_contact_name': return str(emergency?.name);
+		case 'emergency_contact_number': return str(emergency?.contact_number);
+		case 'emergency_contact_relationship': return str(emergency?.relationship);
+		default: return undefined;
+	}
 }
 
 /** Builds the display text, wrapping with prefix/suffix when the element is a variable. */
