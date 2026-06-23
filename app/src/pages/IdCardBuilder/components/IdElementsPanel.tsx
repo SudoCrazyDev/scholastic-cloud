@@ -19,6 +19,11 @@ import {
 	GraduationCap,
 	Users,
 	IdCard,
+	Home,
+	Phone,
+	Briefcase,
+	Languages,
+	School,
 } from 'lucide-react';
 import { type CanvasElement } from './IdCardCanvas';
 import type { Institution } from '@/types';
@@ -74,10 +79,32 @@ const STUDENT_VARIABLES: Array<{
 	{ key: 'lrn_qr', label: 'LRN QR Code', icon: QrCode, type: 'qr' },
 ];
 
+// Family & Background — resolved from the student's normalized admission records.
+const FAMILY_VARIABLES: Array<{
+	key: string;
+	label: string;
+	icon: React.ComponentType<{ className?: string }>;
+	type: 'text';
+}> = [
+	{ key: 'complete_address', label: 'Address', icon: Home, type: 'text' },
+	{ key: 'mobile_number', label: 'Mobile Number', icon: Phone, type: 'text' },
+	{ key: 'place_of_birth', label: 'Place of Birth', icon: MapPin, type: 'text' },
+	{ key: 'mother_tongue', label: 'Mother Tongue', icon: Languages, type: 'text' },
+	{ key: 'last_school_attended', label: 'Last School Attended', icon: School, type: 'text' },
+	{ key: 'father_name', label: "Father's Name", icon: User, type: 'text' },
+	{ key: 'father_occupation', label: "Father's Occupation", icon: Briefcase, type: 'text' },
+	{ key: 'mother_name', label: "Mother's Name", icon: User, type: 'text' },
+	{ key: 'mother_occupation', label: "Mother's Occupation", icon: Briefcase, type: 'text' },
+	{ key: 'emergency_contact_name', label: 'Emergency Contact', icon: User, type: 'text' },
+	{ key: 'emergency_contact_number', label: 'Emergency Number', icon: Phone, type: 'text' },
+	{ key: 'emergency_contact_relationship', label: 'Emergency Relationship', icon: Users, type: 'text' },
+];
+
 export default function IdElementsPanel({ institution, onAddElement, onCollapse }: ElementsPanelProps) {
 	const [elementsOpen, setElementsOpen] = useState(true);
 	const [institutionOpen, setInstitutionOpen] = useState(true);
 	const [studentOpen, setStudentOpen] = useState(true);
+	const [familyOpen, setFamilyOpen] = useState(false);
 
 	const baseElement = () => ({
 		id: crypto.randomUUID(),
@@ -306,6 +333,38 @@ export default function IdElementsPanel({ institution, onAddElement, onCollapse 
 											>
 												<div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm">
 													<Icon className="w-3.5 h-3.5 text-emerald-600" />
+												</div>
+												<span className="text-xs font-medium text-gray-700 truncate">{variable.label}</span>
+											</motion.button>
+										);
+									})}
+								</div>
+							</motion.div>
+						)}
+					</AnimatePresence>
+				</div>
+
+				{/* Family & Background variables */}
+				<div className="border-b border-gray-200 last:border-b-0">
+					<SectionHeader open={familyOpen} onToggle={() => setFamilyOpen((o) => !o)} label="Family & Background" />
+					<AnimatePresence initial={false}>
+						{familyOpen && (
+							<motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+								<p className="text-[10px] text-gray-400 mb-2 px-1">Bound to selected student</p>
+								<div className="space-y-1.5 pb-3">
+									{FAMILY_VARIABLES.map((variable) => {
+										const Icon = variable.icon;
+										return (
+											<motion.button
+												key={variable.key}
+												whileHover={{ scale: 1.02, x: 2 }}
+												whileTap={{ scale: 0.98 }}
+												onClick={() => addStudentVariable(variable)}
+												className="w-full flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border border-amber-200/50 hover:border-amber-300 rounded-lg transition-all text-left shadow-sm hover:shadow"
+												title={`Add ${variable.label}`}
+											>
+												<div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm">
+													<Icon className="w-3.5 h-3.5 text-amber-600" />
 												</div>
 												<span className="text-xs font-medium text-gray-700 truncate">{variable.label}</span>
 											</motion.button>
