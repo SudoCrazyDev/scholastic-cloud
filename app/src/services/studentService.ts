@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { Student, CreateStudentData, UpdateStudentData, PaginatedResponse } from '../types'
+import type { Student, CreateStudentData, UpdateStudentData, UpdateAdmissionRecordData, PaginatedResponse } from '../types'
 
 class StudentService {
   private baseUrl = '/students'
@@ -115,6 +115,12 @@ class StudentService {
 
   async deleteStudent(id: string) {
     const response = await api.delete<{ success: boolean; message: string }>(`${this.baseUrl}/${id}`)
+    return response.data
+  }
+
+  /** Update the student's normalized admission records (profile, guardians, emergency contacts, health). */
+  async updateAdmissionRecord(id: string, data: UpdateAdmissionRecordData) {
+    const response = await api.put<{ success: boolean; data: Student }>(`${this.baseUrl}/${id}/admission-record`, data)
     return response.data
   }
 

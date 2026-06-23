@@ -106,6 +106,38 @@ class Student extends Model
         return $this->hasOne(StudentRfidTag::class);
     }
 
+    /**
+     * Extended personal information from the admission form (1:1).
+     */
+    public function profile()
+    {
+        return $this->hasOne(StudentProfile::class);
+    }
+
+    /**
+     * Family / guardian records from the admission form (1:many).
+     */
+    public function guardians()
+    {
+        return $this->hasMany(StudentGuardian::class);
+    }
+
+    /**
+     * Emergency contacts from the admission form (1:many).
+     */
+    public function emergencyContacts()
+    {
+        return $this->hasMany(StudentEmergencyContact::class);
+    }
+
+    /**
+     * Health / medical record from the admission form (1:1).
+     */
+    public function healthRecord()
+    {
+        return $this->hasOne(StudentHealthRecord::class);
+    }
+
     public function rfidScanLogs()
     {
         return $this->hasMany(RfidScanLog::class);

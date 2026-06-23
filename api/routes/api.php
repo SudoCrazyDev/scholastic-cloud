@@ -177,6 +177,7 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('payment-plans', PaymentPlanController::class);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
     Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
+    Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord']);
     Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index']);
     Route::post('students/{studentId}/documents', [StudentDocumentController::class, 'store']);
     Route::post('students/{studentId}/documents/{documentId}/cross-check', [StudentDocumentController::class, 'crossCheck']);

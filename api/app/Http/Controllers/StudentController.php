@@ -204,15 +204,121 @@ class StudentController extends Controller
             }
         }
 
-        $student = Student::with('studentInstitutions')
+        $student = Student::with(['studentInstitutions', 'profile', 'guardians', 'emergencyContacts', 'healthRecord'])
             ->whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
                 $q->where('institution_id', $defaultInstitutionId);
             })
             ->find($id);
-            
+
         if (!$student) {
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
+        return response()->json(['success' => true, 'data' => $student]);
+    }
+
+    /**
+     * Update the student's normalized admission records (profile, guardians,
+     * emergency contacts, health record). Staff only.
+     */
+    public function updateAdmissionRecord(Request $request, $id): JsonResponse
+    {
+        if ($this->isStudentActor($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        $defaultInstitutionId = $this->resolveInstitutionId($request);
+        if (!$defaultInstitutionId) {
+            return response()->json(['success' => false, 'error' => 'User does not have any institution assigned'], 400);
+        }
+
+        $student = Student::whereHas('studentInstitutions', function ($q) use ($defaultInstitutionId) {
+                $q->where('institution_id', $defaultInstitutionId);
+            })
+            ->find($id);
+
+        if (!$student) {
+            return response()->json(['success' => false, 'message' => 'Student not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'profile' => 'sometimes|array',
+            'profile.complete_address' => 'nullable|string',
+            'profile.mobile_number' => 'nullable|string|max:50',
+            'profile.place_of_birth' => 'nullable|string|max:255',
+            'profile.mother_tongue' => 'nullable|string|max:255',
+            'profile.last_school_attended' => 'nullable|string|max:255',
+            'profile.school_year' => 'nullable|string|max:50',
+            'profile.school_address' => 'nullable|string|max:255',
+            'profile.brothers_count' => 'nullable|integer|min:0|max:50',
+            'profile.sisters_count' => 'nullable|integer|min:0|max:50',
+
+            'guardians' => 'sometimes|array',
+            'guardians.*.relation' => 'required|string|in:father,mother,guardian',
+            'guardians.*.name' => 'nullable|string|max:255',
+            'guardians.*.age' => 'nullable|integer|min:0|max:150',
+            'guardians.*.occupation' => 'nullable|string|max:255',
+
+            'emergency_contacts' => 'sometimes|array',
+            'emergency_contacts.*.name' => 'nullable|string|max:255',
+            'emergency_contacts.*.address' => 'nullable|string|max:255',
+            'emergency_contacts.*.relationship' => 'nullable|string|max:255',
+            'emergency_contacts.*.age' => 'nullable|integer|min:0|max:150',
+            'emergency_contacts.*.contact_number' => 'nullable|string|max:50',
+
+            'health_record' => 'sometimes|array',
+            'health_record.had_chicken_pox' => 'boolean',
+            'health_record.had_chicken_pox_note' => 'nullable|string|max:255',
+            'health_record.had_chicken_pox_vaccine' => 'boolean',
+            'health_record.had_chicken_pox_vaccine_note' => 'nullable|string|max:255',
+            'health_record.hospitalization_past_year' => 'boolean',
+            'health_record.hospitalization_past_year_note' => 'nullable|string',
+            'health_record.chronic_condition' => 'boolean',
+            'health_record.chronic_condition_note' => 'nullable|string',
+            'health_record.allergies' => 'boolean',
+            'health_record.allergies_note' => 'nullable|string',
+            'health_record.other_medical_problems' => 'boolean',
+            'health_record.other_medical_problems_note' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            if (array_key_exists('profile', $validated)) {
+                $student->profile()->updateOrCreate(
+                    ['student_id' => $student->id],
+                    $validated['profile']
+                );
+            }
+
+            if (array_key_exists('guardians', $validated)) {
+                $student->guardians()->delete();
+                foreach ($validated['guardians'] as $guardian) {
+                    $student->guardians()->create($guardian);
+                }
+            }
+
+            if (array_key_exists('emergency_contacts', $validated)) {
+                $student->emergencyContacts()->delete();
+                foreach ($validated['emergency_contacts'] as $contact) {
+                    $student->emergencyContacts()->create($contact);
+                }
+            }
+
+            if (array_key_exists('health_record', $validated)) {
+                $student->healthRecord()->updateOrCreate(
+                    ['student_id' => $student->id],
+                    $validated['health_record']
+                );
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Failed to update student admission record: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to update record: ' . $e->getMessage()], 500);
+        }
+
+        $student->load(['studentInstitutions', 'profile', 'guardians', 'emergencyContacts', 'healthRecord']);
+
         return response()->json(['success' => true, 'data' => $student]);
     }
 
