@@ -354,15 +354,145 @@ export interface PaymentVoidRequest {
   reviewer?: { id: string; first_name: string; last_name: string } | null;
 }
 
+// Legacy enum kept for back-compat; plans are now identified by payment_plan_id + name.
 export type StudentPaymentPlanType = 'monthly' | 'quarterly';
 
 export interface StudentPaymentPlan {
   id: string;
   academic_year: string;
-  plan_type: StudentPaymentPlanType;
+  payment_plan_id?: string | null;
+  name?: string | null;
+  plan_type?: StudentPaymentPlanType | null;
   installment_count: number;
   selected_at?: string | null;
   selected_by_student: boolean;
+}
+
+// Admin-managed payment plan definitions (Finance > Payment Plans module).
+export interface PaymentPlanInstallmentTemplate {
+  id?: string;
+  sequence: number;
+  label?: string | null;
+  due_month: number; // 1-12
+  due_day: number; // 1-31
+  share_percentage?: number | null;
+}
+
+export interface PaymentPlan {
+  id: string;
+  institution_id?: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  installment_count: number;
+  installments: PaymentPlanInstallmentTemplate[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreatePaymentPlanData {
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+  installments: Array<Omit<PaymentPlanInstallmentTemplate, 'id' | 'sequence'> & { sequence?: number }>;
+}
+
+export interface PaymentPlanChange {
+  id: string;
+  student_id: string;
+  academic_year: string;
+  payment_plan_id?: string | null;
+  plan_name?: string | null;
+  previous_payment_plan_id?: string | null;
+  previous_plan_name?: string | null;
+  changed_at?: string | null;
+  changed_by?: string | null;
+  changed_by_name?: string | null;
+  changed_by_student: boolean;
+  note?: string | null;
+}
+
+export type DayOfWeek =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+export interface StaffScheduleDay {
+  id?: string;
+  day_of_week: DayOfWeek;
+  start_time: string; // "HH:MM"
+  end_time: string; // "HH:MM"
+  lunch_start?: string | null; // "HH:MM"
+  lunch_end?: string | null; // "HH:MM"
+}
+
+// A schedule is a reusable template (name + description + weekly hours).
+export interface StaffSchedule {
+  id: string;
+  institution_id?: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  assigned_count: number;
+  day_count: number;
+  days: StaffScheduleDay[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreateStaffScheduleData {
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  days: StaffScheduleDay[];
+}
+
+// Assigning a schedule template to staff.
+export interface StaffScheduleAssignment {
+  id: string;
+  user_id: string;
+  staff_name?: string | null;
+  staff_email?: string | null;
+  staff_schedule_id: string;
+  schedule_name?: string | null;
+  created_at?: string | null;
+}
+
+export interface AssignStaffScheduleData {
+  user_ids: string[];
+}
+
+export interface AssignStaffScheduleResult {
+  created: number;
+  reassigned: number;
+  total: number;
+}
+
+// Calendar — holidays & events
+export type CalendarEventType = 'holiday' | 'event';
+
+export interface StaffCalendarEvent {
+  id: string;
+  institution_id?: string;
+  title: string;
+  description?: string | null;
+  type: CalendarEventType;
+  event_date: string; // YYYY-MM-DD
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreateStaffCalendarEventData {
+  title: string;
+  description?: string | null;
+  type: CalendarEventType;
+  event_date: string;
 }
 
 export interface StudentInstallment {
@@ -1502,6 +1632,7 @@ export interface BiometricDevice {
   firmware_version: string | null;
   status: 'online' | 'offline' | 'unknown';
   is_paired: boolean;
+  connection: 'bridge' | 'adms' | 'pending';
   last_seen_at: string | null;
   pairing_code?: string;
   pairing_code_expires_at: string | null;

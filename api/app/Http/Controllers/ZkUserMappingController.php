@@ -18,6 +18,30 @@ class ZkUserMappingController extends Controller
             ->value('institution_id');
     }
 
+    /**
+     * Queue a roster re-read so the device reports its users back shortly. Because
+     * the device sends no command ack, this echo is how we confirm an enrollment
+     * actually "took" (see IClockController::upsertUserLine). Deduped on pending.
+     */
+    private function queueRosterRefresh(string $institutionId, string $deviceId): void
+    {
+        $pending = DeviceCommand::where('device_id', $deviceId)
+            ->where('command_type', 'query_users')
+            ->where('status', 'pending')
+            ->exists();
+
+        if (!$pending) {
+            DeviceCommand::create([
+                'institution_id' => $institutionId,
+                'device_id'      => $deviceId,
+                'cmd_id'         => DeviceCommand::generateCmdId(),
+                'command_type'   => 'query_users',
+                'payload'        => DeviceCommand::buildQueryUsersPayload(),
+                'status'         => 'pending',
+            ]);
+        }
+    }
+
     public function index(Request $request): JsonResponse
     {
         $institutionId = $this->institutionId($request);
@@ -126,6 +150,9 @@ class ZkUserMappingController extends Controller
             'push_queued_at' => now(),
         ]);
 
+        // Re-read the roster afterwards so the device confirms the user took.
+        $this->queueRosterRefresh($institutionId, $mapping->device_id);
+
         return response()->json([
             'success' => true,
             'message' => 'Enrollment queued — device will receive it on next ADMS poll (within 30s)',
@@ -226,6 +253,9 @@ class ZkUserMappingController extends Controller
             'payload'        => DeviceCommand::buildAddUserPayload($validated['zk_user_id'], $name),
             'status'         => 'pending',
         ]);
+
+        // Re-read the roster afterwards so the device confirms the user took.
+        $this->queueRosterRefresh($institutionId, $validated['device_id']);
 
         $mapping->load('user', 'device');
 

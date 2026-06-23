@@ -4,6 +4,7 @@ import { CpuChipIcon, PencilIcon, TrashIcon, PlusIcon, XMarkIcon, ArrowDownTrayI
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { studentRfidTagService } from '../../../services/studentRfidTagService'
+import { StudentIdCardPrint } from './StudentIdCardPrint'
 import { toast } from 'react-hot-toast'
 import type { Student, StudentRfidTag } from '../../../types'
 
@@ -105,9 +106,12 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* ID Card */}
+      {/* Print a designed ID card (from saved templates) */}
+      <StudentIdCardPrint student={student} />
+
+      {/* Quick ID Card (auto-generated QR) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-base font-semibold text-gray-900 mb-6">Student ID Card</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-6">Quick ID Card</h3>
 
         <div className="flex flex-col items-center gap-4">
           <div className="w-80 rounded-2xl overflow-hidden shadow-lg border border-indigo-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">

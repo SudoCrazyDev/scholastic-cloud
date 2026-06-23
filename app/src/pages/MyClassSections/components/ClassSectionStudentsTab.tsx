@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '../../../components/button';
 import { Badge } from '../../../components/badge';
 import { Select } from '../../../components/select';
-import { Search, User, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, User, Plus, Edit, Trash2, ArrowRightLeft } from 'lucide-react';
 import type { Student, Subject } from '../../../types';
 
 // Student Card Component with image error handling
@@ -12,10 +12,11 @@ const StudentCard: React.FC<{
   index: number;
   getFullName: (student: Student) => string;
   onEditStudent: (student: Student & { assignmentId: string }) => void;
+  onTransferStudent: (student: Student & { assignmentId: string }) => void;
   onRemoveStudent: (student: Student & { assignmentId: string }) => void;
   goToStudentDetail: (studentId: string) => void;
   removeStudentMutationPending: boolean;
-}> = ({ student, index, getFullName, onEditStudent, onRemoveStudent, goToStudentDetail, removeStudentMutationPending }) => {
+}> = ({ student, index, getFullName, onEditStudent, onTransferStudent, onRemoveStudent, goToStudentDetail, removeStudentMutationPending }) => {
   const [imageError, setImageError] = useState(false);
   const hasProfilePicture = student.profile_picture && student.profile_picture.trim() !== '';
 
@@ -94,6 +95,18 @@ const StudentCard: React.FC<{
           <Button
             onClick={(e) => {
               e.stopPropagation();
+              onTransferStudent(student);
+            }}
+            variant="ghost"
+            size="sm"
+            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 opacity-0 group-hover:opacity-100 transition-all"
+            title="Transfer student to another section"
+          >
+            <ArrowRightLeft className="w-4 h-4" />
+          </Button>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
               onRemoveStudent(student);
             }}
             variant="ghost"
@@ -121,6 +134,7 @@ interface ClassSectionStudentsTabProps {
   onCreateStudent: () => void;
   onAssignStudents: () => void;
   onEditStudent: (student: Student & { assignmentId: string }) => void;
+  onTransferStudent: (student: Student & { assignmentId: string }) => void;
   onRemoveStudent: (student: Student & { assignmentId: string }) => void;
   studentsLoading: boolean;
   studentsError: any;
@@ -141,6 +155,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   onCreateStudent,
   onAssignStudents,
   onEditStudent,
+  onTransferStudent,
   onRemoveStudent,
   studentsLoading,
   studentsError,
@@ -294,6 +309,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
                     index={index}
                     getFullName={getFullName}
                     onEditStudent={onEditStudent}
+                    onTransferStudent={onTransferStudent}
                     onRemoveStudent={onRemoveStudent}
                     goToStudentDetail={goToStudentDetail}
                     removeStudentMutationPending={removeStudentMutationPending}

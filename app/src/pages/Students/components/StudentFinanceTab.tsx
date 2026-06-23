@@ -15,6 +15,7 @@ import { Select } from '../../../components/select'
 import { useAuth } from '../../../hooks/useAuth'
 import { schoolFeeService } from '../../../services/schoolFeeService'
 import { studentFinanceService } from '../../../services/studentFinanceService'
+import { paymentPlanService } from '../../../services/paymentPlanService'
 import { studentDiscountService } from '../../../services/studentDiscountService'
 import { studentPaymentService } from '../../../services/studentPaymentService'
 import { studentOnlinePaymentService } from '../../../services/studentOnlinePaymentService'
@@ -23,9 +24,9 @@ import type {
   CreateStudentDiscountData,
   CreateStudentPaymentData,
   CreateStudentOnlinePaymentCheckoutData,
+  PaymentPlan,
   Student,
   StudentPayment,
-  StudentPaymentPlanType,
 } from '../../../types'
 
 interface StudentFinanceTabProps {
@@ -71,6 +72,13 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     enabled: Boolean(roleSlug && !isStudentUser),
   })
 
+  const activePlansQuery = useQuery({
+    queryKey: ['active-payment-plans'],
+    queryFn: () => paymentPlanService.getPlans({ is_active: true }),
+    enabled: Boolean(studentId),
+  })
+  const activePlans = activePlansQuery.data?.data || []
+
   const ledgerQuery = useQuery({
     queryKey: ['student-ledger', studentId, selectedAcademicYear || 'auto'],
     queryFn: () => studentFinanceService.getLedger(studentId, selectedAcademicYear || undefined),
@@ -95,6 +103,17 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       }),
     enabled: Boolean(studentId && resolvedAcademicYear && isStudentUser),
   })
+
+  const planHistoryQuery = useQuery({
+    queryKey: ['payment-plan-changes', studentId, resolvedAcademicYear],
+    queryFn: () =>
+      paymentPlanService.getChangeHistory({
+        student_id: studentId,
+        academic_year: resolvedAcademicYear,
+      }),
+    enabled: Boolean(studentId && resolvedAcademicYear && !isStudentUser),
+  })
+  const planHistory = planHistoryQuery.data?.data || []
 
   useEffect(() => {
     if (!selectedAcademicYear && ledgerData?.academic_year) {
@@ -227,14 +246,15 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   })
 
   const setPaymentPlanMutation = useMutation({
-    mutationFn: (planType: StudentPaymentPlanType) =>
+    mutationFn: (paymentPlanId: string) =>
       studentFinanceService.setPaymentPlan(studentId, {
         academic_year: resolvedAcademicYear,
-        plan_type: planType,
+        payment_plan_id: paymentPlanId,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
       queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
+      queryClient.invalidateQueries({ queryKey: ['payment-plan-changes', studentId] })
       toast.success('Payment plan saved.')
     },
     onError: (error: any) => {
@@ -308,13 +328,8 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   }
 
   const buildInstallmentItemName = (installment: { label: string; due_date: string }) => {
-    if (paymentPlan?.plan_type === 'quarterly') {
-      return `${installment.label} Quarterly Payment`
-    }
-    const monthAbbr = new Date(installment.due_date).toLocaleDateString('en-PH', {
-      month: 'short',
-    })
-    return `${monthAbbr} Monthly Payment`
+    const planName = paymentPlan?.name ? `${paymentPlan.name} ` : ''
+    return `${planName}${installment.label} Payment`.trim()
   }
 
   const handlePayInstallment = (installment: {
@@ -421,8 +436,8 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const installments = ledgerData?.installments ?? []
   const needsPlanSelection = isStudentUser && !paymentPlan && !ledgerQuery.isLoading
 
-  const handlePlanSubmit = (planType: StudentPaymentPlanType) => {
-    setPaymentPlanMutation.mutate(planType, {
+  const handlePlanSubmit = (paymentPlanId: string) => {
+    setPaymentPlanMutation.mutate(paymentPlanId, {
       onSuccess: () => setShowPlanOverride(false),
     })
   }
@@ -449,7 +464,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           </p>
         </div>
         <PaymentPlanPicker
+          plans={activePlans}
           loading={setPaymentPlanMutation.isPending}
+          plansLoading={activePlansQuery.isLoading}
           onSelect={handlePlanSubmit}
         />
       </div>
@@ -466,7 +483,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
             <div className="mt-2 flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
                 <CalendarDaysIcon className="w-3.5 h-3.5" />
-                {paymentPlan.plan_type === 'quarterly' ? 'Quarterly' : 'Monthly'} plan
+                {paymentPlan.name || 'Payment'} plan
                 <span className="text-indigo-500">·</span>
                 {paymentPlan.installment_count} installments
               </span>
@@ -504,10 +521,70 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               : 'The student has not yet picked a plan. You may set one on their behalf.'}
           </p>
           <PaymentPlanPicker
+            plans={activePlans}
             loading={setPaymentPlanMutation.isPending}
-            currentPlan={paymentPlan?.plan_type}
+            plansLoading={activePlansQuery.isLoading}
+            currentPlanId={paymentPlan?.payment_plan_id ?? undefined}
             onSelect={handlePlanSubmit}
           />
+        </div>
+      )}
+
+      {!isStudentUser && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+            <CalendarDaysIcon className="w-5 h-5 text-indigo-600" />
+            Payment Plan History
+          </h4>
+          <p className="text-sm text-gray-500 mb-4">
+            Every plan selection and change for {resolvedAcademicYear}.
+          </p>
+          {planHistoryQuery.isLoading ? (
+            <p className="text-gray-500">Loading history...</p>
+          ) : !planHistory.length ? (
+            <p className="text-sm text-gray-500">No payment plan changes recorded yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed From</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {planHistory.map((change) => (
+                    <tr key={change.id}>
+                      <td className="px-4 py-2 text-sm text-gray-600">
+                        {change.changed_at
+                          ? new Date(change.changed_at).toLocaleString('en-PH', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                        {change.plan_name || '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-600">
+                        {change.previous_plan_name || '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-600">
+                        {change.changed_by_name || (change.changed_by_student ? 'Student' : '—')}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-600">{change.note || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -869,14 +946,13 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               Installment Schedule
             </h4>
             <span className="text-xs text-gray-500">
-              {paymentPlan.plan_type === 'quarterly' ? 'Quarterly' : 'Monthly'} ·{' '}
+              {paymentPlan.name || 'Payment'} ·{' '}
               {paymentPlan.installment_count} installments
             </span>
           </div>
           <p className="text-sm text-gray-600 mb-4">
             Net charges (after discounts) divided across {paymentPlan.installment_count}{' '}
-            {paymentPlan.plan_type === 'quarterly' ? 'quarters' : 'months'} for academic year{' '}
-            {resolvedAcademicYear}.
+            installments for academic year {resolvedAcademicYear}.
           </p>
 
           {/* Mobile: stacked cards */}
@@ -1151,13 +1227,21 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 }
 
 interface PaymentPlanPickerProps {
+  plans: PaymentPlan[]
   loading: boolean
-  currentPlan?: StudentPaymentPlanType
-  onSelect: (plan: StudentPaymentPlanType) => void
+  plansLoading?: boolean
+  currentPlanId?: string
+  onSelect: (paymentPlanId: string) => void
 }
 
-const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({ loading, currentPlan, onSelect }) => {
-  const [choice, setChoice] = useState<StudentPaymentPlanType | null>(currentPlan ?? null)
+const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({
+  plans,
+  loading,
+  plansLoading,
+  currentPlanId,
+  onSelect,
+}) => {
+  const [choice, setChoice] = useState<string | null>(currentPlanId ?? null)
 
   const cardClass = (active: boolean) =>
     `flex-1 text-left cursor-pointer rounded-xl border p-5 transition shadow-sm ${
@@ -1166,50 +1250,53 @@ const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({ loading, currentP
         : 'border-gray-200 bg-white hover:border-indigo-300'
     }`
 
+  if (plansLoading) {
+    return <p className="text-sm text-gray-500">Loading available plans…</p>
+  }
+
+  if (!plans.length) {
+    return (
+      <p className="text-sm text-gray-600">
+        No payment plans are available yet. Please contact your school registrar.
+      </p>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-4">
-        <button
-          type="button"
-          className={cardClass(choice === 'monthly')}
-          onClick={() => setChoice('monthly')}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h5 className="text-base font-semibold text-gray-900">Monthly</h5>
-            <span className="text-xs font-medium text-indigo-600 bg-indigo-50 rounded-full px-2 py-0.5">
-              10 installments
-            </span>
-          </div>
-          <p className="text-sm text-gray-600">
-            Pay your net fees in 10 monthly installments from August to May.
-          </p>
-        </button>
-
-        <button
-          type="button"
-          className={cardClass(choice === 'quarterly')}
-          onClick={() => setChoice('quarterly')}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h5 className="text-base font-semibold text-gray-900">Quarterly</h5>
-            <span className="text-xs font-medium text-indigo-600 bg-indigo-50 rounded-full px-2 py-0.5">
-              4 installments
-            </span>
-          </div>
-          <p className="text-sm text-gray-600">
-            Pay your net fees in 4 quarterly installments aligned to grading periods.
-          </p>
-        </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {plans.map((plan) => (
+          <button
+            key={plan.id}
+            type="button"
+            className={cardClass(choice === plan.id)}
+            onClick={() => setChoice(plan.id)}
+          >
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <h5 className="text-base font-semibold text-gray-900">{plan.name}</h5>
+              <span className="text-xs font-medium text-indigo-600 bg-indigo-50 rounded-full px-2 py-0.5 whitespace-nowrap">
+                {plan.installment_count} installment{plan.installment_count === 1 ? '' : 's'}
+              </span>
+            </div>
+            <p className="text-sm text-gray-600">
+              {plan.description
+                ? plan.description
+                : `Pay your net fees in ${plan.installment_count} installment${
+                    plan.installment_count === 1 ? '' : 's'
+                  }.`}
+            </p>
+          </button>
+        ))}
       </div>
 
       <div className="flex justify-end">
         <Button
-          disabled={!choice || loading || choice === currentPlan}
+          disabled={!choice || loading || choice === currentPlanId}
           loading={loading}
           onClick={() => choice && onSelect(choice)}
           className="bg-indigo-600 hover:bg-indigo-700 text-white"
         >
-          {currentPlan ? 'Update plan' : 'Confirm plan'}
+          {currentPlanId ? 'Update plan' : 'Confirm plan'}
         </Button>
       </div>
     </div>

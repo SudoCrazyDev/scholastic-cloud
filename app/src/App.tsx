@@ -28,12 +28,15 @@ import SetNewPassword from './pages/SetNewPassword';
 import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
 import CertificateBuilderPage from './pages/CertificateBuilder/CertificateBuilderPage';
 import CertificateList from './pages/CertificateBuilder/CertificateList';
+import IdCardBuilder from './pages/IdCardBuilder/IdCardBuilder';
+import IdCardBuilderPage from './pages/IdCardBuilder/IdCardBuilderPage';
 import SchoolDays from './pages/SchoolDays';
 import Departments from './pages/Departments/Departments';
 import GradeLevels from './pages/GradeLevels/GradeLevels';
 import Settings from './pages/Settings/Settings';
 import TracksStrands from './pages/TracksStrands/TracksStrands';
 import Finance from './pages/Finance';
+import PaymentPlansView from './pages/Finance/PaymentPlansView';
 import Login from './pages/Login';
 import MyAssessments from './pages/MyAssessments';
 import { TakeAssessment } from './pages/MyAssessments';
@@ -50,6 +53,7 @@ import GateEntries from './pages/GateEntries/GateEntries';
 import HrisDevices from './pages/HRIS/Devices';
 import HrisZkUsers from './pages/HRIS/ZkUsers';
 import HrisAttendance from './pages/HRIS/Attendance';
+import HrisStaffSchedules from './pages/HRIS/StaffSchedules';
 
 
 function App() {
@@ -126,6 +130,8 @@ function App() {
               <Route path="certificate-builder/new" element={<CertificateBuilder />} />
               <Route path="certificate-builder" element={<CertificateBuilderPage />} />
               <Route path="certificates" element={<CertificateList />} />
+              <Route path="id-card-builder/new" element={<IdCardBuilder />} />
+              <Route path="id-card-builder" element={<IdCardBuilderPage />} />
               <Route path="form-builder" element={<FormBuilderPage />} />
               <Route path="school-days" element={<SchoolDays />} />
               <Route path="departments" element={<Departments />} />
@@ -133,6 +139,7 @@ function App() {
               <Route path="tracks-strands" element={<TracksStrands />} />
               <Route path="finance" element={<Finance />} />
               <Route path="finance/school-fees" element={<Finance />} />
+              <Route path="payment-plans" element={<PaymentPlansView />} />
               <Route path="finance/default-amounts" element={<Finance />} />
               <Route path="finance/cashiering" element={<Finance />} />
               <Route path="finance/ledger" element={<Finance />} />
@@ -144,6 +151,7 @@ function App() {
               <Route path="hris/devices" element={<HrisDevices />} />
               <Route path="hris/zk-users" element={<HrisZkUsers />} />
               <Route path="hris/attendance" element={<HrisAttendance />} />
+              <Route path="hris/staff-schedules" element={<HrisStaffSchedules />} />
 
             </Route>
 

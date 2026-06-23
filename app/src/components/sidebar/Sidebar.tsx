@@ -34,6 +34,7 @@ import {
   Fingerprint,
   Monitor,
   Clock,
+  CalendarClock,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -165,18 +166,6 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    label: 'People',
-    items: [
-      {
-        id: 'staffs',
-        label: 'Staffs',
-        icon: <UserCheck className="w-5 h-5" />,
-        path: '/staffs',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
-      },
-    ],
-  },
-  {
     label: 'Students',
     items: [
       {
@@ -212,6 +201,13 @@ const menuGroups: MenuGroup[] = [
         path: '/finance',
         allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
       },
+      {
+        id: 'payment-plans',
+        label: 'Payment Plans',
+        icon: <CalendarDays className="w-5 h-5" />,
+        path: '/payment-plans',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+      },
     ],
   },
   {
@@ -237,6 +233,20 @@ const menuGroups: MenuGroup[] = [
         icon: <Clock className="w-5 h-5" />,
         path: '/hris/attendance',
         allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'hris-staff-schedules',
+        label: 'Staff Schedules',
+        icon: <CalendarClock className="w-5 h-5" />,
+        path: '/hris/staff-schedules',
+        allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'staffs',
+        label: 'Staffs',
+        icon: <UserCheck className="w-5 h-5" />,
+        path: '/staffs',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
       },
     ],
   },
@@ -309,6 +319,13 @@ const menuGroups: MenuGroup[] = [
         label: 'Form Builder',
         icon: <LayoutTemplate className="w-5 h-5" />,
         path: '/form-builder',
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+      },
+      {
+        id: 'id-card-builder',
+        label: 'Student ID Builder',
+        icon: <CreditCard className="w-5 h-5" />,
+        path: '/id-card-builder',
         allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
       },
     ],

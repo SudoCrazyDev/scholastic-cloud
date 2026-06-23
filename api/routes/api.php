@@ -1,53 +1,54 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\RoleController;
-use App\Http\Controllers\SubscriptionController;
-use App\Http\Controllers\InstitutionController;
+use App\Http\Controllers\AdmissionFormSubmissionController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\StaffController;
-use App\Http\Controllers\ClassSectionController;
-use App\Http\Controllers\TimetableController;
-use App\Http\Controllers\SubjectController;
-use App\Http\Controllers\SubjectTemplateController;
-use App\Http\Controllers\StudentController;
-use App\Http\Controllers\StudentSectionController;
-use App\Http\Controllers\StudentEcrItemScoreController;
-use App\Http\Controllers\SectionConsolidatedGradesController;
-use App\Http\Controllers\UserAddressController;
-use App\Http\Controllers\UserWorkExperienceController;
-use App\Http\Controllers\CoreValueMarkingController;
-use App\Http\Controllers\SF9Controller;
+use App\Http\Controllers\BiometricDeviceController;
+use App\Http\Controllers\BridgeController;
 use App\Http\Controllers\CertificateController;
-use App\Http\Controllers\StudentAttendanceController;
+use App\Http\Controllers\ClassSectionController;
+use App\Http\Controllers\CoreValueMarkingController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\FinanceDashboardController;
+use App\Http\Controllers\GradeLevelController;
+use App\Http\Controllers\GradeLevelDiscountController;
+use App\Http\Controllers\IdCardTemplateController;
+use App\Http\Controllers\InstitutionController;
+use App\Http\Controllers\InternalPaymentCallbackController;
+use App\Http\Controllers\PaymentPlanController;
+use App\Http\Controllers\PaymentTransactionController;
+use App\Http\Controllers\PaymentVoidRequestController;
+use App\Http\Controllers\ReceiptTemplateController;
+use App\Http\Controllers\RfidScanLogController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SchoolDayController;
 use App\Http\Controllers\SchoolFeeController;
 use App\Http\Controllers\SchoolFeeDefaultController;
-use App\Http\Controllers\FinanceDashboardController;
-use App\Http\Controllers\StudentDiscountController;
-use App\Http\Controllers\StudentPaymentController;
-use App\Http\Controllers\PaymentTransactionController;
-use App\Http\Controllers\PaymentVoidRequestController;
-use App\Http\Controllers\StudentFinanceController;
-use App\Http\Controllers\StudentPaymentPlanController;
-use App\Http\Controllers\StudentOnlinePaymentController;
-use App\Http\Controllers\InternalPaymentCallbackController;
-use App\Http\Controllers\GradeLevelDiscountController;
-use App\Http\Controllers\StudentAdditionalFeeController;
-use App\Http\Controllers\ReceiptTemplateController;
-use App\Http\Controllers\StudentRfidTagController;
-use App\Http\Controllers\RfidScanLogController;
-use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\GradeLevelController;
-use App\Http\Controllers\TrackController;
+use App\Http\Controllers\SectionConsolidatedGradesController;
+use App\Http\Controllers\SF9Controller;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StrandController;
+use App\Http\Controllers\StudentAdditionalFeeController;
+use App\Http\Controllers\StudentAttendanceController;
+use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentDocumentController;
-use App\Http\Controllers\AdmissionFormSubmissionController;
-use App\Http\Controllers\BridgeController;
-use App\Http\Controllers\BiometricDeviceController;
+use App\Http\Controllers\StudentEcrItemScoreController;
+use App\Http\Controllers\StudentFinanceController;
+use App\Http\Controllers\StudentOnlinePaymentController;
+use App\Http\Controllers\StudentPaymentController;
+use App\Http\Controllers\StudentPaymentPlanChangeController;
+use App\Http\Controllers\StudentPaymentPlanController;
+use App\Http\Controllers\StudentRfidTagController;
+use App\Http\Controllers\StudentSectionController;
+use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\SubjectTemplateController;
+use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\TimetableController;
+use App\Http\Controllers\TrackController;
+use App\Http\Controllers\UserAddressController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\ZkUserMappingController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -91,7 +92,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile/password', [AuthController::class, 'updatePassword']);
     Route::post('/assume-user', [AuthController::class, 'assumeUser']);
-    
+
     // Desktop app specific endpoints - for offline data synchronization
     Route::prefix('desktop')->group(function () {
         Route::get('/institution', [\App\Http\Controllers\DesktopController::class, 'getInstitution']);
@@ -101,7 +102,7 @@ Route::middleware('auth.token')->group(function () {
         Route::get('/ecr-data', [\App\Http\Controllers\DesktopController::class, 'getEcrData']);
         Route::get('/running-grades', [\App\Http\Controllers\DesktopController::class, 'getStudentRunningGrades']);
         Route::get('/sync', [\App\Http\Controllers\DesktopController::class, 'sync']);
-        
+
         // Manual sync endpoints for running grades
         Route::get('/running-grades/download', [\App\Http\Controllers\DesktopController::class, 'downloadRunningGrades']);
         Route::post('/running-grades/upload', [\App\Http\Controllers\DesktopController::class, 'uploadRunningGrades']);
@@ -172,6 +173,8 @@ Route::middleware('auth.token')->group(function () {
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
     Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show']);
     Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store']);
+    Route::get('payment-plan-changes', [StudentPaymentPlanChangeController::class, 'index']);
+    Route::apiResource('payment-plans', PaymentPlanController::class);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
     Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
     Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord']);
@@ -197,6 +200,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
     Route::get('class-sections/academic-years', [ClassSectionController::class, 'getAcademicYears']);
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);
+    Route::post('class-sections/{id}/transfer-student', [ClassSectionController::class, 'transferStudent']);
     Route::apiResource('class-sections', ClassSectionController::class);
 
     // Timetable routes
@@ -323,7 +327,7 @@ Route::middleware('auth.token')->group(function () {
 
     // Finance collections (monthly/quarterly breakdown)
     Route::get('finance/collections', [FinanceDashboardController::class, 'collections']);
-    
+
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
     Route::get('proficiency', [\App\Http\Controllers\ProficiencyController::class, 'index']);
@@ -344,8 +348,22 @@ Route::middleware('auth.token')->group(function () {
     // Certificate routes
     Route::apiResource('certificates', CertificateController::class);
 
+    // Student ID card template routes
+    Route::post('id-card-templates/assets', [IdCardTemplateController::class, 'uploadAsset']);
+    Route::apiResource('id-card-templates', IdCardTemplateController::class);
+
     // HRIS — Attendance logs
     Route::get('attendance/logs', [\App\Http\Controllers\AttendanceLogController::class, 'index']);
+
+    // HRIS — Staff schedules (templates + assignments)
+    Route::get('staff-schedule-assignments', [\App\Http\Controllers\StaffScheduleController::class, 'assignments']);
+    Route::delete('staff-schedule-assignments/{assignmentId}', [\App\Http\Controllers\StaffScheduleController::class, 'unassign']);
+    Route::post('staff-schedules/{id}/assign', [\App\Http\Controllers\StaffScheduleController::class, 'assign']);
+    Route::apiResource('staff-schedules', \App\Http\Controllers\StaffScheduleController::class);
+
+    // HRIS — Staff calendar (holidays & events)
+    Route::apiResource('staff-calendar-events', \App\Http\Controllers\StaffCalendarEventController::class)
+        ->only(['index', 'store', 'update', 'destroy']);
 
     // HRIS — Biometric devices
     Route::get('biometric/devices', [BiometricDeviceController::class, 'index']);
@@ -353,6 +371,8 @@ Route::middleware('auth.token')->group(function () {
     Route::get('biometric/devices/{id}', [BiometricDeviceController::class, 'show']);
     Route::delete('biometric/devices/{id}', [BiometricDeviceController::class, 'destroy']);
     Route::post('biometric/devices/{id}/refresh-pairing-code', [BiometricDeviceController::class, 'refreshPairingCode']);
+    Route::post('biometric/devices/{id}/fetch-users', [BiometricDeviceController::class, 'fetchUsers']);
+    Route::post('biometric/devices/{id}/fetch-attendance', [BiometricDeviceController::class, 'fetchAttendance']);
 
     // HRIS — ZK user mappings
     Route::get('biometric/zk-users', [ZkUserMappingController::class, 'index']);
@@ -374,6 +394,6 @@ Route::get('/health', function () {
     return response()->json([
         'status' => 'healthy',
         'timestamp' => now(),
-        'version' => config('app.version', '1.0.0')
+        'version' => config('app.version', '1.0.0'),
     ]);
 });

@@ -1,0 +1,233 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Eye, EyeOff, Lock, Unlock, Trash2, Copy, Layers, ChevronUp, ChevronDown } from 'lucide-react';
+import { type CanvasElement } from './IdCardCanvas';
+import Button from '@/components/ui/Button';
+
+interface LayersPanelProps {
+	elements: CanvasElement[];
+	selectedIds: string[];
+	onSelect: (ids: string[]) => void;
+	onToggleHide: (id: string) => void;
+	onToggleLock: (id: string) => void;
+	onReorder: (id: string, direction: 'up' | 'down') => void;
+	onDelete: (id: string) => void;
+	onDuplicate: (element: CanvasElement) => void;
+}
+
+const IdLayersPanel: React.FC<LayersPanelProps> = ({
+	elements,
+	selectedIds,
+	onSelect,
+	onToggleHide,
+	onToggleLock,
+	onReorder,
+	onDelete,
+	onDuplicate,
+}) => {
+	const getElementIcon = (element: CanvasElement) => {
+		switch (element.type) {
+			case 'text': return 'T';
+			case 'paragraph': return '¶';
+			case 'photo': return '👤';
+			case 'image': return '🖼️';
+			case 'qr': return 'QR';
+			case 'rectangle': case 'square': return '⬜';
+			case 'circle': case 'ellipse': return '⭕';
+			default: return '📄';
+		}
+	};
+
+	const getElementColor = (element: CanvasElement) => {
+		switch (element.type) {
+			case 'text': case 'paragraph': return 'text-blue-600';
+			case 'photo': return 'text-emerald-600';
+			case 'image': return 'text-green-600';
+			case 'qr': return 'text-teal-600';
+			case 'rectangle': case 'square': return 'text-purple-600';
+			case 'circle': case 'ellipse': return 'text-orange-600';
+			default: return 'text-gray-600';
+		}
+	};
+
+	const handleElementClick = (id: string, multiSelect: boolean) => {
+		if (multiSelect) {
+			if (selectedIds.includes(id)) {
+				onSelect(selectedIds.filter((selectedId) => selectedId !== id));
+			} else {
+				onSelect([...selectedIds, id]);
+			}
+		} else {
+			onSelect([id]);
+		}
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			handleElementClick(id, e.shiftKey);
+		}
+	};
+
+	return (
+		<motion.div
+			initial={{ opacity: 0, y: 20 }}
+			animate={{ opacity: 1, y: 0 }}
+			className="p-4 flex flex-col min-h-0 h-full"
+		>
+			<div className="flex-shrink-0 mb-4">
+				<h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+					<Layers className="w-5 h-5" />
+					Layers
+				</h3>
+				<p className="text-sm text-gray-600">
+					{elements.length} element{elements.length !== 1 ? 's' : ''}
+				</p>
+			</div>
+
+			{elements.length === 0 ? (
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					className="text-center py-8 text-gray-500 flex-shrink-0"
+				>
+					<Layers className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+					<p className="text-sm">No elements yet</p>
+					<p className="text-xs text-gray-400">Add elements from the left panel</p>
+				</motion.div>
+			) : (
+				<div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
+					{elements.map((element, index) => {
+						const isSelected = selectedIds.includes(element.id);
+						const isFirst = index === 0;
+						const isLast = index === elements.length - 1;
+
+						return (
+							<motion.div
+								key={element.id}
+								layout
+								initial={{ opacity: 0, scale: 0.8 }}
+								animate={{ opacity: 1, scale: 1 }}
+								exit={{ opacity: 0, scale: 0.8 }}
+								className={`
+									group relative p-3 rounded-lg border cursor-pointer transition-all duration-200
+									${isSelected ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}
+									${element.hidden ? 'opacity-50' : ''}
+								`}
+								onClick={() => handleElementClick(element.id, false)}
+								onKeyDown={(e) => handleKeyDown(e, element.id)}
+								tabIndex={0}
+								role="button"
+								aria-label={`Layer ${index + 1}: ${element.type}`}
+							>
+								{isSelected && (
+									<motion.div
+										initial={{ scale: 0 }}
+										animate={{ scale: 1 }}
+										className="absolute -left-1 top-1/2 w-1 h-8 bg-blue-500 rounded-r transform -translate-y-1/2"
+									/>
+								)}
+
+								<div className="flex items-center gap-3">
+									<div
+										className={`flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-sm font-medium ${getElementColor(element)}`}
+									>
+										{getElementIcon(element)}
+									</div>
+
+									<div className="flex-1 min-w-0">
+										<div className="flex items-center gap-2">
+											<span className="text-sm font-medium text-gray-900 truncate capitalize">{element.type}</span>
+											{element.hidden && <EyeOff className="w-3 h-3 text-gray-400" />}
+											{element.locked && <Lock className="w-3 h-3 text-gray-400" />}
+										</div>
+										<p className="text-xs text-gray-500 truncate">
+											{(element.type === 'text' || element.type === 'paragraph') && element.content
+												? element.content
+												: `${Math.round(element.width)} × ${Math.round(element.height)}`}
+										</p>
+									</div>
+
+									<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+										<Button
+											onClick={(e) => { e.stopPropagation(); onToggleHide(element.id); }}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-6 w-6 !min-w-0"
+											title={element.hidden ? 'Show' : 'Hide'}
+											icon={element.hidden ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+										/>
+										<Button
+											onClick={(e) => { e.stopPropagation(); onToggleLock(element.id); }}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-6 w-6 !min-w-0"
+											title={element.locked ? 'Unlock' : 'Lock'}
+											icon={element.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+										/>
+										<Button
+											onClick={(e) => { e.stopPropagation(); onDuplicate(element); }}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-6 w-6 !min-w-0"
+											title="Duplicate"
+											icon={<Copy className="w-3 h-3" />}
+										/>
+										<Button
+											onClick={(e) => { e.stopPropagation(); onDelete(element.id); }}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-6 w-6 !min-w-0 text-red-600 hover:text-red-700 hover:!bg-transparent"
+											title="Delete"
+											icon={<Trash2 className="w-3 h-3" />}
+										/>
+									</div>
+								</div>
+
+								<div className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+									<div className="flex flex-col gap-1">
+										<Button
+											onClick={(e) => { e.stopPropagation(); onReorder(element.id, 'up'); }}
+											disabled={isFirst}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-5 w-5"
+											icon={<ChevronUp className="w-3 h-3" />}
+										/>
+										<Button
+											onClick={(e) => { e.stopPropagation(); onReorder(element.id, 'down'); }}
+											disabled={isLast}
+											variant="ghost"
+											size="sm"
+											className="p-1 h-5 w-5"
+											icon={<ChevronDown className="w-3 h-3" />}
+										/>
+									</div>
+								</div>
+							</motion.div>
+						);
+					})}
+				</div>
+			)}
+
+			{elements.length > 0 && (
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					className="flex-shrink-0 mt-4 pt-4 border-t border-gray-200"
+				>
+					<div className="flex gap-2">
+						<Button onClick={() => onSelect([])} variant="ghost" size="sm" className="flex-1">
+							Deselect All
+						</Button>
+						<Button onClick={() => onSelect(elements.map((el) => el.id))} variant="ghost" size="sm" className="flex-1">
+							Select All
+						</Button>
+					</div>
+				</motion.div>
+			)}
+		</motion.div>
+	);
+};
+
+export default IdLayersPanel;

@@ -107,19 +107,25 @@ class IClockController extends Controller
 
         $count = 0;
 
+        $body = $request->getContent();
+
         if ($table === 'ATTLOG') {
-            $count = $this->processAttLog($device, $request->getContent());
+            $count = $this->processAttLog($device, $body);
         } elseif ($table === 'OPERLOG') {
-            $count = $this->processOperLog($device, $request->getContent());
+            $count = $this->processOperLog($device, $body);
+        } elseif ($table === 'USERINFO') {
+            // Response to a "DATA QUERY USERINFO" command — the full enrolled roster.
+            $count = $this->processUserData($device, $body);
         } elseif (empty($table)) {
             // Some devices send multiple tables in one POST
-            $body = $request->getContent();
             if (str_contains($body, 'ATTLOG')) {
                 $count += $this->processAttLog($device, $body);
             }
             if (str_contains($body, 'OPERLOG')) {
                 $count += $this->processOperLog($device, $body);
             }
+            // User records may arrive without an explicit table param
+            $count += $this->processUserData($device, $body);
         }
 
         return $this->txt("OK: {$count}\n");
@@ -146,8 +152,17 @@ class IClockController extends Controller
             return $this->txt("OK\n");
         }
 
-        $command->update(['status' => 'sent', 'sent_at' => now()]);
-        Log::info("[ADMS] serving command id={$command->id} cmd_id={$command->cmd_id}");
+        // QUERY commands (query_users / query_attlog) return their result as a
+        // separate cdata upload and never send a devicecmd ack — so mark them done
+        // on delivery instead of leaving them stuck at "sent" forever. Mutating
+        // commands (add_user, etc.) do get an ack via deviceCmd(), so stay "sent".
+        $isQuery = str_starts_with($command->command_type, 'query_');
+        $command->update([
+            'status'       => $isQuery ? 'done' : 'sent',
+            'sent_at'      => now(),
+            'completed_at' => $isQuery ? now() : $command->completed_at,
+        ]);
+        Log::info("[ADMS] serving command id={$command->id} cmd_id={$command->cmd_id} type={$command->command_type}");
 
         return $this->txt("C:{$command->cmd_id}:{$command->payload}\n");
     }
@@ -236,43 +251,79 @@ class IClockController extends Controller
 
     private function processOperLog(BiometricDevice $device, string $body): int
     {
-        // OPERLOG contains device-side operations: user enroll, FP enroll, etc.
-        // Log for now; parse in V2 for real-time sync
+        // OPERLOG carries device-side operations AND, on most firmwares, user
+        // records (lines prefixed "USER " / "USERINFO "). Parse the user rows.
         Log::info("[ADMS] OPERLOG SN={$device->serial_number} body=" . substr($body, 0, 500));
 
-        // If the OPERLOG contains user info (some devices send USERINFO here)
+        return $this->processUserData($device, $body);
+    }
+
+    /**
+     * Parse enrolled-user records out of an ADMS upload body.
+     *
+     * Firmware sends one user per line, tab-separated key=value pairs, prefixed
+     * with either "USER " or "USERINFO ", e.g.:
+     *   USER PIN=1\tName=John Doe\tPri=0\tPasswd=\tCard=123\tGrp=1
+     *   USERINFO PIN=1\tName=John\tPrivilege=14\t...
+     */
+    private function processUserData(BiometricDevice $device, string $body): int
+    {
         $count = 0;
         foreach (explode("\n", trim($body)) as $line) {
             $line = trim($line);
-            if (str_starts_with($line, 'USERINFO')) {
-                $this->processUserInfoLine($device, $line);
+            if (!preg_match('/^USER(INFO)?\s+/i', $line)) continue;
+            if ($this->upsertUserLine($device, $line)) {
                 $count++;
             }
+        }
+        if ($count) {
+            Log::info("[ADMS] processUserData: upserted {$count} users SN={$device->serial_number}");
         }
         return $count;
     }
 
-    private function processUserInfoLine(BiometricDevice $device, string $line): void
+    private function upsertUserLine(BiometricDevice $device, string $line): bool
     {
-        // Format: USERINFO PIN=1\tName=Admin\tPassword=\tPrivilege=14\t...
+        // Strip the "USER " / "USERINFO " prefix, then collect key=value pairs.
+        $line = preg_replace('/^USER(INFO)?\s+/i', '', $line);
+
         $data = [];
         preg_match_all('/(\w+)=([^\t\n]*)/', $line, $matches, PREG_SET_ORDER);
         foreach ($matches as $m) {
-            $data[$m[1]] = $m[2];
+            $data[strtolower($m[1])] = trim($m[2]);
         }
-        $pin  = $data['PIN'] ?? null;
-        $name = $data['Name'] ?? null;
-        if (!$pin) return;
+
+        $pin = $data['pin'] ?? null;
+        if (empty($pin)) return false;
+
+        $name    = $data['name'] ?? null;
+        $cardNo  = $data['card'] ?? $data['cardno'] ?? null;
+        $privCode = $data['pri'] ?? $data['privilege'] ?? null;
+
+        $attributes = [
+            'institution_id' => $device->institution_id,
+            'last_synced_at' => now(),
+        ];
+        // Only overwrite name/card/privilege when the device actually sent them,
+        // so a sparse re-sync doesn't wipe existing values.
+        if ($name !== null && $name !== '')   $attributes['zk_name'] = $name;
+        if ($cardNo !== null && $cardNo !== '' && $cardNo !== '0') $attributes['zk_card_no'] = $cardNo;
+        if ($privCode !== null && $privCode !== '') $attributes['zk_privilege'] = $privCode;
+
+        // Confirm a pending enrollment: this device sends no command ack, so the
+        // proof that a pushed user "took" is the device reporting it back here.
+        $existing = ZkUserMapping::where('device_id', $device->id)->where('zk_user_id', $pin)->first();
+        if ($existing && $existing->push_status === 'pending' && $existing->push_action === 'enroll_user') {
+            $attributes['push_status'] = 'done';
+            $attributes['push_error']  = null;
+        }
 
         ZkUserMapping::updateOrCreate(
             ['device_id' => $device->id, 'zk_user_id' => $pin],
-            [
-                'institution_id' => $device->institution_id,
-                'zk_name'        => $name,
-                'last_synced_at' => now(),
-            ]
+            $attributes
         );
         Log::info("[ADMS] upserted user PIN={$pin} name={$name}");
+        return true;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

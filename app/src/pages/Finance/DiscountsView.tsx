@@ -118,36 +118,6 @@ const DiscountsView: React.FC<DiscountsViewProps> = ({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3">
-        <div className="min-w-[140px]">
-          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-            Grade level
-          </label>
-          <Select
-            value={filters.grade_level}
-            onChange={(e) => setFilters((prev) => ({ ...prev, grade_level: e.target.value }))}
-            options={filterGradeOptions}
-            className="w-full"
-          />
-        </div>
-        <div className="min-w-[140px]">
-          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-            Academic year
-          </label>
-          <Select
-            value={filters.academic_year}
-            onChange={(e) => setFilters((prev) => ({ ...prev, academic_year: e.target.value }))}
-            options={academicYearOptions}
-            className="w-full"
-          />
-        </div>
-        <p className="text-sm text-gray-500 ml-auto self-center">
-          {discountsQuery.isLoading
-            ? 'Loading...'
-            : `${discounts.length} discount${discounts.length === 1 ? '' : 's'}`}
-        </p>
-      </div>
-
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="text-base font-semibold text-gray-900 mb-4">Add Grade-Level Discount</h3>
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -235,7 +205,37 @@ const DiscountsView: React.FC<DiscountsViewProps> = ({
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
-          <h3 className="text-base font-semibold text-gray-900">Existing Grade-Level Discounts</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-gray-900">Existing Grade-Level Discounts</h3>
+            <p className="text-sm text-gray-500">
+              {discountsQuery.isLoading
+                ? 'Loading...'
+                : `${discounts.length} discount${discounts.length === 1 ? '' : 's'}`}
+            </p>
+          </div>
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+              Filters
+            </label>
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="min-w-[140px]">
+                <Select
+                  value={filters.grade_level}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, grade_level: e.target.value }))}
+                  options={filterGradeOptions}
+                  className="w-full"
+                />
+              </div>
+              <div className="min-w-[140px]">
+                <Select
+                  value={filters.academic_year}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, academic_year: e.target.value }))}
+                  options={academicYearOptions}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
         </div>
         {discountsQuery.isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading...</div>

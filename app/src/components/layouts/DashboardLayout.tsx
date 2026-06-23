@@ -9,10 +9,13 @@ const DashboardLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  // Hide main sidebar only when editing or creating a certificate (not on the list)
+  // Hide main sidebar and use the full-width canvas only when editing/creating in a
+  // visual builder (certificate or student ID) — not on their list pages.
   const isCertificateBuilder =
     location.pathname === '/certificate-builder/new' ||
-    (location.pathname === '/certificate-builder' && searchParams.has('id'));
+    (location.pathname === '/certificate-builder' && searchParams.has('id')) ||
+    location.pathname === '/id-card-builder/new' ||
+    (location.pathname === '/id-card-builder' && searchParams.has('id'));
   const { isImpersonating, user, stopImpersonating } = useAuth();
 
   // Close mobile sidebar when screen size changes to desktop
