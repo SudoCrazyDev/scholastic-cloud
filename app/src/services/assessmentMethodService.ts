@@ -10,6 +10,8 @@ export type AssessmentQuestionType =
   | 'true_false'
   | 'short_answer'
   | 'essay'
+  | 'image_upload'
+  | 'video_upload'
 
 export interface AssessmentMethodRules {
   maxAttempts: number
@@ -57,7 +59,11 @@ const QUESTION_TYPE_SET = new Set<AssessmentQuestionType>([
   'true_false',
   'short_answer',
   'essay',
+  'image_upload',
+  'video_upload',
 ])
+
+const UPLOAD_QUESTION_TYPES = new Set<AssessmentQuestionType>(['image_upload', 'video_upload'])
 
 const DEFAULT_RULES_BY_TYPE: Record<AssessmentMethodType, AssessmentMethodRules> = {
   quiz: {
@@ -119,7 +125,12 @@ const mapQuestionFromItem = (question: RawAssessmentQuestion): AssessmentMethodQ
     type,
     prompt: question.question ?? '',
     points: typeof question.points === 'number' ? question.points : 1,
-    choices: type === 'true_false' ? ['True', 'False'] : (question.choices ?? defaultChoiceList()),
+    choices:
+      type === 'true_false'
+        ? ['True', 'False']
+        : UPLOAD_QUESTION_TYPES.has(type)
+          ? []
+          : (question.choices ?? defaultChoiceList()),
     correctAnswers: [],
     blanks: [],
     sampleAnswer: '',
@@ -134,6 +145,8 @@ const mapQuestionFromItem = (question: RawAssessmentQuestion): AssessmentMethodQ
     baseQuestion.correctAnswers = [trueFalseAnswer]
   } else if (type === 'fill_in_the_blanks') {
     baseQuestion.blanks = Array.isArray(question.blanks) && question.blanks.length > 0 ? question.blanks : ['']
+  } else if (UPLOAD_QUESTION_TYPES.has(type)) {
+    baseQuestion.sampleAnswer = ''
   } else {
     baseQuestion.sampleAnswer = Array.isArray(question.answer)
       ? String(question.answer[0] ?? '')
@@ -224,6 +237,13 @@ const normalizeQuestionForPayload = (question: AssessmentMethodQuestion) => {
     return {
       ...base,
       blanks: question.blanks.map((blank) => blank.trim()).filter(Boolean),
+    }
+  }
+
+  if (UPLOAD_QUESTION_TYPES.has(question.type)) {
+    return {
+      ...base,
+      instructions: question.sampleAnswer.trim(),
     }
   }
 

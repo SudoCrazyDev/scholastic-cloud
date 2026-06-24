@@ -21,12 +21,21 @@ export interface SubjectEcrItem {
       randomize_questions?: boolean;
     };
     questions?: Array<{
-      type: 'true_false' | 'single_choice' | 'multiple_choice' | 'fill_in_the_blanks' | 'short_answer' | 'essay';
+      type:
+        | 'true_false'
+        | 'single_choice'
+        | 'multiple_choice'
+        | 'fill_in_the_blanks'
+        | 'short_answer'
+        | 'essay'
+        | 'image_upload'
+        | 'video_upload';
       question: string;
       choices?: string[];
       allow_multiple?: boolean;
       answer?: string | string[]; // string for single/true_false, string[] or "A,B" for multiple_choice
       blanks?: string[]; // correct answers in order for fill_in_the_blanks
+      instructions?: string; // for image_upload / video_upload
       points?: number;
     }>;
   };

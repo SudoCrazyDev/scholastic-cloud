@@ -25,7 +25,26 @@ export interface StudentAssessmentItem {
   can_retake?: boolean;
 }
 
-export type QuestionType = 'true_false' | 'single_choice' | 'multiple_choice' | 'fill_in_the_blanks' | 'short_answer' | 'essay';
+export type QuestionType =
+  | 'true_false'
+  | 'single_choice'
+  | 'multiple_choice'
+  | 'fill_in_the_blanks'
+  | 'short_answer'
+  | 'essay'
+  | 'image_upload'
+  | 'video_upload';
+
+export interface UploadAnswer {
+  path: string;
+  url: string | null;
+  name: string;
+  mime: string;
+  size: number;
+}
+
+export type AssessmentAnswer = string | string[] | UploadAnswer | null;
+export type AssessmentAnswers = Record<string, AssessmentAnswer>;
 
 export interface AssessmentQuestion {
   index: number;
@@ -35,6 +54,8 @@ export interface AssessmentQuestion {
   points: number;
   num_blanks?: number; // for fill_in_the_blanks
   placeholder?: string;
+  instructions?: string; // for image_upload / video_upload
+  accept?: string; // accepted file types, e.g. "image/*" or "video/*"
 }
 
 export interface TakeAssessmentPayload {
@@ -60,7 +81,7 @@ export interface TakeAssessmentPayload {
   attempts_allowed?: number;
   questions: AssessmentQuestion[];
   attempt_id: string;
-  answers: Record<string, string | string[]>;
+  answers: AssessmentAnswers;
 }
 
 export interface SubmitResult {
@@ -88,8 +109,22 @@ class StudentAssessmentService {
     return res.data;
   }
 
-  async submit(id: string, answers: Record<string, string | string[]>): Promise<{ success: boolean; data: SubmitResult }> {
+  async submit(id: string, answers: AssessmentAnswers): Promise<{ success: boolean; data: SubmitResult }> {
     const res = await api.post(`${this.baseUrl}/${id}/submit`, { answers });
+    return res.data;
+  }
+
+  async uploadAttachment(
+    id: string,
+    questionIndex: number,
+    file: File
+  ): Promise<{ success: boolean; data: UploadAnswer }> {
+    const formData = new FormData();
+    formData.append('question_index', String(questionIndex));
+    formData.append('file', file);
+    const res = await api.post(`${this.baseUrl}/${id}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data;
   }
 }

@@ -17,6 +17,9 @@ import {
   ExclamationTriangleIcon,
   LightBulbIcon,
   ListBulletIcon,
+  PhotoIcon,
+  VideoCameraIcon,
+  ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import {
@@ -56,6 +59,7 @@ import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
 import { Switch } from '@/components/switch'
 import { Select } from '@/components/select'
+import { GradeSubmissionsModal } from './GradeSubmissionsModal'
 
 interface AssessmentBuilderTabProps {
   subjectId: string
@@ -158,6 +162,20 @@ const QUESTION_TYPE_OPTIONS: Array<{
     icon: BookOpenIcon,
     accentClass: 'text-rose-700 bg-rose-100 border-rose-200',
   },
+  {
+    type: 'image_upload',
+    label: 'Image Upload',
+    hint: 'Student uploads an image',
+    icon: PhotoIcon,
+    accentClass: 'text-cyan-700 bg-cyan-100 border-cyan-200',
+  },
+  {
+    type: 'video_upload',
+    label: 'Video Upload',
+    hint: 'Student uploads a video',
+    icon: VideoCameraIcon,
+    accentClass: 'text-fuchsia-700 bg-fuchsia-100 border-fuchsia-200',
+  },
 ]
 
 const QUESTION_TYPE_LABELS: Record<AssessmentQuestionType, string> = {
@@ -167,6 +185,8 @@ const QUESTION_TYPE_LABELS: Record<AssessmentQuestionType, string> = {
   fill_in_the_blanks: 'Fill in the Blanks',
   short_answer: 'Short Answer',
   essay: 'Essay',
+  image_upload: 'Image Upload',
+  video_upload: 'Video Upload',
 }
 
 const QUESTION_TYPE_SELECT_OPTIONS = QUESTION_TYPE_OPTIONS.map((option) => ({
@@ -237,7 +257,7 @@ const makeQuestion = (type: AssessmentQuestionType): AssessmentMethodQuestion =>
       sampleAnswer: '',
     }
   }
-  if (type === 'short_answer' || type === 'essay') {
+  if (type === 'short_answer' || type === 'essay' || type === 'image_upload' || type === 'video_upload') {
     return {
       id: nanoid(),
       type,
@@ -576,6 +596,33 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
           />
         </div>
       )}
+
+      {(question.type === 'image_upload' || question.type === 'video_upload') && (
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
+            {question.type === 'image_upload' ? (
+              <PhotoIcon className="mt-0.5 h-5 w-5 shrink-0 text-cyan-600" />
+            ) : (
+              <VideoCameraIcon className="mt-0.5 h-5 w-5 shrink-0 text-fuchsia-600" />
+            )}
+            <p className="text-xs text-gray-600">
+              Students will upload {question.type === 'image_upload' ? 'an image' : 'a video'} file as their answer.
+              Submissions are graded manually.
+            </p>
+          </div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Instructions for students (optional)</label>
+          <textarea
+            className="min-h-16 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            value={question.sampleAnswer}
+            onChange={(event) => onSampleAnswerChange(question.id, event.target.value)}
+            placeholder={
+              question.type === 'image_upload'
+                ? 'e.g. Upload a clear photo of your completed worksheet.'
+                : 'e.g. Upload a 2-3 minute video demonstrating the experiment.'
+            }
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -588,6 +635,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
   const [builderOpen, setBuilderOpen] = useState(false)
   const [draft, setDraft] = useState<BuilderDraft | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const [gradingMethod, setGradingMethod] = useState<{ id: string; title: string } | null>(null)
 
   const { data: ecrRes } = useQuery({
     queryKey: ['subjectEcrs', subjectId],
@@ -917,6 +965,14 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => method.id && setGradingMethod({ id: method.id, title: method.title })}
+                      className="rounded-md p-2 text-gray-500 transition hover:bg-emerald-50 hover:text-emerald-600"
+                      title="Submissions & grading"
+                    >
+                      <ClipboardDocumentCheckIcon className="h-4 w-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => openEditBuilder(method)}
@@ -1373,6 +1429,14 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
             )}
           </div>
         </div>
+      )}
+
+      {gradingMethod && (
+        <GradeSubmissionsModal
+          itemId={gradingMethod.id}
+          title={gradingMethod.title}
+          onClose={() => setGradingMethod(null)}
+        />
       )}
     </div>
   )

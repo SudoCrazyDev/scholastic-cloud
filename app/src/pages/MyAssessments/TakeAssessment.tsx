@@ -1,15 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DocumentTextIcon, PaperAirplaneIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import { studentAssessmentService, type TakeAssessmentPayload, type AssessmentQuestion } from '@/services/studentAssessmentService';
+import {
+  DocumentTextIcon,
+  PaperAirplaneIcon,
+  CheckCircleIcon,
+  ArrowUpTrayIcon,
+  PhotoIcon,
+  VideoCameraIcon,
+} from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
+import {
+  studentAssessmentService,
+  type TakeAssessmentPayload,
+  type AssessmentQuestion,
+  type AssessmentAnswers,
+  type UploadAnswer,
+} from '@/services/studentAssessmentService';
 import { Button } from '@/components/button';
+
+const isUploadAnswer = (value: unknown): value is UploadAnswer =>
+  !!value && typeof value === 'object' && !Array.isArray(value) && 'path' in (value as Record<string, unknown>);
 
 export const TakeAssessment: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  const [answers, setAnswers] = useState<AssessmentAnswers>({});
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<{ score: number; max_score: number } | null>(null);
 
@@ -28,7 +46,7 @@ export const TakeAssessment: React.FC = () => {
   });
 
   const submitMutation = useMutation({
-    mutationFn: (ans: Record<string, string | string[]>) => studentAssessmentService.submit(id!, ans),
+    mutationFn: (ans: AssessmentAnswers) => studentAssessmentService.submit(id!, ans),
     onSuccess: (res) => {
       setResult(res.data);
       setSubmitted(true);
@@ -67,7 +85,11 @@ export const TakeAssessment: React.FC = () => {
     setAnswers((prev) => {
       const key = String(index);
       const current = prev[key];
-      const arr = Array.isArray(current) ? [...current] : current ? [current] : [];
+      const arr: string[] = Array.isArray(current)
+        ? current.filter((v): v is string => typeof v === 'string')
+        : typeof current === 'string'
+          ? [current]
+          : [];
       const set = new Set(arr);
       if (set.has(letter)) set.delete(letter);
       else set.add(letter);
@@ -88,6 +110,19 @@ export const TakeAssessment: React.FC = () => {
 
   const handleTextAnswer = (index: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [String(index)]: value }));
+  };
+
+  const handleFileUpload = async (index: number, file: File) => {
+    const key = String(index);
+    setUploading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const res = await studentAssessmentService.uploadAttachment(id!, index, file);
+      setAnswers((prev) => ({ ...prev, [key]: res.data }));
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Upload failed. Please try again.');
+    } finally {
+      setUploading((prev) => ({ ...prev, [key]: false }));
+    }
   };
 
   const handleSubmit = () => {
@@ -269,6 +304,67 @@ export const TakeAssessment: React.FC = () => {
                     />
                   </div>
                 )}
+                {(type === 'image_upload' || type === 'video_upload') && (() => {
+                  const upload = isUploadAnswer(answerVal) ? answerVal : null;
+                  const isUploading = !!uploading[key];
+                  const accept = q.accept ?? (type === 'image_upload' ? 'image/*' : 'video/*');
+                  return (
+                    <div className="space-y-3">
+                      {q.instructions && <p className="text-sm text-gray-600">{q.instructions}</p>}
+                      {upload && (
+                        <div className="rounded-lg border border-gray-200 p-3">
+                          {type === 'image_upload' && upload.url && (
+                            <img
+                              src={upload.url}
+                              alt={upload.name}
+                              className="max-h-64 rounded-md object-contain"
+                            />
+                          )}
+                          {type === 'video_upload' && upload.url && (
+                            <video src={upload.url} controls className="max-h-64 w-full rounded-md" />
+                          )}
+                          <p className="mt-2 truncate text-xs text-gray-500" title={upload.name}>
+                            {upload.name}
+                          </p>
+                        </div>
+                      )}
+                      <label
+                        className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                          isUploading
+                            ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                            : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                        }`}
+                      >
+                        {type === 'image_upload' ? (
+                          <PhotoIcon className="h-4 w-4" />
+                        ) : (
+                          <VideoCameraIcon className="h-4 w-4" />
+                        )}
+                        {isUploading ? (
+                          'Uploading…'
+                        ) : (
+                          <>
+                            <ArrowUpTrayIcon className="h-4 w-4" />
+                            {upload
+                              ? 'Replace file'
+                              : `Upload ${type === 'image_upload' ? 'image' : 'video'}`}
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept={accept}
+                          disabled={isUploading}
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(q.index, file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );

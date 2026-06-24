@@ -11,10 +11,13 @@ use App\Models\StudentSubject;
 use App\Models\Subject;
 use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
+use App\Services\AssessmentScoringService;
 use App\Services\RunningGradeRecalcService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * LMS-style: student lists/takes quizzes, assignments, exams; live scoring.
@@ -23,7 +26,8 @@ use Illuminate\Support\Facades\DB;
 class StudentAssessmentController extends Controller
 {
     public function __construct(
-        protected RunningGradeRecalcService $runningGradeRecalcService
+        protected RunningGradeRecalcService $runningGradeRecalcService,
+        protected AssessmentScoringService $scoringService
     ) {
     }
 
@@ -205,7 +209,7 @@ class StudentAssessmentController extends Controller
         $questions = $item->content['questions'] ?? [];
         if (!empty($questions)) {
             $payload['questions'] = $this->stripAnswersFromQuestions($questions);
-            $payload['max_score_possible'] = $this->computeMaxScoreFromQuestions($questions);
+            $payload['max_score_possible'] = $this->scoringService->maxScore($questions);
         } else {
             $payload['questions'] = [];
             $payload['max_score_possible'] = (float) $item->score;
@@ -313,7 +317,7 @@ class StudentAssessmentController extends Controller
             ], 422);
         }
 
-        $maxScore = $this->computeMaxScoreFromQuestions($questions);
+        $maxScore = $this->scoringService->maxScore($questions);
         $attempt = StudentAssessmentAttempt::create([
             'student_id' => $student->id,
             'subject_ecr_item_id' => $item->id,
@@ -399,11 +403,12 @@ class StudentAssessmentController extends Controller
             return response()->json(['success' => false, 'message' => 'Assessment has no questions.'], 422);
         }
 
-        $computed = $this->computeScore($questions, $validated['answers']);
+        $objectiveScore = $this->scoringService->objectiveScore($questions, $validated['answers']);
+        $maxScore = $this->scoringService->maxScore($questions);
         $attempt->update([
             'submitted_at' => now(),
-            'score' => $computed['score'],
-            'max_score' => $computed['max_score'],
+            'score' => $objectiveScore,
+            'max_score' => $maxScore,
             'answers' => $validated['answers'],
         ]);
 
@@ -412,20 +417,134 @@ class StudentAssessmentController extends Controller
                 'student_id' => $student->id,
                 'subject_ecr_item_id' => $item->id,
             ],
-            ['score' => $computed['score']]
+            ['score' => $objectiveScore]
         );
 
         $this->runningGradeRecalcService->recalculate($student->id, $item->id);
 
+        // Whether any question still needs a teacher to grade it manually.
+        $needsManualGrading = false;
+        foreach ($questions as $q) {
+            if ($this->scoringService->isManualQuestion($q)) {
+                $needsManualGrading = true;
+                break;
+            }
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'score' => (float) $computed['score'],
-                'max_score' => (float) $computed['max_score'],
+                'score' => (float) $objectiveScore,
+                'max_score' => (float) $maxScore,
                 'attempt_id' => $attempt->id,
                 'submitted_at' => $attempt->submitted_at?->toIso8601String(),
+                'needs_manual_grading' => $needsManualGrading,
             ],
         ]);
+    }
+
+    /**
+     * Upload an image/video answer for an upload-type question to R2.
+     * Returns a file reference the client stores in its answers map and sends back on submit.
+     */
+    public function uploadAttachment(Request $request, string $id): JsonResponse
+    {
+        $student = $this->resolveStudent($request);
+        if (!$student) {
+            return response()->json(['success' => false, 'message' => 'Not linked to a student account.'], 403);
+        }
+
+        $validated = $request->validate([
+            'question_index' => 'required|integer|min:0',
+            // Hard ceiling; per-type limits enforced below. 204800 KB = 200 MB.
+            'file' => 'required|file|max:204800',
+        ]);
+
+        $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($id);
+        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
+            return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
+        }
+
+        $subjectId = $item->subjectEcr?->subject_id;
+        $eligibleSubjectIds = $this->eligibleSubjectIds($student);
+        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
+            return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
+        }
+
+        $availabilityError = $this->availabilityError($item);
+        if ($availabilityError !== null) {
+            return response()->json(['success' => false, 'message' => $availabilityError], 422);
+        }
+
+        // A file can only be attached to an attempt that is in progress.
+        $attempt = StudentAssessmentAttempt::where('student_id', $student->id)
+            ->where('subject_ecr_item_id', $item->id)
+            ->whereNull('submitted_at')
+            ->latest('created_at')
+            ->first();
+        if (!$attempt) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No attempt in progress. Start the assessment first.',
+            ], 422);
+        }
+
+        $questions = $item->content['questions'] ?? [];
+        $qIndex = (int) $validated['question_index'];
+        $question = $questions[$qIndex] ?? null;
+        $type = $question['type'] ?? null;
+        if (!$question || !in_array($type, ['image_upload', 'video_upload'], true)) {
+            return response()->json(['success' => false, 'message' => 'This question does not accept file uploads.'], 422);
+        }
+
+        $file = $request->file('file');
+        $mime = $file->getMimeType() ?? $file->getClientMimeType();
+        $isImage = str_starts_with((string) $mime, 'image/');
+        $isVideo = str_starts_with((string) $mime, 'video/');
+
+        if ($type === 'image_upload' && !$isImage) {
+            return response()->json(['success' => false, 'message' => 'Please upload an image file.'], 422);
+        }
+        if ($type === 'video_upload' && !$isVideo) {
+            return response()->json(['success' => false, 'message' => 'Please upload a video file.'], 422);
+        }
+        if ($type === 'image_upload' && $file->getSize() > 25 * 1024 * 1024) {
+            return response()->json(['success' => false, 'message' => 'Image must be 25 MB or smaller.'], 422);
+        }
+
+        $institutionId = $student->institutions()->first()?->id ?? 'unknown';
+        $extension = $file->getClientOriginalExtension() ?: ($isVideo ? 'mp4' : 'bin');
+        $fileName = Str::uuid() . '.' . $extension;
+        $path = $institutionId . '/student/' . $student->id . '/assessments/' . $item->id . '/' . $attempt->id . '/q' . $qIndex . '/' . $fileName;
+
+        Storage::disk('r2')->put($path, file_get_contents($file->getRealPath()));
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'path' => $path,
+                'url' => $this->temporaryFileUrl($path),
+                'name' => $file->getClientOriginalName(),
+                'mime' => $mime,
+                'size' => $file->getSize(),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Best-effort viewable URL for an R2 object: presigned if supported, else public URL.
+     */
+    private function temporaryFileUrl(string $path): ?string
+    {
+        try {
+            return Storage::disk('r2')->temporaryUrl($path, now()->addDays(7));
+        } catch (\Throwable) {
+            try {
+                return Storage::disk('r2')->url($path);
+            } catch (\Throwable) {
+                return null;
+            }
+        }
     }
 
     private function stripAnswersFromQuestions(array $questions): array
@@ -453,125 +572,13 @@ class StudentAssessmentController extends Controller
                     ? 'Write your detailed answer here...'
                     : 'Write your answer here...';
             }
+            if (in_array($type, ['image_upload', 'video_upload'], true)) {
+                $entry['instructions'] = (string) ($q['instructions'] ?? '');
+                $entry['accept'] = $type === 'image_upload' ? 'image/*' : 'video/*';
+            }
             $out[] = $entry;
         }
         return $out;
-    }
-
-    private function computeMaxScoreFromQuestions(array $questions): float
-    {
-        $sum = 0;
-        foreach ($questions as $q) {
-            $sum += (float) ($q['points'] ?? 1);
-        }
-        return $sum;
-    }
-
-    private function computeScore(array $questions, array $answers): array
-    {
-        $maxScore = $this->computeMaxScoreFromQuestions($questions);
-        $score = 0;
-        foreach ($questions as $i => $q) {
-            $type = (string) ($q['type'] ?? 'single_choice');
-            $points = (float) ($q['points'] ?? 1);
-            $key = (string) $i;
-            $givenRaw = $answers[$key] ?? $answers[$i] ?? null;
-            if ($this->isQuestionCorrect($type, $q, $givenRaw)) {
-                $score += $points;
-            }
-        }
-        return ['score' => $score, 'max_score' => $maxScore];
-    }
-
-    private function isQuestionCorrect(string $type, array $q, mixed $givenRaw): bool
-    {
-        if ($givenRaw === null || $givenRaw === '') {
-            return false;
-        }
-        if ($type === 'true_false') {
-            $correct = trim((string) ($q['answer'] ?? ''));
-            $given = is_array($givenRaw) ? trim((string) ($givenRaw[0] ?? '')) : trim((string) $givenRaw);
-            return strcasecmp($correct, $given) === 0;
-        }
-        if ($type === 'single_choice') {
-            $correct = (string) ($q['answer'] ?? '');
-            $given = is_array($givenRaw) ? (string) ($givenRaw[0] ?? '') : (string) $givenRaw;
-            return $this->choiceMatches($correct, $given, $q['choices'] ?? []);
-        }
-        if ($type === 'multiple_choice') {
-            $correctRaw = $q['answer'] ?? [];
-            $correct = is_array($correctRaw)
-                ? array_map('trim', array_map('strtoupper', $correctRaw))
-                : array_map('trim', array_map('strtoupper', explode(',', (string) $correctRaw)));
-            $correct = array_values(array_filter($correct));
-            sort($correct);
-            $given = is_array($givenRaw)
-                ? array_map('trim', array_map('strtoupper', $givenRaw))
-                : array_map('trim', array_map('strtoupper', explode(',', (string) $givenRaw)));
-            $given = array_values(array_filter($given));
-            sort($given);
-            return $correct === $given;
-        }
-        if ($type === 'fill_in_the_blanks') {
-            $correctBlanks = $q['blanks'] ?? [];
-            if (empty($correctBlanks)) {
-                return false;
-            }
-            $givenBlanks = is_array($givenRaw) ? $givenRaw : (array) $givenRaw;
-            if (count($givenBlanks) !== count($correctBlanks)) {
-                return false;
-            }
-            foreach ($correctBlanks as $idx => $correctVal) {
-                $givenVal = trim((string) ($givenBlanks[$idx] ?? ''));
-                // Allow multiple acceptable answers per blank: "answer1 | answer2 | answer3"
-                $alternatives = array_map('trim', explode('|', (string) $correctVal));
-                $alternatives = array_filter($alternatives);
-                $matched = false;
-                foreach ($alternatives as $alt) {
-                    if (strcasecmp($alt, $givenVal) === 0) {
-                        $matched = true;
-                        break;
-                    }
-                }
-                if (!$matched) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        if (in_array($type, ['short_answer', 'essay'], true)) {
-            $correctRaw = $q['answer'] ?? '';
-            $correctValues = is_array($correctRaw)
-                ? $correctRaw
-                : explode('|', (string) $correctRaw);
-            $correctValues = array_values(array_filter(array_map(fn ($v) => trim((string) $v), $correctValues)));
-            if (empty($correctValues)) {
-                // No answer key means this should be manually graded.
-                return false;
-            }
-            $given = is_array($givenRaw)
-                ? trim((string) ($givenRaw[0] ?? ''))
-                : trim((string) $givenRaw);
-            foreach ($correctValues as $correct) {
-                if (strcasecmp($correct, $given) === 0) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        return false;
-    }
-
-    private function choiceMatches(string $correct, string $given, array $choices): bool
-    {
-        $normalize = function (string $v): string {
-            $v = trim($v);
-            if (preg_match('/^([A-Za-z])[.)\s]/', $v, $m)) {
-                return strtoupper($m[1]);
-            }
-            return strtoupper(substr($v, 0, 1));
-        };
-        return $normalize($correct) === $normalize($given);
     }
 
     /**
@@ -712,7 +719,7 @@ class StudentAssessmentController extends Controller
             'title' => $item->title,
             'description' => $item->description,
             'quarter' => $item->quarter,
-            'max_score' => (float) $this->computeMaxScoreFromQuestions($questions),
+            'max_score' => (float) $this->scoringService->maxScore($questions),
             'subject_title' => $item->subjectEcr?->subject?->title ?? '',
             'settings' => $rules,
             'open_at' => $item->open_at?->toIso8601String(),

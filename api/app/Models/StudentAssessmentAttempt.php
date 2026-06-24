@@ -20,12 +20,17 @@ class StudentAssessmentAttempt extends Model
         'score',
         'max_score',
         'answers',
+        'manual_scores',
+        'graded_at',
+        'graded_by',
     ];
 
     protected $casts = [
         'answers' => 'array',
+        'manual_scores' => 'array',
         'started_at' => 'datetime',
         'submitted_at' => 'datetime',
+        'graded_at' => 'datetime',
         'score' => 'decimal:2',
         'max_score' => 'decimal:2',
     ];
