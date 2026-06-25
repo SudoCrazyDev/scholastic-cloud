@@ -316,6 +316,7 @@ export interface StudentLedgerEntry {
   date?: string | null;
   fee_id?: string;
   fee_name?: string;
+  or_number?: string | null;
   receipt_number?: string;
   reference_number?: string;
   payment_id?: string;

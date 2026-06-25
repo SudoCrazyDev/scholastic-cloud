@@ -2239,6 +2239,9 @@ const Finance: React.FC = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                               Date
                             </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              OR Number
+                            </th>
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                               Amount
                             </th>
@@ -2281,6 +2284,9 @@ const Finance: React.FC = () => {
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600">
                                 {entry.date ?? '—'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 font-mono">
+                                {entry.or_number ?? '—'}
                               </td>
                               <td
                                 className={`px-4 py-3 text-sm text-right tabular-nums ${
@@ -2328,7 +2334,7 @@ const Finance: React.FC = () => {
                           {!ledgerQuery.data?.data?.entries?.length && (
                             <tr>
                               <td
-                                colSpan={canRequestVoid ? 7 : 6}
+                                colSpan={canRequestVoid ? 8 : 7}
                                 className="px-4 py-8 text-center text-gray-500"
                               >
                                 No ledger entries for this academic year.
