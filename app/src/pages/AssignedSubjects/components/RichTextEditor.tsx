@@ -36,11 +36,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const settingRef = useRef(false)
   onChangeRef.current = onChange
 
-  // Create the Quill instance once.
+  // Create the Quill instance once. Wipe the host first so a prior
+  // StrictMode dev pass (setup → cleanup → setup) can't leave a second editor.
   useEffect(() => {
-    if (!containerRef.current || quillRef.current) return
+    const host = containerRef.current
+    if (!host) return
+    host.innerHTML = ''
     const editorEl = document.createElement('div')
-    containerRef.current.appendChild(editorEl)
+    host.appendChild(editorEl)
 
     const quill = new Quill(editorEl, {
       theme: 'snow',
@@ -63,7 +66,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
     return () => {
       quillRef.current = null
-      if (containerRef.current) containerRef.current.innerHTML = ''
+      host.innerHTML = ''
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
