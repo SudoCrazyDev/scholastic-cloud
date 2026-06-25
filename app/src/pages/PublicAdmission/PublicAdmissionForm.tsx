@@ -5,7 +5,7 @@ import { Formik, Form, Field, ErrorMessage, useFormikContext, useField } from 'f
 import { motion, AnimatePresence } from 'framer-motion'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
-import { Check, CheckCircle2 } from 'lucide-react'
+import { Check, CheckCircle2, Lock } from 'lucide-react'
 import { admissionFormService } from '../../services/admissionFormService'
 import { api } from '../../lib/api'
 import { Select } from '../../components/select'
@@ -138,6 +138,7 @@ type PublicInstitution = {
   abbr?: string | null
   address?: string | null
   logo_url?: string | null
+  admission_form_open?: boolean
 }
 
 function InstitutionLogo({
@@ -173,6 +174,26 @@ function AdmissionThankYou({ institution }: { institution: PublicInstitution }) 
       <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-3">Thank you</h1>
       <p className="text-slate-600 text-base leading-relaxed max-w-md mx-auto mb-6">
         Your application has been received. We will review your application and contact you soon.
+      </p>
+      <p className="text-sm text-slate-500">
+        {institution.title}
+        {institution.abbr ? ` (${institution.abbr})` : ''}
+      </p>
+      {institution.address ? <p className="mt-2 text-sm text-slate-400">{institution.address}</p> : null}
+    </div>
+  )
+}
+
+function AdmissionClosed({ institution }: { institution: PublicInstitution }) {
+  return (
+    <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-indigo-950/5 ring-1 ring-slate-200/80 p-8 md:p-10 text-center">
+      <InstitutionLogo title={institution.title} logoUrl={institution.logo_url} className="mb-6" />
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-500 mb-6">
+        <Lock className="h-8 w-8" strokeWidth={2} aria-hidden />
+      </div>
+      <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-3">Admissions are closed</h1>
+      <p className="text-slate-600 text-base leading-relaxed max-w-md mx-auto mb-6">
+        This admission form is not currently accepting applications. Please contact the school for more information.
       </p>
       <p className="text-sm text-slate-500">
         {institution.title}
@@ -268,6 +289,25 @@ function PublicAdmissionForm() {
   }
 
   const institution = instRes.data
+
+  if (institution.admission_form_open === false && !submitted) {
+    return (
+      <div
+        className="min-h-screen py-8 px-4 bg-gradient-to-b from-slate-50 via-indigo-50/35 to-violet-100/45 flex flex-col items-center justify-center"
+        style={{
+          backgroundImage: `
+          radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent),
+          radial-gradient(ellipse 60% 40% at 100% 50%, rgba(139, 92, 246, 0.08), transparent),
+          radial-gradient(ellipse 50% 30% at 0% 80%, rgba(59, 130, 246, 0.06), transparent)
+        `,
+        }}
+      >
+        <div className="w-full max-w-lg mx-auto px-2">
+          <AdmissionClosed institution={institution} />
+        </div>
+      </div>
+    )
+  }
 
   if (submitted) {
     return (

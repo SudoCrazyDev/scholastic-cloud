@@ -48,7 +48,7 @@ class AdmissionFormSubmissionController extends Controller
      */
     public function publicInstitution(string $id): JsonResponse
     {
-        $institution = Institution::query()->select(['id', 'title', 'abbr', 'address', 'logo'])->find($id);
+        $institution = Institution::query()->select(['id', 'title', 'abbr', 'address', 'logo', 'admission_form_open'])->find($id);
 
         if (! $institution) {
             return response()->json([
@@ -65,6 +65,82 @@ class AdmissionFormSubmissionController extends Controller
                 'abbr' => $institution->abbr,
                 'address' => $institution->address,
                 'logo_url' => $institution->logo,
+                'admission_form_open' => (bool) $institution->admission_form_open,
+            ],
+        ]);
+    }
+
+    /**
+     * Authenticated: get admission form settings for the user's institution.
+     */
+    public function settings(Request $request): JsonResponse
+    {
+        if (! $this->canAccessAdmissionSubmissions($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+        $institutionId = $this->resolveUserInstitutionId($user);
+
+        if (! $institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned.',
+            ], 400);
+        }
+
+        $institution = Institution::query()->select(['id', 'admission_form_open'])->find($institutionId);
+        if (! $institution) {
+            return response()->json(['success' => false, 'message' => 'Institution not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'admission_form_open' => (bool) $institution->admission_form_open,
+            ],
+        ]);
+    }
+
+    /**
+     * Authenticated: open or close the public admission form for the user's institution.
+     */
+    public function updateSettings(Request $request): JsonResponse
+    {
+        if (! $this->canAccessAdmissionSubmissions($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+        $institutionId = $this->resolveUserInstitutionId($user);
+
+        if (! $institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned.',
+            ], 400);
+        }
+
+        $validated = $request->validate([
+            'admission_form_open' => 'required|boolean',
+        ]);
+
+        $institution = Institution::find($institutionId);
+        if (! $institution) {
+            return response()->json(['success' => false, 'message' => 'Institution not found.'], 404);
+        }
+
+        $institution->update(['admission_form_open' => $validated['admission_form_open']]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['admission_form_open']
+                ? 'Admission form is now open.'
+                : 'Admission form is now closed.',
+            'data' => [
+                'admission_form_open' => (bool) $institution->admission_form_open,
             ],
         ]);
     }
@@ -84,6 +160,15 @@ class AdmissionFormSubmissionController extends Controller
                 'message' => 'Validation failed',
                 'errors' => $e->errors(),
             ], 422);
+        }
+
+        // Reject submissions when the institution has closed its admission form.
+        $institution = Institution::query()->select(['id', 'admission_form_open'])->find($validated['institution_id']);
+        if (! $institution || ! $institution->admission_form_open) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This admission form is currently closed and is no longer accepting submissions.',
+            ], 403);
         }
 
         $submission = AdmissionFormSubmission::create([

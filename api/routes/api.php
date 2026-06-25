@@ -388,6 +388,8 @@ Route::middleware('auth.token')->group(function () {
     Route::post('biometric/zk-users/{id}/trigger-fingerprint', [ZkUserMappingController::class, 'triggerFingerprint']);
 
     // Online admission form submissions (admin list/detail/accept/reject)
+    Route::get('admission-form-settings', [AdmissionFormSubmissionController::class, 'settings']);
+    Route::put('admission-form-settings', [AdmissionFormSubmissionController::class, 'updateSettings']);
     Route::get('admission-form-submissions', [AdmissionFormSubmissionController::class, 'index']);
     Route::get('admission-form-submissions/{id}', [AdmissionFormSubmissionController::class, 'show']);
     Route::post('admission-form-submissions/{id}/accept', [AdmissionFormSubmissionController::class, 'accept']);

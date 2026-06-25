@@ -30,6 +30,7 @@ class Institution extends Model
         'subscription_id',
         'default_department_id',
         'current_academic_year',
+        'admission_form_open',
     ];
 
     /**
@@ -39,6 +40,7 @@ class Institution extends Model
      */
     protected $casts = [
         'subscription_id' => 'string',
+        'admission_form_open' => 'boolean',
     ];
 
     /**

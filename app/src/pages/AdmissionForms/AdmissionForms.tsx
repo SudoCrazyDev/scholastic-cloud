@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ClipboardList } from 'lucide-react'
 import { admissionFormService } from '../../services/admissionFormService'
+import { Switch } from '../../components/switch'
 import { useAuth } from '../../hooks/useAuth'
 import { useRoleAccess } from '../../hooks/useRoleAccess'
 import type { AdmissionFormPayload, AdmissionFormSubmissionListItem } from '../../types'
@@ -85,6 +86,25 @@ export default function AdmissionForms() {
     enabled: hasAccess && !!institutionId,
   })
 
+  const { data: settingsRes } = useQuery({
+    queryKey: ['admission-form-settings', institutionId],
+    queryFn: () => admissionFormService.getSettings(),
+    enabled: hasAccess && !!institutionId,
+  })
+
+  const formOpen = settingsRes?.data.admission_form_open ?? true
+
+  const toggleFormOpen = useMutation({
+    mutationFn: (open: boolean) => admissionFormService.updateSettings(open),
+    onSuccess: (res) => {
+      toast.success(res.message)
+      queryClient.invalidateQueries({ queryKey: ['admission-form-settings', institutionId] })
+    },
+    onError: () => {
+      toast.error('Could not update the admission form status.')
+    },
+  })
+
   const copyLink = async () => {
     if (!publicFormUrl) {
       toast.error('No institution context for this account.')
@@ -148,13 +168,34 @@ export default function AdmissionForms() {
             </p>
           </div>
           {publicFormUrl ? (
-            <button
-              type="button"
-              onClick={copyLink}
-              className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-            >
-              Copy public form link
-            </button>
+            <div className="flex flex-col items-stretch gap-3 sm:items-end">
+              <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-900">
+                    Form is {formOpen ? 'open' : 'closed'}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {formOpen
+                      ? 'Applicants can access and submit the form.'
+                      : 'Applicants cannot access or submit the form.'}
+                  </span>
+                </div>
+                <Switch
+                  color="indigo"
+                  checked={formOpen}
+                  disabled={toggleFormOpen.isPending}
+                  onChange={(v) => toggleFormOpen.mutate(!!v)}
+                  aria-label="Toggle admission form open or closed"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={copyLink}
+                className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+              >
+                Copy public form link
+              </button>
+            </div>
           ) : null}
         </div>
 

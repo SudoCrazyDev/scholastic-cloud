@@ -11,8 +11,25 @@ export const admissionFormService = {
         abbr: string | null
         address: string | null
         logo_url: string | null
+        admission_form_open: boolean
       }
     }>(`/public/institutions/${id}`)
+    return response.data
+  },
+
+  async getSettings() {
+    const response = await api.get<{ success: boolean; data: { admission_form_open: boolean } }>(
+      '/admission-form-settings'
+    )
+    return response.data
+  },
+
+  async updateSettings(admissionFormOpen: boolean) {
+    const response = await api.put<{
+      success: boolean
+      message: string
+      data: { admission_form_open: boolean }
+    }>('/admission-form-settings', { admission_form_open: admissionFormOpen })
     return response.data
   },
 
