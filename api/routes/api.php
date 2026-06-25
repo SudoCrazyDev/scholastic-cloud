@@ -231,6 +231,7 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('topics/{id}', [App\Http\Controllers\TopicController::class, 'destroy']);
     Route::post('topics/reorder', [App\Http\Controllers\TopicController::class, 'reorder']);
     Route::patch('topics/{id}/toggle-completion', [App\Http\Controllers\TopicController::class, 'toggleCompletion']);
+    Route::post('topics/{id}/upload', [App\Http\Controllers\TopicController::class, 'uploadAttachment']);
 
     // Subject quarter plans (AI planner)
     Route::get('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'showBySubjectAndQuarter']);
@@ -265,6 +266,11 @@ Route::middleware('auth.token')->group(function () {
     Route::post('student-assessments/{id}/start', [\App\Http\Controllers\StudentAssessmentController::class, 'start']);
     Route::post('student-assessments/{id}/submit', [\App\Http\Controllers\StudentAssessmentController::class, 'submit']);
     Route::post('student-assessments/{id}/upload', [\App\Http\Controllers\StudentAssessmentController::class, 'uploadAttachment']);
+    // Student lessons (LMS: list/read published lessons + per-student progress)
+    Route::get('student-lessons', [\App\Http\Controllers\StudentLessonController::class, 'index']);
+    Route::get('student-lessons/{id}', [\App\Http\Controllers\StudentLessonController::class, 'show']);
+    Route::post('student-lessons/{id}/start', [\App\Http\Controllers\StudentLessonController::class, 'start']);
+    Route::post('student-lessons/{id}/complete', [\App\Http\Controllers\StudentLessonController::class, 'complete']);
     // Teacher grading of assessment submissions (manual questions: essays, uploads)
     Route::get('assessment-methods/{itemId}/submissions', [\App\Http\Controllers\AssessmentGradingController::class, 'submissions']);
     Route::post('assessment-methods/{itemId}/submissions/{attemptId}/grade', [\App\Http\Controllers\AssessmentGradingController::class, 'grade']);

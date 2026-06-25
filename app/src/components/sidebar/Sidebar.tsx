@@ -84,6 +84,13 @@ const menuGroups: MenuGroup[] = [
         allowedRoles: ['student'],
       },
       {
+        id: 'my-lessons',
+        label: 'My Lessons',
+        icon: <GraduationCap className="w-5 h-5" />,
+        path: '/my-lessons',
+        allowedRoles: ['student'],
+      },
+      {
         id: 'my-assessments',
         label: 'My Assessments',
         icon: <FileText className="w-5 h-5" />,

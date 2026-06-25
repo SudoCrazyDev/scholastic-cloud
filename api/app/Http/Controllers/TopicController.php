@@ -7,7 +7,9 @@ use App\Models\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class TopicController extends Controller
@@ -66,8 +68,13 @@ class TopicController extends Controller
             'quarter' => 'nullable|string',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'content' => 'nullable|array',
+            'learning_objectives' => 'nullable|array',
+            'learning_objectives.*' => 'string',
+            'estimated_minutes' => 'nullable|integer|min:0',
             'order' => 'nullable|integer|min:0',
             'is_completed' => 'boolean',
+            'is_published' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -132,8 +139,13 @@ class TopicController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
+            'content' => 'nullable|array',
+            'learning_objectives' => 'nullable|array',
+            'learning_objectives.*' => 'string',
+            'estimated_minutes' => 'nullable|integer|min:0',
             'order' => 'sometimes|required|integer|min:0',
             'is_completed' => 'boolean',
+            'is_published' => 'boolean',
             'quarter' => 'nullable|string',
         ]);
 
@@ -250,6 +262,72 @@ class TopicController extends Controller
                 'message' => 'Failed to update topic completion status',
                 'error' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Upload a lesson attachment (PDF / slides / image / doc) to R2.
+     * Returns a file reference the client stores inside a `file` content block.
+     */
+    public function uploadAttachment(Request $request, string $id): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            // 25 MB ceiling. mimes kept broad enough for typical lesson resources.
+            'file' => 'required|file|max:25600|mimes:pdf,png,jpg,jpeg,gif,webp,doc,docx,ppt,pptx,xls,xlsx,txt',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $topic = Topic::with('subject')->findOrFail($id);
+            $institutionId = $topic->subject?->institution_id ?? 'unknown';
+
+            $file = $request->file('file');
+            $extension = $file->getClientOriginalExtension() ?: 'bin';
+            $fileName = Str::uuid() . '.' . $extension;
+            $path = $institutionId . '/subjects/' . $topic->subject_id . '/lessons/' . $topic->id . '/' . $fileName;
+
+            Storage::disk('r2')->put($path, file_get_contents($file->getRealPath()));
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'path' => $path,
+                    'url' => $this->temporaryFileUrl($path),
+                    'name' => $file->getClientOriginalName(),
+                    'mime' => $file->getMimeType() ?? $file->getClientMimeType(),
+                    'size' => $file->getSize(),
+                ],
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Topic attachment upload error:', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload attachment',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Best-effort viewable URL for an R2 object: presigned if supported, else public URL.
+     */
+    private function temporaryFileUrl(string $path): ?string
+    {
+        try {
+            return Storage::disk('r2')->temporaryUrl($path, now()->addDays(7));
+        } catch (\Throwable) {
+            try {
+                return Storage::disk('r2')->url($path);
+            } catch (\Throwable) {
+                return null;
+            }
         }
     }
 }

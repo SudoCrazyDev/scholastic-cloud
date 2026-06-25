@@ -102,11 +102,11 @@ const SubjectDetail: React.FC = () => {
       label: 'Assessment Methods',
       icon: DocumentTextIcon,
     },
-    // {
-    //   id: 'topics' as TabType,
-    //   label: 'Topics',
-    //   icon: ListBulletIcon,
-    // },
+    {
+      id: 'topics' as TabType,
+      label: 'Lessons',
+      icon: BookOpenIcon,
+    },
     // {
     //   id: 'ai-planner' as TabType,
     //   label: 'AI Planner',

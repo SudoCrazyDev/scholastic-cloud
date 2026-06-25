@@ -14,3 +14,33 @@
 html {
   color-scheme: light;
 }
+
+/* Quill (snow theme) rich-text lessons — editor + read-only rendering. */
+.lesson-quill .ql-toolbar.ql-snow,
+.lesson-quill .ql-container.ql-snow {
+  border-color: #d1d5db;
+}
+.lesson-quill .ql-toolbar.ql-snow {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+.lesson-quill .ql-container.ql-snow {
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+  font-size: 0.875rem;
+}
+.lesson-quill .ql-editor {
+  min-height: 8rem;
+}
+.lesson-quill .ql-editor.ql-blank::before {
+  color: #9ca3af;
+  font-style: normal;
+}
+/* Read-only rendering: no chrome, flush with surrounding layout. */
+.lesson-quill--readonly .ql-container.ql-snow {
+  border: none;
+}
+.lesson-quill--readonly .ql-editor {
+  padding: 0;
+  min-height: 0;
+}

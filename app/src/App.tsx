@@ -40,6 +40,8 @@ import PaymentPlansView from './pages/Finance/PaymentPlansView';
 import Login from './pages/Login';
 import MyAssessments from './pages/MyAssessments';
 import { TakeAssessment } from './pages/MyAssessments';
+import MyLessons from './pages/MyLessons';
+import { ViewLesson } from './pages/MyLessons';
 import MyPersonalInfo from './pages/MyPersonalInfo';
 import MySubjects from './pages/MySubjects';
 import MyFinance from './pages/MyFinance';
@@ -108,6 +110,22 @@ function App() {
                 element={(
                   <StudentOnlyRoute>
                     <TakeAssessment />
+                  </StudentOnlyRoute>
+                )}
+              />
+              <Route
+                path="my-lessons"
+                element={(
+                  <StudentOnlyRoute>
+                    <MyLessons />
+                  </StudentOnlyRoute>
+                )}
+              />
+              <Route
+                path="my-lessons/:id/view"
+                element={(
+                  <StudentOnlyRoute>
+                    <ViewLesson />
                   </StudentOnlyRoute>
                 )}
               />

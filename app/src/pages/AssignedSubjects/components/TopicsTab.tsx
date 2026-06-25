@@ -7,7 +7,7 @@ import {
 import { Button } from '../../../components/button'
 import { Alert } from '../../../components/alert'
 import { ConfirmationModal } from '../../../components/ConfirmationModal'
-import { TopicModal } from './TopicModal'
+import { LessonEditor } from './LessonEditor'
 import { TopicItem } from './TopicItem'
 import { useTopics } from '../../../hooks/useTopics'
 import type { Topic } from '../../../types'
@@ -72,25 +72,18 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
     '4': 'Fourth Quarter'
   }
 
-  const handleCreateTopic = async (data: CreateTopicData) => {
+  const handleSubmitLesson = async (
+    data: CreateTopicData | UpdateTopicData,
+    topicId: string | null
+  ): Promise<Topic> => {
     try {
       setError(null)
-      await createTopic(data)
+      const saved = topicId
+        ? await updateTopic(topicId, data as UpdateTopicData)
+        : await createTopic(data as CreateTopicData)
+      return saved
     } catch (err) {
-      setError('Failed to create topic. Please try again.')
-      throw err
-    }
-  }
-
-  const handleUpdateTopic = async (data: UpdateTopicData) => {
-    if (!editingTopic) return
-    
-    try {
-      setError(null)
-      await updateTopic(editingTopic.id, data)
-      setEditingTopic(null)
-    } catch (err) {
-      setError('Failed to update topic. Please try again.')
+      setError('Failed to save the lesson. Please try again.')
       throw err
     }
   }
@@ -215,8 +208,8 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <ListBulletIcon className="w-8 h-8 text-gray-400 animate-pulse" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Topics</h3>
-        <p className="text-gray-500">Please wait while we load the topics...</p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Loading Lessons</h3>
+        <p className="text-gray-500">Please wait while we load the lessons...</p>
       </div>
     )
   }
@@ -227,22 +220,16 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <ListBulletIcon className="w-8 h-8 text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No Topics</h3>
-        <p className="text-gray-500 mb-4">No topics have been created for this subject yet.</p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No Lessons</h3>
+        <p className="text-gray-500 mb-4">No lessons have been created for this subject yet.</p>
         <Button onClick={handleAddTopic} type="button">
           <PlusIcon className="w-4 h-4 mr-2" />
-          Add First Topic
+          Add First Lesson
         </Button>
-        <TopicModal
+        <LessonEditor
           isOpen={isModalOpen}
           onClose={handleCloseModal}
-          onSubmit={async (data, isEditing) => {
-            if (isEditing) {
-              await handleUpdateTopic(data as UpdateTopicData)
-            } else {
-              await handleCreateTopic(data as CreateTopicData)
-            }
-          }}
+          onSubmit={handleSubmitLesson}
           topic={editingTopic}
           subjectId={subjectId}
           isLoading={isCreating || isUpdating}
@@ -266,9 +253,9 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
       {/* Progress Overview */}
       <div className="bg-gray-50 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-gray-900">Course Progress</h3>
+          <h3 className="text-sm font-medium text-gray-900">Teaching Progress</h3>
           <span className="text-sm text-gray-600">
-            {completedTopics.length} of {topics.length} topics completed
+            {completedTopics.length} of {topics.length} lessons taught
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -285,10 +272,10 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
       {/* Topics by Quarter */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900">Topics by Quarter</h3>
+          <h3 className="text-lg font-medium text-gray-900">Lessons by Quarter</h3>
           <Button onClick={handleAddTopic} disabled={isCreating}>
             <PlusIcon className="w-4 h-4 mr-2" />
-            Add Topic
+            Add Lesson
           </Button>
         </div>
 
@@ -333,17 +320,11 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
         ))}
       </div>
 
-      {/* Topic Modal */}
-      <TopicModal
+      {/* Lesson Editor */}
+      <LessonEditor
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onSubmit={async (data, isEditing) => {
-          if (isEditing) {
-            await handleUpdateTopic(data as UpdateTopicData)
-          } else {
-            await handleCreateTopic(data as CreateTopicData)
-          }
-        }}
+        onSubmit={handleSubmitLesson}
         topic={editingTopic}
         subjectId={subjectId}
         isLoading={isCreating || isUpdating}
@@ -354,8 +335,8 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
         isOpen={!!deletingTopicId}
         onClose={() => setDeletingTopicId(null)}
         onConfirm={() => deletingTopicId && handleDeleteTopic(deletingTopicId)}
-        title="Delete Topic"
-        message="Are you sure you want to delete this topic? This action cannot be undone."
+        title="Delete Lesson"
+        message="Are you sure you want to delete this lesson? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"

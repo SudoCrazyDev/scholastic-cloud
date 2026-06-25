@@ -1,16 +1,18 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { 
+import {
   CheckCircleIcon,
   ClockIcon,
   PencilIcon,
   TrashIcon,
   EllipsisVerticalIcon,
   ChevronUpIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../../../components/dropdown'
+import { stripHtml } from './LessonContentViewer'
 import type { Topic } from '../../../types'
 
 interface TopicItemProps {
@@ -91,32 +93,43 @@ export const TopicItem: React.FC<TopicItemProps> = ({
       </div>
       
       <div className="flex-1 min-w-0">
-        <div className="flex items-center space-x-2 mb-1">
+        <div className="flex flex-wrap items-center gap-2 mb-1">
           <h4 className={`text-sm font-medium truncate ${
             topic.is_completed ? 'text-green-900' : 'text-gray-900'
           }`}>
             {topic.title}
           </h4>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            topic.is_published ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-600'
+          }`}>
+            {topic.is_published ? 'Published' : 'Draft'}
+          </span>
           {topic.is_completed && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Completed
+              Taught
             </span>
           )}
         </div>
-        
-        {topic.description && (
-          <p className={`text-sm mb-2 ${
+
+        {stripHtml(topic.description) && (
+          <p className={`text-sm mb-2 line-clamp-2 ${
             topic.is_completed ? 'text-green-700' : 'text-gray-600'
           }`}>
-            {topic.description}
+            {stripHtml(topic.description)}
           </p>
         )}
-        
-        <div className="flex items-center space-x-4 text-xs text-gray-500">
+
+        <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
           <div className="flex items-center space-x-1">
-            <ClockIcon className="w-3 h-3" />
-            <span>Order: {topic.order}</span>
+            <DocumentTextIcon className="w-3 h-3" />
+            <span>{topic.content?.length ?? 0} block{(topic.content?.length ?? 0) !== 1 ? 's' : ''}</span>
           </div>
+          {topic.estimated_minutes ? (
+            <div className="flex items-center space-x-1">
+              <ClockIcon className="w-3 h-3" />
+              <span>{topic.estimated_minutes} min</span>
+            </div>
+          ) : null}
         </div>
       </div>
       

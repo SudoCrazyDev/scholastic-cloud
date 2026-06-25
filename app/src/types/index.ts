@@ -971,13 +971,55 @@ export interface ClassRecord {
   updated_at: string;
 }
 
+// ── Lesson content blocks (LMS) ─────────────────────────────────────────────
+export type LessonBlockType = 'rich_text' | 'video' | 'file' | 'assessment';
+
+export interface RichTextBlock {
+  id: string;
+  type: 'rich_text';
+  html: string;
+}
+
+export interface VideoBlock {
+  id: string;
+  type: 'video';
+  url: string;
+  title?: string;
+}
+
+export interface FileBlock {
+  id: string;
+  type: 'file';
+  path: string;
+  url: string;
+  name: string;
+  mime?: string;
+  size?: number;
+}
+
+export interface AssessmentBlock {
+  id: string;
+  type: 'assessment';
+  subject_ecr_item_id: string;
+  title?: string;
+  assessmentType?: 'quiz' | 'assignment' | 'exam';
+  /** Populated by the student-facing API (StudentLessonController). */
+  assessment_available?: boolean;
+}
+
+export type LessonBlock = RichTextBlock | VideoBlock | FileBlock | AssessmentBlock;
+
 export interface Topic {
   id: string;
   subject_id: string;
   title: string;
   description?: string;
+  content?: LessonBlock[];
+  learning_objectives?: string[];
+  estimated_minutes?: number | null;
   order: number;
   is_completed: boolean;
+  is_published?: boolean;
   quarter?: string;
   created_at: string;
   updated_at: string;

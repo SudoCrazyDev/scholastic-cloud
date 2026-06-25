@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Http\Controllers\Concerns\ResolvesStudentSubjects;
 use App\Models\Student;
 use App\Models\StudentAssessmentAttempt;
 use App\Models\StudentEcrItemScore;
@@ -25,25 +26,12 @@ use Illuminate\Support\Str;
  */
 class StudentAssessmentController extends Controller
 {
+    use ResolvesStudentSubjects;
+
     public function __construct(
         protected RunningGradeRecalcService $runningGradeRecalcService,
         protected AssessmentScoringService $scoringService
     ) {
-    }
-
-    /**
-     * Resolve the current user's student record (for student portal).
-     */
-    protected function resolveStudent(Request $request): ?Student
-    {
-        $user = $request->user();
-        if (!$user) {
-            return null;
-        }
-        if ($user instanceof StudentPortalUser) {
-            return $user->student;
-        }
-        return Student::where('user_id', $user->id)->first();
     }
 
     /**
@@ -579,49 +567,6 @@ class StudentAssessmentController extends Controller
             $out[] = $entry;
         }
         return $out;
-    }
-
-    /**
-     * Resolve subjects a student can access:
-     * - non-limited subjects from active class sections
-     * - limited subjects only when explicitly assigned via student_subjects
-     * - plus explicit active assignments as fallback for migrated/legacy data.
-     */
-    private function eligibleSubjectIds(Student $student): array
-    {
-        $activeSectionIds = StudentSection::where('student_id', $student->id)
-            ->where('is_active', true)
-            ->pluck('section_id')
-            ->toArray();
-
-        $explicitAssignedSubjectIds = StudentSubject::where('student_id', $student->id)
-            ->where('is_active', true)
-            ->pluck('subject_id')
-            ->toArray();
-
-        if (empty($activeSectionIds)) {
-            return array_values(array_unique($explicitAssignedSubjectIds));
-        }
-
-        $sectionSubjectIds = Subject::whereIn('class_section_id', $activeSectionIds)
-            ->where(function ($query) use ($student) {
-                $query
-                    ->where(function ($q) {
-                        $q->where('is_limited_student', false)
-                            ->orWhereNull('is_limited_student');
-                    })
-                    ->orWhere(function ($q) use ($student) {
-                        $q->where('is_limited_student', true)
-                            ->whereHas('studentSubjects', function ($sq) use ($student) {
-                                $sq->where('student_id', $student->id)
-                                    ->where('is_active', true);
-                            });
-                    });
-            })
-            ->pluck('id')
-            ->toArray();
-
-        return array_values(array_unique(array_merge($sectionSubjectIds, $explicitAssignedSubjectIds)));
     }
 
     private function isSupportedAssessmentItem(?SubjectEcrItem $item): bool

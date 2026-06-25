@@ -1,19 +1,35 @@
 import { api } from '../lib/api'
-import type { Topic, ApiResponse } from '../types'
+import type { Topic, ApiResponse, LessonBlock } from '../types'
 
 export interface CreateTopicData {
   subject_id: string
   title: string
   description?: string
+  content?: LessonBlock[]
+  learning_objectives?: string[]
+  estimated_minutes?: number | null
   is_completed?: boolean
+  is_published?: boolean
   quarter?: string
 }
 
 export interface UpdateTopicData {
   title?: string
   description?: string
+  content?: LessonBlock[]
+  learning_objectives?: string[]
+  estimated_minutes?: number | null
   is_completed?: boolean
+  is_published?: boolean
   quarter?: string
+}
+
+export interface LessonUploadResult {
+  path: string
+  url: string
+  name: string
+  mime?: string
+  size?: number
 }
 
 export interface ReorderTopicsData {
@@ -141,5 +157,20 @@ export const topicService = {
       console.error('Error toggling topic completion:', error)
       throw error
     }
+  },
+
+  /**
+   * Upload a lesson attachment (PDF / slides / image / doc) for a topic.
+   * Returns a file reference to store inside a `file` content block.
+   */
+  async uploadAttachment(topicId: string, file: File): Promise<LessonUploadResult> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post<ApiResponse<LessonUploadResult>>(
+      `/topics/${topicId}/upload`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return response.data.data
   }
 }
