@@ -2286,7 +2286,7 @@ const Finance: React.FC = () => {
                                 {entry.date ?? '—'}
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600 font-mono">
-                                {entry.receipt_number ?? '—'}
+                                {entry.or_number ?? '—'}
                               </td>
                               <td
                                 className={`px-4 py-3 text-sm text-right tabular-nums ${

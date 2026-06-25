@@ -246,6 +246,7 @@ class StudentFinanceController extends Controller
                 'description' => $label,
                 'amount' => -1 * (float) $payment->amount,
                 'date' => $payment->payment_date?->toDateString(),
+                'or_number' => $payment->or_number,
                 'receipt_number' => $payment->receipt_number,
                 'reference_number' => $payment->reference_number,
                 'payment_id' => $payment->id,
