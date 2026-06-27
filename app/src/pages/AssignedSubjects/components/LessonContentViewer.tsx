@@ -5,8 +5,9 @@ import {
   AcademicCapIcon,
   PencilSquareIcon,
   BookOpenIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline'
-import type { LessonBlock, AssessmentBlock } from '../../../types'
+import type { LessonBlock, AssessmentBlock, FileBlock } from '../../../types'
 import { RichTextEditor } from './RichTextEditor'
 
 interface LessonContentViewerProps {
@@ -75,6 +76,21 @@ const formatSize = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+type FileKind = 'image' | 'video' | 'audio' | 'pdf' | 'other'
+
+/** Classify an uploaded file by mime first, then by filename extension. */
+const fileKind = (block: FileBlock): FileKind => {
+  const mime = (block.mime || '').toLowerCase()
+  const name = (block.name || block.path || '').toLowerCase()
+  const ext = name.includes('.') ? name.split('.').pop()! : ''
+
+  if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif'].includes(ext)) return 'image'
+  if (mime.startsWith('video/') || ['mp4', 'webm', 'mov', 'm4v', 'ogv'].includes(ext)) return 'video'
+  if (mime.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'aac', 'oga'].includes(ext)) return 'audio'
+  if (mime === 'application/pdf' || ext === 'pdf') return 'pdf'
+  return 'other'
+}
+
 export const LessonContentViewer: React.FC<LessonContentViewerProps> = ({ blocks, onOpenAssessment }) => {
   if (!blocks || blocks.length === 0) {
     return (
@@ -116,6 +132,77 @@ export const LessonContentViewer: React.FC<LessonContentViewerProps> = ({ blocks
         }
 
         if (block.type === 'file') {
+          const kind = fileKind(block)
+          const caption = (
+            <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
+              <span className="truncate">
+                {block.name}
+                {formatSize(block.size) ? ` · ${formatSize(block.size)}` : ''}
+              </span>
+              <a
+                href={block.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex shrink-0 items-center gap-1 font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" /> Open
+              </a>
+            </div>
+          )
+
+          if (kind === 'image') {
+            return (
+              <figure key={block.id} className="space-y-1.5">
+                <a href={block.url} target="_blank" rel="noreferrer" className="block">
+                  <img
+                    src={block.url}
+                    alt={block.name}
+                    loading="lazy"
+                    className="max-h-[32rem] w-full rounded-xl border border-gray-200 bg-gray-50 object-contain"
+                  />
+                </a>
+                {caption}
+              </figure>
+            )
+          }
+
+          if (kind === 'video') {
+            return (
+              <div key={block.id} className="space-y-1.5">
+                <video
+                  src={block.url}
+                  controls
+                  preload="metadata"
+                  className="w-full rounded-xl border border-gray-200 bg-black"
+                />
+                {caption}
+              </div>
+            )
+          }
+
+          if (kind === 'audio') {
+            return (
+              <div key={block.id} className="space-y-1.5 rounded-xl border border-gray-200 bg-white p-3">
+                <audio src={block.url} controls preload="metadata" className="w-full" />
+                {caption}
+              </div>
+            )
+          }
+
+          if (kind === 'pdf') {
+            return (
+              <div key={block.id} className="space-y-1.5">
+                <iframe
+                  src={block.url}
+                  title={block.name}
+                  className="h-[40rem] w-full rounded-xl border border-gray-200 bg-gray-50"
+                />
+                {caption}
+              </div>
+            )
+          }
+
+          // Non-previewable files (docs, slides, spreadsheets) — keep the download card.
           return (
             <a
               key={block.id}

@@ -8,7 +8,9 @@ import {
   EllipsisVerticalIcon,
   ChevronUpIcon,
   ChevronDownIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  EyeIcon,
+  EyeSlashIcon
 } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../../../components/dropdown'
@@ -20,6 +22,7 @@ interface TopicItemProps {
   onEdit: (topic: Topic) => void
   onDelete: (topicId: string) => void
   onToggleCompletion: (topicId: string) => void
+  onTogglePublish?: (topicId: string) => void
   onMoveUp?: (topicId: string) => void
   onMoveDown?: (topicId: string) => void
   canMoveUp?: boolean
@@ -27,6 +30,7 @@ interface TopicItemProps {
   isDeleting?: boolean
   isTogglingCompletion?: boolean
   isReordering?: boolean
+  isUpdating?: boolean
 }
 
 export const TopicItem: React.FC<TopicItemProps> = ({
@@ -34,30 +38,44 @@ export const TopicItem: React.FC<TopicItemProps> = ({
   onEdit,
   onDelete,
   onToggleCompletion,
+  onTogglePublish,
   onMoveUp,
   onMoveDown,
   canMoveUp = false,
   canMoveDown = false,
   isDeleting = false,
   isTogglingCompletion = false,
-  isReordering = false
+  isReordering = false,
+  isUpdating = false
 }) => {
   const handleToggleCompletion = () => {
     onToggleCompletion(topic.id)
   }
+
+  const busy = isDeleting || isTogglingCompletion || isReordering || isUpdating
 
   const dropdownItems = [
     {
       label: 'Edit',
       icon: PencilIcon,
       onClick: () => onEdit(topic),
-      disabled: isDeleting || isTogglingCompletion || isReordering
+      disabled: busy
     },
+    ...(onTogglePublish
+      ? [
+          {
+            label: topic.is_published ? 'Unpublish' : 'Publish',
+            icon: topic.is_published ? EyeSlashIcon : EyeIcon,
+            onClick: () => onTogglePublish(topic.id),
+            disabled: busy
+          }
+        ]
+      : []),
     {
       label: 'Delete',
       icon: TrashIcon,
       onClick: () => onDelete(topic.id),
-      disabled: isDeleting || isTogglingCompletion || isReordering,
+      disabled: busy,
       className: 'text-red-600 hover:text-red-700 hover:bg-red-50'
     }
   ]
@@ -99,10 +117,21 @@ export const TopicItem: React.FC<TopicItemProps> = ({
           }`}>
             {topic.title}
           </h4>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-            topic.is_published ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-600'
-          }`}>
-            {topic.is_published ? 'Published' : 'Draft'}
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+              topic.is_published ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'
+            }`}
+            title={topic.is_published ? 'Visible to students' : 'Draft — hidden from students until published'}
+          >
+            {topic.is_published ? (
+              <>
+                <EyeIcon className="w-3 h-3" /> Published
+              </>
+            ) : (
+              <>
+                <EyeSlashIcon className="w-3 h-3" /> Draft · hidden from students
+              </>
+            )}
           </span>
           {topic.is_completed && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

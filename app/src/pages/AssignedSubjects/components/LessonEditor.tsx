@@ -220,20 +220,48 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
   }
 
   const handleFileUpload = async (blockId: string, file: File) => {
-    if (!savedTopicId) {
-      toast.error('Save the lesson first, then upload files.')
-      return
+    let topicId = savedTopicId
+    // The upload endpoint is keyed by topic id, so an unsaved lesson must be
+    // persisted first. Do it transparently — the teacher only needs a title.
+    if (!topicId) {
+      if (!draft.title.trim()) {
+        const msg = 'Add a lesson title before uploading files.'
+        setError(msg)
+        toast.error(msg)
+        return
+      }
+      try {
+        setUploadingBlockId(blockId)
+        const saved = await onSubmit(buildPayload(), null)
+        topicId = saved.id
+        setSavedTopicId(saved.id)
+        setDraft((d) => ({ ...d, content: (saved.content || d.content).map((b) => ({ ...b })) }))
+        setError(null)
+      } catch {
+        setError('Failed to save the lesson. Please try again.')
+        setUploadingBlockId(null)
+        return
+      }
     }
     try {
       setUploadingBlockId(blockId)
-      const result = await topicService.uploadAttachment(savedTopicId, file)
-      updateBlock(blockId, {
+      const result = await topicService.uploadAttachment(topicId, file)
+      const filePatch: Partial<LessonBlock> = {
         path: result.path,
         url: result.url,
         name: result.name,
         mime: result.mime,
         size: result.size,
-      })
+      }
+      // Apply locally, then persist the new content so the upload survives a
+      // reopen — otherwise the file reference lives only in component state and
+      // is lost unless the teacher remembers to hit Save.
+      const nextContent = draft.content.map((b) =>
+        b.id === blockId ? ({ ...b, ...filePatch } as LessonBlock) : b
+      )
+      setDraft((d) => ({ ...d, content: nextContent }))
+      const saved = await onSubmit(buildPayload(nextContent), topicId)
+      setDraft((d) => ({ ...d, content: (saved.content || nextContent).map((b) => ({ ...b })) }))
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to upload file.')
     } finally {
@@ -251,14 +279,14 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
     return null
   }
 
-  const buildPayload = (): CreateTopicData => {
+  const buildPayload = (contentOverride?: LessonBlock[]): CreateTopicData => {
     const objectives = draft.learning_objectives.map((o) => o.trim()).filter(Boolean)
     const minutes = draft.estimated_minutes.trim() === '' ? null : Math.max(0, Number(draft.estimated_minutes) || 0)
     return {
       subject_id: subjectId,
       title: draft.title.trim(),
       description: draft.description.trim(),
-      content: draft.content,
+      content: contentOverride ?? draft.content,
       learning_objectives: objectives,
       estimated_minutes: minutes,
       is_published: draft.is_published,
@@ -317,7 +345,14 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <span>{draft.is_published ? 'Published' : 'Draft'}</span>
+                  <span className="flex flex-col items-end leading-tight">
+                    <span className={draft.is_published ? 'font-medium text-indigo-700' : 'font-medium text-amber-700'}>
+                      {draft.is_published ? 'Published' : 'Draft'}
+                    </span>
+                    <span className="text-[11px] text-gray-400">
+                      {draft.is_published ? 'Visible to students' : 'Hidden from students'}
+                    </span>
+                  </span>
                   <Switch
                     checked={draft.is_published}
                     onChange={(v: boolean) => setDraft((d) => ({ ...d, is_published: Boolean(v) }))}
@@ -453,7 +488,7 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
 
                 {!savedTopicId && (
                   <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    Save the lesson once to enable file uploads.
+                    Add a lesson title, then choose a file — the lesson is saved automatically on your first upload.
                   </p>
                 )}
 
@@ -505,16 +540,16 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
                                   <label
                                     className={clsx(
                                       'flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50',
-                                      (!savedTopicId || uploadingBlockId === block.id) && 'cursor-not-allowed opacity-60'
+                                      uploadingBlockId === block.id && 'cursor-not-allowed opacity-60'
                                     )}
                                   >
                                     <ArrowUpTrayIcon className="h-4 w-4" />
-                                    {uploadingBlockId === block.id ? 'Uploading…' : 'Choose a file (PDF, image, slides, doc)'}
+                                    {uploadingBlockId === block.id ? 'Uploading…' : 'Choose a file (PDF, image, video, audio, slides, doc)'}
                                     <input
                                       type="file"
                                       className="hidden"
-                                      accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
-                                      disabled={!savedTopicId || uploadingBlockId === block.id}
+                                      accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.mp4,.webm,.mov,.m4v,.mp3,.wav,.m4a"
+                                      disabled={uploadingBlockId === block.id}
                                       onChange={(e) => {
                                         const f = e.target.files?.[0]
                                         if (f) handleFileUpload(block.id, f)

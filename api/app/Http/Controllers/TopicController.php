@@ -272,8 +272,10 @@ class TopicController extends Controller
     public function uploadAttachment(Request $request, string $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            // 25 MB ceiling. mimes kept broad enough for typical lesson resources.
-            'file' => 'required|file|max:25600|mimes:pdf,png,jpg,jpeg,gif,webp,doc,docx,ppt,pptx,xls,xlsx,txt',
+            // 100 MB ceiling so short lesson videos/audio fit alongside docs & images.
+            // NOTE: PHP's upload_max_filesize / post_max_size must be >= this for
+            // large uploads to actually reach the app.
+            'file' => 'required|file|max:102400|mimes:pdf,png,jpg,jpeg,gif,webp,doc,docx,ppt,pptx,xls,xlsx,txt,mp4,webm,mov,m4v,mp3,wav,m4a',
         ]);
 
         if ($validator->fails()) {

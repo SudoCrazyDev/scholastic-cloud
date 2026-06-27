@@ -109,6 +109,18 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
     }
   }
 
+  const handleTogglePublish = async (topicId: string) => {
+    const topic = topics.find((t) => t.id === topicId)
+    if (!topic) return
+    try {
+      setError(null)
+      await updateTopic(topicId, { is_published: !topic.is_published })
+    } catch (err) {
+      setError('Failed to update publish status. Please try again.')
+      throw err
+    }
+  }
+
   const handleMoveUp = async (topicId: string) => {
     try {
       setError(null)
@@ -301,6 +313,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
                     onEdit={handleEditTopic}
                     onDelete={(topicId) => setDeletingTopicId(topicId)}
                     onToggleCompletion={handleToggleCompletion}
+                    onTogglePublish={handleTogglePublish}
                     onMoveUp={handleMoveUp}
                     onMoveDown={handleMoveDown}
                     canMoveUp={index > 0}
@@ -308,6 +321,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
                     isDeleting={isDeleting}
                     isTogglingCompletion={isTogglingCompletion}
                     isReordering={isReordering}
+                    isUpdating={isUpdating}
                   />
                 ))}
               </div>
