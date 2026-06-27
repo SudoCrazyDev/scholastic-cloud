@@ -50,21 +50,21 @@ const validationSchema = Yup.object({
     .required('First name is required')
     .min(2, 'First name must be at least 2 characters')
     .max(50, 'First name must be less than 50 characters')
-    .matches(/^[a-zA-Z\s]+$/, 'First name can only contain letters and spaces'),
-  
+    .matches(/^[\p{L}\s.'-]+$/u, 'First name contains invalid characters'),
+
   middle_name: Yup.string()
     .max(50, 'Middle name must be less than 50 characters')
-    .matches(/^[a-zA-Z\s]*$/, 'Middle name can only contain letters and spaces'),
-  
+    .matches(/^[\p{L}\s.'-]*$/u, 'Middle name contains invalid characters'),
+
   last_name: Yup.string()
     .required('Last name is required')
     .min(2, 'Last name must be at least 2 characters')
     .max(50, 'Last name must be less than 50 characters')
-    .matches(/^[a-zA-Z\s]+$/, 'Last name can only contain letters and spaces'),
+    .matches(/^[\p{L}\s.'-]+$/u, 'Last name contains invalid characters'),
   
   ext_name: Yup.string()
     .max(20, 'Extension name must be less than 20 characters')
-    .matches(/^[a-zA-Z\s.,]*$/, 'Extension name can only contain letters, spaces, dots, and commas'),
+    .matches(/^[\p{L}\s.,'-]*$/u, 'Extension name contains invalid characters'),
   
   birthdate: Yup.date()
     .required('Birthdate is required')
