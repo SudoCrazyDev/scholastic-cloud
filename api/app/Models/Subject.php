@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subject extends Model
 {
     use HasUuids;
-    
+
     protected $fillable = [
         'institution_id',
         'class_section_id',
@@ -20,6 +20,8 @@ class Subject extends Model
         'parent_subject_id',
         'title',
         'variant',
+        'grading_type',
+        'grading_scale_id',
         'start_time',
         'end_time',
         'meeting_days',
@@ -42,6 +44,11 @@ class Subject extends Model
     public function classSection(): BelongsTo
     {
         return $this->belongsTo(ClassSection::class);
+    }
+
+    public function gradingScale(): BelongsTo
+    {
+        return $this->belongsTo(GradingScale::class);
     }
 
     public function adviserUser(): BelongsTo
@@ -123,7 +130,7 @@ class Subject extends Model
      */
     public function isChildSubject(): bool
     {
-        return !is_null($this->parent_subject_id);
+        return ! is_null($this->parent_subject_id);
     }
 
     /**

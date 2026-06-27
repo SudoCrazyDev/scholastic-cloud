@@ -120,6 +120,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('grade-levels', [GradeLevelController::class, 'store']);
     Route::put('grade-levels/{id}', [GradeLevelController::class, 'update']);
     Route::delete('grade-levels/{id}', [GradeLevelController::class, 'destroy']);
+    Route::apiResource('grading-scales', \App\Http\Controllers\GradingScaleController::class);
     Route::get('departments', [DepartmentController::class, 'index']);
     Route::post('departments', [DepartmentController::class, 'store']);
     Route::get('departments/{id}', [DepartmentController::class, 'show']);

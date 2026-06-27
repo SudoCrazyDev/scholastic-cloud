@@ -18,12 +18,14 @@ import { StudentGradesByQuarter } from './StudentGradesByQuarter'
 import { Alert } from '../../../components/alert'
 import { ErrorHandler } from '../../../utils/errorHandler'
 import { toast } from 'react-hot-toast'
+import type { GradeBandLike } from '../../../utils/gradeScale'
 
 interface ClassRecordTabProps {
   subjectId: string
   classSectionId?: string
   isLimited?: boolean
   assignedStudentIds?: string[]
+  gradingBands?: GradeBandLike[] | null
 }
 
 // Type for batch grade changes
@@ -40,7 +42,7 @@ interface BatchGradeChange {
 // Type for submission strategy
 type SubmissionStrategy = 'bulk' | 'individual' | 'hybrid';
 
-export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [] }) => {
+export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [], gradingBands = null }) => {
   // Fetch students
   const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId });
 
@@ -709,6 +711,7 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
                           isBatchMode={isBatchMode}
                           onGradeChange={handleGradeChange}
                           isDisabled={isSubmitting}
+                          gradingBands={gradingBands}
                         />
                       ))}
                     </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { FinalGradeInput } from './FinalGradeInput';
 import type { StudentRunningGrade } from '../../../services/studentRunningGradeService';
 import type { Student } from '../../../types';
+import type { GradeBandLike } from '../../../utils/gradeScale';
 
 
 interface StudentGradesByQuarterProps {
@@ -22,6 +23,7 @@ interface StudentGradesByQuarterProps {
     hasChanged: boolean;
   }) => void;
   isDisabled?: boolean;
+  gradingBands?: GradeBandLike[] | null;
 }
 
 export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
@@ -33,6 +35,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
   isBatchMode = false,
   onGradeChange,
   isDisabled = false,
+  gradingBands = null,
 }) => {
   // Group grades by quarter
   const gradesByQuarter = runningGrades.reduce((acc, grade) => {
@@ -108,6 +111,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
                       isBatchMode={isBatchMode}
                       onGradeChange={onGradeChange}
                       isDisabled={isDisabled}
+                      gradingBands={gradingBands}
                     />
                   </div>
                 </div>
@@ -136,6 +140,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
                       isBatchMode={isBatchMode}
                       onGradeChange={onGradeChange}
                       isDisabled={isDisabled}
+                      gradingBands={gradingBands}
                     />
                   </div>
                 </div>

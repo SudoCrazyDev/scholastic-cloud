@@ -7,6 +7,7 @@ import { Badge } from '../../components/badge';
 import { Button } from '../../components/button';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { ConsolidatedGradesPDF } from './components/ConsolidatedGradesPDF';
+import { formatGradeWithLetter, type GradeBandLike } from '../../utils/gradeScale';
 
 export default function SectionGrades() {
   const { sectionId, quarter } = useParams<{ sectionId: string; quarter: string }>();
@@ -100,6 +101,27 @@ export default function SectionGrades() {
       subject_title: base,
     }));
   }, [data]);
+
+  // Map each base subject to its non-numerical grading bands (if any), so we can
+  // render the letter grade alongside the numeric value ("show both").
+  const baseToBands = React.useMemo(() => {
+    const meta = data?.subjects_meta;
+    const map: Record<string, GradeBandLike[] | null> = {};
+    if (!meta) return map;
+    baseSubjects.forEach((subject) => {
+      const nonNumerical = subject.subject_ids
+        .map((id) => meta[id])
+        .find((m) => m && m.grading_type === 'non_numerical' && m.bands.length > 0);
+      map[subject.subject_title] = nonNumerical ? nonNumerical.bands : null;
+    });
+    return map;
+  }, [data, baseSubjects]);
+
+  const formatGradeCell = (baseTitle: string, grade: number | string | null) => {
+    const bands = baseToBands[baseTitle];
+    if (bands) return formatGradeWithLetter(grade as number | null, bands);
+    return formatGrade(grade);
+  };
 
   // For each student, group grades by base subject (preserve subject_type for final grade calc)
   const studentsWithGroupedSubjects = React.useMemo(() => {
@@ -323,7 +345,7 @@ export default function SectionGrades() {
                               <td key={subject.base} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                                 <div className="text-center">
                                   <div className={`text-sm font-medium ${getGradeColor(subj?.grade)}`}>
-                                    {formatGrade(subj?.grade)}
+                                    {formatGradeCell(subject.subject_title, subj?.grade)}
                                   </div>
                                 </div>
                               </td>
@@ -419,7 +441,7 @@ export default function SectionGrades() {
                               <td key={subject.base} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                                 <div className="text-center">
                                   <div className={`text-sm font-medium ${getGradeColor(subj?.grade)}`}>
-                                    {formatGrade(subj?.grade)}
+                                    {formatGradeCell(subject.subject_title, subj?.grade)}
                                   </div>
                                 </div>
                               </td>
@@ -518,7 +540,7 @@ export default function SectionGrades() {
                                   <td key={subject.base} className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
                                     <div className="text-center">
                                       <div className={`text-sm font-medium ${getGradeColor(subj?.grade)}`}>
-                                        {formatGrade(subj?.grade)}
+                                        {formatGradeCell(subject.subject_title, subj?.grade)}
                                       </div>
                                     </div>
                                   </td>

@@ -22,6 +22,7 @@ import { AiPlannerTab } from './components/AiPlannerTab'
 import { LessonPlanCalendarTab } from './components/LessonPlanCalendarTab'
 import SummativeAssessmentTab from './components/SummativeAssessmentTab'
 import { AssessmentBuilderTab } from './components/AssessmentBuilderTab'
+import { GradingTypeControl } from './components/GradingTypeControl'
 import type { Subject, Student, ClassSection } from '../../types'
 
 type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'assessment-methods' | 'ai-planner' | 'lesson-plan-calendar'
@@ -40,7 +41,11 @@ const SubjectDetail: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('student-scores')
 
   const subject = data?.data as SubjectWithClassSectionStudents;
-  
+
+  // Non-numerical grading bands for this subject (used to show letter grades alongside numeric).
+  const gradingBands =
+    subject?.grading_type === 'non_numerical' ? subject?.grading_scale?.bands ?? null : null;
+
   // Fetch assigned student IDs if subject is limited
   const { data: assignedRes } = useQuery({
     queryKey: ['student-subjects', subject?.id],
@@ -151,6 +156,16 @@ const SubjectDetail: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Grading type control */}
+          <div className="flex flex-col items-start sm:items-end gap-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Grading</span>
+            <GradingTypeControl
+              subjectId={subject.id}
+              gradingType={subject.grading_type}
+              gradingScaleId={subject.grading_scale_id}
+            />
+          </div>
         </div>
 
         {/* Subject Info Grid */}
@@ -212,6 +227,7 @@ const SubjectDetail: React.FC = () => {
               classSectionId={subject.class_section_id}
               isLimited={!!subject.is_limited_student}
               assignedStudentIds={assignedStudentIds}
+              gradingBands={gradingBands}
             />
           )}
           {activeTab === 'student-scores' && (

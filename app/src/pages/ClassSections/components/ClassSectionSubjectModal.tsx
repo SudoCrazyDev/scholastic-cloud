@@ -8,6 +8,7 @@ import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
 import { Autocomplete } from '../../../components/autocomplete'
 import { useTeachers } from '../../../hooks/useTeachers'
+import { useGradingScales } from '../../../hooks/useGradingScales'
 import type { Subject, CreateSubjectData, UpdateSubjectData, Student } from '../../../types'
 import { studentService } from '../../../services/studentService'
 import { studentSubjectService } from '../../../services/studentSubjectService'
@@ -62,6 +63,15 @@ const validationSchema = Yup.object().shape({
       then: (schema) => schema.required('Subject teacher is required for child subjects'),
       otherwise: (schema) => schema.optional(),
     }),
+  grading_type: Yup.string()
+    .oneOf(['numerical', 'non_numerical'], 'Invalid grading type')
+    .required('Grading type is required'),
+  grading_scale_id: Yup.string()
+    .when('grading_type', {
+      is: 'non_numerical',
+      then: (schema) => schema.required('Select a grading scale for non-numerical grading'),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
   is_limited_student: Yup.boolean()
     .optional(),
 })
@@ -100,6 +110,8 @@ export function ClassSectionSubjectModal({
 
   const isEditing = !!subject
 
+  const { gradingScales } = useGradingScales()
+
   const [sectionStudents, setSectionStudents] = useState<Student[]>([])
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
   const [studentSearch, setStudentSearch] = useState('')
@@ -110,6 +122,8 @@ export function ClassSectionSubjectModal({
       parent_subject_id: '',
       title: '',
       variant: '',
+      grading_type: 'numerical' as 'numerical' | 'non_numerical',
+      grading_scale_id: '',
       start_time: '',
       end_time: '',
       adviser: '',
@@ -125,6 +139,8 @@ export function ClassSectionSubjectModal({
           parent_subject_id: values.subject_type === 'child' ? values.parent_subject_id : undefined,
           title: values.title,
           variant: isEditing ? values.variant : (values.variant === '' ? '' : values.variant || undefined),
+          grading_type: values.grading_type,
+          grading_scale_id: values.grading_type === 'non_numerical' ? values.grading_scale_id : null,
           start_time: isEditing ? values.start_time : (values.start_time === '' ? '' : values.start_time || undefined),
           end_time: isEditing ? values.end_time : (values.end_time === '' ? '' : values.end_time || undefined),
           adviser: isEditing ? values.adviser : (values.adviser === '' ? '' : values.adviser || undefined),
@@ -159,6 +175,8 @@ export function ClassSectionSubjectModal({
           parent_subject_id: subject.parent_subject_id || '',
           title: subject.title,
           variant: subject.variant || '',
+          grading_type: subject.grading_type === 'non_numerical' ? 'non_numerical' : 'numerical',
+          grading_scale_id: subject.grading_scale_id || '',
           start_time: subject.start_time || '',
           end_time: subject.end_time || '',
           adviser: subject.adviser || '',
@@ -488,6 +506,70 @@ export function ClassSectionSubjectModal({
                   <p className="mt-1 text-xs text-gray-500">
                     Use variants for subjects with the same name but different specializations (e.g., TLE - Sewing, TLE - Machineries)
                   </p>
+                </div>
+
+                {/* Grading Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Grading Type *
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="grading_type"
+                        value="numerical"
+                        checked={formik.values.grading_type === 'numerical'}
+                        onChange={formik.handleChange}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">Numerical</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="grading_type"
+                        value="non_numerical"
+                        checked={formik.values.grading_type === 'non_numerical'}
+                        onChange={formik.handleChange}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">Non-Numerical</span>
+                    </label>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Non-numerical subjects compute the same way, then map the result to a letter via a grading scale.
+                  </p>
+
+                  {formik.values.grading_type === 'non_numerical' && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Grading Scale *
+                      </label>
+                      {gradingScales.length === 0 ? (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
+                          No grading scales found. Create one under{' '}
+                          <span className="font-medium">Grading Scales</span> in the admin menu first.
+                        </div>
+                      ) : (
+                        <Select
+                          name="grading_scale_id"
+                          value={formik.values.grading_scale_id}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                          className={formik.touched.grading_scale_id && formik.errors.grading_scale_id ? 'border-red-500' : ''}
+                          placeholder="Choose a grading scale..."
+                          options={gradingScales.map((scale) => ({
+                            value: scale.id,
+                            label: scale.name,
+                          }))}
+                        />
+                      )}
+                      {formik.touched.grading_scale_id && formik.errors.grading_scale_id && (
+                        <p className="mt-1 text-sm text-red-600">{formik.errors.grading_scale_id}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Time Schedule */}

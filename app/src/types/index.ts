@@ -924,6 +924,41 @@ export interface UpdateSubjectTemplateItemData {
 }
 
 // Subject types
+export type GradingType = 'numerical' | 'non_numerical';
+
+export interface GradingScaleBand {
+  id?: string;
+  grading_scale_id?: string;
+  label: string;
+  min_score: number;
+  max_score: number;
+  sort_order?: number;
+}
+
+export interface GradingScale {
+  id: string;
+  institution_id: string;
+  name: string;
+  description?: string | null;
+  bands: GradingScaleBand[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GradingScaleBandInput {
+  label: string;
+  min_score: number;
+  max_score: number;
+}
+
+export interface CreateGradingScaleData {
+  name: string;
+  description?: string | null;
+  bands: GradingScaleBandInput[];
+}
+
+export type UpdateGradingScaleData = CreateGradingScaleData;
+
 export interface Subject {
   id: string;
   institution_id: string;
@@ -935,6 +970,9 @@ export interface Subject {
   parent_subject?: Subject; // Full parent subject object
   title: string;
   variant?: string; // Optional variant (e.g., "Sewing", "Machineries", "Plumbing")
+  grading_type?: GradingType;
+  grading_scale_id?: string | null;
+  grading_scale?: GradingScale | null;
   start_time?: string;
   end_time?: string;
   meeting_days?: string[] | null; // e.g. ['monday','wednesday','friday']
@@ -1131,6 +1169,8 @@ export interface CreateSubjectData {
   parent_subject_id?: string;
   title: string;
   variant?: string;
+  grading_type?: GradingType;
+  grading_scale_id?: string | null;
   start_time?: string;
   end_time?: string;
   meeting_days?: string[] | null;
@@ -1145,6 +1185,8 @@ export interface UpdateSubjectData {
   parent_subject_id?: string;
   title?: string;
   variant?: string;
+  grading_type?: GradingType;
+  grading_scale_id?: string | null;
   start_time?: string;
   end_time?: string;
   meeting_days?: string[] | null;

@@ -25,6 +25,13 @@ export interface ConsolidatedGradesResponse {
         calculated_grade: number | string | null
       }>
     }>
+    subjects_meta?: Record<
+      string,
+      {
+        grading_type: 'numerical' | 'non_numerical'
+        bands: Array<{ label: string; min_score: number; max_score: number }>
+      }
+    >
   }
 }
 

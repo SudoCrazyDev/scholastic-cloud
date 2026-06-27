@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\ClassSection;
 use App\Models\StudentRunningGrade;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class SectionConsolidatedGradesController extends Controller
 {
@@ -24,18 +24,19 @@ class SectionConsolidatedGradesController extends Controller
         $isFinal = $quarter === 'final';
 
         // Get the section with its students and subjects (eager load childSubjects)
-        $section = ClassSection::with(['students', 'subjects.childSubjects'])->findOrFail($sectionId);
+        $section = ClassSection::with(['students', 'subjects.childSubjects', 'subjects.gradingScale.bands'])->findOrFail($sectionId);
 
         // Get all students in this section and sort by last name alphabetically
         $students = $section->students->sortBy('last_name');
 
         // Get all subjects for this section, ordered hierarchically
-        $subjects = $section->subjects->sortBy(function($subject) {
+        $subjects = $section->subjects->sortBy(function ($subject) {
             if ($subject->subject_type === 'parent') {
                 return $subject->order * 1000;
             } else {
                 $parentOrder = $subject->parentSubject ? $subject->parentSubject->order : 999;
                 $childOrder = $subject->order;
+
                 return ($parentOrder * 1000) + $childOrder;
             }
         });
@@ -47,30 +48,34 @@ class SectionConsolidatedGradesController extends Controller
         if ($isFinal) {
             $gradesQuery->whereIn('quarter', [1, 2, 3, 4]);
         } else {
-            $gradesQuery->where('quarter', (int)$quarter);
+            $gradesQuery->where('quarter', (int) $quarter);
         }
 
         $grades = $gradesQuery->get();
 
         // Helper: get base title (strip after dash or parenthesis)
-        $getBaseTitle = function($title) {
+        $getBaseTitle = function ($title) {
             // Remove everything after the first dash or parenthesis
             $title = preg_replace('/\s*[-(].*$/', '', $title);
+
             return trim($title);
         };
 
         // Helper: compute the average grade for a subject across all 4 quarters.
         // Round each quarter to whole number first, then average, then round — matches
         // Final Report Card (gradeUtils.calculateFinalGrade / getQuarterGrade) and DepEd rules.
-        $averageAcrossQuarters = function($studentId, $subjectId) use ($grades) {
+        $averageAcrossQuarters = function ($studentId, $subjectId) use ($grades) {
             $quarterGrades = $grades->where('student_id', $studentId)
                 ->where('subject_id', $subjectId)
                 ->whereIn('quarter', [1, 2, 3, 4]);
             $rounded = [];
             foreach ($quarterGrades as $g) {
                 $v = $g->final_grade ?? $g->grade;
-                if ($v !== null) $rounded[] = (int) round((float) $v);
+                if ($v !== null) {
+                    $rounded[] = (int) round((float) $v);
+                }
             }
+
             return count($rounded) > 0 ? (int) round(array_sum($rounded) / count($rounded)) : null;
         };
 
@@ -120,7 +125,7 @@ class SectionConsolidatedGradesController extends Controller
                             break;
                         }
                     }
-                    if (!$alreadyIncluded) {
+                    if (! $alreadyIncluded) {
                         if ($isFinal) {
                             $val = $averageAcrossQuarters($student->id, $subject->id);
                         } else {
@@ -135,9 +140,9 @@ class SectionConsolidatedGradesController extends Controller
                             'subject_variant' => $subject->variant,
                             'subject_type' => $subject->subject_type,
                             'parent_subject_id' => $subject->parent_subject_id,
-                            'grade' => $val !== null ? (int)$val : null,
-                            'final_grade' => $val !== null ? (int)$val : null,
-                            'calculated_grade' => $val !== null ? (int)$val : null,
+                            'grade' => $val !== null ? (int) $val : null,
+                            'final_grade' => $val !== null ? (int) $val : null,
+                            'calculated_grade' => $val !== null ? (int) $val : null,
                         ];
                     }
                 }
@@ -146,10 +151,10 @@ class SectionConsolidatedGradesController extends Controller
             // 2. Handle subjects with variants (group by base title only if variant is not empty/null)
             $variantGroups = [];
             $regularSubjects = [];
-            
+
             foreach ($subjects as $subject) {
-                if ($subject->subject_type !== 'parent' && $subject->subject_type !== 'child' && !in_array($subject->id, $handledParentIds)) {
-                    if (!empty($subject->variant) && $subject->variant !== null) {
+                if ($subject->subject_type !== 'parent' && $subject->subject_type !== 'child' && ! in_array($subject->id, $handledParentIds)) {
+                    if (! empty($subject->variant) && $subject->variant !== null) {
                         $baseTitle = $getBaseTitle($subject->title);
                         $variantGroups[$baseTitle][] = $subject;
                     } else {
@@ -157,14 +162,16 @@ class SectionConsolidatedGradesController extends Controller
                     }
                 }
             }
-            
+
             // Process grouped subjects with variants
             foreach ($variantGroups as $baseTitle => $groupedSubjects) {
                 if ($isFinal) {
                     $finalAvgs = [];
                     foreach ($groupedSubjects as $subject) {
                         $avg = $averageAcrossQuarters($student->id, $subject->id);
-                        if ($avg !== null) $finalAvgs[] = $avg;
+                        if ($avg !== null) {
+                            $finalAvgs[] = $avg;
+                        }
                     }
                     $val = count($finalAvgs) > 0 ? round(array_sum($finalAvgs) / count($finalAvgs)) : null;
                     $studentGrades[] = [
@@ -173,9 +180,9 @@ class SectionConsolidatedGradesController extends Controller
                         'subject_variant' => null,
                         'subject_type' => $groupedSubjects[0]->subject_type,
                         'parent_subject_id' => $groupedSubjects[0]->parent_subject_id,
-                        'grade' => $val !== null ? (int)$val : null,
-                        'final_grade' => $val !== null ? (int)$val : null,
-                        'calculated_grade' => $val !== null ? (int)$val : null,
+                        'grade' => $val !== null ? (int) $val : null,
+                        'final_grade' => $val !== null ? (int) $val : null,
+                        'calculated_grade' => $val !== null ? (int) $val : null,
                     ];
                 } else {
                     $gradesArr = [];
@@ -197,13 +204,13 @@ class SectionConsolidatedGradesController extends Controller
                         'subject_variant' => null,
                         'subject_type' => $groupedSubjects[0]->subject_type,
                         'parent_subject_id' => $groupedSubjects[0]->parent_subject_id,
-                        'grade' => $avg !== null ? (int)$avg : null,
-                        'final_grade' => $finalAvg !== null ? (int)$finalAvg : null,
-                        'calculated_grade' => $avg !== null ? (int)$avg : null,
+                        'grade' => $avg !== null ? (int) $avg : null,
+                        'final_grade' => $finalAvg !== null ? (int) $finalAvg : null,
+                        'calculated_grade' => $avg !== null ? (int) $avg : null,
                     ];
                 }
             }
-            
+
             // Process regular subjects (without variants) individually
             foreach ($regularSubjects as $subject) {
                 if ($isFinal) {
@@ -220,16 +227,16 @@ class SectionConsolidatedGradesController extends Controller
                     'subject_variant' => $subject->variant,
                     'subject_type' => $subject->subject_type,
                     'parent_subject_id' => $subject->parent_subject_id,
-                    'grade' => $val !== null ? (int)$val : null,
-                    'final_grade' => $val !== null ? (int)$val : null,
-                    'calculated_grade' => $val !== null ? (int)$val : null,
+                    'grade' => $val !== null ? (int) $val : null,
+                    'final_grade' => $val !== null ? (int) $val : null,
+                    'calculated_grade' => $val !== null ? (int) $val : null,
                 ];
             }
 
             // Format student name as: LAST_NAME, FIRST_NAME MIDDLE_INITIAL EXT_NAME
-            $middleInitial = !empty($student->middle_name) ? substr($student->middle_name, 0, 1) . '.' : '';
-            $extName = !empty($student->ext_name) ? ' ' . $student->ext_name : '';
-            $formattedName = strtoupper(trim($student->last_name . ', ' . $student->first_name . ' ' . $middleInitial . $extName));
+            $middleInitial = ! empty($student->middle_name) ? substr($student->middle_name, 0, 1).'.' : '';
+            $extName = ! empty($student->ext_name) ? ' '.$student->ext_name : '';
+            $formattedName = strtoupper(trim($student->last_name.', '.$student->first_name.' '.$middleInitial.$extName));
 
             $consolidatedGrades[] = [
                 'student_id' => $student->id,
@@ -237,6 +244,22 @@ class SectionConsolidatedGradesController extends Controller
                 'lrn' => $student->lrn,
                 'gender' => $student->gender,
                 'subjects' => $studentGrades,
+            ];
+        }
+
+        // Build a per-subject meta map so the frontend can render letter grades
+        // for non-numerical subjects ("show both": e.g. "A- (91)").
+        $subjectsMeta = [];
+        foreach ($subjects as $subject) {
+            $subjectsMeta[$subject->id] = [
+                'grading_type' => $subject->grading_type ?? 'numerical',
+                'bands' => ($subject->gradingScale?->bands ?? collect())->map(function ($band) {
+                    return [
+                        'label' => $band->label,
+                        'min_score' => (float) $band->min_score,
+                        'max_score' => (float) $band->max_score,
+                    ];
+                })->values(),
             ];
         }
 
@@ -251,7 +274,8 @@ class SectionConsolidatedGradesController extends Controller
                 ],
                 'quarter' => $quarter,
                 'students' => $consolidatedGrades,
+                'subjects_meta' => $subjectsMeta,
             ],
         ]);
     }
-} 
+}

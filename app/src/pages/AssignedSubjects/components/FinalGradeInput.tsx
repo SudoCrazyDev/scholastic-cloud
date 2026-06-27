@@ -4,6 +4,7 @@ import { CalculatorIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useUpdateFinalGrade, useUpsertFinalGrade, useDeleteStudentRunningGrade } from '../../../hooks/useStudentRunningGrades';
 import { toast } from 'react-hot-toast';
 import { formatGrade, getGradeColor, getGradeBackground, toNumber } from '../../../utils/gradeUtils';
+import { mapScoreToLabel, type GradeBandLike } from '../../../utils/gradeScale';
 
 interface FinalGradeInputProps {
   studentId: string;
@@ -25,6 +26,8 @@ interface FinalGradeInputProps {
     hasChanged: boolean;
   }) => void;
   isDisabled?: boolean;
+  /** Non-numerical grading bands; when present the calculated grade also shows its letter. */
+  gradingBands?: GradeBandLike[] | null;
 }
 
 export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
@@ -38,6 +41,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   isBatchMode = false,
   onGradeChange,
   isDisabled = false,
+  gradingBands = null,
 }) => {
   const [finalGrade, setFinalGrade] = useState<number | ''>(
     currentFinalGrade != null ? currentFinalGrade : ''
@@ -230,12 +234,16 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   // Visual indicator for changes in batch mode
   const hasChanges = isBatchMode ? hasLocalChanges : false;
 
+  // For non-numerical subjects, map the calculated grade to its letter ("show both").
+  const calculatedLetter =
+    gradingBands && gradingBands.length > 0 ? mapScoreToLabel(toNumber(calculatedGrade), gradingBands) : null;
+
   return (
     <div className="flex flex-col items-center space-y-2">
       {/* Calculated Grade Display with Calculator Button */}
       <div className="flex items-center space-x-1">
         <span className={`text-sm font-semibold px-2 py-1 rounded-md ${getGradeBackground(calculatedGrade)} ${getGradeColor(calculatedGrade)}`}>
-          {formatGrade(calculatedGrade)}
+          {calculatedLetter ? `${calculatedLetter} (${formatGrade(calculatedGrade)})` : formatGrade(calculatedGrade)}
         </span>
         
         {/* Use Calculated Grade Button */}

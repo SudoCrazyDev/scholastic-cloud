@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Subject;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class SubjectController extends Controller
 {
@@ -22,24 +22,24 @@ class SubjectController extends Controller
             ->where('is_default', true)
             ->first();
 
-        if (!$defaultInstitution) {
+        if (! $defaultInstitution) {
             return response()->json([
                 'success' => false,
-                'message' => 'No default institution found for authenticated user'
+                'message' => 'No default institution found for authenticated user',
             ], 403);
         }
 
         // Check if class_section_id parameter is provided
         $classSectionId = $request->query('class_section_id');
-        
-        if (!$classSectionId) {
+
+        if (! $classSectionId) {
             return response()->json([
                 'success' => true,
-                'data' => []
+                'data' => [],
             ]);
         }
 
-        $query = Subject::with(['institution', 'classSection', 'adviserUser', 'parentSubject', 'childSubjects'])
+        $query = Subject::with(['institution', 'classSection', 'adviserUser', 'parentSubject', 'childSubjects', 'gradingScale.bands'])
             ->where('institution_id', $defaultInstitution->institution_id)
             ->where('class_section_id', $classSectionId)
             ->orderBy('order', 'asc')
@@ -54,7 +54,7 @@ class SubjectController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $subjects
+            'data' => $subjects,
         ]);
     }
 
@@ -68,14 +68,14 @@ class SubjectController extends Controller
             ->where('is_default', true)
             ->first();
 
-        if (!$defaultInstitution) {
+        if (! $defaultInstitution) {
             return response()->json([
                 'success' => false,
-                'message' => 'No default institution found for authenticated user'
+                'message' => 'No default institution found for authenticated user',
             ], 403);
         }
 
-        $subjects = Subject::with(['institution', 'classSection', 'parentSubject', 'childSubjects'])
+        $subjects = Subject::with(['institution', 'classSection', 'parentSubject', 'childSubjects', 'gradingScale.bands'])
             ->where('institution_id', $defaultInstitution->institution_id)
             ->orderBy('title', 'asc')
             ->orderBy('variant', 'asc')
@@ -84,7 +84,7 @@ class SubjectController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $subjects
+            'data' => $subjects,
         ]);
     }
 
@@ -101,10 +101,10 @@ class SubjectController extends Controller
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultInstitution) {
+            if (! $defaultInstitution) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No default institution found for authenticated user'
+                    'message' => 'No default institution found for authenticated user',
                 ], 403);
             }
 
@@ -115,6 +115,8 @@ class SubjectController extends Controller
                 'parent_subject_id' => 'nullable|exists:subjects,id',
                 'title' => 'required|string|max:255',
                 'variant' => 'nullable|string|max:255',
+                'grading_type' => 'nullable|in:numerical,non_numerical',
+                'grading_scale_id' => 'nullable|required_if:grading_type,non_numerical|exists:grading_scales,id',
                 'start_time' => 'nullable|date_format:H:i',
                 'end_time' => 'nullable|date_format:H:i',
                 'meeting_days' => 'nullable|array',
@@ -127,10 +129,10 @@ class SubjectController extends Controller
             Log::info('Subject store validated data:', $validated);
 
             // Validate adviser exists in users table if provided
-            if (!empty($validated['adviser'])) {
-                if (!\App\Models\User::find($validated['adviser'])) {
+            if (! empty($validated['adviser'])) {
+                if (! \App\Models\User::find($validated['adviser'])) {
                     throw ValidationException::withMessages([
-                        'adviser' => 'The selected subject teacher does not exist.'
+                        'adviser' => 'The selected subject teacher does not exist.',
                     ]);
                 }
             }
@@ -152,7 +154,7 @@ class SubjectController extends Controller
             $validated['institution_id'] = $defaultInstitution->institution_id;
 
             // Set order if not provided
-            if (!isset($validated['order'])) {
+            if (! isset($validated['order'])) {
                 $maxOrder = Subject::where('institution_id', $defaultInstitution->institution_id)
                     ->where('class_section_id', $validated['class_section_id'])
                     ->max('order');
@@ -162,21 +164,21 @@ class SubjectController extends Controller
             // Validate parent_subject_id is required when subject_type is child
             if ($validated['subject_type'] === 'child' && empty($validated['parent_subject_id'])) {
                 throw ValidationException::withMessages([
-                    'parent_subject_id' => 'Parent subject is required when subject type is child.'
+                    'parent_subject_id' => 'Parent subject is required when subject type is child.',
                 ]);
             }
 
             // Validate parent_subject_id should be null when subject_type is parent
-            if ($validated['subject_type'] === 'parent' && !empty($validated['parent_subject_id'])) {
+            if ($validated['subject_type'] === 'parent' && ! empty($validated['parent_subject_id'])) {
                 throw ValidationException::withMessages([
-                    'parent_subject_id' => 'Parent subject should not be set when subject type is parent.'
+                    'parent_subject_id' => 'Parent subject should not be set when subject type is parent.',
                 ]);
             }
 
             // Validate adviser is required for child subjects
             if ($validated['subject_type'] === 'child' && empty($validated['adviser'])) {
                 throw ValidationException::withMessages([
-                    'adviser' => 'Subject teacher is required for child subjects.'
+                    'adviser' => 'Subject teacher is required for child subjects.',
                 ]);
             }
 
@@ -185,20 +187,20 @@ class SubjectController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Subject created successfully',
-                'data' => $subject->load(['institution', 'classSection', 'adviserUser', 'parentSubject'])
+                'data' => $subject->load(['institution', 'classSection', 'adviserUser', 'parentSubject', 'gradingScale.bands']),
             ], 201);
 
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create subject',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -216,26 +218,26 @@ class SubjectController extends Controller
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultInstitution) {
+            if (! $defaultInstitution) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No default institution found for authenticated user'
+                    'message' => 'No default institution found for authenticated user',
                 ], 403);
             }
 
-            $subject = Subject::with(['institution', 'classSection.students', 'adviserUser', 'parentSubject', 'childSubjects'])
+            $subject = Subject::with(['institution', 'classSection.students', 'adviserUser', 'parentSubject', 'childSubjects', 'gradingScale.bands'])
                 ->where('institution_id', $defaultInstitution->institution_id)
                 ->findOrFail($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $subject
+                'data' => $subject,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Subject not found'
+                'message' => 'Subject not found',
             ], 404);
         }
     }
@@ -253,10 +255,10 @@ class SubjectController extends Controller
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultInstitution) {
+            if (! $defaultInstitution) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No default institution found for authenticated user'
+                    'message' => 'No default institution found for authenticated user',
                 ], 403);
             }
 
@@ -266,7 +268,7 @@ class SubjectController extends Controller
             if ($subject->institution_id !== $defaultInstitution->institution_id) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Subject not found or access denied'
+                    'message' => 'Subject not found or access denied',
                 ], 404);
             }
 
@@ -277,6 +279,8 @@ class SubjectController extends Controller
                 'parent_subject_id' => 'nullable|exists:subjects,id',
                 'title' => 'sometimes|required|string|max:255',
                 'variant' => 'nullable|string|max:255',
+                'grading_type' => 'nullable|in:numerical,non_numerical',
+                'grading_scale_id' => 'nullable|required_if:grading_type,non_numerical|exists:grading_scales,id',
                 'start_time' => 'nullable|date_format:H:i',
                 'end_time' => 'nullable|date_format:H:i',
                 'meeting_days' => 'nullable|array',
@@ -289,10 +293,10 @@ class SubjectController extends Controller
             Log::info('Subject update validated data:', $validated);
 
             // Validate adviser exists in users table if provided
-            if (!empty($validated['adviser'])) {
-                if (!\App\Models\User::find($validated['adviser'])) {
+            if (! empty($validated['adviser'])) {
+                if (! \App\Models\User::find($validated['adviser'])) {
                     throw ValidationException::withMessages([
-                        'adviser' => 'The selected subject teacher does not exist.'
+                        'adviser' => 'The selected subject teacher does not exist.',
                     ]);
                 }
             }
@@ -313,21 +317,21 @@ class SubjectController extends Controller
             // Validate parent_subject_id is required when subject_type is child
             if (isset($validated['subject_type']) && $validated['subject_type'] === 'child' && empty($validated['parent_subject_id'])) {
                 throw ValidationException::withMessages([
-                    'parent_subject_id' => 'Parent subject is required when subject type is child.'
+                    'parent_subject_id' => 'Parent subject is required when subject type is child.',
                 ]);
             }
 
             // Validate parent_subject_id should be null when subject_type is parent
-            if (isset($validated['subject_type']) && $validated['subject_type'] === 'parent' && !empty($validated['parent_subject_id'])) {
+            if (isset($validated['subject_type']) && $validated['subject_type'] === 'parent' && ! empty($validated['parent_subject_id'])) {
                 throw ValidationException::withMessages([
-                    'parent_subject_id' => 'Parent subject should not be set when subject type is parent.'
+                    'parent_subject_id' => 'Parent subject should not be set when subject type is parent.',
                 ]);
             }
 
             // Validate adviser is required for child subjects
             if (isset($validated['subject_type']) && $validated['subject_type'] === 'child' && isset($validated['adviser']) && empty($validated['adviser'])) {
                 throw ValidationException::withMessages([
-                    'adviser' => 'Subject teacher is required for child subjects.'
+                    'adviser' => 'Subject teacher is required for child subjects.',
                 ]);
             }
 
@@ -339,20 +343,20 @@ class SubjectController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Subject updated successfully',
-                'data' => $subject->load(['institution', 'classSection', 'adviserUser', 'parentSubject'])
+                'data' => $subject->load(['institution', 'classSection', 'adviserUser', 'parentSubject', 'gradingScale.bands']),
             ]);
 
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update subject',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -370,10 +374,10 @@ class SubjectController extends Controller
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultInstitution) {
+            if (! $defaultInstitution) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No default institution found for authenticated user'
+                    'message' => 'No default institution found for authenticated user',
                 ], 403);
             }
 
@@ -384,14 +388,14 @@ class SubjectController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Subject deleted successfully'
+                'message' => 'Subject deleted successfully',
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete subject',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -409,10 +413,10 @@ class SubjectController extends Controller
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultInstitution) {
+            if (! $defaultInstitution) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No default institution found for authenticated user'
+                    'message' => 'No default institution found for authenticated user',
                 ], 403);
             }
 
@@ -433,7 +437,7 @@ class SubjectController extends Controller
             if ($subjects->count() !== $subjectIds->count()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Some subjects not found or access denied'
+                    'message' => 'Some subjects not found or access denied',
                 ], 404);
             }
 
@@ -444,20 +448,20 @@ class SubjectController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Subjects reordered successfully'
+                'message' => 'Subjects reordered successfully',
             ]);
 
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to reorder subjects',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -475,10 +479,10 @@ class SubjectController extends Controller
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultInstitution) {
+            if (! $defaultInstitution) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No default institution found for authenticated user'
+                    'message' => 'No default institution found for authenticated user',
                 ], 403);
             }
 
@@ -495,10 +499,10 @@ class SubjectController extends Controller
                 ->where('subject_type', 'parent')
                 ->first();
 
-            if (!$parentSubject) {
+            if (! $parentSubject) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Parent subject not found or access denied'
+                    'message' => 'Parent subject not found or access denied',
                 ], 404);
             }
 
@@ -512,7 +516,7 @@ class SubjectController extends Controller
             if ($childSubjects->count() !== $childSubjectIds->count()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Some child subjects not found or access denied'
+                    'message' => 'Some child subjects not found or access denied',
                 ], 404);
             }
 
@@ -523,20 +527,20 @@ class SubjectController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Child subjects reordered successfully'
+                'message' => 'Child subjects reordered successfully',
             ]);
 
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to reorder child subjects',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

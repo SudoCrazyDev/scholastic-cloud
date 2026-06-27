@@ -27,6 +27,7 @@ import {
   FolderTree,
   LayoutTemplate,
   ListOrdered,
+  ListChecks,
   Route,
   ClipboardList,
   CalendarDays,
@@ -148,6 +149,13 @@ const menuGroups: MenuGroup[] = [
         icon: <ListOrdered className="w-5 h-5" />,
         path: '/grade-levels',
         allowedRoles: ['super-administrator'],
+      },
+      {
+        id: 'grading-scales',
+        label: 'Grading Scales',
+        icon: <ListChecks className="w-5 h-5" />,
+        path: '/grading-scales',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
       },
       {
         id: 'consolidated-grades',
