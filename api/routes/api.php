@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdmissionFormSubmissionController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiometricDeviceController;
 use App\Http\Controllers\BridgeController;
@@ -393,6 +394,17 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('biometric/zk-users/{id}', [ZkUserMappingController::class, 'destroy']);
     Route::post('biometric/zk-users/{id}/enroll', [ZkUserMappingController::class, 'enroll']);
     Route::post('biometric/zk-users/{id}/trigger-fingerprint', [ZkUserMappingController::class, 'triggerFingerprint']);
+
+    // Announcements
+    // Viewer feed (students + staff) — declared before the apiResource so the
+    // {announcement} wildcard doesn't swallow these paths.
+    Route::get('announcements/feed', [AnnouncementController::class, 'feed']);
+    Route::get('announcements/unread-count', [AnnouncementController::class, 'unreadCount']);
+    Route::post('announcements/{id}/read', [AnnouncementController::class, 'markRead']);
+    // Authoring (teachers + admins)
+    Route::post('announcements/{id}/attachments', [AnnouncementController::class, 'uploadAttachment']);
+    Route::delete('announcements/{id}/attachments/{attachmentId}', [AnnouncementController::class, 'deleteAttachment']);
+    Route::apiResource('announcements', AnnouncementController::class);
 
     // Online admission form submissions (admin list/detail/accept/reject)
     Route::get('admission-form-settings', [AdmissionFormSubmissionController::class, 'settings']);

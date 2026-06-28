@@ -16,6 +16,8 @@ class PaymentPlanInstallment extends Model
         'label',
         'due_month',
         'due_day',
+        'grace_period_days',
+        'late_fee_percentage',
         'share_percentage',
     ];
 
@@ -23,6 +25,8 @@ class PaymentPlanInstallment extends Model
         'sequence' => 'integer',
         'due_month' => 'integer',
         'due_day' => 'integer',
+        'grace_period_days' => 'integer',
+        'late_fee_percentage' => 'float',
         'share_percentage' => 'float',
     ];
 

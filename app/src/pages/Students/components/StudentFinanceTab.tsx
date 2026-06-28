@@ -990,6 +990,11 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                             day: 'numeric',
                           })}
                         </p>
+                        {installment.is_overdue && installment.late_fee_amount > 0 && (
+                          <p className="text-xs font-medium text-red-600 mt-0.5">
+                            Overdue · +{formatAmount(installment.late_fee_amount)} late fee
+                          </p>
+                        )}
                       </div>
                     </div>
                     <p className="text-base font-bold text-gray-900 tabular-nums whitespace-nowrap">
@@ -1076,6 +1081,11 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                           month: 'short',
                           day: 'numeric',
                         })}
+                        {installment.is_overdue && installment.late_fee_amount > 0 && (
+                          <span className="block text-xs font-medium text-red-600">
+                            Overdue · +{formatAmount(installment.late_fee_amount)} late fee
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
                         {formatAmount(installment.amount)}

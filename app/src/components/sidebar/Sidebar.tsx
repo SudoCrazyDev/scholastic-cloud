@@ -36,7 +36,10 @@ import {
   Monitor,
   Clock,
   CalendarClock,
+  Megaphone,
+  Send,
 } from 'lucide-react';
+import { announcementService } from '../../services/announcementService';
 
 interface MenuItem {
   id: string;
@@ -44,6 +47,9 @@ interface MenuItem {
   icon: React.ReactNode;
   path: string;
   allowedRoles?: string[];
+  // Match the path exactly (NavLink `end`) so a parent path doesn't stay
+  // highlighted when a child route like `/announcements/manage` is active.
+  end?: boolean;
 }
 
 interface MenuGroup {
@@ -64,6 +70,25 @@ const menuGroups: MenuGroup[] = [
         label: 'Dashboard',
         icon: <LayoutDashboard className="w-5 h-5" />,
         path: '/dashboard',
+      },
+    ],
+  },
+  {
+    label: 'Communication',
+    items: [
+      {
+        id: 'announcements-board',
+        label: 'Announcements',
+        icon: <Megaphone className="w-5 h-5" />,
+        path: '/announcements',
+        end: true,
+      },
+      {
+        id: 'announcements-manage',
+        label: 'Manage Announcements',
+        icon: <Send className="w-5 h-5" />,
+        path: '/announcements/manage',
+        allowedRoles: ['subject-teacher', 'super-administrator', 'principal', 'institution-administrator'],
       },
     ],
   },
@@ -370,6 +395,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   const sidebarLabel = institution?.title ?? 'ScholasticCloud';
   const sidebarLogo = institution?.logo;
 
+  // Unread announcement count drives the badge on the Announcements board item.
+  const { data: unreadResponse } = useQuery({
+    queryKey: ['announcement-unread-count'],
+    queryFn: () => announcementService.getUnreadCount(),
+    refetchInterval: 60000,
+  });
+  const unreadCount = unreadResponse?.data?.count ?? 0;
+
   const filteredGroups = useMemo(() => {
     if (userRoleSlug === 'finance') {
       return menuGroups.filter((group) => group.label === 'Finance');
@@ -460,6 +493,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
                 <NavLink
                   key={item.id}
                   to={item.path}
+                  end={item.end}
                   onClick={onMobileClose}
                   className={({ isActive }) =>
                     `flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer group ${
@@ -485,6 +519,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
                     >
                       {item.label}
                     </motion.span>
+                  )}
+                  {item.id === 'announcements-board' && unreadCount > 0 && (
+                    <span className="ml-auto inline-flex items-center justify-center rounded-full bg-indigo-600 px-1.5 min-w-[1.25rem] h-5 text-[10px] font-semibold text-white">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
                   )}
                 </NavLink>
               ))}

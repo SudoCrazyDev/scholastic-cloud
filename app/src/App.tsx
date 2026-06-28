@@ -57,6 +57,8 @@ import HrisDevices from './pages/HRIS/Devices';
 import HrisZkUsers from './pages/HRIS/ZkUsers';
 import HrisAttendance from './pages/HRIS/Attendance';
 import HrisStaffSchedules from './pages/HRIS/StaffSchedules';
+import AnnouncementBoard from './pages/Announcements/AnnouncementBoard';
+import AnnouncementsManage from './pages/Announcements/AnnouncementsManage';
 
 
 function App() {
@@ -172,6 +174,8 @@ function App() {
               <Route path="hris/zk-users" element={<HrisZkUsers />} />
               <Route path="hris/attendance" element={<HrisAttendance />} />
               <Route path="hris/staff-schedules" element={<HrisStaffSchedules />} />
+              <Route path="announcements" element={<AnnouncementBoard />} />
+              <Route path="announcements/manage" element={<AnnouncementsManage />} />
 
             </Route>
 

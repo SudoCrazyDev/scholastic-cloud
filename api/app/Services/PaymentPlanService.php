@@ -68,6 +68,9 @@ class PaymentPlanService
 
             $discountAmount = round($originalAmount - $amount, 2);
             $dueDate = $this->resolveDueDate($startYear, (int) $template->due_month, (int) $template->due_day);
+            // Overdue charges only apply once the grace window after the due date has elapsed.
+            $graceDays = max(0, (int) $template->grace_period_days);
+            $overdueDate = $dueDate->copy()->addDays($graceDays);
 
             // FIFO-allocate payments across installments: earlier installments fill first.
             $paidApplied = round(min($remainingPaid, $amount), 2);
@@ -82,10 +85,22 @@ class PaymentPlanService
                 $status = 'partial';
             }
 
+            // Live, one-time late fee: applies when today is past the grace window and the
+            // installment is not fully paid. Based on the installment's net amount. No charge
+            // record is persisted — the ledger computes and folds this in on each load.
+            $lateFeePercentage = max(0.0, (float) $template->late_fee_percentage);
+            $isOverdue = $status !== 'paid' && $amount > 0 && Carbon::today()->greaterThan($overdueDate);
+            $lateFeeAmount = $isOverdue ? round($amount * $lateFeePercentage / 100, 2) : 0.0;
+
             $installments[] = [
                 'sequence' => $i + 1,
                 'label' => $template->label ?: $dueDate->format('F Y'),
                 'due_date' => $dueDate->toDateString(),
+                'grace_period_days' => $graceDays,
+                'overdue_date' => $overdueDate->toDateString(),
+                'is_overdue' => $isOverdue,
+                'late_fee_percentage' => $lateFeePercentage,
+                'late_fee_amount' => $lateFeeAmount,
                 'amount' => $amount,
                 'original_amount' => $originalAmount,
                 'discount_amount' => $discountAmount,

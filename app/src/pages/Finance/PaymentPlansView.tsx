@@ -27,6 +27,26 @@ const MONTH_OPTIONS = [
 const monthName = (month: number) =>
   MONTH_OPTIONS.find((option) => option.value === String(month))?.label ?? String(month)
 
+// The date picker is just a friendlier way to choose a month + day — only those are
+// persisted. The picked year is ignored; the backend resolves the real year from the
+// academic year. A leap year is used as the reference so Feb 29 stays selectable.
+const REF_YEAR = 2024
+const pad = (n: number) => String(n).padStart(2, '0')
+
+const toDateValue = (month: string, day: string): string => {
+  const m = Number(month)
+  const d = Number(day)
+  if (!m || !d) return ''
+  const maxDay = new Date(REF_YEAR, m, 0).getDate()
+  return `${REF_YEAR}-${pad(m)}-${pad(Math.min(d, maxDay))}`
+}
+
+const fromDateValue = (value: string): { month: string; day: string } | null => {
+  const match = /^\d{4}-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return null
+  return { month: String(Number(match[1])), day: String(Number(match[2])) }
+}
+
 const errorMessage = (err: unknown, fallback: string): string => {
   const response = (err as { response?: { data?: { message?: string } } })?.response
   return response?.data?.message || fallback
@@ -36,9 +56,17 @@ interface InstallmentRow {
   label: string
   due_month: string
   due_day: string
+  grace_days: string
+  late_fee: string
 }
 
-const emptyInstallment = (): InstallmentRow => ({ label: '', due_month: '8', due_day: '31' })
+const emptyInstallment = (): InstallmentRow => ({
+  label: '',
+  due_month: '8',
+  due_day: '31',
+  grace_days: '0',
+  late_fee: '0',
+})
 
 const emptyForm = () => ({
   name: '',
@@ -123,6 +151,8 @@ const PaymentPlansView: React.FC = () => {
           label: inst.label,
           due_month: inst.due_month,
           due_day: inst.due_day,
+          grace_period_days: inst.grace_period_days ?? 0,
+          late_fee_percentage: inst.late_fee_percentage ?? 0,
           share_percentage: inst.share_percentage ?? null,
         })),
       }),
@@ -149,6 +179,8 @@ const PaymentPlansView: React.FC = () => {
             label: inst.label || '',
             due_month: String(inst.due_month),
             due_day: String(inst.due_day),
+            grace_days: String(inst.grace_period_days ?? 0),
+            late_fee: String(inst.late_fee_percentage ?? 0),
           }))
         : [emptyInstallment()],
     })
@@ -161,13 +193,17 @@ const PaymentPlansView: React.FC = () => {
     }
   }
 
-  const updateInstallment = (index: number, field: keyof InstallmentRow, value: string) => {
+  const patchInstallment = (index: number, patch: Partial<InstallmentRow>) => {
     setForm((prev) => ({
       ...prev,
       installments: prev.installments.map((inst, i) =>
-        i === index ? { ...inst, [field]: value } : inst
+        i === index ? { ...inst, ...patch } : inst
       ),
     }))
+  }
+
+  const updateInstallment = (index: number, field: keyof InstallmentRow, value: string) => {
+    patchInstallment(index, { [field]: value })
   }
 
   const addInstallment = () => {
@@ -201,7 +237,17 @@ const PaymentPlansView: React.FC = () => {
         return
       }
       if (!day || day < 1 || day > 31) {
-        setError(`Installment ${i + 1}: due day must be between 1 and 31.`)
+        setError(`Installment ${i + 1}: pick a due date.`)
+        return
+      }
+      const grace = Number(inst.grace_days)
+      if (Number.isNaN(grace) || grace < 0) {
+        setError(`Installment ${i + 1}: grace period must be 0 or more days.`)
+        return
+      }
+      const lateFee = Number(inst.late_fee)
+      if (Number.isNaN(lateFee) || lateFee < 0 || lateFee > 100) {
+        setError(`Installment ${i + 1}: late fee must be between 0 and 100%.`)
         return
       }
     }
@@ -214,6 +260,8 @@ const PaymentPlansView: React.FC = () => {
         label: inst.label.trim() || null,
         due_month: Number(inst.due_month),
         due_day: Number(inst.due_day),
+        grace_period_days: Number(inst.grace_days) || 0,
+        late_fee_percentage: Number(inst.late_fee) || 0,
       })),
     }
 
@@ -294,7 +342,7 @@ const PaymentPlansView: React.FC = () => {
               {form.installments.map((inst, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-1 sm:grid-cols-[2.5rem_1fr_1fr_5rem_2.5rem] gap-3 items-end rounded-lg border border-gray-200 p-3 bg-gray-50/50"
+                  className="grid grid-cols-1 sm:grid-cols-[2.5rem_1fr_1fr_6rem_6rem_2.5rem] gap-3 items-end rounded-lg border border-gray-200 p-3 bg-gray-50/50"
                 >
                   <div className="text-sm font-semibold text-gray-500 sm:pb-2.5">#{index + 1}</div>
                   <div>
@@ -307,23 +355,39 @@ const PaymentPlansView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Due Month</label>
-                    <Select
-                      value={inst.due_month}
-                      onChange={(e) => updateInstallment(index, 'due_month', e.target.value)}
-                      options={MONTH_OPTIONS}
-                      className="w-full"
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Due Date</label>
+                    <Input
+                      type="date"
+                      value={toDateValue(inst.due_month, inst.due_day)}
+                      onChange={(e) => {
+                        const parsed = fromDateValue(e.target.value)
+                        if (parsed) {
+                          patchInstallment(index, { due_month: parsed.month, due_day: parsed.day })
+                        }
+                      }}
                       disabled={isSaving}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Due Day</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Grace (days)</label>
                     <Input
                       type="number"
-                      min="1"
-                      max="31"
-                      value={inst.due_day}
-                      onChange={(e) => updateInstallment(index, 'due_day', e.target.value)}
+                      min="0"
+                      max="365"
+                      value={inst.grace_days}
+                      onChange={(e) => updateInstallment(index, 'grace_days', e.target.value)}
+                      disabled={isSaving}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Late fee (%)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={inst.late_fee}
+                      onChange={(e) => updateInstallment(index, 'late_fee', e.target.value)}
                       disabled={isSaving}
                     />
                   </div>
@@ -340,8 +404,11 @@ const PaymentPlansView: React.FC = () => {
               ))}
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              Due dates use the academic year automatically: months August–December fall in the start
-              year, January–July in the following year. Day 31 lands on the last day of shorter months.
+              Pick any date — only the month and day are used; the academic year is applied
+              automatically (August–December fall in the start year, January–July in the following
+              year). Grace days are how long after the due date before the late fee applies; the
+              late fee is a one-time charge of that percent of the installment, added to the
+              student's balance while the installment stays unpaid.
             </p>
           </div>
 
@@ -411,6 +478,8 @@ const PaymentPlansView: React.FC = () => {
                           className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600"
                         >
                           {inst.label || `Installment ${inst.sequence}`} · {monthName(inst.due_month)} {inst.due_day}
+                          {inst.grace_period_days ? ` · +${inst.grace_period_days}d grace` : ''}
+                          {inst.late_fee_percentage ? ` · ${inst.late_fee_percentage}% late fee` : ''}
                         </span>
                       ))}
                     </div>

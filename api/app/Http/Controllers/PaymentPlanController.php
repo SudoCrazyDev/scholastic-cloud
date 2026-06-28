@@ -202,6 +202,8 @@ class PaymentPlanController extends Controller
             'installments.*.label' => 'nullable|string|max:255',
             'installments.*.due_month' => 'required|integer|min:1|max:12',
             'installments.*.due_day' => 'required|integer|min:1|max:31',
+            'installments.*.grace_period_days' => 'nullable|integer|min:0|max:365',
+            'installments.*.late_fee_percentage' => 'nullable|numeric|min:0|max:100',
             'installments.*.share_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
     }
@@ -220,6 +222,12 @@ class PaymentPlanController extends Controller
                 'label' => ($installment['label'] ?? '') !== '' ? $installment['label'] : null,
                 'due_month' => (int) $installment['due_month'],
                 'due_day' => (int) $installment['due_day'],
+                'grace_period_days' => isset($installment['grace_period_days']) && $installment['grace_period_days'] !== ''
+                    ? (int) $installment['grace_period_days']
+                    : 0,
+                'late_fee_percentage' => isset($installment['late_fee_percentage']) && $installment['late_fee_percentage'] !== ''
+                    ? (float) $installment['late_fee_percentage']
+                    : 0,
                 'share_percentage' => isset($installment['share_percentage']) && $installment['share_percentage'] !== ''
                     ? (float) $installment['share_percentage']
                     : null,
@@ -247,6 +255,8 @@ class PaymentPlanController extends Controller
                     'label' => $installment->label,
                     'due_month' => (int) $installment->due_month,
                     'due_day' => (int) $installment->due_day,
+                    'grace_period_days' => (int) $installment->grace_period_days,
+                    'late_fee_percentage' => (float) $installment->late_fee_percentage,
                     'share_percentage' => $installment->share_percentage !== null
                         ? (float) $installment->share_percentage
                         : null,

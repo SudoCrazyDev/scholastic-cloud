@@ -376,6 +376,8 @@ export interface PaymentPlanInstallmentTemplate {
   label?: string | null;
   due_month: number; // 1-12
   due_day: number; // 1-31
+  grace_period_days?: number; // days after the due date before an overdue charge applies
+  late_fee_percentage?: number; // % of the installment charged once overdue
   share_percentage?: number | null;
 }
 
@@ -500,6 +502,11 @@ export interface StudentInstallment {
   sequence: number;
   label: string;
   due_date: string;
+  grace_period_days: number;
+  overdue_date: string;
+  is_overdue: boolean;
+  late_fee_percentage: number;
+  late_fee_amount: number;
   amount: number;
   original_amount: number;
   discount_amount: number;
@@ -1759,4 +1766,76 @@ export interface AttendanceLog {
   verify_type: 'fingerprint' | 'card' | 'face' | 'password' | 'unknown';
   created_at: string;
   updated_at: string;
+}
+
+// ===================== Announcements =====================
+
+export type AnnouncementAudience = 'students' | 'teachers' | 'both';
+export type AnnouncementScope = 'institution' | 'grade_levels' | 'sections';
+export type AnnouncementStatus = 'draft' | 'published';
+
+export interface AnnouncementAttachment {
+  id: string;
+  name: string;
+  mime: string | null;
+  size: number | null;
+  url: string | null;
+}
+
+export interface AnnouncementSectionRef {
+  id: string;
+  title: string;
+  grade_level: string | null;
+}
+
+// Full shape returned to authors (teachers/admins) on the manage view.
+export interface Announcement {
+  id: string;
+  institution_id: string;
+  title: string;
+  body: string | null;
+  audience: AnnouncementAudience;
+  scope: AnnouncementScope;
+  is_pinned: boolean;
+  status: AnnouncementStatus;
+  publish_at: string | null;
+  expires_at: string | null;
+  author_id: string | null;
+  author_role: string | null;
+  author_name: string;
+  read_count: number;
+  section_ids: string[];
+  sections: AnnouncementSectionRef[];
+  grade_levels: string[];
+  attachments: AnnouncementAttachment[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Trimmed shape returned to viewers (students/staff) on the board feed.
+export interface AnnouncementFeedItem {
+  id: string;
+  title: string;
+  body: string | null;
+  is_pinned: boolean;
+  audience: AnnouncementAudience;
+  author_role: string | null;
+  author_name: string;
+  is_read: boolean;
+  publish_at: string | null;
+  attachments: AnnouncementAttachment[];
+  created_at: string;
+}
+
+export interface CreateAnnouncementData {
+  title: string;
+  body?: string | null;
+  audience: AnnouncementAudience;
+  scope: AnnouncementScope;
+  is_pinned?: boolean;
+  status?: AnnouncementStatus;
+  publish_at?: string | null;
+  expires_at?: string | null;
+  section_ids?: string[];
+  grade_levels?: string[];
 }

@@ -129,6 +129,42 @@ class StudentFinanceController extends Controller
             $studentId
         );
 
+        $paymentPlan = StudentPaymentPlan::with('paymentPlan.installments')
+            ->where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->first();
+
+        // Installments are split from the principal charges (before late fees) so the
+        // late fee never feeds back into the per-installment amounts.
+        $installments = $this->planService->buildInstallments(
+            $paymentPlan,
+            $academicYear,
+            (float) $chargesTotal,
+            (float) $discountsTotal,
+            (float) $paymentsTotal
+        );
+
+        // Overdue installments accrue a one-time late fee, computed live (no stored charge
+        // record). Surface each as a ledger charge and fold the total into charges/balance.
+        $lateFeeEntries = collect($installments)
+            ->filter(fn ($inst) => ($inst['late_fee_amount'] ?? 0) > 0)
+            ->map(function ($inst) {
+                $pct = rtrim(rtrim(number_format((float) $inst['late_fee_percentage'], 2), '0'), '.');
+
+                return [
+                    'type' => 'charge',
+                    'description' => 'Late fee — ' . $inst['label'] . ' (' . $pct . '% overdue)',
+                    'amount' => (float) $inst['late_fee_amount'],
+                    'date' => $inst['overdue_date'],
+                    'fee_id' => 'late-fee-' . $inst['sequence'],
+                    'fee_name' => 'Late Fee',
+                ];
+            })
+            ->values();
+        $lateFeesTotal = (float) $lateFeeEntries->sum('amount');
+        $chargesTotal += $lateFeesTotal;
+
         $entries = collect();
         if (abs($balanceForward) > 0.0001) {
             $entries->push([
@@ -263,6 +299,7 @@ class StudentFinanceController extends Controller
         $entries = $entries
             ->merge($chargeEntries)
             ->merge($additionalFeeEntries)
+            ->merge($lateFeeEntries)
             ->merge($discountEntries)
             ->merge($gradeLevelDiscountEntries)
             ->merge($paymentEntries);
@@ -335,23 +372,24 @@ class StudentFinanceController extends Controller
             ];
         }))->values();
 
+        // Late fees aren't tied to a school fee; show them as a single outstanding
+        // breakdown line so the per-fee outstanding totals reconcile with the balance.
+        if ($lateFeesTotal > 0.0001) {
+            $feeBreakdown->push([
+                'fee_id' => 'late-fees',
+                'fee_name' => 'Late Fees',
+                'is_additional' => true,
+                'charge' => round($lateFeesTotal, 2),
+                'discount' => 0.0,
+                'paid' => 0.0,
+                'outstanding' => round($lateFeesTotal, 2),
+            ]);
+            $feeBreakdown = $feeBreakdown->values();
+        }
+
         $unallocatedPayments = (float) $activePayments
             ->filter(fn ($payment) => !$payment->school_fee_id)
             ->sum('amount');
-
-        $paymentPlan = StudentPaymentPlan::with('paymentPlan.installments')
-            ->where('institution_id', $institutionId)
-            ->where('student_id', $studentId)
-            ->where('academic_year', $academicYear)
-            ->first();
-
-        $installments = $this->planService->buildInstallments(
-            $paymentPlan,
-            $academicYear,
-            (float) $chargesTotal,
-            (float) $discountsTotal,
-            (float) $paymentsTotal
-        );
 
         return response()->json([
             'success' => true,
