@@ -11,6 +11,7 @@ use App\Http\Controllers\CoreValueMarkingController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\GradeLevelController;
+use App\Http\Controllers\DefaultDiscountController;
 use App\Http\Controllers\GradeLevelDiscountController;
 use App\Http\Controllers\IdCardTemplateController;
 use App\Http\Controllers\InstitutionController;
@@ -313,6 +314,9 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update']);
     Route::patch('student-discounts/{id}', [StudentDiscountController::class, 'update']);
     Route::delete('student-discounts/{id}', [StudentDiscountController::class, 'destroy']);
+
+    // Default (reusable) discounts
+    Route::apiResource('default-discounts', DefaultDiscountController::class);
 
     // Grade-level discounts
     Route::get('grade-level-discounts', [GradeLevelDiscountController::class, 'index']);

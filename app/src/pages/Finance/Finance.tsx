@@ -15,6 +15,7 @@ import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import { studentDiscountService } from '../../services/studentDiscountService'
+import { defaultDiscountService } from '../../services/defaultDiscountService'
 import { studentAdditionalFeeService } from '../../services/studentAdditionalFeeService'
 import { paymentVoidService } from '../../services/paymentVoidService'
 import { useAuth } from '../../hooks/useAuth'
@@ -22,9 +23,10 @@ import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import DashboardCharts from './DashboardCharts'
 import CollectionsView from './CollectionsView'
 import DiscountsView from './DiscountsView'
+import DefaultDiscountsView from './DefaultDiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
-import type { SchoolFee, SchoolFeeDefault, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
 
 const VOID_APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator']
 
@@ -38,6 +40,7 @@ const Finance: React.FC = () => {
     if (pathname.endsWith('/cashiering')) return 'cashiering'
     if (pathname.endsWith('/ledger')) return 'ledger'
     if (pathname.endsWith('/collections')) return 'collections'
+    if (pathname.endsWith('/default-discounts')) return 'default-discounts'
     if (pathname.endsWith('/discounts')) return 'discounts'
     if (pathname.endsWith('/receipt-builder')) return 'receipt-builder'
     if (pathname.endsWith('/void-requests')) return 'void-requests'
@@ -118,6 +121,7 @@ const Finance: React.FC = () => {
   const [ledgerViewMode, setLedgerViewMode] = useState<'entries' | 'monthly' | 'quarterly'>('entries')
   const [showLedgerDiscount, setShowLedgerDiscount] = useState(false)
   const [ledgerDiscountForm, setLedgerDiscountForm] = useState({
+    default_discount_id: '',
     discount_type: 'fixed' as 'fixed' | 'percentage',
     value: '',
     school_fee_id: '',
@@ -136,6 +140,7 @@ const Finance: React.FC = () => {
     mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
     onSuccess: () => {
       setLedgerDiscountForm({
+        default_discount_id: '',
         discount_type: 'fixed',
         value: '',
         school_fee_id: '',
@@ -341,6 +346,32 @@ const Finance: React.FC = () => {
     queryKey: ['school-fees'],
     queryFn: () => schoolFeeService.getSchoolFees(),
   })
+
+  const defaultDiscountsQuery = useQuery({
+    queryKey: ['default-discounts', 'active'],
+    queryFn: () => defaultDiscountService.getDefaultDiscounts({ is_active: true }),
+    enabled: view === 'ledger',
+  })
+  const defaultDiscountOptions = defaultDiscountsQuery.data?.data || []
+
+  const handleSelectDefaultDiscount = (id: string) => {
+    if (!id) {
+      setLedgerDiscountForm((prev) => ({
+        ...prev,
+        default_discount_id: '',
+      }))
+      return
+    }
+    const preset = defaultDiscountOptions.find((discount: DefaultDiscount) => discount.id === id)
+    if (!preset) return
+    setLedgerDiscountForm((prev) => ({
+      ...prev,
+      default_discount_id: id,
+      discount_type: preset.discount_type,
+      value: preset.value.toString(),
+      description: preset.description || preset.name,
+    }))
+  }
 
   const dashboardQuery = useQuery({
     queryKey: ['finance-dashboard', dashboardYear],
@@ -855,6 +886,16 @@ const Finance: React.FC = () => {
             }
           >
             Discounts
+          </NavLink>
+          <NavLink
+            to="/finance/default-discounts"
+            className={({ isActive }) =>
+              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`
+            }
+          >
+            Default Discounts
           </NavLink>
           <NavLink
             to="/finance/receipt-builder"
@@ -1987,6 +2028,32 @@ const Finance: React.FC = () => {
                       className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4"
                       onSubmit={handleLedgerDiscountSubmit}
                     >
+                      {defaultDiscountOptions.length > 0 && (
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Use a default discount
+                          </label>
+                          <Select
+                            value={ledgerDiscountForm.default_discount_id}
+                            onChange={(e) => handleSelectDefaultDiscount(e.target.value)}
+                            options={[
+                              { value: '', label: 'None — enter manually' },
+                              ...defaultDiscountOptions.map((discount: DefaultDiscount) => ({
+                                value: discount.id,
+                                label:
+                                  discount.discount_type === 'percentage'
+                                    ? `${discount.name} (${Number(discount.value)}%)`
+                                    : `${discount.name} (₱${Number(discount.value).toFixed(2)})`,
+                              })),
+                            ]}
+                            className="w-full"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            Pick a saved discount to fill in the type and amount automatically. You can
+                            still adjust the fields below.
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
                           Discount Type
@@ -1996,6 +2063,7 @@ const Finance: React.FC = () => {
                           onChange={(e) =>
                             setLedgerDiscountForm((prev) => ({
                               ...prev,
+                              default_discount_id: '',
                               discount_type: e.target.value as 'fixed' | 'percentage',
                             }))
                           }
@@ -2017,7 +2085,11 @@ const Finance: React.FC = () => {
                         step="0.01"
                         value={ledgerDiscountForm.value}
                         onChange={(e) =>
-                          setLedgerDiscountForm((prev) => ({ ...prev, value: e.target.value }))
+                          setLedgerDiscountForm((prev) => ({
+                            ...prev,
+                            default_discount_id: '',
+                            value: e.target.value,
+                          }))
                         }
                       />
                       <div>
@@ -2577,6 +2649,8 @@ const Finance: React.FC = () => {
           fees={fees}
         />
       )}
+
+      {view === 'default-discounts' && <DefaultDiscountsView />}
 
       {view === 'receipt-builder' && <ReceiptBuilderView />}
 

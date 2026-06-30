@@ -123,6 +123,34 @@ export interface UpdateSchoolFeeData {
   is_active?: boolean;
 }
 
+export interface DefaultDiscount {
+  id: string;
+  institution_id: string;
+  name: string;
+  discount_type: 'fixed' | 'percentage';
+  value: number;
+  description?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDefaultDiscountData {
+  name: string;
+  discount_type: 'fixed' | 'percentage';
+  value: number;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface UpdateDefaultDiscountData {
+  name?: string;
+  discount_type?: 'fixed' | 'percentage';
+  value?: number;
+  description?: string;
+  is_active?: boolean;
+}
+
 export interface SchoolFeeDefault {
   id: string;
   school_fee_id: string;
