@@ -189,6 +189,25 @@ class StudentService {
     }>(`${this.baseUrl}/${studentId}/auth`, payload)
     return response.data
   }
+
+  /** Get the portal access change history (who reset/changed access, when). */
+  async getStudentAuthLogs(studentId: string) {
+    const response = await api.get<{
+      success: boolean
+      data: StudentAuthLog[]
+    }>(`${this.baseUrl}/${studentId}/auth/logs`)
+    return response.data
+  }
+}
+
+export interface StudentAuthLog {
+  id: string
+  action: 'created' | 'reset_password' | 'changed_email'
+  old_email: string | null
+  new_email: string | null
+  performed_by: string | null
+  performed_by_name: string | null
+  created_at: string | null
 }
 
 export const studentService = new StudentService() 

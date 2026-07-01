@@ -172,6 +172,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
     Route::post('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'store']);
     Route::get('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'show']);
+    Route::get('students/{student}/auth/logs', [App\Http\Controllers\StudentAuthController::class, 'logs']);
     Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger']);
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
     Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show']);

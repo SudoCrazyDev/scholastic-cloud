@@ -3,7 +3,7 @@ import { Dialog, DialogTitle, DialogBody, DialogActions } from '../../../compone
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { XMarkIcon, KeyIcon } from '@heroicons/react/24/outline'
-import { studentService } from '../../../services/studentService'
+import { studentService, type StudentAuthLog } from '../../../services/studentService'
 import type { Student } from '../../../types'
 
 function generatePassword(length = 12): string {
@@ -22,6 +22,34 @@ function generatePassword(length = 12): string {
 function getFullName(student: Student) {
   const parts = [student.first_name, student.middle_name, student.last_name].filter(Boolean)
   return (parts.join(' ') + (student.ext_name ? ` ${student.ext_name}` : '')).trim()
+}
+
+function describeAction(log: StudentAuthLog): string {
+  switch (log.action) {
+    case 'created':
+      return 'Created portal login'
+    case 'changed_email':
+      return log.old_email && log.new_email
+        ? `Changed email from ${log.old_email} to ${log.new_email}`
+        : 'Changed email'
+    case 'reset_password':
+    default:
+      return 'Reset password'
+  }
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isNaN(d.getTime())
+    ? ''
+    : d.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
 }
 
 interface StudentPasswordResetModalProps {
@@ -44,6 +72,14 @@ export function StudentPasswordResetModal({
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<StudentAuthLog[]>([])
+
+  const loadLogs = (studentId: string) => {
+    studentService
+      .getStudentAuthLogs(studentId)
+      .then((res) => setLogs(res.data ?? []))
+      .catch(() => setLogs([]))
+  }
 
   useEffect(() => {
     if (!isOpen || !student) return
@@ -53,6 +89,7 @@ export function StudentPasswordResetModal({
     setFetchError(null)
     setAuthState('loading')
     setExistingEmail('')
+    setLogs([])
 
     let cancelled = false
     studentService
@@ -61,6 +98,7 @@ export function StudentPasswordResetModal({
         if (cancelled) return
         setAuthState('exists')
         setExistingEmail(res.data?.email ?? '')
+        setEmail(res.data?.email ?? '')
       })
       .catch((err: { response?: { status: number }; message?: string }) => {
         if (cancelled) return
@@ -71,6 +109,8 @@ export function StudentPasswordResetModal({
         }
       })
 
+    loadLogs(student.id)
+
     return () => {
       cancelled = true
     }
@@ -78,31 +118,31 @@ export function StudentPasswordResetModal({
 
   const handleGenerate = async () => {
     if (!student) return
-    if (authState === 'none') {
-      const trimmed = email.trim()
-      if (!trimmed) {
-        setEmailError('Email is required.')
-        return
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(trimmed)) {
-        setEmailError('Enter a valid email address.')
-        return
-      }
-      setEmailError('')
+
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setEmailError('Email is required.')
+      return
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(trimmed)) {
+      setEmailError('Enter a valid email address.')
+      return
+    }
+    setEmailError('')
 
     setSubmitting(true)
     const newPassword = generatePassword(12)
-    const emailToUse = authState === 'none' ? email.trim() : existingEmail
 
     try {
       await studentService.createOrUpdateStudentAuth(student.id, {
-        email: emailToUse,
+        email: trimmed,
         password: newPassword,
-        is_new: authState === 'exists' ? true : true,
+        is_new: true,
       })
       setGeneratedPassword(newPassword)
+      setExistingEmail(trimmed)
+      loadLogs(student.id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
         ?? (err as { message?: string })?.message
@@ -120,6 +160,7 @@ export function StudentPasswordResetModal({
       setEmail('')
       setEmailError('')
       setFetchError(null)
+      setLogs([])
       onClose()
     }
   }
@@ -127,13 +168,37 @@ export function StudentPasswordResetModal({
   if (!student) return null
 
   const name = getFullName(student)
+  const emailChanged = authState === 'exists' && email.trim() !== existingEmail
+  const confirmLabel = authState === 'none'
+    ? (submitting ? 'Generating...' : 'Generate')
+    : (submitting ? 'Resetting...' : emailChanged ? 'Change email & reset' : 'Reset password')
+
+  const history = logs.length > 0 && (
+    <div className="mt-6 border-t border-gray-100 pt-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+        Access history
+      </p>
+      <ul className="space-y-2 max-h-40 overflow-y-auto">
+        {logs.map((log) => (
+          <li key={log.id} className="text-sm text-gray-600">
+            <span className="text-gray-900">{describeAction(log)}</span>
+            <span className="text-gray-400">
+              {' — '}
+              {log.performed_by_name ?? 'Unknown user'}
+              {log.created_at ? `, ${formatDateTime(log.created_at)}` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="md" light>
       <div className="flex items-center justify-between">
         <DialogTitle light className="flex items-center gap-2 text-gray-900">
           <KeyIcon className="w-5 h-5 text-indigo-600" />
-          Student portal password
+          Reset student portal
         </DialogTitle>
         <button
           type="button"
@@ -156,10 +221,14 @@ export function StudentPasswordResetModal({
           <div className="py-4 text-center text-gray-500">Checking student login...</div>
         )}
 
-        {authState === 'none' && !generatedPassword && (
+        {(authState === 'none' || authState === 'exists') && !generatedPassword && (
           <>
             <p className="text-sm text-gray-600 mb-4">
-              This student does not have portal login yet. Enter their email and generate a password.
+              {authState === 'none' ? (
+                <>This student does not have portal login yet. Enter their email and generate a password.</>
+              ) : (
+                <>Reset portal access for <strong>{name}</strong>. You can update their email below; a new password will be generated. They will need the new password to sign in.</>
+              )}
             </p>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Email</label>
@@ -178,25 +247,10 @@ export function StudentPasswordResetModal({
                 Cancel
               </Button>
               <Button onClick={handleGenerate} disabled={submitting}>
-                {submitting ? 'Generating...' : 'Generate'}
+                {confirmLabel}
               </Button>
             </DialogActions>
-          </>
-        )}
-
-        {authState === 'exists' && !generatedPassword && (
-          <>
-            <p className="text-sm text-gray-600 mb-4">
-              Confirm to reset the password for <strong>{name}</strong>. They will need to use the new password to sign in.
-            </p>
-            <DialogActions className="mt-6">
-              <Button variant="outline" onClick={handleClose} disabled={submitting}>
-                Cancel
-              </Button>
-              <Button onClick={handleGenerate} disabled={submitting}>
-                {submitting ? 'Resetting...' : 'Confirm'}
-              </Button>
-            </DialogActions>
+            {history}
           </>
         )}
 
@@ -209,6 +263,7 @@ export function StudentPasswordResetModal({
             <DialogActions className="mt-6">
               <Button onClick={handleClose}>Done</Button>
             </DialogActions>
+            {history}
           </>
         )}
       </DialogBody>

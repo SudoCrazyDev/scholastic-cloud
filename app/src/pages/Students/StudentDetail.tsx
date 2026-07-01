@@ -9,6 +9,7 @@ import {
   UsersIcon,
   IdentificationIcon,
   PencilIcon,
+  KeyIcon,
   CameraIcon,
   XMarkIcon,
   PhotoIcon,
@@ -22,7 +23,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
-import { StudentFinanceTab, CrossCheckModal, StudentIdTab, StudentFamilyTab, StudentMedicalTab } from './components'
+import { StudentFinanceTab, CrossCheckModal, StudentIdTab, StudentFamilyTab, StudentMedicalTab, StudentPasswordResetModal } from './components'
 import { studentService } from '../../services/studentService'
 import { studentDocumentService } from '../../services/studentDocumentService'
 import { toast } from 'react-hot-toast'
@@ -53,6 +54,7 @@ export default function StudentDetail() {
   const [docOpenStates, setDocOpenStates] = useState<Record<string, boolean>>({})
   const [docUploading, setDocUploading] = useState<Record<string, boolean>>({})
   const [crossCheckDoc, setCrossCheckDoc] = useState<StudentDocument | null>(null)
+  const [isPortalResetOpen, setIsPortalResetOpen] = useState(false)
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -626,6 +628,14 @@ export default function StudentDetail() {
                 Generate SF9
               </Button>
               <Button
+                onClick={() => setIsPortalResetOpen(true)}
+                variant="outline"
+                className="border-amber-600 text-amber-600 hover:bg-amber-50"
+              >
+                <KeyIcon className="w-4 h-4 mr-2" />
+                Reset Portal
+              </Button>
+              <Button
                 onClick={() => handleEdit(student)}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white"
               >
@@ -681,6 +691,12 @@ export default function StudentDetail() {
           onClose={() => setCrossCheckDoc(null)}
         />
       )}
+
+      <StudentPasswordResetModal
+        isOpen={isPortalResetOpen}
+        onClose={() => setIsPortalResetOpen(false)}
+        student={student}
+      />
     </div>
   )
 } 
