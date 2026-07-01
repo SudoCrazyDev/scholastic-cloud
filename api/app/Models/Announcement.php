@@ -43,6 +43,7 @@ class Announcement extends Model
     public function sections()
     {
         return $this->belongsToMany(ClassSection::class, 'announcement_sections', 'announcement_id', 'class_section_id')
+            ->using(AnnouncementSection::class)
             ->withTimestamps();
     }
 
