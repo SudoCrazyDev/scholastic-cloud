@@ -328,6 +328,13 @@ class SubjectController extends Controller
                 ]);
             }
 
+            // When switching to a parent subject, always clear any stale parent assignment.
+            // The client omits parent_subject_id (sends undefined) on child->parent conversions,
+            // so it must be explicitly nulled here or the old value persists in the database.
+            if (isset($validated['subject_type']) && $validated['subject_type'] === 'parent') {
+                $validated['parent_subject_id'] = null;
+            }
+
             // Validate adviser is required for child subjects
             if (isset($validated['subject_type']) && $validated['subject_type'] === 'child' && isset($validated['adviser']) && empty($validated['adviser'])) {
                 throw ValidationException::withMessages([
