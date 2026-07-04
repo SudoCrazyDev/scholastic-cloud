@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\DB;
 class UserController extends Controller
 {
     /**
+     * Roles that see every subject in their institution(s) instead of only
+     * the subjects they advise.
+     */
+    private const SUBJECT_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator'];
+
+    /**
      * Display a listing of the resource with pagination and filtering.
      */
     public function index(Request $request): JsonResponse
@@ -371,7 +377,18 @@ class UserController extends Controller
     {
         try {
             $user = $request->user();
-            $query = $user->advisedSubjects()->with(['classSection', 'adviserUser', 'parentSubject']);
+
+            $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+            $hasInstitutionOverview = in_array((string) ($role->slug ?? ''), self::SUBJECT_OVERVIEW_ROLES, true);
+
+            if ($hasInstitutionOverview) {
+                $institutionIds = $user->userInstitutions()->pluck('institution_id');
+                $query = \App\Models\Subject::query()->whereIn('institution_id', $institutionIds);
+            } else {
+                $query = $user->advisedSubjects();
+            }
+
+            $query->with(['classSection', 'adviserUser', 'parentSubject', 'institution']);
 
             $academicYear = $request->query('academic_year');
             if ($academicYear !== null && $academicYear !== '') {

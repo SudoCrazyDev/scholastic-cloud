@@ -7,13 +7,17 @@ const AssignedSubjects: React.FC = () => {
   const {
     // Data
     assignedSubjects,
+    sections,
     loading,
     error,
     search,
+    sectionFilter,
     sorting,
+    isInstitutionOverview,
 
     // Actions
     handleSearch,
+    handleSectionFilter,
     handleSort,
   } = useAssignedSubjects()
 
@@ -29,6 +33,10 @@ const AssignedSubjects: React.FC = () => {
         search={search}
         onSearch={handleSearch}
         totalSubjects={assignedSubjects.length}
+        sections={sections}
+        sectionFilter={sectionFilter}
+        onSectionFilter={handleSectionFilter}
+        isInstitutionOverview={isInstitutionOverview}
       />
 
       {/* Grid */}
@@ -38,6 +46,7 @@ const AssignedSubjects: React.FC = () => {
         error={error}
         sorting={sorting}
         onSort={handleSort}
+        isInstitutionOverview={isInstitutionOverview}
       />
     </motion.div>
   )

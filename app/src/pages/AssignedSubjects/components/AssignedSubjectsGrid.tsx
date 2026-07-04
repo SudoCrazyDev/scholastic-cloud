@@ -2,10 +2,11 @@ import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
-import { 
-  BookOpenIcon, 
+import {
+  BookOpenIcon,
   ClockIcon,
   UserGroupIcon,
+  UserIcon,
   ChevronRightIcon
 } from '@heroicons/react/24/outline'
 import { studentService } from '../../../services/studentService'
@@ -17,12 +18,14 @@ interface AssignedSubjectsGridProps {
   error: string | null
   sorting: { field: string; direction: 'asc' | 'desc' }
   onSort: (field: string) => void
+  isInstitutionOverview?: boolean
 }
 
 export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
   assignedSubjects,
   loading,
   error,
+  isInstitutionOverview = false,
 }) => {
   // Get unique class section IDs
   const uniqueSectionIds = useMemo(() => {
@@ -125,8 +128,14 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <BookOpenIcon className="w-8 h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Assigned Subjects</h3>
-          <p className="text-gray-500 mb-6">You don't have any subjects assigned to you yet.</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {isInstitutionOverview ? 'No Subjects Found' : 'No Assigned Subjects'}
+          </h3>
+          <p className="text-gray-500 mb-6">
+            {isInstitutionOverview
+              ? 'No subjects match the current filters.'
+              : "You don't have any subjects assigned to you yet."}
+          </p>
         </div>
       </div>
     )
@@ -184,6 +193,16 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
                           <ClockIcon className="w-3 h-3 mr-1 flex-shrink-0" />
                           <span>
                             {subject.start_time} - {subject.end_time}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Teacher (institution overview only) */}
+                      {isInstitutionOverview && subject.adviser_user && (
+                        <div className="flex items-center text-xs text-gray-600">
+                          <UserIcon className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <span className="truncate">
+                            {subject.adviser_user.first_name} {subject.adviser_user.last_name}
                           </span>
                         </div>
                       )}

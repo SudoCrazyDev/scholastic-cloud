@@ -1,13 +1,21 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { userService } from '../services/userService'
+import { useAuth } from './useAuth'
+
+const INSTITUTION_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator']
 
 export const useAssignedSubjects = () => {
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
+  const [sectionFilter, setSectionFilter] = useState('all')
   const [sorting, setSorting] = useState<{ field: string; direction: 'asc' | 'desc' }>({
     field: 'title',
     direction: 'asc',
   })
+
+  // Principals and institution admins see every subject in the institution
+  const isInstitutionOverview = INSTITUTION_OVERVIEW_ROLES.includes(user?.role?.slug || '')
 
   const {
     data: assignedSubjectsRaw = [],
@@ -21,24 +29,52 @@ export const useAssignedSubjects = () => {
     retry: 1,
   })
 
+  // Unique class sections available for filtering
+  const sections = useMemo(() => {
+    const map = new Map<string, { id: string; title: string; gradeLevel: string }>()
+    assignedSubjectsRaw.forEach(subject => {
+      const section = subject.class_section
+      if (section?.id && !map.has(section.id)) {
+        map.set(section.id, {
+          id: section.id,
+          title: section.title,
+          gradeLevel: section.grade_level || '',
+        })
+      }
+    })
+    return Array.from(map.values()).sort((a, b) => {
+      const gradeA = parseInt(a.gradeLevel) || 0
+      const gradeB = parseInt(b.gradeLevel) || 0
+      if (gradeA !== gradeB) return gradeA - gradeB
+      return a.title.localeCompare(b.title)
+    })
+  }, [assignedSubjectsRaw])
+
   // Filter and sort subjects
   const assignedSubjects = useMemo(() => {
     let filtered = assignedSubjectsRaw
 
-    // Apply search filter
+    // Apply section filter
+    if (sectionFilter !== 'all') {
+      filtered = filtered.filter(subject => subject.class_section?.id === sectionFilter)
+    }
+
+    // Apply search filter (matches subject or section)
     if (search) {
+      const term = search.toLowerCase()
       filtered = filtered.filter(subject =>
-        subject.title.toLowerCase().includes(search.toLowerCase()) ||
-        subject.variant?.toLowerCase().includes(search.toLowerCase()) ||
-        subject.class_section.title.toLowerCase().includes(search.toLowerCase()) ||
-        subject.institution.title.toLowerCase().includes(search.toLowerCase())
+        subject.title.toLowerCase().includes(term) ||
+        subject.variant?.toLowerCase().includes(term) ||
+        subject.class_section?.title?.toLowerCase().includes(term) ||
+        subject.class_section?.grade_level?.toLowerCase().includes(term) ||
+        subject.institution?.title?.toLowerCase().includes(term)
       )
     }
 
     // Apply sorting
     filtered = [...filtered].sort((a, b) => {
-      let aValue: any
-      let bValue: any
+      let aValue: string
+      let bValue: string
 
       switch (sorting.field) {
         case 'title':
@@ -46,12 +82,12 @@ export const useAssignedSubjects = () => {
           bValue = b.title
           break
         case 'class_section':
-          aValue = a.class_section.title
-          bValue = b.class_section.title
+          aValue = a.class_section?.title || ''
+          bValue = b.class_section?.title || ''
           break
         case 'institution':
-          aValue = a.institution.title
-          bValue = b.institution.title
+          aValue = a.institution?.title || ''
+          bValue = b.institution?.title || ''
           break
         case 'start_time':
           aValue = a.start_time || ''
@@ -70,10 +106,14 @@ export const useAssignedSubjects = () => {
     })
 
     return filtered
-  }, [assignedSubjectsRaw, search, sorting])
+  }, [assignedSubjectsRaw, search, sectionFilter, sorting])
 
   const handleSearch = (value: string) => {
     setSearch(value)
+  }
+
+  const handleSectionFilter = (sectionId: string) => {
+    setSectionFilter(sectionId)
   }
 
   const handleSort = (field: string) => {
@@ -86,14 +126,18 @@ export const useAssignedSubjects = () => {
   return {
     // Data
     assignedSubjects,
+    sections,
     loading,
     error: error?.message || null,
     search,
+    sectionFilter,
     sorting,
+    isInstitutionOverview,
 
     // Actions
     handleSearch,
+    handleSectionFilter,
     handleSort,
     refetch,
   }
-} 
+}
