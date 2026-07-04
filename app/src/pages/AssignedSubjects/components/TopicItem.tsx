@@ -10,11 +10,13 @@ import {
   ChevronDownIcon,
   DocumentTextIcon,
   EyeIcon,
-  EyeSlashIcon
+  EyeSlashIcon,
+  DocumentMagnifyingGlassIcon
 } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../../../components/dropdown'
 import { stripHtml } from './LessonContentViewer'
+import { PreviewLessonModal } from './PreviewLessonModal'
 import type { Topic } from '../../../types'
 
 interface TopicItemProps {
@@ -48,6 +50,8 @@ export const TopicItem: React.FC<TopicItemProps> = ({
   isReordering = false,
   isUpdating = false
 }) => {
+  const [showPreview, setShowPreview] = React.useState(false)
+
   const handleToggleCompletion = () => {
     onToggleCompletion(topic.id)
   }
@@ -55,6 +59,12 @@ export const TopicItem: React.FC<TopicItemProps> = ({
   const busy = isDeleting || isTogglingCompletion || isReordering || isUpdating
 
   const dropdownItems = [
+    {
+      label: 'Preview',
+      icon: DocumentMagnifyingGlassIcon,
+      onClick: () => setShowPreview(true),
+      disabled: busy
+    },
     {
       label: 'Edit',
       icon: PencilIcon,
@@ -81,6 +91,7 @@ export const TopicItem: React.FC<TopicItemProps> = ({
   ]
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -218,5 +229,8 @@ export const TopicItem: React.FC<TopicItemProps> = ({
         </Dropdown>
       </div>
     </motion.div>
+
+    {showPreview && <PreviewLessonModal topic={topic} onClose={() => setShowPreview(false)} />}
+    </>
   )
 }
