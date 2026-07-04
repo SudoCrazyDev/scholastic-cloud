@@ -20,6 +20,7 @@ import {
   PhotoIcon,
   VideoCameraIcon,
   ClipboardDocumentCheckIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import {
@@ -60,6 +61,7 @@ import { Badge } from '@/components/badge'
 import { Switch } from '@/components/switch'
 import { Select } from '@/components/select'
 import { GradeSubmissionsModal } from './GradeSubmissionsModal'
+import { PreviewAssessmentModal } from './PreviewAssessmentModal'
 
 interface AssessmentBuilderTabProps {
   subjectId: string
@@ -636,6 +638,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
   const [draft, setDraft] = useState<BuilderDraft | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [gradingMethod, setGradingMethod] = useState<{ id: string; title: string } | null>(null)
+  const [previewMethod, setPreviewMethod] = useState<AssessmentMethod | null>(null)
 
   const { data: ecrRes } = useQuery({
     queryKey: ['subjectEcrs', subjectId],
@@ -965,6 +968,14 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMethod(method)}
+                      className="rounded-md p-2 text-gray-500 transition hover:bg-sky-50 hover:text-sky-600"
+                      title="View as student"
+                    >
+                      <EyeIcon className="h-4 w-4" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => method.id && setGradingMethod({ id: method.id, title: method.title })}
@@ -1437,6 +1448,10 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
           title={gradingMethod.title}
           onClose={() => setGradingMethod(null)}
         />
+      )}
+
+      {previewMethod && (
+        <PreviewAssessmentModal method={previewMethod} onClose={() => setPreviewMethod(null)} />
       )}
     </div>
   )
