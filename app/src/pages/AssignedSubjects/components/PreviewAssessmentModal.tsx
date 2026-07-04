@@ -7,6 +7,7 @@ import {
   PhotoIcon,
   VideoCameraIcon,
   EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline'
 import type { AssessmentMethod } from '@/services/assessmentMethodService'
 import { Button } from '@/components/button'
@@ -45,6 +46,13 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
             <XMarkIcon className="h-5 w-5" />
           </button>
         </header>
+
+        {method.status === 'draft' && (
+          <div className="flex items-center justify-center gap-2 border-b border-amber-200 bg-amber-50 px-6 py-2 text-sm font-medium text-amber-800">
+            <EyeSlashIcon className="h-4 w-4" />
+            Draft — students can't see this assessment yet.
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-2xl space-y-6 p-6">

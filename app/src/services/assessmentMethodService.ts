@@ -293,6 +293,12 @@ class AssessmentMethodService {
     return items.map(fromSubjectEcrItem)
   }
 
+  async get(id: string): Promise<AssessmentMethod> {
+    const response = await subjectEcrItemService.get(id)
+    const item = (response?.data ?? response) as SubjectEcrItem
+    return fromSubjectEcrItem(item)
+  }
+
   async create(input: AssessmentMethodInput) {
     return subjectEcrItemService.create(toSubjectEcrItemPayload(input))
   }
