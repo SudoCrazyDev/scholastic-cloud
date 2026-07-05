@@ -38,6 +38,7 @@ import {
   CalendarClock,
   Megaphone,
   Send,
+  Banknote,
 } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 
@@ -279,6 +280,13 @@ const menuGroups: MenuGroup[] = [
         label: 'Staff Schedules',
         icon: <CalendarClock className="w-5 h-5" />,
         path: '/hris/staff-schedules',
+        allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        id: 'hris-payroll',
+        label: 'Payroll',
+        icon: <Banknote className="w-5 h-5" />,
+        path: '/hris/payroll',
         allowedRoles: ['principal', 'institution-administrator'],
       },
       {

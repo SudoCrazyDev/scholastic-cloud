@@ -1867,3 +1867,151 @@ export interface CreateAnnouncementData {
   section_ids?: string[];
   grade_levels?: string[];
 }
+
+// =====================
+// Payroll (HRIS)
+// =====================
+
+export interface PayrollCompensation {
+  id: string;
+  user_id: string;
+  designation: string | null;
+  daily_rate: number;
+  hourly_rate: number | null;
+  effective_hourly_rate: number;
+  hours_per_day: number;
+  sss_employee: number;
+  pagibig_employee: number;
+  philhealth_employee: number;
+  sss_employer: number;
+  pagibig_employer: number;
+  philhealth_employer: number;
+  updated_at?: string;
+}
+
+// One row of the Employee Rates tab: a staff member + their (possibly unset) rates.
+export interface PayrollStaffCompensation {
+  user_id: string;
+  staff_name: string;
+  email: string;
+  role_title: string | null;
+  compensation: PayrollCompensation | null;
+}
+
+export interface SavePayrollCompensationData {
+  designation?: string | null;
+  daily_rate: number;
+  hourly_rate?: number | null;
+  hours_per_day: number;
+  sss_employee?: number;
+  pagibig_employee?: number;
+  philhealth_employee?: number;
+  sss_employer?: number;
+  pagibig_employer?: number;
+  philhealth_employer?: number;
+}
+
+export type PayrollPeriodStatus = 'draft' | 'finalized';
+
+export interface PayrollPeriod {
+  id: string;
+  institution_id: string;
+  name: string;
+  date_from: string;
+  date_to: string;
+  status: PayrollPeriodStatus;
+  paid_on: string | null;
+  payslip_count: number;
+  gross_total: number;
+  net_total: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreatePayrollPeriodData {
+  name: string;
+  date_from: string;
+  date_to: string;
+}
+
+export interface PayslipSummary {
+  id: string;
+  user_id: string;
+  staff_name: string;
+  designation: string | null;
+  daily_rate: number;
+  days_worked: number;
+  hours_worked: number;
+  gross_pay: number;
+  total_deductions: number;
+  net_pay: number;
+}
+
+export interface PayslipDay {
+  id: string;
+  work_date: string;
+  time_in: string | null;
+  time_out: string | null;
+  required_hours: number;
+  hours_worked: number;
+  amount_earned: number;
+  is_holiday: boolean;
+  is_rest_day: boolean;
+}
+
+export interface Payslip {
+  id: string;
+  user_id: string;
+  staff_name: string;
+  designation: string | null;
+  institution_name: string | null;
+  institution_address: string | null;
+  period: {
+    id: string;
+    name: string;
+    date_from: string;
+    date_to: string;
+    status: PayrollPeriodStatus;
+    paid_on: string | null;
+  } | null;
+  daily_rate: number;
+  hourly_rate: number;
+  hours_per_day: number;
+  days_worked: number;
+  hours_worked: number;
+  gross_pay: number;
+  sss_employee: number;
+  pagibig_employee: number;
+  philhealth_employee: number;
+  advance: number;
+  other_deductions: number;
+  other_deductions_note: string | null;
+  sss_employer: number;
+  pagibig_employer: number;
+  philhealth_employer: number;
+  employer_share_total: number;
+  total_deductions: number;
+  net_pay: number;
+  days: PayslipDay[];
+  updated_at?: string;
+}
+
+export interface UpdatePayslipData {
+  designation?: string | null;
+  daily_rate?: number;
+  hourly_rate?: number;
+  sss_employee?: number;
+  pagibig_employee?: number;
+  philhealth_employee?: number;
+  advance?: number;
+  other_deductions?: number;
+  other_deductions_note?: string | null;
+  sss_employer?: number;
+  pagibig_employer?: number;
+  philhealth_employer?: number;
+}
+
+export interface UpdatePayslipDayData {
+  time_in: string | null;
+  time_out: string | null;
+}

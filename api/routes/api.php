@@ -382,6 +382,18 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('staff-calendar-events', \App\Http\Controllers\StaffCalendarEventController::class)
         ->only(['index', 'store', 'update', 'destroy']);
 
+    // HRIS — Payroll (compensation settings, periods, payslips)
+    Route::get('payroll-compensations', [\App\Http\Controllers\PayrollCompensationController::class, 'index']);
+    Route::put('payroll-compensations/{userId}', [\App\Http\Controllers\PayrollCompensationController::class, 'upsert']);
+    Route::post('payroll-periods/{id}/generate', [\App\Http\Controllers\PayrollPeriodController::class, 'generate']);
+    Route::post('payroll-periods/{id}/finalize', [\App\Http\Controllers\PayrollPeriodController::class, 'finalize']);
+    Route::post('payroll-periods/{id}/reopen', [\App\Http\Controllers\PayrollPeriodController::class, 'reopen']);
+    Route::get('payroll-periods/{periodId}/payslips', [\App\Http\Controllers\PayslipController::class, 'indexByPeriod']);
+    Route::apiResource('payroll-periods', \App\Http\Controllers\PayrollPeriodController::class);
+    Route::get('payslips/{id}', [\App\Http\Controllers\PayslipController::class, 'show']);
+    Route::put('payslips/{id}', [\App\Http\Controllers\PayslipController::class, 'update']);
+    Route::put('payslips/{id}/days/{dayId}', [\App\Http\Controllers\PayslipController::class, 'updateDay']);
+
     // HRIS — Biometric devices
     Route::get('biometric/devices', [BiometricDeviceController::class, 'index']);
     Route::post('biometric/devices', [BiometricDeviceController::class, 'store']);
