@@ -22,12 +22,6 @@ class Payslip extends Model
         'days_worked',
         'hours_worked',
         'gross_pay',
-        'sss_employee',
-        'pagibig_employee',
-        'philhealth_employee',
-        'advance',
-        'other_deductions',
-        'other_deductions_note',
         'sss_employer',
         'pagibig_employer',
         'philhealth_employer',
@@ -42,11 +36,6 @@ class Payslip extends Model
         'days_worked' => 'decimal:2',
         'hours_worked' => 'decimal:2',
         'gross_pay' => 'decimal:2',
-        'sss_employee' => 'decimal:2',
-        'pagibig_employee' => 'decimal:2',
-        'philhealth_employee' => 'decimal:2',
-        'advance' => 'decimal:2',
-        'other_deductions' => 'decimal:2',
         'sss_employer' => 'decimal:2',
         'pagibig_employer' => 'decimal:2',
         'philhealth_employer' => 'decimal:2',
@@ -72,5 +61,10 @@ class Payslip extends Model
     public function days(): HasMany
     {
         return $this->hasMany(PayslipDay::class)->orderBy('work_date');
+    }
+
+    public function deductions(): HasMany
+    {
+        return $this->hasMany(PayslipDeduction::class)->orderBy('created_at');
     }
 }

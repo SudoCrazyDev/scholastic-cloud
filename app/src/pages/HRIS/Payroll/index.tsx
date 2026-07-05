@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { BanknotesIcon, CalendarDaysIcon } from '@heroicons/react/24/outline'
+import { BanknotesIcon, CalendarDaysIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline'
 import { Banknote } from 'lucide-react'
 import CompensationTab from './CompensationTab'
+import DeductionTypesTab from './DeductionTypesTab'
 import PeriodsTab from './PeriodsTab'
 
-type Tab = 'periods' | 'rates'
+type Tab = 'periods' | 'rates' | 'deductions'
 
 const Payroll: React.FC = () => {
   const [tab, setTab] = useState<Tab>('periods')
@@ -42,9 +43,17 @@ const Payroll: React.FC = () => {
           <BanknotesIcon className="h-4 w-4" />
           Employee Rates
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('deductions')}
+          className={tabClass(tab === 'deductions')}
+        >
+          <ReceiptPercentIcon className="h-4 w-4" />
+          Deduction Types
+        </button>
       </div>
 
-      {tab === 'periods' ? <PeriodsTab /> : <CompensationTab />}
+      {tab === 'periods' ? <PeriodsTab /> : tab === 'rates' ? <CompensationTab /> : <DeductionTypesTab />}
     </motion.div>
   )
 }

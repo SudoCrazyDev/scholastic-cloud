@@ -6,10 +6,13 @@ use App\Auth\StudentPortalUser;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipDay;
+use App\Models\PayslipDeduction;
 use App\Models\User;
 use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class PayslipController extends Controller
@@ -57,7 +60,7 @@ class PayslipController extends Controller
             return $this->noInstitution();
         }
 
-        $payslip = Payslip::with(['user', 'days', 'payrollPeriod', 'institution'])
+        $payslip = Payslip::with(['user', 'days', 'deductions', 'payrollPeriod', 'institution'])
             ->where('institution_id', $institutionId)
             ->find($id);
 
@@ -102,15 +105,21 @@ class PayslipController extends Controller
             'designation' => 'sometimes|nullable|string|max:255',
             'daily_rate' => 'sometimes|numeric|min:0|max:999999',
             'hourly_rate' => 'sometimes|numeric|min:0|max:999999',
-            'sss_employee' => 'sometimes|numeric|min:0|max:999999',
-            'pagibig_employee' => 'sometimes|numeric|min:0|max:999999',
-            'philhealth_employee' => 'sometimes|numeric|min:0|max:999999',
-            'advance' => 'sometimes|numeric|min:0|max:999999',
-            'other_deductions' => 'sometimes|numeric|min:0|max:999999',
-            'other_deductions_note' => 'sometimes|nullable|string|max:255',
             'sss_employer' => 'sometimes|numeric|min:0|max:999999',
             'pagibig_employer' => 'sometimes|numeric|min:0|max:999999',
             'philhealth_employer' => 'sometimes|numeric|min:0|max:999999',
+            'deductions' => 'sometimes|array',
+            'deductions.*.deduction_type_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('payroll_deduction_types', 'id')
+                    ->where(fn ($query) => $query->where('institution_id', $institutionId)),
+            ],
+            'deductions.*.name' => 'required|string|max:255',
+            'deductions.*.amount' => 'required|numeric|min:0|max:999999',
+        ], [
+            'deductions.*.deduction_type_id.exists' => 'One of the deductions does not belong to your institution.',
+            'deductions.*.name.required' => 'Each deduction needs a name.',
         ]);
 
         if ($validated === []) {
@@ -118,8 +127,26 @@ class PayslipController extends Controller
         }
 
         $ratesChanged = array_key_exists('daily_rate', $validated) || array_key_exists('hourly_rate', $validated);
+        $deductions = $validated['deductions'] ?? null;
+        unset($validated['deductions']);
 
-        $payslip->update($validated);
+        DB::transaction(function () use ($payslip, $validated, $deductions) {
+            if ($validated !== []) {
+                $payslip->update($validated);
+            }
+
+            if ($deductions !== null) {
+                // Deduction lines are fully replaced on every save.
+                $payslip->deductions()->delete();
+                foreach ($deductions as $deduction) {
+                    $payslip->deductions()->create([
+                        'deduction_type_id' => $deduction['deduction_type_id'] ?? null,
+                        'name' => $deduction['name'],
+                        'amount' => $deduction['amount'],
+                    ]);
+                }
+            }
+        });
 
         if ($ratesChanged) {
             $payrollService->applyRates($payslip);
@@ -127,7 +154,7 @@ class PayslipController extends Controller
             $payrollService->recomputeTotals($payslip);
         }
 
-        $payslip->refresh()->load(['user', 'days', 'payrollPeriod', 'institution']);
+        $payslip->refresh()->load(['user', 'days', 'deductions', 'payrollPeriod', 'institution']);
 
         return response()->json([
             'success' => true,
@@ -184,7 +211,7 @@ class PayslipController extends Controller
         $day->update(['time_in' => $timeIn, 'time_out' => $timeOut]);
         $payrollService->recomputeDay($payslip, $day->refresh());
 
-        $payslip->refresh()->load(['user', 'days', 'payrollPeriod', 'institution']);
+        $payslip->refresh()->load(['user', 'days', 'deductions', 'payrollPeriod', 'institution']);
 
         return response()->json([
             'success' => true,
@@ -234,12 +261,12 @@ class PayslipController extends Controller
             'days_worked' => (float) $payslip->days_worked,
             'hours_worked' => (float) $payslip->hours_worked,
             'gross_pay' => (float) $payslip->gross_pay,
-            'sss_employee' => (float) $payslip->sss_employee,
-            'pagibig_employee' => (float) $payslip->pagibig_employee,
-            'philhealth_employee' => (float) $payslip->philhealth_employee,
-            'advance' => (float) $payslip->advance,
-            'other_deductions' => (float) $payslip->other_deductions,
-            'other_deductions_note' => $payslip->other_deductions_note,
+            'deductions' => $payslip->deductions->map(fn (PayslipDeduction $deduction) => [
+                'id' => $deduction->id,
+                'deduction_type_id' => $deduction->deduction_type_id,
+                'name' => $deduction->name,
+                'amount' => (float) $deduction->amount,
+            ])->values(),
             'sss_employer' => (float) $payslip->sss_employer,
             'pagibig_employer' => (float) $payslip->pagibig_employer,
             'philhealth_employer' => (float) $payslip->philhealth_employer,

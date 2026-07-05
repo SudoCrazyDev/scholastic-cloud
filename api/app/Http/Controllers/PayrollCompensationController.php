@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class PayrollCompensationController extends Controller
@@ -50,7 +51,8 @@ class PayrollCompensationController extends Controller
 
         $staff = $query->orderBy('first_name')->orderBy('last_name')->get();
 
-        $compensations = PayrollCompensation::where('institution_id', $institutionId)
+        $compensations = PayrollCompensation::with('deductions.deductionType')
+            ->where('institution_id', $institutionId)
             ->whereIn('user_id', $staff->pluck('id'))
             ->get()
             ->keyBy('user_id');
@@ -93,37 +95,54 @@ class PayrollCompensationController extends Controller
             'daily_rate' => 'required|numeric|min:0|max:999999',
             'hourly_rate' => 'nullable|numeric|min:0|max:999999',
             'hours_per_day' => 'required|numeric|min:1|max:24',
-            'sss_employee' => 'nullable|numeric|min:0|max:999999',
-            'pagibig_employee' => 'nullable|numeric|min:0|max:999999',
-            'philhealth_employee' => 'nullable|numeric|min:0|max:999999',
             'sss_employer' => 'nullable|numeric|min:0|max:999999',
             'pagibig_employer' => 'nullable|numeric|min:0|max:999999',
             'philhealth_employer' => 'nullable|numeric|min:0|max:999999',
+            'deductions' => 'nullable|array',
+            'deductions.*.deduction_type_id' => [
+                'required',
+                'uuid',
+                'distinct',
+                Rule::exists('payroll_deduction_types', 'id')
+                    ->where(fn ($query) => $query->where('institution_id', $institutionId)),
+            ],
+            'deductions.*.amount' => 'required|numeric|min:0|max:999999',
         ], [
             'user_id.exists' => 'This staff member does not belong to your institution.',
+            'deductions.*.deduction_type_id.exists' => 'One of the deductions does not belong to your institution.',
         ]);
 
-        $compensation = PayrollCompensation::updateOrCreate(
-            ['institution_id' => $institutionId, 'user_id' => $userId],
-            [
-                'designation' => $validated['designation'] ?? null,
-                'daily_rate' => $validated['daily_rate'],
-                'hourly_rate' => $validated['hourly_rate'] ?? null,
-                'hours_per_day' => $validated['hours_per_day'],
-                'sss_employee' => $validated['sss_employee'] ?? 0,
-                'pagibig_employee' => $validated['pagibig_employee'] ?? 0,
-                'philhealth_employee' => $validated['philhealth_employee'] ?? 0,
-                'sss_employer' => $validated['sss_employer'] ?? 0,
-                'pagibig_employer' => $validated['pagibig_employer'] ?? 0,
-                'philhealth_employer' => $validated['philhealth_employer'] ?? 0,
-                'created_by' => $request->user()?->id,
-            ]
-        );
+        $compensation = DB::transaction(function () use ($validated, $institutionId, $userId, $request) {
+            $compensation = PayrollCompensation::updateOrCreate(
+                ['institution_id' => $institutionId, 'user_id' => $userId],
+                [
+                    'designation' => $validated['designation'] ?? null,
+                    'daily_rate' => $validated['daily_rate'],
+                    'hourly_rate' => $validated['hourly_rate'] ?? null,
+                    'hours_per_day' => $validated['hours_per_day'],
+                    'sss_employer' => $validated['sss_employer'] ?? 0,
+                    'pagibig_employer' => $validated['pagibig_employer'] ?? 0,
+                    'philhealth_employer' => $validated['philhealth_employer'] ?? 0,
+                    'created_by' => $request->user()?->id,
+                ]
+            );
+
+            // Deduction defaults are fully replaced on every save.
+            $compensation->deductions()->delete();
+            foreach ($validated['deductions'] ?? [] as $deduction) {
+                $compensation->deductions()->create([
+                    'deduction_type_id' => $deduction['deduction_type_id'],
+                    'amount' => $deduction['amount'],
+                ]);
+            }
+
+            return $compensation;
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'Compensation saved successfully',
-            'data' => $this->serialize($compensation),
+            'data' => $this->serialize($compensation->fresh('deductions.deductionType')),
         ]);
     }
 
@@ -141,12 +160,15 @@ class PayrollCompensationController extends Controller
             'hourly_rate' => $compensation->hourly_rate !== null ? (float) $compensation->hourly_rate : null,
             'effective_hourly_rate' => $compensation->effectiveHourlyRate(),
             'hours_per_day' => (float) $compensation->hours_per_day,
-            'sss_employee' => (float) $compensation->sss_employee,
-            'pagibig_employee' => (float) $compensation->pagibig_employee,
-            'philhealth_employee' => (float) $compensation->philhealth_employee,
             'sss_employer' => (float) $compensation->sss_employer,
             'pagibig_employer' => (float) $compensation->pagibig_employer,
             'philhealth_employer' => (float) $compensation->philhealth_employer,
+            'deductions' => $compensation->deductions->map(fn ($deduction) => [
+                'deduction_type_id' => $deduction->deduction_type_id,
+                'name' => $deduction->deductionType?->name,
+                'amount' => (float) $deduction->amount,
+            ])->values(),
+            'deductions_total' => round((float) $compensation->deductions->sum('amount'), 2),
             'updated_at' => $compensation->updated_at?->toIso8601String(),
         ];
     }

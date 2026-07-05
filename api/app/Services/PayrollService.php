@@ -28,7 +28,9 @@ class PayrollService
         $from = $period->date_from->copy()->startOfDay();
         $to = $period->date_to->copy()->endOfDay();
 
-        $compensations = PayrollCompensation::where('institution_id', $institutionId)->get();
+        $compensations = PayrollCompensation::with('deductions.deductionType')
+            ->where('institution_id', $institutionId)
+            ->get();
         $userIds = $compensations->pluck('user_id')->all();
 
         $holidayDates = StaffCalendarEvent::where('institution_id', $institutionId)
@@ -87,9 +89,6 @@ class PayrollService
             'daily_rate' => $compensation->daily_rate,
             'hourly_rate' => $hourlyRate,
             'hours_per_day' => $compensation->hours_per_day,
-            'sss_employee' => $compensation->sss_employee,
-            'pagibig_employee' => $compensation->pagibig_employee,
-            'philhealth_employee' => $compensation->philhealth_employee,
             'sss_employer' => $compensation->sss_employer,
             'pagibig_employer' => $compensation->pagibig_employer,
             'philhealth_employer' => $compensation->philhealth_employer,
@@ -142,6 +141,19 @@ class PayrollService
         }
 
         $payslip->days()->saveMany($rows);
+
+        // Copy the staff member's default deductions onto the payslip.
+        foreach ($compensation->deductions as $deduction) {
+            if ((float) $deduction->amount <= 0 || ! $deduction->deductionType?->is_active) {
+                continue;
+            }
+            $payslip->deductions()->create([
+                'deduction_type_id' => $deduction->deduction_type_id,
+                'name' => $deduction->deductionType->name,
+                'amount' => $deduction->amount,
+            ]);
+        }
+
         $this->recomputeTotals($payslip);
 
         return $payslip;
@@ -197,14 +209,7 @@ class PayrollService
         $days = $payslip->days()->get();
 
         $gross = round((float) $days->sum('amount_earned'), 2);
-        $totalDeductions = round(
-            (float) $payslip->sss_employee
-            + (float) $payslip->pagibig_employee
-            + (float) $payslip->philhealth_employee
-            + (float) $payslip->advance
-            + (float) $payslip->other_deductions,
-            2
-        );
+        $totalDeductions = round((float) $payslip->deductions()->sum('amount'), 2);
 
         $payslip->update([
             'days_worked' => $days->filter(fn ($day) => (float) $day->hours_worked > 0)->count(),

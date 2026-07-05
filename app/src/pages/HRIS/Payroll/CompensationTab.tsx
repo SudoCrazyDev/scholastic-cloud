@@ -5,7 +5,11 @@ import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { payrollService } from '../../../services/payrollService'
-import type { PayrollStaffCompensation, SavePayrollCompensationData } from '../../../types'
+import type {
+  PayrollDeductionType,
+  PayrollStaffCompensation,
+  SavePayrollCompensationData,
+} from '../../../types'
 import { errorMessage, numberOrZero, peso } from './helpers'
 
 interface CompensationForm {
@@ -13,12 +17,11 @@ interface CompensationForm {
   daily_rate: string
   hourly_rate: string
   hours_per_day: string
-  sss_employee: string
-  pagibig_employee: string
-  philhealth_employee: string
   sss_employer: string
   pagibig_employer: string
   philhealth_employer: string
+  // deduction_type_id -> amount (as entered)
+  deductions: Record<string, string>
 }
 
 const emptyForm = (): CompensationForm => ({
@@ -26,12 +29,10 @@ const emptyForm = (): CompensationForm => ({
   daily_rate: '',
   hourly_rate: '',
   hours_per_day: '8',
-  sss_employee: '',
-  pagibig_employee: '',
-  philhealth_employee: '',
   sss_employer: '',
   pagibig_employer: '',
   philhealth_employer: '',
+  deductions: {},
 })
 
 const CompensationTab: React.FC = () => {
@@ -46,9 +47,19 @@ const CompensationTab: React.FC = () => {
     queryFn: () => payrollService.getCompensations(),
   })
 
+  const typesQuery = useQuery({
+    queryKey: ['payroll-deduction-types'],
+    queryFn: () => payrollService.getDeductionTypes(),
+  })
+
   const rows = useMemo<PayrollStaffCompensation[]>(
     () => compensationsQuery.data?.data || [],
     [compensationsQuery.data]
+  )
+
+  const activeTypes = useMemo<PayrollDeductionType[]>(
+    () => (typesQuery.data?.data || []).filter((type) => type.is_active),
+    [typesQuery.data]
   )
 
   const filteredRows = useMemo(() => {
@@ -80,17 +91,25 @@ const CompensationTab: React.FC = () => {
 
   const openEditor = (row: PayrollStaffCompensation) => {
     const c = row.compensation
+    const deductionAmounts: Record<string, string> = {}
+    for (const type of activeTypes) {
+      const existing = c?.deductions.find((d) => d.deduction_type_id === type.id)
+      // Existing staff amount wins; otherwise pre-fill the type's default.
+      deductionAmounts[type.id] = existing
+        ? String(existing.amount)
+        : c
+          ? '0'
+          : String(type.default_amount)
+    }
     setForm({
       designation: c?.designation || '',
       daily_rate: c ? String(c.daily_rate) : '',
       hourly_rate: c?.hourly_rate != null ? String(c.hourly_rate) : '',
       hours_per_day: c ? String(c.hours_per_day) : '8',
-      sss_employee: c ? String(c.sss_employee) : '',
-      pagibig_employee: c ? String(c.pagibig_employee) : '',
-      philhealth_employee: c ? String(c.philhealth_employee) : '',
       sss_employer: c ? String(c.sss_employer) : '',
       pagibig_employer: c ? String(c.pagibig_employer) : '',
       philhealth_employer: c ? String(c.philhealth_employer) : '',
+      deductions: deductionAmounts,
     })
     setFormError(null)
     setEditing(row)
@@ -106,33 +125,23 @@ const CompensationTab: React.FC = () => {
         daily_rate: numberOrZero(form.daily_rate),
         hourly_rate: form.hourly_rate.trim() === '' ? null : numberOrZero(form.hourly_rate),
         hours_per_day: numberOrZero(form.hours_per_day) || 8,
-        sss_employee: numberOrZero(form.sss_employee),
-        pagibig_employee: numberOrZero(form.pagibig_employee),
-        philhealth_employee: numberOrZero(form.philhealth_employee),
         sss_employer: numberOrZero(form.sss_employer),
         pagibig_employer: numberOrZero(form.pagibig_employer),
         philhealth_employer: numberOrZero(form.philhealth_employer),
+        deductions: activeTypes.map((type) => ({
+          deduction_type_id: type.id,
+          amount: numberOrZero(form.deductions[type.id] ?? ''),
+        })),
       },
     })
   }
 
-  const setField = (key: keyof CompensationForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [key]: e.target.value }))
+  const setField = (key: Exclude<keyof CompensationForm, 'deductions'>) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value }))
 
-  const moneyField = (label: string, key: keyof CompensationForm, required = false) => (
-    <div>
-      <label className="mb-1 block text-xs font-medium text-gray-600">{label}</label>
-      <Input
-        type="number"
-        min="0"
-        step="0.01"
-        required={required}
-        value={form[key]}
-        onChange={setField(key)}
-        placeholder="0.00"
-      />
-    </div>
-  )
+  const setDeduction = (typeId: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, deductions: { ...prev.deductions, [typeId]: e.target.value } }))
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -140,8 +149,8 @@ const CompensationTab: React.FC = () => {
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Employee Rates & Contributions</h2>
           <p className="text-sm text-gray-500">
-            Set each staff member's daily/hourly rate and the default SSS, Pag-IBIG and PhilHealth
-            amounts used when generating payslips.
+            Set each staff member's daily/hourly rate and default deduction amounts used when
+            generating payslips. Manage the deduction list in the Deduction Types tab.
           </p>
         </div>
         <div className="relative w-full max-w-xs">
@@ -164,28 +173,27 @@ const CompensationTab: React.FC = () => {
               <th className="px-4 py-3">Designation</th>
               <th className="px-4 py-3 text-right">Daily Rate</th>
               <th className="px-4 py-3 text-right">Hourly Rate</th>
-              <th className="px-4 py-3 text-right">SSS</th>
-              <th className="px-4 py-3 text-right">Pag-IBIG</th>
-              <th className="px-4 py-3 text-right">PhilHealth</th>
+              <th className="px-4 py-3">Deductions / period</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {compensationsQuery.isLoading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
                   Loading staff…
                 </td>
               </tr>
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
                   No staff found.
                 </td>
               </tr>
             ) : (
               filteredRows.map((row) => {
                 const c = row.compensation
+                const appliedDeductions = (c?.deductions || []).filter((d) => d.amount > 0)
                 return (
                   <tr key={row.user_id} className="border-b border-gray-50 hover:bg-gray-50/50">
                     <td className="px-4 py-3">
@@ -208,14 +216,21 @@ const CompensationTab: React.FC = () => {
                         '—'
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-600">
-                      {c ? peso(c.sss_employee) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-600">
-                      {c ? peso(c.pagibig_employee) : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-600">
-                      {c ? peso(c.philhealth_employee) : '—'}
+                    <td className="px-4 py-3 text-gray-600">
+                      {c ? (
+                        appliedDeductions.length > 0 ? (
+                          <span title={appliedDeductions.map((d) => `${d.name}: ${peso(d.amount)}`).join(', ')}>
+                            <span className="tabular-nums font-medium">{peso(c.deductions_total)}</span>
+                            <span className="ml-1 text-xs text-gray-400">
+                              ({appliedDeductions.map((d) => d.name).join(', ')})
+                            </span>
+                          </span>
+                        ) : (
+                          'none'
+                        )
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button variant="outline" size="sm" onClick={() => openEditor(row)}>
@@ -261,7 +276,18 @@ const CompensationTab: React.FC = () => {
                     placeholder="e.g. Classroom Teacher"
                   />
                 </div>
-                {moneyField('Daily rate (₱)', 'daily_rate', true)}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Daily rate (₱)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={form.daily_rate}
+                    onChange={setField('daily_rate')}
+                    placeholder="0.00"
+                  />
+                </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">Hourly rate (₱)</label>
                   <Input
@@ -291,11 +317,33 @@ const CompensationTab: React.FC = () => {
                 <p className="mb-2 text-sm font-medium text-gray-700">
                   Deductions — employee's share (per payroll period)
                 </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  {moneyField('SSS', 'sss_employee')}
-                  {moneyField('Pag-IBIG', 'pagibig_employee')}
-                  {moneyField('PhilHealth', 'philhealth_employee')}
-                </div>
+                {activeTypes.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-400">
+                    No deduction types yet — add them in the Deduction Types tab (e.g. SSS,
+                    Pag-IBIG, PhilHealth, Cash Advance).
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {activeTypes.map((type) => (
+                      <div key={type.id}>
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                          {type.name}
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.deductions[type.id] ?? ''}
+                          onChange={setDeduction(type.id)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Amounts set to 0 are not applied when generating payslips.
+                </p>
               </div>
 
               <div>
@@ -303,9 +351,18 @@ const CompensationTab: React.FC = () => {
                   Other benefits — employer's share (per payroll period)
                 </p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  {moneyField('SSS', 'sss_employer')}
-                  {moneyField('Pag-IBIG', 'pagibig_employer')}
-                  {moneyField('PhilHealth', 'philhealth_employer')}
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">SSS</label>
+                    <Input type="number" min="0" step="0.01" value={form.sss_employer} onChange={setField('sss_employer')} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Pag-IBIG</label>
+                    <Input type="number" min="0" step="0.01" value={form.pagibig_employer} onChange={setField('pagibig_employer')} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">PhilHealth</label>
+                    <Input type="number" min="0" step="0.01" value={form.philhealth_employer} onChange={setField('philhealth_employer')} placeholder="0.00" />
+                  </div>
                 </div>
               </div>
 

@@ -1872,6 +1872,29 @@ export interface CreateAnnouncementData {
 // Payroll (HRIS)
 // =====================
 
+// Institution-defined deduction catalog entry (SSS, Pag-IBIG, Cash Advance, ...).
+export interface PayrollDeductionType {
+  id: string;
+  name: string;
+  default_amount: number;
+  is_active: boolean;
+  sort_order: number;
+  updated_at?: string;
+}
+
+export interface SavePayrollDeductionTypeData {
+  name: string;
+  default_amount?: number;
+  is_active?: boolean;
+}
+
+// A staff member's default amount for one deduction type.
+export interface PayrollCompensationDeduction {
+  deduction_type_id: string;
+  name: string | null;
+  amount: number;
+}
+
 export interface PayrollCompensation {
   id: string;
   user_id: string;
@@ -1880,12 +1903,11 @@ export interface PayrollCompensation {
   hourly_rate: number | null;
   effective_hourly_rate: number;
   hours_per_day: number;
-  sss_employee: number;
-  pagibig_employee: number;
-  philhealth_employee: number;
   sss_employer: number;
   pagibig_employer: number;
   philhealth_employer: number;
+  deductions: PayrollCompensationDeduction[];
+  deductions_total: number;
   updated_at?: string;
 }
 
@@ -1903,12 +1925,10 @@ export interface SavePayrollCompensationData {
   daily_rate: number;
   hourly_rate?: number | null;
   hours_per_day: number;
-  sss_employee?: number;
-  pagibig_employee?: number;
-  philhealth_employee?: number;
   sss_employer?: number;
   pagibig_employer?: number;
   philhealth_employer?: number;
+  deductions?: { deduction_type_id: string; amount: number }[];
 }
 
 export type PayrollPeriodStatus = 'draft' | 'finalized';
@@ -1980,12 +2000,7 @@ export interface Payslip {
   days_worked: number;
   hours_worked: number;
   gross_pay: number;
-  sss_employee: number;
-  pagibig_employee: number;
-  philhealth_employee: number;
-  advance: number;
-  other_deductions: number;
-  other_deductions_note: string | null;
+  deductions: PayslipDeduction[];
   sss_employer: number;
   pagibig_employer: number;
   philhealth_employer: number;
@@ -1996,19 +2011,22 @@ export interface Payslip {
   updated_at?: string;
 }
 
+// One deduction line on a payslip; name is a snapshot of the type name.
+export interface PayslipDeduction {
+  id?: string;
+  deduction_type_id: string | null;
+  name: string;
+  amount: number;
+}
+
 export interface UpdatePayslipData {
   designation?: string | null;
   daily_rate?: number;
   hourly_rate?: number;
-  sss_employee?: number;
-  pagibig_employee?: number;
-  philhealth_employee?: number;
-  advance?: number;
-  other_deductions?: number;
-  other_deductions_note?: string | null;
   sss_employer?: number;
   pagibig_employer?: number;
   philhealth_employer?: number;
+  deductions?: { deduction_type_id: string | null; name: string; amount: number }[];
 }
 
 export interface UpdatePayslipDayData {

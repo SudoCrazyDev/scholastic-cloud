@@ -15,6 +15,7 @@ const moneyOrDash = (amount: number) => (amount ? money(amount) : '—')
 
 /**
  * Replicates the paper "Employee's Salary and Working Time Record" form.
+ * The DEDUCTIONS section grows one column per deduction line on the payslip.
  * All styles live in the embedded <style> tag so the markup survives the
  * copy into the print popup (Tailwind classes would be lost there).
  */
@@ -27,6 +28,11 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
   const year = toDate?.getFullYear() ?? new Date().getFullYear()
   const fmtDay = (d: Date | null) =>
     d ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '________'
+
+  const deductions = payslip.deductions
+  const deductionCols = Math.max(deductions.length, 1)
+  // The deductions section shares a fixed slice of the sheet width.
+  const deductionColWidth = 26 / deductionCols
 
   const handlePrint = () => {
     if (!printRef.current) return
@@ -123,10 +129,9 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                   <col style={{ width: '6.5%' }} />
                   <col style={{ width: '7%' }} />
                   <col style={{ width: '8%' }} />
-                  <col style={{ width: '6.5%' }} />
-                  <col style={{ width: '6.5%' }} />
-                  <col style={{ width: '6.5%' }} />
-                  <col style={{ width: '6.5%' }} />
+                  {Array.from({ length: deductionCols }, (_, i) => (
+                    <col key={i} style={{ width: `${deductionColWidth}%` }} />
+                  ))}
                   <col style={{ width: '7%' }} />
                   <col style={{ width: '8%' }} />
                 </colgroup>
@@ -147,7 +152,7 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                       <br />
                       EARNED
                     </th>
-                    <th colSpan={4}>
+                    <th colSpan={deductionCols}>
                       DEDUCTIONS
                       <br />
                       (Employee's Share)
@@ -170,10 +175,13 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                     <th>PAG-IBIG</th>
                     <th>PHILHEALTH</th>
                     <th>TOTAL</th>
-                    <th>SSS</th>
-                    <th>PAG-IBIG</th>
-                    <th>PHILHEALTH</th>
-                    <th>Advance</th>
+                    {deductions.length === 0 ? (
+                      <th>—</th>
+                    ) : (
+                      deductions.map((deduction) => (
+                        <th key={deduction.id || deduction.name}>{deduction.name.toUpperCase()}</th>
+                      ))
+                    )}
                   </tr>
                   <tr />
                 </thead>
@@ -188,7 +196,7 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                         <td colSpan={4} />
                         <td className="num">{day.amount_earned ? money(payslip.daily_rate) : ''}</td>
                         <td className="num">{money(day.amount_earned)}</td>
-                        <td colSpan={4} />
+                        <td colSpan={deductionCols} />
                         <td />
                         <td />
                       </tr>
@@ -203,10 +211,15 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                     <td className="num">{moneyOrDash(payslip.employer_share_total)}</td>
                     <td className="num">{money(payslip.daily_rate)}</td>
                     <td className="num">{money(payslip.gross_pay)}</td>
-                    <td className="num">{moneyOrDash(payslip.sss_employee)}</td>
-                    <td className="num">{moneyOrDash(payslip.pagibig_employee)}</td>
-                    <td className="num">{moneyOrDash(payslip.philhealth_employee)}</td>
-                    <td className="num">{moneyOrDash(payslip.advance)}</td>
+                    {deductions.length === 0 ? (
+                      <td className="num">—</td>
+                    ) : (
+                      deductions.map((deduction) => (
+                        <td key={deduction.id || deduction.name} className="num">
+                          {moneyOrDash(deduction.amount)}
+                        </td>
+                      ))
+                    )}
                     <td className="num">{money(payslip.total_deductions)}</td>
                     <td className="num">{money(payslip.net_pay)}</td>
                   </tr>

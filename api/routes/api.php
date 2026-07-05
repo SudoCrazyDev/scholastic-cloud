@@ -382,7 +382,9 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('staff-calendar-events', \App\Http\Controllers\StaffCalendarEventController::class)
         ->only(['index', 'store', 'update', 'destroy']);
 
-    // HRIS — Payroll (compensation settings, periods, payslips)
+    // HRIS — Payroll (compensation settings, deduction types, periods, payslips)
+    Route::apiResource('payroll-deduction-types', \App\Http\Controllers\PayrollDeductionTypeController::class)
+        ->only(['index', 'store', 'update', 'destroy']);
     Route::get('payroll-compensations', [\App\Http\Controllers\PayrollCompensationController::class, 'index']);
     Route::put('payroll-compensations/{userId}', [\App\Http\Controllers\PayrollCompensationController::class, 'upsert']);
     Route::post('payroll-periods/{id}/generate', [\App\Http\Controllers\PayrollPeriodController::class, 'generate']);

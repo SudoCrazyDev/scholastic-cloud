@@ -5,14 +5,44 @@ import type {
   Payslip,
   PayslipSummary,
   PayrollCompensation,
+  PayrollDeductionType,
   PayrollPeriod,
   PayrollStaffCompensation,
   SavePayrollCompensationData,
+  SavePayrollDeductionTypeData,
   UpdatePayslipData,
   UpdatePayslipDayData,
 } from '../types'
 
 class PayrollService {
+  // --- Deduction types (institution catalog) ---
+
+  async getDeductionTypes() {
+    const response = await api.get<ApiResponse<PayrollDeductionType[]>>('/payroll-deduction-types')
+    return response.data
+  }
+
+  async createDeductionType(payload: SavePayrollDeductionTypeData) {
+    const response = await api.post<ApiResponse<PayrollDeductionType>>(
+      '/payroll-deduction-types',
+      payload
+    )
+    return response.data
+  }
+
+  async updateDeductionType(id: string, payload: SavePayrollDeductionTypeData) {
+    const response = await api.put<ApiResponse<PayrollDeductionType>>(
+      `/payroll-deduction-types/${id}`,
+      payload
+    )
+    return response.data
+  }
+
+  async deleteDeductionType(id: string) {
+    const response = await api.delete<ApiResponse<null>>(`/payroll-deduction-types/${id}`)
+    return response.data
+  }
+
   // --- Compensation settings (Employee Rates) ---
 
   async getCompensations(params?: { search?: string }) {

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PayrollCompensation extends Model
 {
@@ -20,9 +21,6 @@ class PayrollCompensation extends Model
         'daily_rate',
         'hourly_rate',
         'hours_per_day',
-        'sss_employee',
-        'pagibig_employee',
-        'philhealth_employee',
         'sss_employer',
         'pagibig_employer',
         'philhealth_employer',
@@ -33,9 +31,6 @@ class PayrollCompensation extends Model
         'daily_rate' => 'decimal:2',
         'hourly_rate' => 'decimal:2',
         'hours_per_day' => 'decimal:2',
-        'sss_employee' => 'decimal:2',
-        'pagibig_employee' => 'decimal:2',
-        'philhealth_employee' => 'decimal:2',
         'sss_employer' => 'decimal:2',
         'pagibig_employer' => 'decimal:2',
         'philhealth_employer' => 'decimal:2',
@@ -49,6 +44,11 @@ class PayrollCompensation extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function deductions(): HasMany
+    {
+        return $this->hasMany(PayrollCompensationDeduction::class, 'payroll_compensation_id');
     }
 
     /**
