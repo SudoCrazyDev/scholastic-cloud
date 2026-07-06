@@ -65,10 +65,16 @@ export const TakeAssessment: React.FC = () => {
   }, [payload?.answers]);
 
   useEffect(() => {
-    if (status === 'not_started' && questions.length > 0 && !startMutation.isPending && !startMutation.data) {
+    if (
+      status === 'not_started' &&
+      questions.length > 0 &&
+      !startMutation.isPending &&
+      !startMutation.data &&
+      !startMutation.isError
+    ) {
       startMutation.mutate();
     }
-  }, [status, questions.length, startMutation.isPending, startMutation.data]);
+  }, [status, questions.length, startMutation.isPending, startMutation.data, startMutation.isError]);
 
   useEffect(() => {
     if (alreadySubmitted && payload?.attempt) {
@@ -139,6 +145,22 @@ export const TakeAssessment: React.FC = () => {
       <div className="max-w-2xl mx-auto p-6 flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
         <span className="ml-3 text-gray-600">Loading...</span>
+      </div>
+    );
+  }
+
+  if (startMutation.isError && !startMutation.data) {
+    const startError = startMutation.error as { response?: { data?: { message?: string } } } | undefined;
+    const message =
+      startError?.response?.data?.message ?? 'This assessment cannot be started right now.';
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
+          <DocumentTextIcon className="w-14 h-14 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Assessment unavailable</h2>
+          <p className="text-gray-600 mb-6">{message}</p>
+          <Button onClick={() => navigate('/my-assessments')}>Back to My Assessments</Button>
+        </div>
       </div>
     );
   }
