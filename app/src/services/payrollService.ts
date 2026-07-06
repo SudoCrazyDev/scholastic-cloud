@@ -8,8 +8,10 @@ import type {
   PayrollDeductionType,
   PayrollPeriod,
   PayrollStaffCompensation,
+  PayslipTemplate,
   SavePayrollCompensationData,
   SavePayrollDeductionTypeData,
+  SavePayslipTemplateData,
   UpdatePayslipData,
   UpdatePayslipDayData,
 } from '../types'
@@ -40,6 +42,28 @@ class PayrollService {
 
   async deleteDeductionType(id: string) {
     const response = await api.delete<ApiResponse<null>>(`/payroll-deduction-types/${id}`)
+    return response.data
+  }
+
+  // --- Payslip templates (designer) ---
+
+  async getPayslipTemplates() {
+    const response = await api.get<ApiResponse<PayslipTemplate[]>>('/payslip-templates')
+    return response.data
+  }
+
+  async createPayslipTemplate(payload: SavePayslipTemplateData) {
+    const response = await api.post<ApiResponse<PayslipTemplate>>('/payslip-templates', payload)
+    return response.data
+  }
+
+  async updatePayslipTemplate(id: string, payload: SavePayslipTemplateData) {
+    const response = await api.put<ApiResponse<PayslipTemplate>>(`/payslip-templates/${id}`, payload)
+    return response.data
+  }
+
+  async deletePayslipTemplate(id: string) {
+    const response = await api.delete<ApiResponse<null>>(`/payslip-templates/${id}`)
     return response.data
   }
 

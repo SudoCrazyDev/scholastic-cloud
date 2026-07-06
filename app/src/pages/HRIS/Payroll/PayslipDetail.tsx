@@ -9,6 +9,7 @@ import { payrollService } from '../../../services/payrollService'
 import type { Payslip, PayslipDay, PayrollDeductionType, UpdatePayslipData } from '../../../types'
 import { dayLabel, errorMessage, numberOrZero, peso, time12 } from './helpers'
 import PayslipPrintModal from './PayslipPrintModal'
+import PayslipSlipPrintModal from './PayslipSlipPrintModal'
 
 interface PayslipDetailProps {
   payslipId: string
@@ -47,7 +48,7 @@ const deductionsFromPayslip = (payslip: Payslip): DeductionRow[] =>
 
 const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalized, onBack }) => {
   const queryClient = useQueryClient()
-  const [showPrint, setShowPrint] = useState(false)
+  const [showPrint, setShowPrint] = useState<'slip' | 'record' | null>(null)
   const [editingDay, setEditingDay] = useState<PayslipDay | null>(null)
   const [dayForm, setDayForm] = useState({ time_in: '', time_out: '' })
   const [form, setForm] = useState<RatesForm | null>(null)
@@ -196,9 +197,13 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
               Finalized — read only
             </span>
           )}
-          <Button size="sm" onClick={() => setShowPrint(true)}>
+          <Button size="sm" onClick={() => setShowPrint('slip')}>
             <PrinterIcon className="h-4 w-4" />
-            Print record
+            Print Pay Slip
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setShowPrint('record')}>
+            <PrinterIcon className="h-4 w-4" />
+            Time Record
           </Button>
         </div>
       </div>
@@ -495,7 +500,12 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
         </div>
       )}
 
-      {showPrint && <PayslipPrintModal payslip={payslip} onClose={() => setShowPrint(false)} />}
+      {showPrint === 'record' && (
+        <PayslipPrintModal payslip={payslip} onClose={() => setShowPrint(null)} />
+      )}
+      {showPrint === 'slip' && (
+        <PayslipSlipPrintModal payslip={payslip} onClose={() => setShowPrint(null)} />
+      )}
     </div>
   )
 }

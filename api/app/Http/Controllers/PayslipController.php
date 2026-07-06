@@ -246,6 +246,7 @@ class PayslipController extends Controller
             'designation' => $payslip->designation,
             'institution_name' => $payslip->institution?->title,
             'institution_address' => $payslip->institution?->address,
+            'institution_logo' => $payslip->institution?->logo,
             'period' => $period ? [
                 'id' => $period->id,
                 'name' => $period->name,

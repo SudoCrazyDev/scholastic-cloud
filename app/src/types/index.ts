@@ -1986,6 +1986,7 @@ export interface Payslip {
   designation: string | null;
   institution_name: string | null;
   institution_address: string | null;
+  institution_logo: string | null;
   period: {
     id: string;
     name: string;
@@ -2032,4 +2033,59 @@ export interface UpdatePayslipData {
 export interface UpdatePayslipDayData {
   time_in: string | null;
   time_out: string | null;
+}
+
+// =====================
+// Payslip templates (designer)
+// =====================
+
+export type PayslipTemplateElementType =
+  | 'institution_logo'
+  | 'institution_name'
+  | 'institution_address'
+  | 'title'
+  | 'pay_date'
+  | 'employee_name'
+  | 'designation'
+  | 'covered_period'
+  | 'daily_rate'
+  | 'hourly_rate'
+  | 'total_working_days'
+  | 'total_hours'
+  | 'total_salary_earned'
+  | 'deductions_list'
+  | 'total_deductions'
+  | 'employer_benefits_list'
+  | 'net_pay'
+  | 'pay_master'
+  | 'received_by'
+  | 'signature_line'
+  | 'divider'
+  | 'custom_text'
+  | 'spacer';
+
+export interface PayslipTemplateElement {
+  id: string;
+  type: PayslipTemplateElementType;
+  label?: string;
+  // Free text for custom_text/title, or the person's name for pay_master.
+  content?: string;
+}
+
+export interface PayslipTemplate {
+  id: string;
+  institution_id: string;
+  name: string;
+  is_default: boolean;
+  paper_size: string;
+  layout: PayslipTemplateElement[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SavePayslipTemplateData {
+  name: string;
+  is_default?: boolean;
+  paper_size?: string;
+  layout: PayslipTemplateElement[];
 }
