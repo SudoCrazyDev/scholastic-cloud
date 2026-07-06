@@ -13,20 +13,14 @@ import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
 import { useAuth } from '../../../hooks/useAuth'
-import { schoolFeeService } from '../../../services/schoolFeeService'
 import { studentFinanceService } from '../../../services/studentFinanceService'
 import { paymentPlanService } from '../../../services/paymentPlanService'
-import { studentDiscountService } from '../../../services/studentDiscountService'
-import { studentPaymentService } from '../../../services/studentPaymentService'
 import { studentOnlinePaymentService } from '../../../services/studentOnlinePaymentService'
 import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
 import type {
-  CreateStudentDiscountData,
-  CreateStudentPaymentData,
   CreateStudentOnlinePaymentCheckoutData,
   PaymentPlan,
   Student,
-  StudentPayment,
 } from '../../../types'
 
 interface StudentFinanceTabProps {
@@ -43,34 +37,11 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const isStudentUser = roleSlug === 'student'
 
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string>('')
-  const [paymentForm, setPaymentForm] = useState({
-    amount: '',
-    payment_date: '',
-    payment_method: '',
-    reference_number: '',
-    remarks: '',
-    school_fee_id: '',
-  })
-  const [paymentError, setPaymentError] = useState<string | null>(null)
-  const [receipt, setReceipt] = useState<StudentPayment | null>(null)
   const [onlinePaymentAmount, setOnlinePaymentAmount] = useState('')
   const [onlinePaymentError, setOnlinePaymentError] = useState<string | null>(null)
   const [onlinePaymentMessage, setOnlinePaymentMessage] = useState<string | null>(null)
-  const [discountForm, setDiscountForm] = useState({
-    discount_type: 'fixed',
-    value: '',
-    school_fee_id: '',
-    description: '',
-  })
-  const [discountError, setDiscountError] = useState<string | null>(null)
   const [showPlanOverride, setShowPlanOverride] = useState(false)
   const [payingInstallment, setPayingInstallment] = useState<number | null>(null)
-
-  const feesQuery = useQuery({
-    queryKey: ['school-fees'],
-    queryFn: () => schoolFeeService.getSchoolFees({ is_active: true }),
-    enabled: Boolean(roleSlug && !isStudentUser),
-  })
 
   const activePlansQuery = useQuery({
     queryKey: ['active-payment-plans'],
@@ -182,27 +153,6 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     return years.map((year) => ({ value: year, label: year }))
   }, [ledgerData?.available_academic_years, fallbackAcademicYear])
 
-  const createPaymentMutation = useMutation({
-    mutationFn: (payload: CreateStudentPaymentData) => studentPaymentService.createPayment(payload),
-    onSuccess: (response) => {
-      setReceipt(response.data)
-      setPaymentForm({
-        amount: '',
-        payment_date: '',
-        payment_method: '',
-        reference_number: '',
-        remarks: '',
-        school_fee_id: '',
-      })
-      setPaymentError(null)
-      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
-      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
-    },
-    onError: (error: any) => {
-      setPaymentError(error.response?.data?.message || 'Failed to record payment.')
-    },
-  })
-
   const createOnlinePaymentMutation = useMutation({
     mutationFn: (payload: CreateStudentOnlinePaymentCheckoutData) =>
       studentOnlinePaymentService.createCheckout(payload),
@@ -223,25 +173,6 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     onError: (error: any) => {
       setOnlinePaymentError(error.response?.data?.message || 'Failed to create online checkout.')
       setOnlinePaymentMessage(null)
-    },
-  })
-
-  const createDiscountMutation = useMutation({
-    mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
-    onSuccess: () => {
-      setDiscountForm({
-        discount_type: 'fixed',
-        value: '',
-        school_fee_id: '',
-        description: '',
-      })
-      setDiscountError(null)
-      queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
-      queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
-      queryClient.invalidateQueries({ queryKey: ['student-additional-fees', studentId] })
-    },
-    onError: (error: any) => {
-      setDiscountError(error.response?.data?.message || 'Failed to save discount.')
     },
   })
 
@@ -270,31 +201,6 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)
-  }
-
-  const handlePaymentSubmit = (event: React.FormEvent) => {
-    event.preventDefault()
-    setPaymentError(null)
-
-    const amountValue = Number(paymentForm.amount)
-    if (!amountValue || amountValue <= 0) {
-      setPaymentError('Payment amount must be greater than zero.')
-      return
-    }
-
-    const payload: CreateStudentPaymentData = {
-      student_id: studentId,
-      academic_year: resolvedAcademicYear,
-      amount: amountValue,
-      payment_date:
-        paymentForm.payment_date || new Date().toISOString().split('T')[0],
-      payment_method: paymentForm.payment_method || undefined,
-      reference_number: paymentForm.reference_number || undefined,
-      remarks: paymentForm.remarks || undefined,
-      school_fee_id: paymentForm.school_fee_id || undefined,
-    }
-
-    createPaymentMutation.mutate(payload)
   }
 
   const studentFullName = [student.first_name, student.last_name]
@@ -401,32 +307,6 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
     setPayingInstallment(null)
     startMayaCheckout(amountValue)
-  }
-
-  const handleDiscountSubmit = (event: React.FormEvent) => {
-    event.preventDefault()
-    setDiscountError(null)
-
-    const value = Number(discountForm.value)
-    if (!value || value <= 0) {
-      setDiscountError('Discount value must be greater than zero.')
-      return
-    }
-    if (discountForm.discount_type === 'percentage' && value > 100) {
-      setDiscountError('Percentage discount cannot exceed 100%.')
-      return
-    }
-
-    const payload: CreateStudentDiscountData = {
-      student_id: studentId,
-      academic_year: resolvedAcademicYear,
-      discount_type: discountForm.discount_type as CreateStudentDiscountData['discount_type'],
-      value,
-      school_fee_id: discountForm.school_fee_id || undefined,
-      description: discountForm.description || undefined,
-    }
-
-    createDiscountMutation.mutate(payload)
   }
 
   const totals = ledgerData?.totals
@@ -621,7 +501,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         </div>
       </div>
 
-      {isStudentUser ? (
+      {isStudentUser && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h4 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
@@ -700,124 +580,6 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                 </table>
               </div>
             )}
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <CreditCardIcon className="w-5 h-5 text-indigo-600" />
-              Record Payment
-            </h4>
-            <form className="space-y-4" onSubmit={handlePaymentSubmit}>
-              <Input
-                label="Amount"
-                type="number"
-                min="0"
-                step="0.01"
-                value={paymentForm.amount}
-                onChange={(event) => setPaymentForm(prev => ({ ...prev, amount: event.target.value }))}
-              />
-              <Input
-                label="Payment Date"
-                type="date"
-                value={paymentForm.payment_date}
-                onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_date: event.target.value }))}
-              />
-              <Select
-                value={paymentForm.school_fee_id}
-                onChange={(event) => setPaymentForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
-                options={(feesQuery.data?.data || []).map((fee) => ({
-                  value: fee.id,
-                  label: fee.name,
-                }))}
-                placeholder="Applied fee (optional)"
-                className="w-full"
-              />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Mode of Payment</label>
-                <Select
-                  value={paymentForm.payment_method}
-                  onChange={(event) => setPaymentForm(prev => ({ ...prev, payment_method: event.target.value }))}
-                  options={[
-                    { value: '', label: '— Select payment mode' },
-                    { value: 'Cash', label: 'Cash' },
-                    { value: 'Check', label: 'Check' },
-                    { value: 'Bank Transfer', label: 'Bank Transfer' },
-                    { value: 'GCash', label: 'GCash' },
-                    { value: 'Maya', label: 'Maya' },
-                    { value: 'Credit Card', label: 'Credit Card' },
-                    { value: 'Debit Card', label: 'Debit Card' },
-                    { value: 'Online Banking', label: 'Online Banking' },
-                    { value: 'Money Order', label: 'Money Order' },
-                    { value: 'Other', label: 'Other' },
-                  ]}
-                  className="w-full"
-                />
-              </div>
-              <Input
-                label="Reference Number"
-                value={paymentForm.reference_number}
-                onChange={(event) => setPaymentForm(prev => ({ ...prev, reference_number: event.target.value }))}
-                placeholder="Optional reference"
-              />
-              <Input
-                label="Remarks"
-                value={paymentForm.remarks}
-                onChange={(event) => setPaymentForm(prev => ({ ...prev, remarks: event.target.value }))}
-                placeholder="Optional note"
-              />
-              {paymentError && <p className="text-sm text-red-600">{paymentError}</p>}
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                Record Payment
-              </Button>
-            </form>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
-              Apply Discount
-            </h4>
-            <form className="space-y-4" onSubmit={handleDiscountSubmit}>
-              <Select
-                value={discountForm.discount_type}
-                onChange={(event) => setDiscountForm(prev => ({ ...prev, discount_type: event.target.value }))}
-                options={[
-                  { value: 'fixed', label: 'Fixed Amount' },
-                  { value: 'percentage', label: 'Percentage' },
-                ]}
-                className="w-full"
-              />
-              <Input
-                label={discountForm.discount_type === 'percentage' ? 'Percentage (%)' : 'Discount Amount'}
-                type="number"
-                min="0"
-                step="0.01"
-                value={discountForm.value}
-                onChange={(event) => setDiscountForm(prev => ({ ...prev, value: event.target.value }))}
-              />
-              <Select
-                value={discountForm.school_fee_id}
-                onChange={(event) => setDiscountForm(prev => ({ ...prev, school_fee_id: event.target.value }))}
-                options={(feesQuery.data?.data || []).map((fee) => ({
-                  value: fee.id,
-                  label: fee.name,
-                }))}
-                placeholder="Apply to specific fee (optional)"
-                className="w-full"
-              />
-              <Input
-                label="Description"
-                value={discountForm.description}
-                onChange={(event) => setDiscountForm(prev => ({ ...prev, description: event.target.value }))}
-                placeholder="Optional note or reason"
-              />
-              {discountError && <p className="text-sm text-red-600">{discountError}</p>}
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                Save Discount
-              </Button>
-            </form>
           </div>
         </div>
       )}
@@ -1181,57 +943,6 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         )}
       </div>
 
-      {receipt && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h4 className="text-lg font-semibold text-gray-900">Payment Receipt</h4>
-              <p className="text-sm text-gray-600">Receipt Number: {receipt.receipt_number}</p>
-            </div>
-            <Button variant="outline" onClick={() => setReceipt(null)}>
-              Clear Receipt
-            </Button>
-          </div>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-            <div>
-              <p className="text-gray-500">Student</p>
-              <p className="font-medium uppercase">
-                {student.first_name} {student.last_name}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-500">Academic Year</p>
-              <p className="font-medium">{receipt.academic_year}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Payment Date</p>
-              <p className="font-medium">{receipt.payment_date}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Amount</p>
-              <p className="font-medium">{formatAmount(receipt.amount)}</p>
-            </div>
-            {receipt.payment_method && (
-              <div>
-                <p className="text-gray-500">Method</p>
-                <p className="font-medium">{receipt.payment_method}</p>
-              </div>
-            )}
-            {receipt.reference_number && (
-              <div>
-                <p className="text-gray-500">Reference</p>
-                <p className="font-medium">{receipt.reference_number}</p>
-              </div>
-            )}
-            {receipt.remarks && (
-              <div className="md:col-span-2">
-                <p className="text-gray-500">Remarks</p>
-                <p className="font-medium">{receipt.remarks}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
