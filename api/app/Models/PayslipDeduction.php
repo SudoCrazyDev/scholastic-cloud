@@ -15,10 +15,12 @@ class PayslipDeduction extends Model
         'deduction_type_id',
         'name',
         'amount',
+        'employer_amount',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'employer_amount' => 'decimal:2',
     ];
 
     public function payslip(): BelongsTo

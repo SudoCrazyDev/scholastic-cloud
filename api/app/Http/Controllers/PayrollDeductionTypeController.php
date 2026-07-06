@@ -49,6 +49,10 @@ class PayrollDeductionTypeController extends Controller
             'institution_id' => $institutionId,
             'name' => $validated['name'],
             'default_amount' => $validated['default_amount'] ?? 0,
+            'has_employer_share' => $validated['has_employer_share'] ?? false,
+            'default_employer_amount' => ($validated['has_employer_share'] ?? false)
+                ? ($validated['default_employer_amount'] ?? 0)
+                : 0,
             'is_active' => $validated['is_active'] ?? true,
             'sort_order' => PayrollDeductionType::where('institution_id', $institutionId)->max('sort_order') + 1,
             'created_by' => $request->user()?->id,
@@ -79,9 +83,13 @@ class PayrollDeductionTypeController extends Controller
 
         $validated = $this->validatePayload($request, $institutionId, $type->id);
 
+        $hasEmployerShare = $validated['has_employer_share'] ?? $type->has_employer_share;
+
         $type->update([
             'name' => $validated['name'],
             'default_amount' => $validated['default_amount'] ?? 0,
+            'has_employer_share' => $hasEmployerShare,
+            'default_employer_amount' => $hasEmployerShare ? ($validated['default_employer_amount'] ?? 0) : 0,
             'is_active' => $validated['is_active'] ?? $type->is_active,
         ]);
 
@@ -132,6 +140,8 @@ class PayrollDeductionTypeController extends Controller
                     ->ignore($ignoreId),
             ],
             'default_amount' => 'nullable|numeric|min:0|max:999999',
+            'has_employer_share' => 'nullable|boolean',
+            'default_employer_amount' => 'nullable|numeric|min:0|max:999999',
             'is_active' => 'nullable|boolean',
         ], [
             'name.unique' => 'A deduction type with this name already exists.',
@@ -144,6 +154,8 @@ class PayrollDeductionTypeController extends Controller
             'id' => $type->id,
             'name' => $type->name,
             'default_amount' => (float) $type->default_amount,
+            'has_employer_share' => (bool) $type->has_employer_share,
+            'default_employer_amount' => (float) $type->default_employer_amount,
             'is_active' => (bool) $type->is_active,
             'sort_order' => (int) $type->sort_order,
             'updated_at' => $type->updated_at?->toIso8601String(),

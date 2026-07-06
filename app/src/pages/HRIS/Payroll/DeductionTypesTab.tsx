@@ -13,7 +13,13 @@ const DeductionTypesTab: React.FC = () => {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', default_amount: '', is_active: true })
+  const [form, setForm] = useState({
+    name: '',
+    default_amount: '',
+    has_employer_share: false,
+    default_employer_amount: '',
+    is_active: true,
+  })
   const [formError, setFormError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<PayrollDeductionType | null>(null)
 
@@ -60,14 +66,26 @@ const DeductionTypesTab: React.FC = () => {
   })
 
   const openCreate = () => {
-    setForm({ name: '', default_amount: '', is_active: true })
+    setForm({
+      name: '',
+      default_amount: '',
+      has_employer_share: false,
+      default_employer_amount: '',
+      is_active: true,
+    })
     setEditingId(null)
     setFormError(null)
     setShowForm(true)
   }
 
   const openEdit = (type: PayrollDeductionType) => {
-    setForm({ name: type.name, default_amount: String(type.default_amount), is_active: type.is_active })
+    setForm({
+      name: type.name,
+      default_amount: String(type.default_amount),
+      has_employer_share: type.has_employer_share,
+      default_employer_amount: String(type.default_employer_amount),
+      is_active: type.is_active,
+    })
     setEditingId(type.id)
     setFormError(null)
     setShowForm(true)
@@ -80,6 +98,10 @@ const DeductionTypesTab: React.FC = () => {
       data: {
         name: form.name.trim(),
         default_amount: numberOrZero(form.default_amount),
+        has_employer_share: form.has_employer_share,
+        default_employer_amount: form.has_employer_share
+          ? numberOrZero(form.default_employer_amount)
+          : 0,
         is_active: form.is_active,
       },
     })
@@ -106,7 +128,8 @@ const DeductionTypesTab: React.FC = () => {
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
               <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3 text-right">Default Amount</th>
+              <th className="px-4 py-3 text-right">Default (Employee)</th>
+              <th className="px-4 py-3 text-right">Default (Employer)</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3" />
             </tr>
@@ -114,13 +137,13 @@ const DeductionTypesTab: React.FC = () => {
           <tbody>
             {typesQuery.isLoading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
                   Loading deduction types…
                 </td>
               </tr>
             ) : types.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
                   No deduction types yet. Add the ones your school uses — e.g. SSS, Pag-IBIG,
                   PhilHealth, Cash Advance.
                 </td>
@@ -131,6 +154,17 @@ const DeductionTypesTab: React.FC = () => {
                   <td className="px-4 py-3 font-medium text-gray-900">{type.name}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {type.default_amount > 0 ? peso(type.default_amount) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {type.has_employer_share ? (
+                      type.default_employer_amount > 0 ? (
+                        peso(type.default_employer_amount)
+                      ) : (
+                        <span className="text-xs text-gray-400">shared, no default</span>
+                      )
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {type.is_active ? (
@@ -202,7 +236,7 @@ const DeductionTypesTab: React.FC = () => {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Default amount (₱)
+                  Default amount — employee's share (₱)
                 </label>
                 <Input
                   type="number"
@@ -213,6 +247,34 @@ const DeductionTypesTab: React.FC = () => {
                   placeholder="0.00"
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={form.has_employer_share}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, has_employer_share: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Shared by employer (adds an employer counterpart, shown under Other Benefits)
+              </label>
+              {form.has_employer_share && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Default amount — employer's share (₱)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.default_employer_amount}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, default_employer_amount: e.target.value }))
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"

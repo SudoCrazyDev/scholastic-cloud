@@ -21,9 +21,6 @@ class PayrollCompensation extends Model
         'daily_rate',
         'hourly_rate',
         'hours_per_day',
-        'sss_employer',
-        'pagibig_employer',
-        'philhealth_employer',
         'created_by',
     ];
 
@@ -31,9 +28,6 @@ class PayrollCompensation extends Model
         'daily_rate' => 'decimal:2',
         'hourly_rate' => 'decimal:2',
         'hours_per_day' => 'decimal:2',
-        'sss_employer' => 'decimal:2',
-        'pagibig_employer' => 'decimal:2',
-        'philhealth_employer' => 'decimal:2',
     ];
 
     public function institution(): BelongsTo

@@ -89,9 +89,6 @@ class PayrollService
             'daily_rate' => $compensation->daily_rate,
             'hourly_rate' => $hourlyRate,
             'hours_per_day' => $compensation->hours_per_day,
-            'sss_employer' => $compensation->sss_employer,
-            'pagibig_employer' => $compensation->pagibig_employer,
-            'philhealth_employer' => $compensation->philhealth_employer,
         ]);
 
         $rows = [];
@@ -144,13 +141,15 @@ class PayrollService
 
         // Copy the staff member's default deductions onto the payslip.
         foreach ($compensation->deductions as $deduction) {
-            if ((float) $deduction->amount <= 0 || ! $deduction->deductionType?->is_active) {
+            $hasAmount = (float) $deduction->amount > 0 || (float) $deduction->employer_amount > 0;
+            if (! $hasAmount || ! $deduction->deductionType?->is_active) {
                 continue;
             }
             $payslip->deductions()->create([
                 'deduction_type_id' => $deduction->deduction_type_id,
                 'name' => $deduction->deductionType->name,
                 'amount' => $deduction->amount,
+                'employer_amount' => $deduction->employer_amount,
             ]);
         }
 

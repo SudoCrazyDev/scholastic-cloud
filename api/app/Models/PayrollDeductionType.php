@@ -14,6 +14,8 @@ class PayrollDeductionType extends Model
         'institution_id',
         'name',
         'default_amount',
+        'has_employer_share',
+        'default_employer_amount',
         'is_active',
         'sort_order',
         'created_by',
@@ -21,6 +23,8 @@ class PayrollDeductionType extends Model
 
     protected $casts = [
         'default_amount' => 'decimal:2',
+        'has_employer_share' => 'boolean',
+        'default_employer_amount' => 'decimal:2',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];

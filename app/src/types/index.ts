@@ -1877,6 +1877,8 @@ export interface PayrollDeductionType {
   id: string;
   name: string;
   default_amount: number;
+  has_employer_share: boolean;
+  default_employer_amount: number;
   is_active: boolean;
   sort_order: number;
   updated_at?: string;
@@ -1885,14 +1887,17 @@ export interface PayrollDeductionType {
 export interface SavePayrollDeductionTypeData {
   name: string;
   default_amount?: number;
+  has_employer_share?: boolean;
+  default_employer_amount?: number;
   is_active?: boolean;
 }
 
-// A staff member's default amount for one deduction type.
+// A staff member's default amounts for one deduction type.
 export interface PayrollCompensationDeduction {
   deduction_type_id: string;
   name: string | null;
   amount: number;
+  employer_amount: number;
 }
 
 export interface PayrollCompensation {
@@ -1903,11 +1908,9 @@ export interface PayrollCompensation {
   hourly_rate: number | null;
   effective_hourly_rate: number;
   hours_per_day: number;
-  sss_employer: number;
-  pagibig_employer: number;
-  philhealth_employer: number;
   deductions: PayrollCompensationDeduction[];
   deductions_total: number;
+  employer_share_total: number;
   updated_at?: string;
 }
 
@@ -1925,10 +1928,7 @@ export interface SavePayrollCompensationData {
   daily_rate: number;
   hourly_rate?: number | null;
   hours_per_day: number;
-  sss_employer?: number;
-  pagibig_employer?: number;
-  philhealth_employer?: number;
-  deductions?: { deduction_type_id: string; amount: number }[];
+  deductions?: { deduction_type_id: string; amount: number; employer_amount?: number }[];
 }
 
 export type PayrollPeriodStatus = 'draft' | 'finalized';
@@ -2001,9 +2001,6 @@ export interface Payslip {
   hours_worked: number;
   gross_pay: number;
   deductions: PayslipDeduction[];
-  sss_employer: number;
-  pagibig_employer: number;
-  philhealth_employer: number;
   employer_share_total: number;
   total_deductions: number;
   net_pay: number;
@@ -2017,16 +2014,19 @@ export interface PayslipDeduction {
   deduction_type_id: string | null;
   name: string;
   amount: number;
+  employer_amount: number;
 }
 
 export interface UpdatePayslipData {
   designation?: string | null;
   daily_rate?: number;
   hourly_rate?: number;
-  sss_employer?: number;
-  pagibig_employer?: number;
-  philhealth_employer?: number;
-  deductions?: { deduction_type_id: string | null; name: string; amount: number }[];
+  deductions?: {
+    deduction_type_id: string | null;
+    name: string;
+    amount: number;
+    employer_amount?: number;
+  }[];
 }
 
 export interface UpdatePayslipDayData {

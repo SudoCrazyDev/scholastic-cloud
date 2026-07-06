@@ -105,9 +105,6 @@ class PayslipController extends Controller
             'designation' => 'sometimes|nullable|string|max:255',
             'daily_rate' => 'sometimes|numeric|min:0|max:999999',
             'hourly_rate' => 'sometimes|numeric|min:0|max:999999',
-            'sss_employer' => 'sometimes|numeric|min:0|max:999999',
-            'pagibig_employer' => 'sometimes|numeric|min:0|max:999999',
-            'philhealth_employer' => 'sometimes|numeric|min:0|max:999999',
             'deductions' => 'sometimes|array',
             'deductions.*.deduction_type_id' => [
                 'nullable',
@@ -117,6 +114,7 @@ class PayslipController extends Controller
             ],
             'deductions.*.name' => 'required|string|max:255',
             'deductions.*.amount' => 'required|numeric|min:0|max:999999',
+            'deductions.*.employer_amount' => 'nullable|numeric|min:0|max:999999',
         ], [
             'deductions.*.deduction_type_id.exists' => 'One of the deductions does not belong to your institution.',
             'deductions.*.name.required' => 'Each deduction needs a name.',
@@ -143,6 +141,7 @@ class PayslipController extends Controller
                         'deduction_type_id' => $deduction['deduction_type_id'] ?? null,
                         'name' => $deduction['name'],
                         'amount' => $deduction['amount'],
+                        'employer_amount' => $deduction['employer_amount'] ?? 0,
                     ]);
                 }
             }
@@ -266,14 +265,9 @@ class PayslipController extends Controller
                 'deduction_type_id' => $deduction->deduction_type_id,
                 'name' => $deduction->name,
                 'amount' => (float) $deduction->amount,
+                'employer_amount' => (float) $deduction->employer_amount,
             ])->values(),
-            'sss_employer' => (float) $payslip->sss_employer,
-            'pagibig_employer' => (float) $payslip->pagibig_employer,
-            'philhealth_employer' => (float) $payslip->philhealth_employer,
-            'employer_share_total' => round(
-                (float) $payslip->sss_employer + (float) $payslip->pagibig_employer + (float) $payslip->philhealth_employer,
-                2
-            ),
+            'employer_share_total' => round((float) $payslip->deductions->sum('employer_amount'), 2),
             'total_deductions' => (float) $payslip->total_deductions,
             'net_pay' => (float) $payslip->net_pay,
             'days' => $payslip->days->map(fn (PayslipDay $day) => [

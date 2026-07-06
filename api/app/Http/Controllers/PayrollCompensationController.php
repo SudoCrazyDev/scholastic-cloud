@@ -95,9 +95,6 @@ class PayrollCompensationController extends Controller
             'daily_rate' => 'required|numeric|min:0|max:999999',
             'hourly_rate' => 'nullable|numeric|min:0|max:999999',
             'hours_per_day' => 'required|numeric|min:1|max:24',
-            'sss_employer' => 'nullable|numeric|min:0|max:999999',
-            'pagibig_employer' => 'nullable|numeric|min:0|max:999999',
-            'philhealth_employer' => 'nullable|numeric|min:0|max:999999',
             'deductions' => 'nullable|array',
             'deductions.*.deduction_type_id' => [
                 'required',
@@ -107,6 +104,7 @@ class PayrollCompensationController extends Controller
                     ->where(fn ($query) => $query->where('institution_id', $institutionId)),
             ],
             'deductions.*.amount' => 'required|numeric|min:0|max:999999',
+            'deductions.*.employer_amount' => 'nullable|numeric|min:0|max:999999',
         ], [
             'user_id.exists' => 'This staff member does not belong to your institution.',
             'deductions.*.deduction_type_id.exists' => 'One of the deductions does not belong to your institution.',
@@ -120,9 +118,6 @@ class PayrollCompensationController extends Controller
                     'daily_rate' => $validated['daily_rate'],
                     'hourly_rate' => $validated['hourly_rate'] ?? null,
                     'hours_per_day' => $validated['hours_per_day'],
-                    'sss_employer' => $validated['sss_employer'] ?? 0,
-                    'pagibig_employer' => $validated['pagibig_employer'] ?? 0,
-                    'philhealth_employer' => $validated['philhealth_employer'] ?? 0,
                     'created_by' => $request->user()?->id,
                 ]
             );
@@ -133,6 +128,7 @@ class PayrollCompensationController extends Controller
                 $compensation->deductions()->create([
                     'deduction_type_id' => $deduction['deduction_type_id'],
                     'amount' => $deduction['amount'],
+                    'employer_amount' => $deduction['employer_amount'] ?? 0,
                 ]);
             }
 
@@ -160,15 +156,14 @@ class PayrollCompensationController extends Controller
             'hourly_rate' => $compensation->hourly_rate !== null ? (float) $compensation->hourly_rate : null,
             'effective_hourly_rate' => $compensation->effectiveHourlyRate(),
             'hours_per_day' => (float) $compensation->hours_per_day,
-            'sss_employer' => (float) $compensation->sss_employer,
-            'pagibig_employer' => (float) $compensation->pagibig_employer,
-            'philhealth_employer' => (float) $compensation->philhealth_employer,
             'deductions' => $compensation->deductions->map(fn ($deduction) => [
                 'deduction_type_id' => $deduction->deduction_type_id,
                 'name' => $deduction->deductionType?->name,
                 'amount' => (float) $deduction->amount,
+                'employer_amount' => (float) $deduction->employer_amount,
             ])->values(),
             'deductions_total' => round((float) $compensation->deductions->sum('amount'), 2),
+            'employer_share_total' => round((float) $compensation->deductions->sum('employer_amount'), 2),
             'updated_at' => $compensation->updated_at?->toIso8601String(),
         ];
     }

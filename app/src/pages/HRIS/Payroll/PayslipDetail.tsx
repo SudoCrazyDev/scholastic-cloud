@@ -20,9 +20,6 @@ interface RatesForm {
   designation: string
   daily_rate: string
   hourly_rate: string
-  sss_employer: string
-  pagibig_employer: string
-  philhealth_employer: string
 }
 
 interface DeductionRow {
@@ -30,15 +27,13 @@ interface DeductionRow {
   deduction_type_id: string | null
   name: string
   amount: string
+  employer_amount: string
 }
 
 const ratesFromPayslip = (payslip: Payslip): RatesForm => ({
   designation: payslip.designation || '',
   daily_rate: String(payslip.daily_rate),
   hourly_rate: String(payslip.hourly_rate),
-  sss_employer: String(payslip.sss_employer),
-  pagibig_employer: String(payslip.pagibig_employer),
-  philhealth_employer: String(payslip.philhealth_employer),
 })
 
 const deductionsFromPayslip = (payslip: Payslip): DeductionRow[] =>
@@ -47,6 +42,7 @@ const deductionsFromPayslip = (payslip: Payslip): DeductionRow[] =>
     deduction_type_id: deduction.deduction_type_id,
     name: deduction.name,
     amount: String(deduction.amount),
+    employer_amount: String(deduction.employer_amount),
   }))
 
 const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalized, onBack }) => {
@@ -129,7 +125,13 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
     if (value === 'custom') {
       setDeductionRows((prev) => [
         ...prev,
-        { key: `new-${Date.now()}-${prev.length}`, deduction_type_id: null, name: '', amount: '' },
+        {
+          key: `new-${Date.now()}-${prev.length}`,
+          deduction_type_id: null,
+          name: '',
+          amount: '',
+          employer_amount: '',
+        },
       ])
       return
     }
@@ -142,6 +144,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
         deduction_type_id: type.id,
         name: type.name,
         amount: String(type.default_amount || ''),
+        employer_amount: type.has_employer_share ? String(type.default_employer_amount || '') : '',
       },
     ])
   }
@@ -152,15 +155,13 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
       designation: form.designation.trim() || null,
       daily_rate: numberOrZero(form.daily_rate),
       hourly_rate: numberOrZero(form.hourly_rate),
-      sss_employer: numberOrZero(form.sss_employer),
-      pagibig_employer: numberOrZero(form.pagibig_employer),
-      philhealth_employer: numberOrZero(form.philhealth_employer),
       deductions: deductionRows
         .filter((row) => row.name.trim() !== '')
         .map((row) => ({
           deduction_type_id: row.deduction_type_id,
           name: row.name.trim(),
           amount: numberOrZero(row.amount),
+          employer_amount: numberOrZero(row.employer_amount),
         })),
     })
   }
@@ -295,19 +296,31 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
 
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Deductions (employee's share)
+                  Deductions
                 </p>
-                {deductionRows.length === 0 && (
+                {deductionRows.length === 0 ? (
                   <p className="mb-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs text-gray-400">
                     No deductions on this payslip.
                   </p>
+                ) : (
+                  <div className="mb-1 grid grid-cols-[1fr_5.5rem_5.5rem_1.75rem] gap-2 px-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                    <span>Deduction</span>
+                    <span>Employee</span>
+                    <span>Employer</span>
+                    <span />
+                  </div>
                 )}
                 <div className="space-y-2">
-                  {deductionRows.map((row, index) => (
-                    <div key={row.key} className="flex items-center gap-2">
-                      <div className="flex-1">
+                  {deductionRows.map((row, index) => {
+                    const rowType = row.deduction_type_id
+                      ? activeTypes.find((t) => t.id === row.deduction_type_id)
+                      : null
+                    const employerDisabled = readOnly || (rowType ? !rowType.has_employer_share : false)
+                    return (
+                      <div key={row.key} className="grid grid-cols-[1fr_5.5rem_5.5rem_1.75rem] items-center gap-2">
                         <Input
                           type="text"
+                          size="sm"
                           value={row.name}
                           placeholder="Deduction name"
                           disabled={readOnly || row.deduction_type_id !== null}
@@ -317,12 +330,11 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             )
                           }
                         />
-                      </div>
-                      <div className="w-28">
                         <Input
                           type="number"
                           min="0"
                           step="0.01"
+                          size="sm"
                           value={row.amount}
                           placeholder="0.00"
                           disabled={readOnly}
@@ -332,21 +344,43 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             )
                           }
                         />
+                        {employerDisabled && !readOnly ? (
+                          <span className="text-center text-xs text-gray-400">—</span>
+                        ) : (
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            size="sm"
+                            value={row.employer_amount}
+                            placeholder="0.00"
+                            disabled={employerDisabled}
+                            onChange={(e) =>
+                              setDeductionRows((prev) =>
+                                prev.map((r, i) =>
+                                  i === index ? { ...r, employer_amount: e.target.value } : r
+                                )
+                              )
+                            }
+                          />
+                        )}
+                        {!readOnly ? (
+                          <button
+                            type="button"
+                            title="Remove deduction"
+                            onClick={() =>
+                              setDeductionRows((prev) => prev.filter((_, i) => i !== index))
+                            }
+                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          >
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <span />
+                        )}
                       </div>
-                      {!readOnly && (
-                        <button
-                          type="button"
-                          title="Remove deduction"
-                          onClick={() =>
-                            setDeductionRows((prev) => prev.filter((_, i) => i !== index))
-                          }
-                          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                        >
-                          <XMarkIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 {!readOnly && (
                   <div className="mt-2">
@@ -359,26 +393,10 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     />
                   </div>
                 )}
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Other benefits (employer's share)
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Employer amounts are benefits paid by the school — they are not deducted from the
+                  employee's pay.
                 </p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">SSS</label>
-                    <Input type="number" min="0" step="0.01" value={form.sss_employer} onChange={setField('sss_employer')} disabled={readOnly} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">Pag-IBIG</label>
-                    <Input type="number" min="0" step="0.01" value={form.pagibig_employer} onChange={setField('pagibig_employer')} disabled={readOnly} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">PhilHealth</label>
-                    <Input type="number" min="0" step="0.01" value={form.philhealth_employer} onChange={setField('philhealth_employer')} disabled={readOnly} />
-                  </div>
-                </div>
               </div>
               {!readOnly && (
                 <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
@@ -412,7 +430,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                 <dd className="font-bold tabular-nums text-green-700">{peso(payslip.net_pay)}</dd>
               </div>
               <div className="flex justify-between pt-2">
-                <dt className="text-gray-500">Employer's share (SSS + Pag-IBIG + PhilHealth)</dt>
+                <dt className="text-gray-500">Employer's share (other benefits)</dt>
                 <dd className="tabular-nums text-gray-600">{peso(payslip.employer_share_total)}</dd>
               </div>
             </dl>

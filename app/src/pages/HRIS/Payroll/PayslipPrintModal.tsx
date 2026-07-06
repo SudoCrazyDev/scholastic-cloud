@@ -34,6 +34,11 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
   // The deductions section shares a fixed slice of the sheet width.
   const deductionColWidth = 26 / deductionCols
 
+  // OTHER BENEFITS columns: deduction lines the employer shares, plus TOTAL.
+  const benefits = deductions.filter((deduction) => deduction.employer_amount > 0)
+  const benefitCols = Math.max(benefits.length, 1) + 1
+  const benefitColWidth = 26 / benefitCols
+
   const handlePrint = () => {
     if (!printRef.current) return
     const printWindow = window.open('', '_blank', 'width=900,height=700')
@@ -123,14 +128,13 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                   <col style={{ width: '9%' }} />
                   <col style={{ width: '7.5%' }} />
                   <col style={{ width: '7.5%' }} />
-                  <col style={{ width: '6.5%' }} />
-                  <col style={{ width: '6.5%' }} />
-                  <col style={{ width: '6.5%' }} />
-                  <col style={{ width: '6.5%' }} />
+                  {Array.from({ length: benefitCols }, (_, i) => (
+                    <col key={`b-${i}`} style={{ width: `${benefitColWidth}%` }} />
+                  ))}
                   <col style={{ width: '7%' }} />
                   <col style={{ width: '8%' }} />
                   {Array.from({ length: deductionCols }, (_, i) => (
-                    <col key={i} style={{ width: `${deductionColWidth}%` }} />
+                    <col key={`d-${i}`} style={{ width: `${deductionColWidth}%` }} />
                   ))}
                   <col style={{ width: '7%' }} />
                   <col style={{ width: '8%' }} />
@@ -139,7 +143,7 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                   <tr>
                     <th rowSpan={3}>Date of Working Days</th>
                     <th colSpan={2}>WORKING HOURS</th>
-                    <th colSpan={4}>
+                    <th colSpan={benefitCols}>
                       OTHER BENEFITS
                       <br />
                       (Employer's Share)
@@ -171,9 +175,13 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                   <tr>
                     <th rowSpan={2}>IN</th>
                     <th rowSpan={2}>OUT</th>
-                    <th>SSS</th>
-                    <th>PAG-IBIG</th>
-                    <th>PHILHEALTH</th>
+                    {benefits.length === 0 ? (
+                      <th>—</th>
+                    ) : (
+                      benefits.map((benefit) => (
+                        <th key={benefit.id || benefit.name}>{benefit.name.toUpperCase()}</th>
+                      ))
+                    )}
                     <th>TOTAL</th>
                     {deductions.length === 0 ? (
                       <th>—</th>
@@ -193,7 +201,7 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                         <td className={off ? 'swtr-red' : undefined}>{dayLabel(day.work_date)}</td>
                         <td>{time12(day.time_in)}</td>
                         <td>{time12(day.time_out)}</td>
-                        <td colSpan={4} />
+                        <td colSpan={benefitCols} />
                         <td className="num">{day.amount_earned ? money(payslip.daily_rate) : ''}</td>
                         <td className="num">{money(day.amount_earned)}</td>
                         <td colSpan={deductionCols} />
@@ -205,9 +213,15 @@ const PayslipPrintModal: React.FC<PayslipPrintModalProps> = ({ payslip, onClose 
                   <tr className="swtr-totals">
                     <td>TOTAL</td>
                     <td colSpan={2}>{payslip.hours_worked ? `${payslip.hours_worked} hrs` : ''}</td>
-                    <td className="num">{moneyOrDash(payslip.sss_employer)}</td>
-                    <td className="num">{moneyOrDash(payslip.pagibig_employer)}</td>
-                    <td className="num">{moneyOrDash(payslip.philhealth_employer)}</td>
+                    {benefits.length === 0 ? (
+                      <td className="num">—</td>
+                    ) : (
+                      benefits.map((benefit) => (
+                        <td key={benefit.id || benefit.name} className="num">
+                          {moneyOrDash(benefit.employer_amount)}
+                        </td>
+                      ))
+                    )}
                     <td className="num">{moneyOrDash(payslip.employer_share_total)}</td>
                     <td className="num">{money(payslip.daily_rate)}</td>
                     <td className="num">{money(payslip.gross_pay)}</td>

@@ -17,11 +17,9 @@ interface CompensationForm {
   daily_rate: string
   hourly_rate: string
   hours_per_day: string
-  sss_employer: string
-  pagibig_employer: string
-  philhealth_employer: string
   // deduction_type_id -> amount (as entered)
   deductions: Record<string, string>
+  employerDeductions: Record<string, string>
 }
 
 const emptyForm = (): CompensationForm => ({
@@ -29,10 +27,8 @@ const emptyForm = (): CompensationForm => ({
   daily_rate: '',
   hourly_rate: '',
   hours_per_day: '8',
-  sss_employer: '',
-  pagibig_employer: '',
-  philhealth_employer: '',
   deductions: {},
+  employerDeductions: {},
 })
 
 const CompensationTab: React.FC = () => {
@@ -92,24 +88,28 @@ const CompensationTab: React.FC = () => {
   const openEditor = (row: PayrollStaffCompensation) => {
     const c = row.compensation
     const deductionAmounts: Record<string, string> = {}
+    const employerAmounts: Record<string, string> = {}
     for (const type of activeTypes) {
       const existing = c?.deductions.find((d) => d.deduction_type_id === type.id)
-      // Existing staff amount wins; otherwise pre-fill the type's default.
+      // Existing staff amounts win; otherwise pre-fill the type's defaults.
       deductionAmounts[type.id] = existing
         ? String(existing.amount)
         : c
           ? '0'
           : String(type.default_amount)
+      employerAmounts[type.id] = existing
+        ? String(existing.employer_amount)
+        : c
+          ? '0'
+          : String(type.default_employer_amount)
     }
     setForm({
       designation: c?.designation || '',
       daily_rate: c ? String(c.daily_rate) : '',
       hourly_rate: c?.hourly_rate != null ? String(c.hourly_rate) : '',
       hours_per_day: c ? String(c.hours_per_day) : '8',
-      sss_employer: c ? String(c.sss_employer) : '',
-      pagibig_employer: c ? String(c.pagibig_employer) : '',
-      philhealth_employer: c ? String(c.philhealth_employer) : '',
       deductions: deductionAmounts,
+      employerDeductions: employerAmounts,
     })
     setFormError(null)
     setEditing(row)
@@ -125,23 +125,29 @@ const CompensationTab: React.FC = () => {
         daily_rate: numberOrZero(form.daily_rate),
         hourly_rate: form.hourly_rate.trim() === '' ? null : numberOrZero(form.hourly_rate),
         hours_per_day: numberOrZero(form.hours_per_day) || 8,
-        sss_employer: numberOrZero(form.sss_employer),
-        pagibig_employer: numberOrZero(form.pagibig_employer),
-        philhealth_employer: numberOrZero(form.philhealth_employer),
         deductions: activeTypes.map((type) => ({
           deduction_type_id: type.id,
           amount: numberOrZero(form.deductions[type.id] ?? ''),
+          employer_amount: type.has_employer_share
+            ? numberOrZero(form.employerDeductions[type.id] ?? '')
+            : 0,
         })),
       },
     })
   }
 
-  const setField = (key: Exclude<keyof CompensationForm, 'deductions'>) =>
+  const setField = (key: Exclude<keyof CompensationForm, 'deductions' | 'employerDeductions'>) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((prev) => ({ ...prev, [key]: e.target.value }))
 
   const setDeduction = (typeId: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, deductions: { ...prev.deductions, [typeId]: e.target.value } }))
+
+  const setEmployerDeduction = (typeId: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({
+      ...prev,
+      employerDeductions: { ...prev.employerDeductions, [typeId]: e.target.value },
+    }))
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -315,7 +321,7 @@ const CompensationTab: React.FC = () => {
 
               <div>
                 <p className="mb-2 text-sm font-medium text-gray-700">
-                  Deductions — employee's share (per payroll period)
+                  Deductions (per payroll period)
                 </p>
                 {activeTypes.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-400">
@@ -323,47 +329,55 @@ const CompensationTab: React.FC = () => {
                     Pag-IBIG, PhilHealth, Cash Advance).
                   </p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    {activeTypes.map((type) => (
-                      <div key={type.id}>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          {type.name}
-                        </label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={form.deductions[type.id] ?? ''}
-                          onChange={setDeduction(type.id)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                    ))}
+                  <div className="overflow-hidden rounded-lg border border-gray-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-xs font-medium text-gray-500">
+                          <th className="px-3 py-2">Deduction</th>
+                          <th className="px-3 py-2">Employee's share</th>
+                          <th className="px-3 py-2">Employer's share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeTypes.map((type) => (
+                          <tr key={type.id} className="border-b border-gray-50 last:border-0">
+                            <td className="px-3 py-2 font-medium text-gray-700">{type.name}</td>
+                            <td className="px-3 py-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                size="sm"
+                                value={form.deductions[type.id] ?? ''}
+                                onChange={setDeduction(type.id)}
+                                placeholder="0.00"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              {type.has_employer_share ? (
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  size="sm"
+                                  value={form.employerDeductions[type.id] ?? ''}
+                                  onChange={setEmployerDeduction(type.id)}
+                                  placeholder="0.00"
+                                />
+                              ) : (
+                                <span className="text-xs text-gray-400">not shared</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
                 <p className="mt-1.5 text-xs text-gray-400">
-                  Amounts set to 0 are not applied when generating payslips.
+                  Rows where both amounts are 0 are not applied when generating payslips.
+                  Employer shares appear under Other Benefits on the printed record.
                 </p>
-              </div>
-
-              <div>
-                <p className="mb-2 text-sm font-medium text-gray-700">
-                  Other benefits — employer's share (per payroll period)
-                </p>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">SSS</label>
-                    <Input type="number" min="0" step="0.01" value={form.sss_employer} onChange={setField('sss_employer')} placeholder="0.00" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">Pag-IBIG</label>
-                    <Input type="number" min="0" step="0.01" value={form.pagibig_employer} onChange={setField('pagibig_employer')} placeholder="0.00" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">PhilHealth</label>
-                    <Input type="number" min="0" step="0.01" value={form.philhealth_employer} onChange={setField('philhealth_employer')} placeholder="0.00" />
-                  </div>
-                </div>
               </div>
 
               <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">

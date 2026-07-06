@@ -22,9 +22,6 @@ class Payslip extends Model
         'days_worked',
         'hours_worked',
         'gross_pay',
-        'sss_employer',
-        'pagibig_employer',
-        'philhealth_employer',
         'total_deductions',
         'net_pay',
     ];
@@ -36,9 +33,6 @@ class Payslip extends Model
         'days_worked' => 'decimal:2',
         'hours_worked' => 'decimal:2',
         'gross_pay' => 'decimal:2',
-        'sss_employer' => 'decimal:2',
-        'pagibig_employer' => 'decimal:2',
-        'philhealth_employer' => 'decimal:2',
         'total_deductions' => 'decimal:2',
         'net_pay' => 'decimal:2',
     ];
