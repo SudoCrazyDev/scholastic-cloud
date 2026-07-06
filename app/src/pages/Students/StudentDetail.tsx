@@ -20,12 +20,15 @@ import {
   TrashIcon,
   DocumentIcon,
   CreditCardIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
 import { StudentFinanceTab, CrossCheckModal, StudentIdTab, StudentFamilyTab, StudentMedicalTab, StudentPasswordResetModal } from './components'
 import { studentService } from '../../services/studentService'
 import { studentDocumentService } from '../../services/studentDocumentService'
+import { useAuth } from '../../hooks/useAuth'
+import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { toast } from 'react-hot-toast'
 import type { Student, StudentDocument } from '../../types'
 
@@ -55,6 +58,9 @@ export default function StudentDetail() {
   const [docUploading, setDocUploading] = useState<Record<string, boolean>>({})
   const [crossCheckDoc, setCrossCheckDoc] = useState<StudentDocument | null>(null)
   const [isPortalResetOpen, setIsPortalResetOpen] = useState(false)
+  const [isStartingImpersonation, setIsStartingImpersonation] = useState(false)
+  const { assumeStudent } = useAuth()
+  const { hasAccess: canImpersonate } = useRoleAccess(['institution-administrator', 'super-administrator'])
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -111,6 +117,20 @@ export default function StudentDetail() {
   const handleGenerateSF9 = () => {
     // Navigate to SF9 page with student pre-selected
     navigate('/sf9', { state: { selectedStudentId: student?.id } })
+  }
+
+  const handleImpersonate = async () => {
+    if (!student?.id) return
+    setIsStartingImpersonation(true)
+    try {
+      await assumeStudent(student.id)
+      toast.success(`Now viewing as ${getFullName(student)}`)
+      navigate('/dashboard')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to impersonate student')
+    } finally {
+      setIsStartingImpersonation(false)
+    }
   }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -627,6 +647,17 @@ export default function StudentDetail() {
                 <DocumentTextIcon className="w-4 h-4 mr-2" />
                 Generate SF9
               </Button>
+              {canImpersonate && (
+                <Button
+                  onClick={handleImpersonate}
+                  disabled={isStartingImpersonation}
+                  variant="outline"
+                  className="border-purple-600 text-purple-600 hover:bg-purple-50"
+                >
+                  <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
+                  {isStartingImpersonation ? 'Starting…' : 'View as Student'}
+                </Button>
+              )}
               <Button
                 onClick={() => setIsPortalResetOpen(true)}
                 variant="outline"

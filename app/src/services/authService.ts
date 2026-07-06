@@ -43,4 +43,13 @@ export const authService = {
     const response = await api.post('/assume-user', { user_id: userId });
     return response.data;
   },
+
+  /**
+   * Assume a student (institution-administrator or super-administrator only).
+   * Returns token and user for the target student.
+   */
+  async assumeStudent(studentId: string): Promise<{ token: string; token_expiry: string; user: any }> {
+    const response = await api.post('/assume-student', { student_id: studentId });
+    return response.data;
+  },
 }; 

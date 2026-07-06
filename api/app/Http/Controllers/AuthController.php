@@ -349,4 +349,119 @@ class AuthController extends Controller
             'user' => $userData,
         ]);
     }
-} 
+
+    /**
+     * Assume a student (institution-administrator or super-administrator only).
+     * Issues a token on the student's student_auth record so the admin can view
+     * the app as that student. Institution admins are scoped to students within
+     * their own institution(s); super-admins are unrestricted.
+     */
+    public function assumeStudent(Request $request)
+    {
+        $authenticatedUser = $request->user();
+        if (!$authenticatedUser || $authenticatedUser instanceof StudentPortalUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $role = $authenticatedUser->getRole();
+        $allowedRoles = ['institution-administrator', 'super-administrator'];
+        if (!$role || !in_array($role->slug, $allowedRoles, true)) {
+            return response()->json([
+                'message' => 'Only institution administrators can assume a student'
+            ], 403);
+        }
+
+        $request->validate([
+            'student_id' => 'required|uuid|exists:students,id',
+        ]);
+
+        $student = Student::with(['studentInstitutions.institution', 'studentAuth'])
+            ->find($request->student_id);
+        if (!$student) {
+            return response()->json(['message' => 'Student not found'], 404);
+        }
+
+        // Institution scoping: an institution admin may only assume students who
+        // belong to one of the admin's own institutions. Super-admins bypass this.
+        if ($role->slug !== 'super-administrator') {
+            $adminInstitutionIds = $authenticatedUser->userInstitutions()
+                ->pluck('institution_id')
+                ->all();
+            $studentInstitutionIds = $student->studentInstitutions
+                ->pluck('institution_id')
+                ->all();
+
+            if (empty(array_intersect($adminInstitutionIds, $studentInstitutionIds))) {
+                return response()->json([
+                    'message' => 'You can only impersonate students within your own institution.'
+                ], 403);
+            }
+        }
+
+        // The student must already have portal access provisioned.
+        $studentAuth = $student->studentAuth;
+        if (!$studentAuth) {
+            return response()->json([
+                'message' => 'This student has no portal access yet. Use "Reset Portal" to set up their login first.'
+            ], 409);
+        }
+
+        // Build the institutions payload (must belong to at least one).
+        $institutions = $student->studentInstitutions->map(function ($si) {
+            $inst = $si->institution;
+            return [
+                'institution_id' => $si->institution_id,
+                'institution' => $inst ? [
+                    'id' => $inst->id,
+                    'name' => $inst->title ?? $inst->name ?? null,
+                ] : null,
+            ];
+        })->filter(fn ($i) => $i['institution'] !== null)->values()->all();
+
+        if (empty($institutions)) {
+            return response()->json([
+                'message' => 'Student is not assigned to any institution.'
+            ], 403);
+        }
+
+        $token = Str::random(60);
+        $tokenExpiry = Carbon::now()->addHours(24)->toDateTimeString();
+        $studentAuth->update([
+            'token' => $token,
+            'token_expiry' => $tokenExpiry,
+        ]);
+
+        Log::info('Student impersonation started', [
+            'actor_id' => $authenticatedUser->id,
+            'actor_role' => $role->slug,
+            'student_id' => $student->id,
+        ]);
+
+        $userData = [
+            'id' => $student->id,
+            'first_name' => $student->first_name,
+            'middle_name' => $student->middle_name,
+            'last_name' => $student->last_name,
+            'ext_name' => $student->ext_name,
+            'email' => $studentAuth->email,
+            'gender' => $student->gender,
+            'birthdate' => $student->birthdate,
+            'is_new' => $studentAuth->is_new,
+            'is_active' => $student->is_active,
+            'role' => [
+                'title' => 'Student',
+                'slug' => 'student',
+            ],
+            'user_institutions' => $institutions,
+            'created_at' => $student->created_at,
+            'updated_at' => $student->updated_at,
+            'student_id' => $student->id,
+        ];
+
+        return response()->json([
+            'token' => $token,
+            'token_expiry' => $tokenExpiry,
+            'user' => $userData,
+        ]);
+    }
+}

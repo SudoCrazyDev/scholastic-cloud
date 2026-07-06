@@ -14,6 +14,7 @@ interface AuthContextType {
   logout: () => void;
   refreshProfile: () => Promise<void>;
   assumeUser: (userId: string) => Promise<void>;
+  assumeStudent: (studentId: string) => Promise<void>;
   stopImpersonating: () => void;
 }
 
@@ -108,13 +109,14 @@ export const useAuthState = () => {
     queryClient.clear();
   };
 
-  const assumeUser = async (userId: string) => {
+  // Swap the active session to an impersonation target, stashing the original
+  // credentials so stopImpersonating() can restore them.
+  const applyImpersonation = (data: { token: string; token_expiry: string; user: any }) => {
     const currentToken = localStorage.getItem('auth_token');
     const currentUser = localStorage.getItem('auth_user');
     const currentExpiry = localStorage.getItem('token_expiry');
     if (!currentToken || !currentUser) return;
 
-    const data = await authService.assumeUser(userId);
     localStorage.setItem(IMPERSONATION_ORIGINAL_TOKEN, currentToken);
     localStorage.setItem(IMPERSONATION_ORIGINAL_USER, currentUser);
     if (currentExpiry) localStorage.setItem(IMPERSONATION_ORIGINAL_EXPIRY, currentExpiry);
@@ -126,6 +128,18 @@ export const useAuthState = () => {
     localStorage.setItem('auth_user', JSON.stringify(data.user));
     localStorage.setItem('token_expiry', data.token_expiry);
     queryClient.clear();
+  };
+
+  const assumeUser = async (userId: string) => {
+    if (!localStorage.getItem('auth_token') || !localStorage.getItem('auth_user')) return;
+    const data = await authService.assumeUser(userId);
+    applyImpersonation(data);
+  };
+
+  const assumeStudent = async (studentId: string) => {
+    if (!localStorage.getItem('auth_token') || !localStorage.getItem('auth_user')) return;
+    const data = await authService.assumeStudent(studentId);
+    applyImpersonation(data);
   };
 
   const stopImpersonating = () => {
@@ -175,6 +189,7 @@ export const useAuthState = () => {
     logout,
     refreshProfile,
     assumeUser,
+    assumeStudent,
     stopImpersonating,
   };
 };
