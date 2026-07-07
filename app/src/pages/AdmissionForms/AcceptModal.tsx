@@ -21,7 +21,12 @@ export interface AcceptPayload {
 
 export function AcceptModal({ submission, onConfirm, onClose }: Props) {
   const gi = submission.payload.general_information
-  const isExisting = !!submission.student_match
+  const hasMatch = !!submission.student_match
+  // When a possible existing student is detected, the admin must explicitly choose
+  // whether to re-enroll that student or create a brand-new record. Name matches are
+  // not reliable identity, so we never silently re-enroll (which would skip creating
+  // the student in the database).
+  const [mode, setMode] = useState<'existing' | 'new' | null>(hasMatch ? null : 'new')
 
   // Section autocomplete
   const [sectionSearch, setSectionSearch] = useState('')
@@ -72,8 +77,12 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
       setError('Please select a section.')
       return
     }
+    if (hasMatch && !mode) {
+      setError('Please choose whether to re-enroll the existing student or create a new record.')
+      return
+    }
     const payload: AcceptPayload = { section_id: selectedSection.id }
-    if (isExisting) {
+    if (mode === 'existing') {
       payload.student_id = submission.student_match!.id
     } else {
       if (!firstName.trim() || !lastName.trim()) {
@@ -102,7 +111,7 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
           <h3 className="text-lg font-semibold text-gray-900">
-            {isExisting ? 'Re-enroll student' : 'Accept & create student'}
+            {mode === 'existing' ? 'Re-enroll student' : mode === 'new' ? 'Accept & create student' : 'Review admission form'}
           </h3>
           <button
             type="button"
@@ -117,22 +126,66 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
 
         {/* Scrollable body — student fields only */}
         <div className="overflow-y-auto px-6 py-4 space-y-4 shrink min-h-0">
-          {/* Existing student notice */}
-          {isExisting && (
-            <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
-              <p className="font-semibold">Existing student detected</p>
-              <p className="mt-0.5 text-blue-700">
-                {gi.full_name || `${gi.first_name} ${gi.surname}`} is already in the system.
-                {submission.student_match?.section && (
-                  <> Previously in <span className="font-medium">{submission.student_match.section.title}</span>{' '}
-                  ({submission.student_match.section.academic_year}).</>
-                )}
-              </p>
+          {/* Possible existing student — admin explicitly chooses how to proceed */}
+          {hasMatch && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                <p className="font-semibold">Possible existing student</p>
+                <p className="mt-0.5 text-amber-700">
+                  {gi.full_name || `${gi.first_name} ${gi.surname}`} may match a student already in the system
+                  {submission.student_match?.section && (
+                    <> (previously in <span className="font-medium">{submission.student_match.section.title}</span>
+                    , {submission.student_match.section.academic_year})</>
+                  )}
+                  . Name matches aren&apos;t always the same person — choose how to proceed.
+                </p>
+              </div>
+
+              <label
+                className={`flex items-start gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                  mode === 'existing' ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/50' : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="accept-mode"
+                  className="mt-0.5"
+                  checked={mode === 'existing'}
+                  onChange={() => { setMode('existing'); setError(null) }}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-900">Re-enroll this existing student</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Enroll the matched student into the selected section. No new student record is created.
+                  </span>
+                </span>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                  mode === 'new' ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/50' : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="accept-mode"
+                  className="mt-0.5"
+                  checked={mode === 'new'}
+                  onChange={() => { setMode('new'); setError(null) }}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-900">Create a new student record</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Add {gi.full_name || `${gi.first_name} ${gi.surname}`} to the students database as a new student.
+                    Use this if they are a different person.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
 
           {/* New student fields */}
-          {!isExisting && (
+          {mode === 'new' && (
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Student information</p>
 
@@ -272,11 +325,11 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
           </button>
           <button
             type="button"
-            disabled={submitting || !selectedSection}
+            disabled={submitting || !selectedSection || (hasMatch && !mode)}
             onClick={handleSubmit}
             className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 transition-colors disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : isExisting ? 'Re-enroll' : 'Accept & save student'}
+            {submitting ? 'Saving…' : mode === 'existing' ? 'Re-enroll' : 'Accept & save student'}
           </button>
         </div>
       </div>

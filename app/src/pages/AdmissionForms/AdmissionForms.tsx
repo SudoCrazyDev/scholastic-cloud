@@ -332,7 +332,7 @@ export default function AdmissionForms() {
                                 }}
                                 className="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-green-500 transition-colors"
                               >
-                                {row.student_match ? 'Re-enroll' : 'Accept'}
+                                Accept
                               </button>
                               <button
                                 type="button"
@@ -436,7 +436,7 @@ export default function AdmissionForms() {
                       onClick={() => setAcceptTarget(detail)}
                       className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-500 transition-colors"
                     >
-                      {detail.student_match ? 'Re-enroll' : 'Accept'}
+                      Accept
                     </button>
                     <button
                       type="button"
