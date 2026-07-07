@@ -165,6 +165,70 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                             </span>
                           </div>
                         )}
+                        {type === 'matching' && (
+                          <div className="space-y-2">
+                            {q.pairs
+                              .filter((pair) => pair.left.trim())
+                              .map((pair, pIdx) => (
+                                <div
+                                  key={pIdx}
+                                  className="flex items-center gap-3 rounded-lg border border-gray-200 p-3"
+                                >
+                                  <span className="flex-1 text-sm font-medium text-gray-800">{pair.left}</span>
+                                  <span className="cursor-not-allowed rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-400">
+                                    Select a match…
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                        {type === 'drag_picture' && (
+                          <div className="space-y-3">
+                            <div className="rounded-xl border border-gray-200 bg-white p-3">
+                              <p className="mb-2 text-xs font-medium text-gray-500">Pictures</p>
+                              <div className="flex flex-wrap gap-2">
+                                {q.cards.map((card) => (
+                                  <div
+                                    key={card.id}
+                                    className="flex w-24 flex-col items-center gap-1 rounded-lg border border-gray-200 bg-white p-2"
+                                  >
+                                    <div className="h-16 w-full overflow-hidden rounded-md bg-gray-50">
+                                      {card.imageUrl && (
+                                        <img
+                                          src={card.imageUrl}
+                                          alt={card.label || 'picture'}
+                                          className="h-full w-full object-cover"
+                                        />
+                                      )}
+                                    </div>
+                                    {card.label && (
+                                      <span className="w-full truncate text-center text-xs text-gray-600">
+                                        {card.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              {q.targets
+                                .filter((target) => target.label.trim())
+                                .map((target, tIdx) => (
+                                  <div
+                                    key={target.id}
+                                    className="min-h-24 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-3"
+                                  >
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-orange-200 bg-orange-100 text-xs font-bold text-orange-700">
+                                        {tIdx + 1}
+                                      </span>
+                                      {target.label}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

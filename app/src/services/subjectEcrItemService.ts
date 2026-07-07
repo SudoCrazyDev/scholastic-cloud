@@ -29,13 +29,18 @@ export interface SubjectEcrItem {
         | 'short_answer'
         | 'essay'
         | 'image_upload'
-        | 'video_upload';
+        | 'video_upload'
+        | 'matching'
+        | 'drag_picture';
       question: string;
       choices?: string[];
       allow_multiple?: boolean;
       answer?: string | string[]; // string for single/true_false, string[] or "A,B" for multiple_choice
       blanks?: string[]; // correct answers in order for fill_in_the_blanks
       instructions?: string; // for image_upload / video_upload
+      pairs?: Array<{ left: string; right: string }>; // for matching
+      targets?: Array<{ id: string; label: string }>; // for drag_picture: drop zones
+      cards?: Array<{ id: string; imageUrl: string; label: string; targetId: string }>; // for drag_picture
       points?: number;
     }>;
   };
@@ -90,6 +95,16 @@ class SubjectEcrItemService {
 
   async delete(id: string) {
     const response = await api.delete(`${this.baseUrl}/${id}`);
+    return response.data;
+  }
+
+  // Uploads an image used inside a question (e.g. Drag The Picture cards); returns a public URL.
+  async uploadImage(file: File): Promise<{ success: boolean; data: { url: string; path: string } }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`${this.baseUrl}/images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   }
 }

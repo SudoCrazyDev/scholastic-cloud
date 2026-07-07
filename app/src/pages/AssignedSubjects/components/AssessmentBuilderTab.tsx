@@ -21,6 +21,9 @@ import {
   VideoCameraIcon,
   ClipboardDocumentCheckIcon,
   EyeIcon,
+  ArrowsRightLeftIcon,
+  RectangleGroupIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import {
@@ -44,6 +47,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { nanoid } from 'nanoid'
 import { subjectEcrService } from '@/services/subjectEcrService'
+import { subjectEcrItemService } from '@/services/subjectEcrItemService'
 import {
   DEFAULT_RULES_BY_TYPE,
   assessmentMethodService,
@@ -171,6 +175,20 @@ const QUESTION_TYPE_OPTIONS: Array<{
     accentClass: 'text-rose-700 bg-rose-100 border-rose-200',
   },
   {
+    type: 'matching',
+    label: 'Matching Type',
+    hint: 'Match prompts to answers',
+    icon: ArrowsRightLeftIcon,
+    accentClass: 'text-teal-700 bg-teal-100 border-teal-200',
+  },
+  {
+    type: 'drag_picture',
+    label: 'Drag The Picture',
+    hint: 'Drag pictures into zones',
+    icon: RectangleGroupIcon,
+    accentClass: 'text-orange-700 bg-orange-100 border-orange-200',
+  },
+  {
     type: 'image_upload',
     label: 'Image Upload',
     hint: 'Student uploads an image',
@@ -195,6 +213,8 @@ const QUESTION_TYPE_LABELS: Record<AssessmentQuestionType, string> = {
   essay: 'Essay',
   image_upload: 'Image Upload',
   video_upload: 'Video Upload',
+  matching: 'Matching Type',
+  drag_picture: 'Drag The Picture',
 }
 
 const QUESTION_TYPE_SELECT_OPTIONS = QUESTION_TYPE_OPTIONS.map((option) => ({
@@ -241,52 +261,48 @@ const formatDateTime = (value: string | null | undefined): string => {
 const choiceLetter = (index: number) => String.fromCharCode(65 + index)
 
 const makeQuestion = (type: AssessmentQuestionType): AssessmentMethodQuestion => {
-  if (type === 'true_false') {
-    return {
-      id: nanoid(),
-      type,
-      prompt: '',
-      points: 1,
-      choices: ['True', 'False'],
-      correctAnswers: ['True'],
-      blanks: [],
-      sampleAnswer: '',
-    }
-  }
-  if (type === 'fill_in_the_blanks') {
-    return {
-      id: nanoid(),
-      type,
-      prompt: '',
-      points: 1,
-      choices: [],
-      correctAnswers: [],
-      blanks: [''],
-      sampleAnswer: '',
-    }
-  }
-  if (type === 'short_answer' || type === 'essay' || type === 'image_upload' || type === 'video_upload') {
-    return {
-      id: nanoid(),
-      type,
-      prompt: '',
-      points: 1,
-      choices: [],
-      correctAnswers: [],
-      blanks: [],
-      sampleAnswer: '',
-    }
-  }
-  return {
+  const base: AssessmentMethodQuestion = {
     id: nanoid(),
     type,
     prompt: '',
     points: 1,
-    choices: ['', ''],
-    correctAnswers: ['A'],
+    choices: [],
+    correctAnswers: [],
     blanks: [],
     sampleAnswer: '',
+    pairs: [],
+    targets: [],
+    cards: [],
   }
+  if (type === 'true_false') {
+    return { ...base, choices: ['True', 'False'], correctAnswers: ['True'] }
+  }
+  if (type === 'fill_in_the_blanks') {
+    return { ...base, blanks: [''] }
+  }
+  if (type === 'short_answer' || type === 'essay' || type === 'image_upload' || type === 'video_upload') {
+    return base
+  }
+  if (type === 'matching') {
+    return {
+      ...base,
+      pairs: [
+        { left: '', right: '' },
+        { left: '', right: '' },
+      ],
+    }
+  }
+  if (type === 'drag_picture') {
+    return {
+      ...base,
+      targets: [
+        { id: nanoid(), label: '' },
+        { id: nanoid(), label: '' },
+      ],
+      cards: [],
+    }
+  }
+  return { ...base, choices: ['', ''], correctAnswers: ['A'] }
 }
 
 const draftFromAssessment = (assessment: AssessmentMethod): BuilderDraft => ({
@@ -391,6 +407,7 @@ interface SortableQuestionCardProps {
   onAddBlank: (id: string) => void
   onRemoveBlank: (id: string, index: number) => void
   onSampleAnswerChange: (id: string, value: string) => void
+  onUpdate: (id: string, updater: (question: AssessmentMethodQuestion) => AssessmentMethodQuestion) => void
 }
 
 const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
@@ -409,6 +426,7 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
   onAddBlank,
   onRemoveBlank,
   onSampleAnswerChange,
+  onUpdate,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: question.id,
@@ -631,6 +649,237 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
           />
         </div>
       )}
+
+      {question.type === 'matching' && (
+        <MatchingEditor question={question} onUpdate={(updater) => onUpdate(question.id, updater)} />
+      )}
+
+      {question.type === 'drag_picture' && (
+        <DragPictureEditor question={question} onUpdate={(updater) => onUpdate(question.id, updater)} />
+      )}
+    </div>
+  )
+}
+
+const MatchingEditor: React.FC<{
+  question: AssessmentMethodQuestion
+  onUpdate: (updater: (question: AssessmentMethodQuestion) => AssessmentMethodQuestion) => void
+}> = ({ question, onUpdate }) => {
+  const setPair = (index: number, key: 'left' | 'right', value: string) =>
+    onUpdate((current) => ({
+      ...current,
+      pairs: current.pairs.map((pair, i) => (i === index ? { ...pair, [key]: value } : pair)),
+    }))
+  const addPair = () =>
+    onUpdate((current) => ({ ...current, pairs: [...current.pairs, { left: '', right: '' }] }))
+  const removePair = (index: number) =>
+    onUpdate((current) => ({ ...current, pairs: current.pairs.filter((_, i) => i !== index) }))
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-medium text-gray-600">Matching pairs</label>
+        <Button type="button" variant="outline" size="sm" onClick={addPair}>
+          + Pair
+        </Button>
+      </div>
+      <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 text-xs font-medium text-gray-400">
+        <span>Prompt</span>
+        <span />
+        <span>Correct match</span>
+        <span />
+      </div>
+      {question.pairs.map((pair, pairIndex) => (
+        <div key={pairIndex} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
+          <Input
+            value={pair.left}
+            onChange={(event) => setPair(pairIndex, 'left', event.target.value)}
+            placeholder={`Prompt ${pairIndex + 1}`}
+          />
+          <ArrowsRightLeftIcon className="h-4 w-4 text-gray-400" />
+          <Input
+            value={pair.right}
+            onChange={(event) => setPair(pairIndex, 'right', event.target.value)}
+            placeholder={`Match ${pairIndex + 1}`}
+          />
+          {question.pairs.length > 2 ? (
+            <Button type="button" variant="ghost" color="danger" size="sm" onClick={() => removePair(pairIndex)}>
+              Remove
+            </Button>
+          ) : (
+            <span />
+          )}
+        </div>
+      ))}
+      <p className="text-xs text-gray-500">
+        Students match each prompt to its correct answer. The answer options are shuffled for each student.
+      </p>
+    </div>
+  )
+}
+
+const DragPictureEditor: React.FC<{
+  question: AssessmentMethodQuestion
+  onUpdate: (updater: (question: AssessmentMethodQuestion) => AssessmentMethodQuestion) => void
+}> = ({ question, onUpdate }) => {
+  const [uploadingCardId, setUploadingCardId] = useState<string | null>(null)
+
+  const targetOptions = question.targets.map((target, index) => ({
+    value: target.id,
+    label: target.label.trim() || `Zone ${index + 1}`,
+  }))
+
+  const setTargetLabel = (targetId: string, label: string) =>
+    onUpdate((current) => ({
+      ...current,
+      targets: current.targets.map((target) => (target.id === targetId ? { ...target, label } : target)),
+    }))
+  const addTarget = () =>
+    onUpdate((current) => ({ ...current, targets: [...current.targets, { id: nanoid(), label: '' }] }))
+  const removeTarget = (targetId: string) =>
+    onUpdate((current) => ({
+      ...current,
+      targets: current.targets.filter((target) => target.id !== targetId),
+      // Unassign any cards that pointed at the removed zone.
+      cards: current.cards.map((card) => (card.targetId === targetId ? { ...card, targetId: '' } : card)),
+    }))
+
+  const addCard = () =>
+    onUpdate((current) => ({
+      ...current,
+      cards: [
+        ...current.cards,
+        { id: nanoid(), imageUrl: '', label: '', targetId: current.targets[0]?.id ?? '' },
+      ],
+    }))
+  const setCard = (cardId: string, patch: Partial<AssessmentMethodQuestion['cards'][number]>) =>
+    onUpdate((current) => ({
+      ...current,
+      cards: current.cards.map((card) => (card.id === cardId ? { ...card, ...patch } : card)),
+    }))
+  const removeCard = (cardId: string) =>
+    onUpdate((current) => ({ ...current, cards: current.cards.filter((card) => card.id !== cardId) }))
+
+  const handleUpload = async (cardId: string, file: File) => {
+    setUploadingCardId(cardId)
+    try {
+      const res = await subjectEcrItemService.uploadImage(file)
+      setCard(cardId, { imageUrl: res.data.url })
+    } catch (error) {
+      toast.error(
+        (error as any)?.response?.data?.message ?? 'Image upload failed. Please try again.'
+      )
+    } finally {
+      setUploadingCardId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-medium text-gray-600">Drop zones</label>
+          <Button type="button" variant="outline" size="sm" onClick={addTarget}>
+            + Zone
+          </Button>
+        </div>
+        {question.targets.map((target, targetIndex) => (
+          <div key={target.id} className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-orange-200 bg-orange-50 text-xs font-semibold text-orange-700">
+              {targetIndex + 1}
+            </span>
+            <Input
+              value={target.label}
+              onChange={(event) => setTargetLabel(target.id, event.target.value)}
+              placeholder={`Zone label ${targetIndex + 1}`}
+            />
+            {question.targets.length > 1 && (
+              <Button type="button" variant="ghost" color="danger" size="sm" onClick={() => removeTarget(target.id)}>
+                Remove
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-medium text-gray-600">Picture cards</label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addCard}
+            disabled={question.targets.length === 0}
+          >
+            + Picture
+          </Button>
+        </div>
+        {question.cards.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-xs text-gray-500">
+            Add pictures and assign each one to the correct drop zone.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {question.cards.map((card) => (
+              <div key={card.id} className="rounded-lg border border-gray-200 p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-gray-50">
+                    {card.imageUrl ? (
+                      <img src={card.imageUrl} alt={card.label || 'card'} className="h-full w-full object-cover" />
+                    ) : (
+                      <PhotoIcon className="h-6 w-6 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <label
+                      className={clsx(
+                        'inline-flex w-full cursor-pointer items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium transition',
+                        uploadingCardId === card.id
+                          ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                          : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                      )}
+                    >
+                      <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+                      {uploadingCardId === card.id ? 'Uploading…' : card.imageUrl ? 'Replace' : 'Upload image'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingCardId === card.id}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0]
+                          if (file) handleUpload(card.id, file)
+                          event.target.value = ''
+                        }}
+                      />
+                    </label>
+                    <Input
+                      value={card.label}
+                      onChange={(event) => setCard(card.id, { label: event.target.value })}
+                      placeholder="Caption (optional)"
+                    />
+                    <Select
+                      value={card.targetId}
+                      onChange={(event) => setCard(card.id, { targetId: event.target.value })}
+                      options={[{ value: '', label: 'Correct zone…' }, ...targetOptions]}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 text-right">
+                  <Button type="button" variant="ghost" color="danger" size="sm" onClick={() => removeCard(card.id)}>
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-500">
+          Students drag each picture into a zone. Cards are shuffled and scored all-or-nothing.
+        </p>
+      </div>
     </div>
   )
 }
@@ -746,6 +995,30 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
         const blanks = question.blanks.map((blank) => blank.trim()).filter(Boolean)
         if (blanks.length === 0) {
           errors.push(`${label} needs at least one blank answer.`)
+        }
+      }
+
+      if (question.type === 'matching') {
+        const completePairs = question.pairs.filter((pair) => pair.left.trim() && pair.right.trim())
+        if (completePairs.length < 2) {
+          errors.push(`${label} needs at least two complete matching pairs.`)
+        }
+      }
+
+      if (question.type === 'drag_picture') {
+        const labeledTargets = question.targets.filter((target) => target.label.trim())
+        if (labeledTargets.length < 1) {
+          errors.push(`${label} needs at least one labeled drop zone.`)
+        }
+        const validTargetIds = new Set(labeledTargets.map((target) => target.id))
+        const readyCards = question.cards.filter(
+          (card) => card.imageUrl && validTargetIds.has(card.targetId)
+        )
+        if (readyCards.length < 1) {
+          errors.push(`${label} needs at least one picture assigned to a zone.`)
+        }
+        if (question.cards.some((card) => card.imageUrl && !validTargetIds.has(card.targetId))) {
+          errors.push(`${label} has a picture without an assigned zone.`)
         }
       }
     })
@@ -1190,6 +1463,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                   onSampleAnswerChange={(questionId, value) =>
                     updateQuestion(questionId, (question) => ({ ...question, sampleAnswer: value }))
                   }
+                  onUpdate={updateQuestion}
                 />
 
                 <aside className="min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
@@ -1478,6 +1752,7 @@ const CanvasPanel: React.FC<{
   onAddBlank: (id: string) => void
   onRemoveBlank: (id: string, index: number) => void
   onSampleAnswerChange: (id: string, value: string) => void
+  onUpdate: (id: string, updater: (question: AssessmentMethodQuestion) => AssessmentMethodQuestion) => void
 }> = ({
   draft,
   onTypeChange,
@@ -1493,6 +1768,7 @@ const CanvasPanel: React.FC<{
   onAddBlank,
   onRemoveBlank,
   onSampleAnswerChange,
+  onUpdate,
 }) => {
   const { setNodeRef, isOver } = useDroppable({ id: CANVAS_DROP_ID })
 
@@ -1542,6 +1818,7 @@ const CanvasPanel: React.FC<{
                 onAddBlank={onAddBlank}
                 onRemoveBlank={onRemoveBlank}
                 onSampleAnswerChange={onSampleAnswerChange}
+                onUpdate={onUpdate}
               />
             ))}
           </div>

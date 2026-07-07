@@ -12,12 +12,34 @@ export type AssessmentQuestionType =
   | 'essay'
   | 'image_upload'
   | 'video_upload'
+  | 'matching'
+  | 'drag_picture'
 
 export interface AssessmentMethodRules {
   maxAttempts: number
   timeLimitMinutes: number | null
   passMark: number | null
   randomizeQuestions: boolean
+}
+
+/** A pair for a Matching question: student matches `left` to its correct `right`. */
+export interface MatchingPair {
+  left: string
+  right: string
+}
+
+/** A labeled drop zone for a Drag The Picture question. */
+export interface DragTarget {
+  id: string
+  label: string
+}
+
+/** A draggable picture card; `targetId` is the drop zone it belongs to (answer key). */
+export interface DragCard {
+  id: string
+  imageUrl: string
+  label: string
+  targetId: string
 }
 
 export interface AssessmentMethodQuestion {
@@ -29,6 +51,9 @@ export interface AssessmentMethodQuestion {
   correctAnswers: string[]
   blanks: string[]
   sampleAnswer: string
+  pairs: MatchingPair[]
+  targets: DragTarget[]
+  cards: DragCard[]
 }
 
 export interface AssessmentMethod {
@@ -61,6 +86,8 @@ const QUESTION_TYPE_SET = new Set<AssessmentQuestionType>([
   'essay',
   'image_upload',
   'video_upload',
+  'matching',
+  'drag_picture',
 ])
 
 const UPLOAD_QUESTION_TYPES = new Set<AssessmentQuestionType>(['image_upload', 'video_upload'])
@@ -119,6 +146,9 @@ interface RawAssessmentQuestion {
   answer?: string | string[]
   blanks?: string[]
   points?: number
+  pairs?: Array<{ left?: string; right?: string }>
+  targets?: Array<{ id?: string; label?: string }>
+  cards?: Array<{ id?: string; imageUrl?: string; label?: string; targetId?: string }>
 }
 
 const mapQuestionFromItem = (question: RawAssessmentQuestion): AssessmentMethodQuestion => {
@@ -134,12 +164,45 @@ const mapQuestionFromItem = (question: RawAssessmentQuestion): AssessmentMethodQ
     choices:
       type === 'true_false'
         ? ['True', 'False']
-        : UPLOAD_QUESTION_TYPES.has(type)
+        : UPLOAD_QUESTION_TYPES.has(type) || type === 'matching' || type === 'drag_picture'
           ? []
           : (question.choices ?? defaultChoiceList()),
     correctAnswers: [],
     blanks: [],
     sampleAnswer: '',
+    pairs: [],
+    targets: [],
+    cards: [],
+  }
+
+  if (type === 'matching') {
+    baseQuestion.pairs =
+      Array.isArray(question.pairs) && question.pairs.length > 0
+        ? question.pairs.map((pair) => ({
+            left: String(pair?.left ?? ''),
+            right: String(pair?.right ?? ''),
+          }))
+        : [{ left: '', right: '' }]
+    return baseQuestion
+  }
+
+  if (type === 'drag_picture') {
+    baseQuestion.targets =
+      Array.isArray(question.targets) && question.targets.length > 0
+        ? question.targets.map((target) => ({
+            id: String(target?.id ?? nanoid()),
+            label: String(target?.label ?? ''),
+          }))
+        : [{ id: nanoid(), label: '' }]
+    baseQuestion.cards = Array.isArray(question.cards)
+      ? question.cards.map((card) => ({
+          id: String(card?.id ?? nanoid()),
+          imageUrl: String(card?.imageUrl ?? ''),
+          label: String(card?.label ?? ''),
+          targetId: String(card?.targetId ?? ''),
+        }))
+      : []
+    return baseQuestion
   }
 
   if (type === 'single_choice') {
@@ -243,6 +306,34 @@ const normalizeQuestionForPayload = (question: AssessmentMethodQuestion) => {
     return {
       ...base,
       blanks: question.blanks.map((blank) => blank.trim()).filter(Boolean),
+    }
+  }
+
+  if (question.type === 'matching') {
+    return {
+      ...base,
+      pairs: question.pairs
+        .map((pair) => ({ left: pair.left.trim(), right: pair.right.trim() }))
+        .filter((pair) => pair.left && pair.right),
+    }
+  }
+
+  if (question.type === 'drag_picture') {
+    const targets = question.targets
+      .map((target) => ({ id: target.id, label: target.label.trim() }))
+      .filter((target) => target.label)
+    const validTargetIds = new Set(targets.map((target) => target.id))
+    return {
+      ...base,
+      targets,
+      cards: question.cards
+        .filter((card) => card.imageUrl && validTargetIds.has(card.targetId))
+        .map((card) => ({
+          id: card.id,
+          imageUrl: card.imageUrl,
+          label: card.label.trim(),
+          targetId: card.targetId,
+        })),
     }
   }
 

@@ -10,6 +10,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class SubjectEcrItemController extends Controller
 {
@@ -122,7 +124,7 @@ class SubjectEcrItemController extends Controller
                 'settings.pass_mark' => 'nullable|numeric|min:0|max:100',
                 'settings.randomize_questions' => 'nullable|boolean',
                 'content.questions' => 'nullable|array',
-                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload'])],
+                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload', 'matching', 'drag_picture'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
                 'content.questions.*.choices.*' => 'string',
@@ -131,6 +133,19 @@ class SubjectEcrItemController extends Controller
                 'content.questions.*.instructions' => 'nullable|string', // for image_upload / video_upload
                 'content.questions.*.blanks' => 'nullable|array', // for fill_in_the_blanks: correct answers in order
                 'content.questions.*.blanks.*' => 'string',
+                // matching: left/right pairs (right is the answer key)
+                'content.questions.*.pairs' => 'nullable|array',
+                'content.questions.*.pairs.*.left' => 'nullable|string',
+                'content.questions.*.pairs.*.right' => 'nullable|string',
+                // drag_picture: labeled drop targets + picture cards (targetId is the answer key)
+                'content.questions.*.targets' => 'nullable|array',
+                'content.questions.*.targets.*.id' => 'nullable|string',
+                'content.questions.*.targets.*.label' => 'nullable|string',
+                'content.questions.*.cards' => 'nullable|array',
+                'content.questions.*.cards.*.id' => 'nullable|string',
+                'content.questions.*.cards.*.imageUrl' => 'nullable|string',
+                'content.questions.*.cards.*.label' => 'nullable|string',
+                'content.questions.*.cards.*.targetId' => 'nullable|string',
                 'content.questions.*.points' => 'nullable|numeric|min:0',
                 'quarter' => 'nullable|string',
                 'scheduled_date' => 'nullable|date_format:Y-m-d',
@@ -204,7 +219,7 @@ class SubjectEcrItemController extends Controller
                 'settings.pass_mark' => 'nullable|numeric|min:0|max:100',
                 'settings.randomize_questions' => 'nullable|boolean',
                 'content.questions' => 'nullable|array',
-                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload'])],
+                'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload', 'matching', 'drag_picture'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
                 'content.questions.*.choices.*' => 'string',
@@ -213,6 +228,17 @@ class SubjectEcrItemController extends Controller
                 'content.questions.*.instructions' => 'nullable|string',
                 'content.questions.*.blanks' => 'nullable|array',
                 'content.questions.*.blanks.*' => 'string',
+                'content.questions.*.pairs' => 'nullable|array',
+                'content.questions.*.pairs.*.left' => 'nullable|string',
+                'content.questions.*.pairs.*.right' => 'nullable|string',
+                'content.questions.*.targets' => 'nullable|array',
+                'content.questions.*.targets.*.id' => 'nullable|string',
+                'content.questions.*.targets.*.label' => 'nullable|string',
+                'content.questions.*.cards' => 'nullable|array',
+                'content.questions.*.cards.*.id' => 'nullable|string',
+                'content.questions.*.cards.*.imageUrl' => 'nullable|string',
+                'content.questions.*.cards.*.label' => 'nullable|string',
+                'content.questions.*.cards.*.targetId' => 'nullable|string',
                 'content.questions.*.points' => 'nullable|numeric|min:0',
                 'quarter' => 'nullable|string',
                 'academic_year' => 'nullable|string',
@@ -266,5 +292,51 @@ class SubjectEcrItemController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Upload an image used inside an assessment question (e.g. Drag The Picture cards).
+     * Returns a stable public URL the builder stores in the question content.
+     */
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $authenticatedUser = $request->user();
+        $defaultInstitution = $authenticatedUser->userInstitutions()
+            ->where('is_default', true)
+            ->first();
+
+        if (!$defaultInstitution) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No default institution found for authenticated user',
+            ], 403);
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:png,jpg,jpeg,webp,gif|max:10240',
+        ]);
+
+        $file = $request->file('file');
+        $extension = $file->getClientOriginalExtension() ?: 'png';
+        $fileName = Str::uuid() . '.' . $extension;
+        $r2Path = $defaultInstitution->institution_id . '/assessments/images/' . $fileName;
+
+        Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
+
+        // Build a public URL the same way ID card assets / student profile pictures do.
+        $r2Url = config('filesystems.disks.r2.url');
+        if ($r2Url) {
+            $url = rtrim($r2Url, '/') . '/' . ltrim($r2Path, '/');
+        } else {
+            $url = Storage::disk('r2')->temporaryUrl($r2Path, now()->addDays(7));
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'url' => $url,
+                'path' => $r2Path,
+            ],
+        ], 201);
     }
 }

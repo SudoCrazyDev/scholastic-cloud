@@ -255,6 +255,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('ai/generation-tasks/{taskId}/status', [App\Http\Controllers\AiPlannerController::class, 'checkGenerationStatus']);
     // SubjectEcr routes
     Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class);
+    Route::post('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'uploadImage']);
     Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class);
     // SubjectSummativeAssessment routes
     Route::apiResource('subject-summative-assessments', \App\Http\Controllers\SubjectSummativeAssessmentController::class);
