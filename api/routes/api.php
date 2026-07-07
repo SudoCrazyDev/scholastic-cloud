@@ -433,6 +433,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('admission-form-submissions', [AdmissionFormSubmissionController::class, 'index']);
     Route::get('admission-form-submissions/{id}', [AdmissionFormSubmissionController::class, 'show']);
     Route::post('admission-form-submissions/{id}/accept', [AdmissionFormSubmissionController::class, 'accept']);
+    Route::post('admission-form-submissions/{id}/create-student', [AdmissionFormSubmissionController::class, 'createStudent']);
     Route::post('admission-form-submissions/{id}/reject', [AdmissionFormSubmissionController::class, 'reject']);
 });
 

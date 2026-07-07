@@ -8,6 +8,9 @@ interface Props {
   submission: AdmissionFormSubmissionListItem
   onConfirm: (payload: AcceptPayload) => Promise<void>
   onClose: () => void
+  // 'recreate' is the recovery flow on the Accepted tab: always create a brand-new
+  // student record for a form that was accepted without one, skipping the match choice.
+  variant?: 'accept' | 'recreate'
 }
 
 export interface AcceptPayload {
@@ -19,9 +22,11 @@ export interface AcceptPayload {
   lrn?: string
 }
 
-export function AcceptModal({ submission, onConfirm, onClose }: Props) {
+export function AcceptModal({ submission, onConfirm, onClose, variant = 'accept' }: Props) {
   const gi = submission.payload.general_information
-  const hasMatch = !!submission.student_match
+  const isRecreate = variant === 'recreate'
+  // In recreate mode we never re-enroll, so the match choice is irrelevant.
+  const hasMatch = !isRecreate && !!submission.student_match
   // When a possible existing student is detected, the admin must explicitly choose
   // whether to re-enroll that student or create a brand-new record. Name matches are
   // not reliable identity, so we never silently re-enroll (which would skip creating
@@ -111,7 +116,9 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
           <h3 className="text-lg font-semibold text-gray-900">
-            {mode === 'existing' ? 'Re-enroll student' : mode === 'new' ? 'Accept & create student' : 'Review admission form'}
+            {isRecreate
+              ? 'Create student record'
+              : mode === 'existing' ? 'Re-enroll student' : mode === 'new' ? 'Accept & create student' : 'Review admission form'}
           </h3>
           <button
             type="button"
@@ -126,6 +133,18 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
 
         {/* Scrollable body — student fields only */}
         <div className="overflow-y-auto px-6 py-4 space-y-4 shrink min-h-0">
+          {/* Recovery flow: this accepted form never got its own student record */}
+          {isRecreate && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+              <p className="font-semibold">Create a new student for this accepted form</p>
+              <p className="mt-0.5 text-amber-700">
+                This adds {gi.full_name || `${gi.first_name} ${gi.surname}`} to the students database as a new
+                record and enrolls them in the selected section. Use this if the form was accepted but no student
+                was created. Skip it if this applicant already has a correct student record, to avoid duplicates.
+              </p>
+            </div>
+          )}
+
           {/* Possible existing student — admin explicitly chooses how to proceed */}
           {hasMatch && (
             <div className="space-y-3">
@@ -329,7 +348,7 @@ export function AcceptModal({ submission, onConfirm, onClose }: Props) {
             onClick={handleSubmit}
             className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 transition-colors disabled:opacity-50"
           >
-            {submitting ? 'Saving…' : mode === 'existing' ? 'Re-enroll' : 'Accept & save student'}
+            {submitting ? 'Saving…' : isRecreate ? 'Create student' : mode === 'existing' ? 'Re-enroll' : 'Accept & save student'}
           </button>
         </div>
       </div>

@@ -55,6 +55,7 @@ export default function AdmissionForms() {
   const [statusFilter, setStatusFilter] = useState<'pending' | 'accepted' | 'rejected'>('pending')
   const [detail, setDetail] = useState<AdmissionFormSubmissionListItem | null>(null)
   const [acceptTarget, setAcceptTarget] = useState<AdmissionFormSubmissionListItem | null>(null)
+  const [createTarget, setCreateTarget] = useState<AdmissionFormSubmissionListItem | null>(null)
   const [rejectTarget, setRejectTarget] = useState<AdmissionFormSubmissionListItem | null>(null)
   const [rejecting, setRejecting] = useState(false)
 
@@ -132,6 +133,21 @@ export default function AdmissionForms() {
     await admissionFormService.accept(acceptTarget.id, payload)
     toast.success('Student enrolled successfully.')
     setAcceptTarget(null)
+    setDetail(null)
+    queryClient.invalidateQueries({ queryKey })
+  }
+
+  const handleCreateStudent = async (payload: AcceptPayload) => {
+    if (!createTarget) return
+    await admissionFormService.createStudent(createTarget.id, {
+      section_id: payload.section_id,
+      first_name: payload.first_name ?? '',
+      last_name: payload.last_name ?? '',
+      middle_name: payload.middle_name,
+      lrn: payload.lrn,
+    })
+    toast.success('Student record created.')
+    setCreateTarget(null)
     setDetail(null)
     queryClient.invalidateQueries({ queryKey })
   }
@@ -346,6 +362,18 @@ export default function AdmissionForms() {
                               </button>
                             </>
                           )}
+                          {(row.status ?? 'pending') === 'accepted' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const res = await admissionFormService.getOne(row.id)
+                                if (res.success && res.data) setCreateTarget(res.data)
+                              }}
+                              className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 shadow-sm hover:bg-amber-100 transition-colors"
+                            >
+                              Create student
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -447,6 +475,15 @@ export default function AdmissionForms() {
                     </button>
                   </>
                 )}
+                {(detail.status ?? 'pending') === 'accepted' && (
+                  <button
+                    type="button"
+                    onClick={() => setCreateTarget(detail)}
+                    className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 shadow-sm hover:bg-amber-100 transition-colors"
+                  >
+                    Create student
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -466,6 +503,16 @@ export default function AdmissionForms() {
           submission={acceptTarget}
           onConfirm={handleAccept}
           onClose={() => setAcceptTarget(null)}
+        />
+      ) : null}
+
+      {/* Create-student recovery modal (Accepted tab) */}
+      {createTarget ? (
+        <AcceptModal
+          submission={createTarget}
+          variant="recreate"
+          onConfirm={handleCreateStudent}
+          onClose={() => setCreateTarget(null)}
         />
       ) : null}
 

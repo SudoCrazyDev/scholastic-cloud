@@ -90,6 +90,23 @@ export const admissionFormService = {
     return response.data
   },
 
+  async createStudent(id: string, payload: {
+    section_id: string
+    first_name: string
+    last_name: string
+    middle_name?: string
+    lrn?: string
+    gender?: string
+    birthdate?: string
+    religion?: string
+  }) {
+    const response = await api.post<{ success: boolean; message: string; data?: { student_id: string } }>(
+      `/admission-form-submissions/${id}/create-student`,
+      payload
+    )
+    return response.data
+  },
+
   async reject(id: string) {
     const response = await api.post<{ success: boolean; message: string }>(
       `/admission-form-submissions/${id}/reject`

@@ -401,6 +401,90 @@ class AdmissionFormSubmissionController extends Controller
     }
 
     /**
+     * Authenticated: force-create a brand-new student from an already-accepted
+     * submission and re-link the submission to it. Recovery path for forms that
+     * were accepted but re-enrolled an existing student instead of creating one.
+     */
+    public function createStudent(Request $request, string $id): JsonResponse
+    {
+        if (! $this->canAccessAdmissionSubmissions($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+        $institutionId = $this->resolveUserInstitutionId($user);
+
+        $submission = AdmissionFormSubmission::query()->find($id);
+        if (! $submission || $submission->institution_id !== $institutionId) {
+            return response()->json(['success' => false, 'message' => 'Submission not found.'], 404);
+        }
+        if ($submission->status !== 'accepted') {
+            return response()->json(['success' => false, 'message' => 'Only accepted submissions can have a student created this way.'], 422);
+        }
+
+        $validated = $request->validate([
+            'section_id'  => 'required|uuid|exists:class_sections,id',
+            'first_name'  => 'required|string|max:255',
+            'last_name'   => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'lrn'         => 'nullable|string|max:50',
+            'gender'      => 'nullable|string|max:50',
+            'birthdate'   => 'nullable|string|max:50',
+            'religion'    => 'nullable|string|in:Catholic,Islam,Iglesia Ni Cristo,Baptists,Others',
+        ]);
+
+        $section = ClassSection::where('institution_id', $institutionId)->find($validated['section_id']);
+        if (! $section) {
+            return response()->json(['success' => false, 'message' => 'Section not found or does not belong to this institution.'], 422);
+        }
+
+        $institution = Institution::find($institutionId);
+        $academicYear = $institution?->current_academic_year ?? $section->academic_year ?? date('Y') . '-' . (date('Y') + 1);
+
+        DB::beginTransaction();
+        try {
+            $gi = $submission->payload['general_information'] ?? [];
+            $student = Student::create([
+                'first_name'  => $validated['first_name'],
+                'last_name'   => $validated['last_name'],
+                'middle_name' => $validated['middle_name'] ?? ($gi['middle_name'] ?? null),
+                'lrn'         => $validated['lrn'] ?? ($gi['lrn'] ?? null) ?: null,
+                'gender'      => $validated['gender'] ?? ($gi['gender'] ?? null),
+                'birthdate'   => $validated['birthdate'] ?? ($gi['birthdate'] ?? null),
+                'religion'    => $validated['religion'] ?? null,
+                'is_active'   => true,
+            ]);
+
+            StudentInstitution::firstOrCreate(
+                ['student_id' => $student->id, 'institution_id' => $institutionId],
+                ['is_active' => true, 'academic_year' => $academicYear]
+            );
+
+            StudentSection::firstOrCreate(
+                ['student_id' => $student->id, 'section_id' => $section->id, 'academic_year' => $academicYear],
+                ['is_active' => true, 'is_promoted' => false]
+            );
+
+            AdmissionPayloadMapper::syncToStudent($student, $submission->payload ?? []);
+
+            // Re-link the submission to the newly created student.
+            $submission->update(['student_id' => $student->id]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to create student: ' . $e->getMessage()], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student record created and enrolled in section.',
+            'data'    => ['student_id' => $student->id],
+        ]);
+    }
+
+    /**
      * Authenticated: reject a submission.
      */
     public function reject(Request $request, string $id): JsonResponse
