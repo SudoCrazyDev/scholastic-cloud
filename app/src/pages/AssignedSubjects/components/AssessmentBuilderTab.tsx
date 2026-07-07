@@ -102,6 +102,12 @@ const TYPE_OPTIONS: Array<{
     accentClass: 'text-indigo-700 bg-indigo-100 border-indigo-200',
   },
   {
+    id: 'activity',
+    label: 'Activity',
+    icon: LightBulbIcon,
+    accentClass: 'text-amber-700 bg-amber-100 border-amber-200',
+  },
+  {
     id: 'assignment',
     label: 'Assignment',
     icon: PencilSquareIcon,

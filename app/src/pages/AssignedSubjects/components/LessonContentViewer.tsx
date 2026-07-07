@@ -4,6 +4,7 @@ import {
   PlayCircleIcon,
   DocumentArrowDownIcon,
   AcademicCapIcon,
+  LightBulbIcon,
   PencilSquareIcon,
   BookOpenIcon,
   ArrowTopRightOnSquareIcon,
@@ -82,6 +83,8 @@ export const stripHtml = (html?: string): string => {
 
 const assessmentMeta = (type?: AssessmentBlock['assessmentType']) => {
   switch (type) {
+    case 'activity':
+      return { label: 'Activity', icon: LightBulbIcon, accent: 'text-amber-700 bg-amber-100' }
     case 'assignment':
       return { label: 'Assignment', icon: PencilSquareIcon, accent: 'text-emerald-700 bg-emerald-100' }
     case 'exam':

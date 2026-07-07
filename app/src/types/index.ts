@@ -1075,7 +1075,7 @@ export interface AssessmentBlock {
   type: 'assessment';
   subject_ecr_item_id: string;
   title?: string;
-  assessmentType?: 'quiz' | 'assignment' | 'exam';
+  assessmentType?: 'quiz' | 'activity' | 'assignment' | 'exam';
   /** Populated by the student-facing API (StudentLessonController). */
   assessment_available?: boolean;
 }

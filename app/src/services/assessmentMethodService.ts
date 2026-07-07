@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid'
 import { subjectEcrItemService, type SubjectEcrItem } from './subjectEcrItemService'
 
-export type AssessmentMethodType = 'quiz' | 'assignment' | 'exam'
+export type AssessmentMethodType = 'quiz' | 'activity' | 'assignment' | 'exam'
 export type AssessmentPublishStatus = 'draft' | 'published'
 export type AssessmentQuestionType =
   | 'single_choice'
@@ -70,6 +70,12 @@ const DEFAULT_RULES_BY_TYPE: Record<AssessmentMethodType, AssessmentMethodRules>
     maxAttempts: 3,
     timeLimitMinutes: 30,
     passMark: 60,
+    randomizeQuestions: false,
+  },
+  activity: {
+    maxAttempts: 1,
+    timeLimitMinutes: null,
+    passMark: null,
     randomizeQuestions: false,
   },
   assignment: {
