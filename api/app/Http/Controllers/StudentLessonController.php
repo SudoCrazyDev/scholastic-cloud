@@ -205,7 +205,7 @@ class StudentLessonController extends Controller
             }
             $item = $items->get($block['subject_ecr_item_id'] ?? null);
             $block['assessment_available'] = $item !== null
-                && in_array($item->type, ['quiz', 'assignment', 'exam'], true)
+                && in_array($item->type, ['quiz', 'activity', 'assignment', 'exam'], true)
                 && ($item->status ?? 'published') === 'published';
             if ($item) {
                 $block['title'] = $item->title;

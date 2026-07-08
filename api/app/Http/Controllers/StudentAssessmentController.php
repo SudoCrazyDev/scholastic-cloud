@@ -60,7 +60,7 @@ class StudentAssessmentController extends Controller
 
         $items = SubjectEcrItem::with(['subjectEcr.subject'])
             ->whereIn('subject_ecr_id', $ecrIds)
-            ->whereIn('type', ['quiz', 'assignment', 'exam'])
+            ->whereIn('type', ['quiz', 'activity', 'assignment', 'exam'])
             ->where(function ($q) {
                 // Backward-compatible: legacy rows may have NULL status but should behave as published.
                 $q->where('status', 'published')
@@ -571,7 +571,7 @@ class StudentAssessmentController extends Controller
 
     private function isSupportedAssessmentItem(?SubjectEcrItem $item): bool
     {
-        return $item !== null && in_array($item->type, ['quiz', 'assignment', 'exam'], true);
+        return $item !== null && in_array($item->type, ['quiz', 'activity', 'assignment', 'exam'], true);
     }
 
     private function isPublishedForStudents(SubjectEcrItem $item): bool
