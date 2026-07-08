@@ -131,7 +131,7 @@ class AssessmentGradingController extends Controller
     private function authorizeItem(Request $request, string $itemId): SubjectEcrItem|JsonResponse
     {
         $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($itemId);
-        if (!$item || !in_array($item->type, ['quiz', 'assignment', 'exam'], true)) {
+        if (!$item || !in_array($item->type, ['quiz', 'activity', 'assignment', 'exam'], true)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
