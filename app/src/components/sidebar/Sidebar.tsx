@@ -214,7 +214,7 @@ const menuGroups: MenuGroup[] = [
         label: 'Students',
         icon: <StudentsIcon className="w-5 h-5" />,
         path: '/students',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'registrar'],
       },
       {
         id: 'admission-forms',
