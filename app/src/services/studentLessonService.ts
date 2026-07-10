@@ -33,6 +33,11 @@ export interface StudentLessonDetail {
   completed_at?: string | null;
 }
 
+export interface StudentLessonSubject {
+  id: string;
+  title: string;
+}
+
 export interface LessonProgressResult {
   progress_status: LessonProgressStatus;
   started_at?: string | null;
@@ -42,7 +47,7 @@ export interface LessonProgressResult {
 class StudentLessonService {
   private baseUrl = '/student-lessons';
 
-  async list(): Promise<{ success: boolean; data: StudentLessonItem[] }> {
+  async list(): Promise<{ success: boolean; data: StudentLessonItem[]; subjects?: StudentLessonSubject[] }> {
     const res = await api.get(this.baseUrl);
     return res.data;
   }

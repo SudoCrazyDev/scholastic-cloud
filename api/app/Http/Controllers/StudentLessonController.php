@@ -34,10 +34,18 @@ class StudentLessonController extends Controller
 
         $subjectIds = $this->eligibleSubjectIds($student);
         if (empty($subjectIds)) {
-            return response()->json(['success' => true, 'data' => []]);
+            return response()->json(['success' => true, 'data' => [], 'subjects' => []]);
         }
 
         $subjectTitles = Subject::whereIn('id', $subjectIds)->pluck('title', 'id');
+
+        // All eligible subjects (even those without published lessons yet) so the
+        // portal can show every subject instead of silently omitting empty ones.
+        $subjects = $subjectTitles
+            ->map(fn ($title, $id) => ['id' => $id, 'title' => $title])
+            ->values()
+            ->sortBy('title')
+            ->values();
 
         $topics = Topic::whereIn('subject_id', $subjectIds)
             ->where('is_published', true)
@@ -70,7 +78,7 @@ class StudentLessonController extends Controller
             ];
         });
 
-        return response()->json(['success' => true, 'data' => $data->values()]);
+        return response()->json(['success' => true, 'data' => $data->values(), 'subjects' => $subjects]);
     }
 
     /**
