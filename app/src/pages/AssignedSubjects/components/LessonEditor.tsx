@@ -172,11 +172,11 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
     }
   }, [isOpen, topic])
 
-  // Assessments available to link (all three types merged).
+  // Assessments available to link (all types merged).
   const { data: linkableAssessments = [] } = useQuery({
     queryKey: ['lesson-linkable-assessments', subjectId],
     queryFn: async () => {
-      const types: AssessmentMethodType[] = ['quiz', 'assignment', 'exam']
+      const types: AssessmentMethodType[] = ['quiz', 'activity', 'assignment', 'exam']
       const results = await Promise.all(types.map((t) => assessmentMethodService.listBySubject(subjectId, t)))
       return results.flat()
     },
