@@ -564,6 +564,31 @@ class StudentAssessmentController extends Controller
                 $entry['instructions'] = (string) ($q['instructions'] ?? '');
                 $entry['accept'] = $type === 'image_upload' ? 'image/*' : 'video/*';
             }
+            if ($type === 'matching') {
+                // Left prompts keep their order (student answers are aligned to it);
+                // right values are shuffled so their position isn't a giveaway.
+                $pairs = is_array($q['pairs'] ?? null) ? $q['pairs'] : [];
+                $entry['lefts'] = array_values(array_map(fn ($p) => (string) ($p['left'] ?? ''), $pairs));
+                $options = array_values(array_map(fn ($p) => (string) ($p['right'] ?? ''), $pairs));
+                shuffle($options);
+                $entry['options'] = $options;
+            }
+            if ($type === 'drag_picture') {
+                // Targets keep their order; cards are shuffled and stripped of the answer key (targetId).
+                $targets = is_array($q['targets'] ?? null) ? $q['targets'] : [];
+                $entry['targets'] = array_values(array_map(fn ($t) => [
+                    'id' => (string) ($t['id'] ?? ''),
+                    'label' => (string) ($t['label'] ?? ''),
+                ], $targets));
+                $cards = is_array($q['cards'] ?? null) ? $q['cards'] : [];
+                $cards = array_values(array_map(fn ($c) => [
+                    'id' => (string) ($c['id'] ?? ''),
+                    'imageUrl' => (string) ($c['imageUrl'] ?? ''),
+                    'label' => (string) ($c['label'] ?? ''),
+                ], $cards));
+                shuffle($cards);
+                $entry['cards'] = $cards;
+            }
             $out[] = $entry;
         }
         return $out;

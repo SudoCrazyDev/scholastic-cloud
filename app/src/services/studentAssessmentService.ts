@@ -33,7 +33,9 @@ export type QuestionType =
   | 'short_answer'
   | 'essay'
   | 'image_upload'
-  | 'video_upload';
+  | 'video_upload'
+  | 'matching'
+  | 'drag_picture';
 
 export interface UploadAnswer {
   path: string;
@@ -43,8 +45,24 @@ export interface UploadAnswer {
   size: number;
 }
 
-export type AssessmentAnswer = string | string[] | UploadAnswer | null;
+/** Drag The Picture answer: maps each card id to the target (drop zone) id it was placed in. */
+export type DragPictureAnswer = Record<string, string>;
+
+export type AssessmentAnswer = string | string[] | UploadAnswer | DragPictureAnswer | null;
 export type AssessmentAnswers = Record<string, AssessmentAnswer>;
+
+/** Student-facing drop zone for a drag_picture question. */
+export interface DragTargetView {
+  id: string;
+  label: string;
+}
+
+/** Student-facing picture card (answer key stripped) for a drag_picture question. */
+export interface DragCardView {
+  id: string;
+  imageUrl: string;
+  label: string;
+}
 
 export interface AssessmentQuestion {
   index: number;
@@ -56,6 +74,10 @@ export interface AssessmentQuestion {
   placeholder?: string;
   instructions?: string; // for image_upload / video_upload
   accept?: string; // accepted file types, e.g. "image/*" or "video/*"
+  lefts?: string[]; // for matching: left prompts in order
+  options?: string[]; // for matching: right values, shuffled
+  targets?: DragTargetView[]; // for drag_picture: drop zones
+  cards?: DragCardView[]; // for drag_picture: draggable picture cards
 }
 
 export interface TakeAssessmentPayload {

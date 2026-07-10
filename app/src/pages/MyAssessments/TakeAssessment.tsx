@@ -16,8 +16,11 @@ import {
   type AssessmentQuestion,
   type AssessmentAnswers,
   type UploadAnswer,
+  type DragPictureAnswer,
 } from '@/services/studentAssessmentService';
 import { Button } from '@/components/button';
+import { MatchingQuestion } from './MatchingQuestion';
+import { DragPictureQuestion } from './DragPictureQuestion';
 
 const isUploadAnswer = (value: unknown): value is UploadAnswer =>
   !!value && typeof value === 'object' && !Array.isArray(value) && 'path' in (value as Record<string, unknown>);
@@ -387,6 +390,30 @@ export const TakeAssessment: React.FC = () => {
                     </div>
                   );
                 })()}
+                {type === 'matching' && (
+                  <MatchingQuestion
+                    lefts={q.lefts ?? []}
+                    options={q.options ?? []}
+                    value={Array.isArray(answerVal) ? (answerVal as string[]) : []}
+                    onChange={(next) =>
+                      setAnswers((prev) => ({ ...prev, [key]: next }))
+                    }
+                  />
+                )}
+                {type === 'drag_picture' && (
+                  <DragPictureQuestion
+                    targets={q.targets ?? []}
+                    cards={q.cards ?? []}
+                    value={
+                      answerVal && typeof answerVal === 'object' && !Array.isArray(answerVal) && !isUploadAnswer(answerVal)
+                        ? (answerVal as DragPictureAnswer)
+                        : {}
+                    }
+                    onChange={(next) =>
+                      setAnswers((prev) => ({ ...prev, [key]: next }))
+                    }
+                  />
+                )}
               </div>
             </div>
           );

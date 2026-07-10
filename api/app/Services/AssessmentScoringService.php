@@ -134,6 +134,39 @@ class AssessmentScoringService
             }
             return false;
         }
+        if ($type === 'matching') {
+            // Correct when every left prompt is paired with its correct right value.
+            // Given is an array aligned to the pairs order: given[i] = the right value the student chose for left i.
+            $pairs = $q['pairs'] ?? [];
+            if (empty($pairs) || !is_array($givenRaw)) {
+                return false;
+            }
+            foreach ($pairs as $idx => $pair) {
+                $correct = trim((string) ($pair['right'] ?? ''));
+                $given = trim((string) ($givenRaw[$idx] ?? $givenRaw[(string) $idx] ?? ''));
+                if ($given === '' || strcasecmp($correct, $given) !== 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if ($type === 'drag_picture') {
+            // Correct when every card is dropped on its assigned target.
+            // Given is a map of cardId => targetId.
+            $cards = $q['cards'] ?? [];
+            if (empty($cards) || !is_array($givenRaw)) {
+                return false;
+            }
+            foreach ($cards as $card) {
+                $cardId = (string) ($card['id'] ?? '');
+                $correctTarget = (string) ($card['targetId'] ?? '');
+                $given = trim((string) ($givenRaw[$cardId] ?? ''));
+                if ($given === '' || $given !== $correctTarget) {
+                    return false;
+                }
+            }
+            return true;
+        }
         // essay, image_upload, video_upload: graded manually.
         return false;
     }
