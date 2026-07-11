@@ -8,6 +8,7 @@ use App\Models\StudentDiscount;
 use App\Auth\StudentPortalUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class StudentDiscountController extends Controller
@@ -91,6 +92,9 @@ class StudentDiscountController extends Controller
             'value' => 'required|numeric|min:0',
             'school_fee_id' => 'nullable|uuid|exists:school_fees,id',
             'description' => 'nullable|string',
+            'allocations' => 'nullable|array|min:1',
+            'allocations.*.school_fee_id' => 'nullable|uuid|exists:school_fees,id',
+            'allocations.*.value' => 'required_with:allocations|numeric|min:0.01',
         ]);
 
         if ($validated['discount_type'] === 'percentage' && $validated['value'] > 100) {
@@ -122,6 +126,61 @@ class StudentDiscountController extends Controller
                     'message' => 'School fee not found for this institution'
                 ], 404);
             }
+        }
+
+        $allocations = $validated['allocations'] ?? null;
+        if ($allocations) {
+            if ($validated['discount_type'] !== 'fixed') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Splitting a discount across fees is only supported for fixed amount discounts.'
+                ], 422);
+            }
+
+            $allocatedTotal = collect($allocations)->sum(fn ($allocation) => (float) $allocation['value']);
+            if (abs($allocatedTotal - (float) $validated['value']) > 0.01) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Allocated amounts must add up to the total discount amount.'
+                ], 422);
+            }
+
+            $feeIds = collect($allocations)->pluck('school_fee_id')->filter()->unique();
+            if ($feeIds->isNotEmpty()) {
+                $validFeeCount = SchoolFee::where('institution_id', $institutionId)
+                    ->whereIn('id', $feeIds)
+                    ->count();
+
+                if ($validFeeCount !== $feeIds->count()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'School fee not found for this institution'
+                    ], 404);
+                }
+            }
+
+            $discounts = DB::transaction(function () use ($allocations, $validated, $institutionId, $request) {
+                return collect($allocations)->map(function ($allocation) use ($validated, $institutionId, $request) {
+                    return StudentDiscount::create([
+                        'institution_id' => $institutionId,
+                        'student_id' => $validated['student_id'],
+                        'school_fee_id' => $allocation['school_fee_id'] ?? null,
+                        'academic_year' => $validated['academic_year'],
+                        'discount_type' => 'fixed',
+                        'value' => $allocation['value'],
+                        'description' => $validated['description'] ?? null,
+                        'created_by' => $request->user()?->id,
+                    ]);
+                });
+            });
+
+            $discounts->each->load('schoolFee');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Discount saved successfully',
+                'data' => $discounts->values()
+            ], 201);
         }
 
         $discount = StudentDiscount::create([

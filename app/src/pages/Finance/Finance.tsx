@@ -124,9 +124,12 @@ const Finance: React.FC = () => {
     default_discount_id: '',
     discount_type: 'fixed' as 'fixed' | 'percentage',
     value: '',
-    school_fee_id: '',
     description: '',
   })
+  // Rows splitting the discount amount across fees; a single row means the full amount.
+  const [ledgerDiscountAllocations, setLedgerDiscountAllocations] = useState<
+    { school_fee_id: string; value: string }[]
+  >([{ school_fee_id: '', value: '' }])
   const [ledgerDiscountError, setLedgerDiscountError] = useState<string | null>(null)
   const [showLedgerAdditionalFee, setShowLedgerAdditionalFee] = useState(false)
   const [ledgerAdditionalFeeForm, setLedgerAdditionalFeeForm] = useState({
@@ -143,9 +146,9 @@ const Finance: React.FC = () => {
         default_discount_id: '',
         discount_type: 'fixed',
         value: '',
-        school_fee_id: '',
         description: '',
       })
+      setLedgerDiscountAllocations([{ school_fee_id: '', value: '' }])
       setLedgerDiscountError(null)
       setShowLedgerDiscount(false)
       queryClient.invalidateQueries({ queryKey: ['student-ledger', selectedLedgerStudent?.id] })
@@ -156,6 +159,13 @@ const Finance: React.FC = () => {
       setLedgerDiscountError(error.response?.data?.message || 'Failed to save discount.')
     },
   })
+
+  const ledgerDiscountAllocatedTotal = ledgerDiscountAllocations.reduce(
+    (sum, allocation) => sum + (Number(allocation.value) || 0),
+    0
+  )
+  const ledgerDiscountRemaining =
+    Math.round(((Number(ledgerDiscountForm.value) || 0) - ledgerDiscountAllocatedTotal) * 100) / 100
 
   const handleLedgerDiscountSubmit = (event: React.FormEvent) => {
     event.preventDefault()
@@ -172,13 +182,36 @@ const Finance: React.FC = () => {
       return
     }
 
+    const isSplit =
+      ledgerDiscountForm.discount_type === 'fixed' && ledgerDiscountAllocations.length > 1
+    if (isSplit) {
+      if (ledgerDiscountAllocations.some((allocation) => !(Number(allocation.value) > 0))) {
+        setLedgerDiscountError('Each Apply To row needs an amount greater than zero.')
+        return
+      }
+      if (ledgerDiscountRemaining !== 0) {
+        setLedgerDiscountError(
+          ledgerDiscountRemaining > 0
+            ? `₱${ledgerDiscountRemaining.toFixed(2)} of the discount amount is still unallocated.`
+            : `Allocated amounts exceed the discount amount by ₱${Math.abs(ledgerDiscountRemaining).toFixed(2)}.`
+        )
+        return
+      }
+    }
+
     createLedgerDiscountMutation.mutate({
       student_id: selectedLedgerStudent.id,
       academic_year: ledgerAcademicYear,
       discount_type: ledgerDiscountForm.discount_type,
       value,
-      school_fee_id: ledgerDiscountForm.school_fee_id || undefined,
+      school_fee_id: isSplit ? undefined : ledgerDiscountAllocations[0]?.school_fee_id || undefined,
       description: ledgerDiscountForm.description || undefined,
+      allocations: isSplit
+        ? ledgerDiscountAllocations.map((allocation) => ({
+            school_fee_id: allocation.school_fee_id || undefined,
+            value: Number(allocation.value),
+          }))
+        : undefined,
     })
   }
 
@@ -371,6 +404,9 @@ const Finance: React.FC = () => {
       value: preset.value.toString(),
       description: preset.description || preset.name,
     }))
+    setLedgerDiscountAllocations((prev) => [
+      { school_fee_id: prev[0]?.school_fee_id ?? '', value: preset.value.toString() },
+    ])
   }
 
   const dashboardQuery = useQuery({
@@ -2060,13 +2096,20 @@ const Finance: React.FC = () => {
                         </label>
                         <Select
                           value={ledgerDiscountForm.discount_type}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const discountType = e.target.value as 'fixed' | 'percentage'
                             setLedgerDiscountForm((prev) => ({
                               ...prev,
                               default_discount_id: '',
-                              discount_type: e.target.value as 'fixed' | 'percentage',
+                              discount_type: discountType,
                             }))
-                          }
+                            setLedgerDiscountAllocations((prev) => [
+                              {
+                                school_fee_id: prev[0]?.school_fee_id ?? '',
+                                value: discountType === 'fixed' ? ledgerDiscountForm.value : '',
+                              },
+                            ])
+                          }}
                           options={[
                             { value: 'fixed', label: 'Fixed Amount' },
                             { value: 'percentage', label: 'Percentage' },
@@ -2084,35 +2127,128 @@ const Finance: React.FC = () => {
                         min="0"
                         step="0.01"
                         value={ledgerDiscountForm.value}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const nextValue = e.target.value
                           setLedgerDiscountForm((prev) => ({
                             ...prev,
                             default_discount_id: '',
-                            value: e.target.value,
+                            value: nextValue,
                           }))
-                        }
+                          setLedgerDiscountAllocations((prev) =>
+                            prev.length === 1 ? [{ ...prev[0], value: nextValue }] : prev
+                          )
+                        }}
                       />
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                          Apply To
-                        </label>
-                        <Select
-                          value={ledgerDiscountForm.school_fee_id}
-                          onChange={(e) =>
-                            setLedgerDiscountForm((prev) => ({
-                              ...prev,
-                              school_fee_id: e.target.value,
-                            }))
-                          }
-                          options={[
-                            { value: '', label: 'All charges (whole year)' },
-                            ...(feesQuery.data?.data || []).map((fee: SchoolFee) => ({
-                              value: fee.id,
-                              label: fee.name,
-                            })),
-                          ]}
-                          className="w-full"
-                        />
+                      <div className="md:col-span-2">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Apply To
+                          </label>
+                          {ledgerDiscountForm.discount_type === 'fixed' &&
+                            ledgerDiscountAllocations.length > 1 && (
+                              <span
+                                className={`text-xs font-medium ${
+                                  ledgerDiscountRemaining === 0
+                                    ? 'text-green-600'
+                                    : 'text-amber-600'
+                                }`}
+                              >
+                                {ledgerDiscountRemaining === 0
+                                  ? 'Fully allocated'
+                                  : ledgerDiscountRemaining > 0
+                                    ? `₱${ledgerDiscountRemaining.toFixed(2)} left to allocate`
+                                    : `₱${Math.abs(ledgerDiscountRemaining).toFixed(2)} over the discount amount`}
+                              </span>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                          {ledgerDiscountAllocations.map((allocation, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <Select
+                                value={allocation.school_fee_id}
+                                onChange={(e) =>
+                                  setLedgerDiscountAllocations((prev) =>
+                                    prev.map((row, i) =>
+                                      i === index ? { ...row, school_fee_id: e.target.value } : row
+                                    )
+                                  )
+                                }
+                                options={[
+                                  { value: '', label: 'All charges (whole year)' },
+                                  ...(feesQuery.data?.data || []).map((fee: SchoolFee) => ({
+                                    value: fee.id,
+                                    label: fee.name,
+                                  })),
+                                ]}
+                                className="w-full"
+                              />
+                              {ledgerDiscountAllocations.length > 1 && (
+                                <>
+                                  <div className="w-40 shrink-0">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="Amount"
+                                      value={allocation.value}
+                                      onChange={(e) =>
+                                        setLedgerDiscountAllocations((prev) =>
+                                          prev.map((row, i) =>
+                                            i === index ? { ...row, value: e.target.value } : row
+                                          )
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setLedgerDiscountAllocations((prev) => {
+                                        const next = prev.filter((_, i) => i !== index)
+                                        return next.length === 1
+                                          ? [{ ...next[0], value: ledgerDiscountForm.value }]
+                                          : next
+                                      })
+                                    }
+                                    className="p-2 text-gray-400 hover:text-red-600 shrink-0"
+                                    aria-label="Remove this allocation"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {ledgerDiscountForm.discount_type === 'fixed' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setLedgerDiscountAllocations((prev) => [
+                                  ...prev,
+                                  {
+                                    school_fee_id: '',
+                                    value:
+                                      ledgerDiscountRemaining > 0
+                                        ? ledgerDiscountRemaining.toFixed(2)
+                                        : '',
+                                  },
+                                ])
+                              }
+                              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              Add another fee
+                            </button>
+                            {ledgerDiscountAllocations.length > 1 && (
+                              <p className="mt-1 text-xs text-gray-500">
+                                Split the discount across the selected fees. The amounts must add
+                                up to the total discount amount.
+                              </p>
+                            )}
+                          </>
+                        )}
                       </div>
                       <Input
                         label="Description (optional)"

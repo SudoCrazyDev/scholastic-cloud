@@ -335,6 +335,7 @@ export interface CreateStudentDiscountData {
   value: number;
   school_fee_id?: string;
   description?: string;
+  allocations?: { school_fee_id?: string; value: number }[];
 }
 
 export interface StudentLedgerEntry {
