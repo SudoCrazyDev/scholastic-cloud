@@ -549,7 +549,10 @@ class StudentAssessmentController extends Controller
             if (in_array($type, ['true_false', 'single_choice', 'multiple_choice'], true)) {
                 $entry['choices'] = $type === 'true_false'
                     ? ['True', 'False']
-                    : ($q['choices'] ?? []);
+                    : array_map(fn ($c) => (string) ($c ?? ''), $q['choices'] ?? []);
+                $entry['choiceImages'] = $type === 'true_false'
+                    ? []
+                    : array_map(fn ($c) => (string) ($c ?? ''), $q['choiceImages'] ?? []);
             }
             if ($type === 'fill_in_the_blanks') {
                 $blanks = $q['blanks'] ?? [];

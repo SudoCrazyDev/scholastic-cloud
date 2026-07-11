@@ -127,7 +127,9 @@ class SubjectEcrItemController extends Controller
                 'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload', 'matching', 'drag_picture'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
-                'content.questions.*.choices.*' => 'string',
+                'content.questions.*.choices.*' => 'nullable|string', // text may be empty when the choice is image-only
+                'content.questions.*.choiceImages' => 'nullable|array', // optional image URL per choice, aligned with choices
+                'content.questions.*.choiceImages.*' => 'nullable|string',
                 'content.questions.*.allow_multiple' => 'nullable|boolean',
                 'content.questions.*.answer' => 'nullable', // string or array for multiple_choice
                 'content.questions.*.instructions' => 'nullable|string', // for image_upload / video_upload
@@ -222,7 +224,9 @@ class SubjectEcrItemController extends Controller
                 'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload', 'matching', 'drag_picture'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
-                'content.questions.*.choices.*' => 'string',
+                'content.questions.*.choices.*' => 'nullable|string', // text may be empty when the choice is image-only
+                'content.questions.*.choiceImages' => 'nullable|array', // optional image URL per choice, aligned with choices
+                'content.questions.*.choiceImages.*' => 'nullable|string',
                 'content.questions.*.allow_multiple' => 'nullable|boolean',
                 'content.questions.*.answer' => 'nullable',
                 'content.questions.*.instructions' => 'nullable|string',

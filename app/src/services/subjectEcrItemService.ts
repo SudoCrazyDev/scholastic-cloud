@@ -34,6 +34,7 @@ export interface SubjectEcrItem {
         | 'drag_picture';
       question: string;
       choices?: string[];
+      choiceImages?: string[]; // optional image URL per choice, aligned with choices
       allow_multiple?: boolean;
       answer?: string | string[]; // string for single/true_false, string[] or "A,B" for multiple_choice
       blanks?: string[]; // correct answers in order for fill_in_the_blanks

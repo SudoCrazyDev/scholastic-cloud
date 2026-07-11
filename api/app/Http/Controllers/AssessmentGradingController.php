@@ -167,6 +167,7 @@ class AssessmentGradingController extends Controller
                 'question' => $q['question'] ?? '',
                 'points' => (float) ($q['points'] ?? 1),
                 'choices' => $q['choices'] ?? [],
+                'choiceImages' => $q['choiceImages'] ?? [],
                 'answer' => $q['answer'] ?? null,
                 'blanks' => $q['blanks'] ?? [],
                 'instructions' => $q['instructions'] ?? '',

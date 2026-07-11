@@ -25,6 +25,23 @@ import { DragPictureQuestion } from './DragPictureQuestion';
 const isUploadAnswer = (value: unknown): value is UploadAnswer =>
   !!value && typeof value === 'object' && !Array.isArray(value) && 'path' in (value as Record<string, unknown>);
 
+/** Choice body for single/multiple choice: image (when set) with optional text caption. */
+const ChoiceContent: React.FC<{ text: string; imageUrl?: string }> = ({ text, imageUrl }) => {
+  if (!imageUrl) {
+    return <span className="text-gray-800">{text}</span>;
+  }
+  return (
+    <span className="flex items-center gap-3">
+      <img
+        src={imageUrl}
+        alt={text || 'choice'}
+        className="h-20 w-20 shrink-0 rounded-md border border-gray-200 object-cover"
+      />
+      {text && <span className="text-gray-800">{text}</span>}
+    </span>
+  );
+};
+
 export const TakeAssessment: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -263,7 +280,7 @@ export const TakeAssessment: React.FC = () => {
                           onChange={() => handleAnswer(q.index, letter)}
                           className="text-indigo-600"
                         />
-                        <span className="text-gray-800">{choice}</span>
+                        <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                       </label>
                     );
                   })}
@@ -285,7 +302,7 @@ export const TakeAssessment: React.FC = () => {
                           onChange={() => handleMultipleChoice(q.index, letter)}
                           className="rounded border-gray-300 text-indigo-600"
                         />
-                        <span className="text-gray-800">{choice}</span>
+                        <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                       </label>
                     );
                   })

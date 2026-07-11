@@ -48,6 +48,8 @@ export interface AssessmentMethodQuestion {
   prompt: string
   points: number
   choices: string[]
+  /** Optional image URL per choice, aligned by index with `choices` ('' = text-only choice). */
+  choiceImages: string[]
   correctAnswers: string[]
   blanks: string[]
   sampleAnswer: string
@@ -143,6 +145,7 @@ interface RawAssessmentQuestion {
   type?: string
   question?: string
   choices?: string[]
+  choiceImages?: string[]
   answer?: string | string[]
   blanks?: string[]
   points?: number
@@ -156,17 +159,25 @@ const mapQuestionFromItem = (question: RawAssessmentQuestion): AssessmentMethodQ
     ? (question.type as AssessmentQuestionType)
     : 'single_choice'
 
+  // Choice text may be null in stored content (empty strings are nulled server-side
+  // when a choice is image-only), so coerce back to strings.
+  const choices =
+    type === 'true_false'
+      ? ['True', 'False']
+      : UPLOAD_QUESTION_TYPES.has(type) || type === 'matching' || type === 'drag_picture'
+        ? []
+        : (question.choices ?? defaultChoiceList()).map((choice) => String(choice ?? ''))
+
   const baseQuestion: AssessmentMethodQuestion = {
     id: nanoid(),
     type,
     prompt: question.question ?? '',
     points: typeof question.points === 'number' ? question.points : 1,
-    choices:
-      type === 'true_false'
-        ? ['True', 'False']
-        : UPLOAD_QUESTION_TYPES.has(type) || type === 'matching' || type === 'drag_picture'
-          ? []
-          : (question.choices ?? defaultChoiceList()),
+    choices,
+    choiceImages:
+      type === 'single_choice' || type === 'multiple_choice'
+        ? choices.map((_, index) => String(question.choiceImages?.[index] ?? ''))
+        : [],
     correctAnswers: [],
     blanks: [],
     sampleAnswer: '',
@@ -277,19 +288,33 @@ const normalizeQuestionForPayload = (question: AssessmentMethodQuestion) => {
     points: Number.isFinite(question.points) ? question.points : 1,
   }
 
-  if (question.type === 'single_choice') {
-    return {
+  if (question.type === 'single_choice' || question.type === 'multiple_choice') {
+    // A choice counts as filled when it has text or an image; drop the rest
+    // while keeping choices and choiceImages aligned by index. Correct-answer
+    // letters are remapped so they still point at the same choices after
+    // empty ones are removed.
+    const entries = question.choices
+      .map((choice, index) => ({
+        letter: String.fromCharCode(65 + index),
+        text: choice.trim(),
+        imageUrl: String(question.choiceImages[index] ?? '').trim(),
+      }))
+      .filter((entry) => entry.text || entry.imageUrl)
+    const remappedAnswers = question.correctAnswers
+      .map((letter) => entries.findIndex((entry) => entry.letter === letter))
+      .filter((index) => index >= 0)
+      .map((index) => String.fromCharCode(65 + index))
+    const payload = {
       ...base,
-      choices: question.choices.map((choice) => choice.trim()).filter(Boolean),
-      answer: question.correctAnswers[0] ?? 'A',
+      choices: entries.map((entry) => entry.text),
+      choiceImages: entries.map((entry) => entry.imageUrl),
     }
-  }
-
-  if (question.type === 'multiple_choice') {
+    if (question.type === 'single_choice') {
+      return { ...payload, answer: remappedAnswers[0] ?? 'A' }
+    }
     return {
-      ...base,
-      choices: question.choices.map((choice) => choice.trim()).filter(Boolean),
-      answer: question.correctAnswers.length > 0 ? question.correctAnswers : ['A'],
+      ...payload,
+      answer: remappedAnswers.length > 0 ? remappedAnswers : ['A'],
       allow_multiple: true,
     }
   }

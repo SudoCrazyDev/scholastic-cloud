@@ -69,6 +69,7 @@ export interface AssessmentQuestion {
   type: QuestionType;
   question: string;
   choices?: string[];
+  choiceImages?: string[]; // optional image URL per choice, aligned with choices
   points: number;
   num_blanks?: number; // for fill_in_the_blanks
   placeholder?: string;

@@ -17,6 +17,23 @@ interface PreviewAssessmentModalProps {
   onClose: () => void
 }
 
+/** Choice body for single/multiple choice: image (when set) with optional text caption. */
+const ChoiceContent: React.FC<{ text: string; imageUrl?: string }> = ({ text, imageUrl }) => {
+  if (!imageUrl) {
+    return <span className="text-gray-800">{text}</span>
+  }
+  return (
+    <span className="flex items-center gap-3">
+      <img
+        src={imageUrl}
+        alt={text || 'choice'}
+        className="h-20 w-20 shrink-0 rounded-md border border-gray-200 object-cover"
+      />
+      {text && <span className="text-gray-800">{text}</span>}
+    </span>
+  )
+}
+
 /**
  * Read-only preview of an assessment method rendered exactly the way students
  * see it while taking it. All inputs are disabled and the submit button is
@@ -102,7 +119,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                               className="flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 p-3"
                             >
                               <input type="radio" disabled className="text-indigo-600" />
-                              <span className="text-gray-800">{choice}</span>
+                              <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                             </label>
                           ))}
                         {type === 'multiple_choice' &&
@@ -112,7 +129,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                               className="flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 p-3"
                             >
                               <input type="checkbox" disabled className="rounded border-gray-300 text-indigo-600" />
-                              <span className="text-gray-800">{choice}</span>
+                              <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                             </label>
                           ))}
                         {type === 'fill_in_the_blanks' && (

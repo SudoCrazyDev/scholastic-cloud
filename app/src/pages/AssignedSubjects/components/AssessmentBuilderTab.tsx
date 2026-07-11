@@ -267,6 +267,7 @@ const makeQuestion = (type: AssessmentQuestionType): AssessmentMethodQuestion =>
     prompt: '',
     points: 1,
     choices: [],
+    choiceImages: [],
     correctAnswers: [],
     blanks: [],
     sampleAnswer: '',
@@ -302,7 +303,7 @@ const makeQuestion = (type: AssessmentQuestionType): AssessmentMethodQuestion =>
       cards: [],
     }
   }
-  return { ...base, choices: ['', ''], correctAnswers: ['A'] }
+  return { ...base, choices: ['', ''], choiceImages: ['', ''], correctAnswers: ['A'] }
 }
 
 const draftFromAssessment = (assessment: AssessmentMethod): BuilderDraft => ({
@@ -319,17 +320,21 @@ const draftFromAssessment = (assessment: AssessmentMethod): BuilderDraft => ({
   dueAt: toDateTimeLocal(assessment.dueAt),
   allowLateSubmission: assessment.allowLateSubmission,
   rules: assessment.rules,
-  questions: assessment.questions.map((question) => ({
-    ...question,
-    id: question.id || nanoid(),
-    choices:
+  questions: assessment.questions.map((question) => {
+    const choices =
       question.type === 'single_choice' || question.type === 'multiple_choice'
         ? question.choices.length > 0
           ? question.choices
           : ['', '']
-        : question.choices,
-    blanks: question.type === 'fill_in_the_blanks' && question.blanks.length === 0 ? [''] : question.blanks,
-  })),
+        : question.choices
+    return {
+      ...question,
+      id: question.id || nanoid(),
+      choices,
+      choiceImages: choices.map((_, index) => question.choiceImages?.[index] ?? ''),
+      blanks: question.type === 'fill_in_the_blanks' && question.blanks.length === 0 ? [''] : question.blanks,
+    }
+  }),
 })
 
 const newDraft = (type: AssessmentMethodType, subjectEcrId: string): BuilderDraft => ({
@@ -433,6 +438,29 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
   })
   const questionMeta = getQuestionTypeOption(question.type)
   const QuestionIcon = questionMeta.icon
+  const [uploadingChoiceIndex, setUploadingChoiceIndex] = useState<number | null>(null)
+
+  const setChoiceImage = (choiceIndex: number, imageUrl: string) =>
+    onUpdate(question.id, (current) => ({
+      ...current,
+      choiceImages: current.choices.map((_, index) =>
+        index === choiceIndex ? imageUrl : current.choiceImages[index] ?? ''
+      ),
+    }))
+
+  const handleChoiceImageUpload = async (choiceIndex: number, file: File) => {
+    setUploadingChoiceIndex(choiceIndex)
+    try {
+      const res = await subjectEcrItemService.uploadImage(file)
+      setChoiceImage(choiceIndex, res.data.url)
+    } catch (error) {
+      toast.error(
+        (error as any)?.response?.data?.message ?? 'Image upload failed. Please try again.'
+      )
+    } finally {
+      setUploadingChoiceIndex(null)
+    }
+  }
 
   return (
     <div
@@ -510,12 +538,14 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
           {question.choices.map((choice, choiceIndex) => {
             const letter = choiceLetter(choiceIndex)
             const checked = question.correctAnswers.includes(letter)
+            const imageUrl = question.choiceImages[choiceIndex] ?? ''
+            const uploading = uploadingChoiceIndex === choiceIndex
             return (
-              <div key={choiceIndex} className="flex items-center gap-2">
+              <div key={choiceIndex} className="flex items-start gap-2">
                 <button
                   type="button"
                   className={clsx(
-                    'h-6 w-6 rounded-full border text-xs font-semibold',
+                    'mt-1.5 h-6 w-6 shrink-0 rounded-full border text-xs font-semibold',
                     checked
                       ? 'border-indigo-500 bg-indigo-600 text-white'
                       : 'border-gray-300 bg-white text-gray-700'
@@ -525,11 +555,53 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
                 >
                   {letter}
                 </button>
-                <Input
-                  value={choice}
-                  onChange={(event) => onChoiceChange(question.id, choiceIndex, event.target.value)}
-                  placeholder={`Option ${letter}`}
-                />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Input
+                    value={choice}
+                    onChange={(event) => onChoiceChange(question.id, choiceIndex, event.target.value)}
+                    placeholder={imageUrl ? `Caption for option ${letter} (optional)` : `Option ${letter}`}
+                  />
+                  <div className="flex items-center gap-2">
+                    {imageUrl && (
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-gray-200 bg-gray-50">
+                        <img src={imageUrl} alt={choice || `Option ${letter}`} className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                    <label
+                      className={clsx(
+                        'inline-flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition',
+                        uploading
+                          ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                          : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                      )}
+                    >
+                      <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+                      {uploading ? 'Uploading…' : imageUrl ? 'Replace image' : 'Add image'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0]
+                          if (file) handleChoiceImageUpload(choiceIndex, file)
+                          event.target.value = ''
+                        }}
+                      />
+                    </label>
+                    {imageUrl && !uploading && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        color="danger"
+                        size="sm"
+                        onClick={() => setChoiceImage(choiceIndex, '')}
+                      >
+                        Remove image
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 {question.choices.length > 2 && (
                   <Button
                     type="button"
@@ -547,7 +619,8 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
           <p className="text-xs text-gray-500">
             {question.type === 'multiple_choice'
               ? 'Select all correct options.'
-              : 'Select the single correct option.'}
+              : 'Select the single correct option.'}{' '}
+            Each choice can be text, an image, or both.
           </p>
         </div>
       )}
@@ -982,12 +1055,24 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
       }
 
       if (question.type === 'single_choice' || question.type === 'multiple_choice') {
-        const normalizedChoices = question.choices.map((choice) => choice.trim()).filter(Boolean)
-        if (normalizedChoices.length < 2) {
-          errors.push(`${label} needs at least two choices.`)
+        // A choice is filled when it has text or an image.
+        const filledCount = question.choices.filter(
+          (choice, choiceIndex) => choice.trim() || (question.choiceImages[choiceIndex] ?? '').trim()
+        ).length
+        if (filledCount < 2) {
+          errors.push(`${label} needs at least two choices (text or image).`)
         }
         if (question.correctAnswers.length === 0) {
           errors.push(`${label} needs at least one correct choice.`)
+        }
+        const hasEmptyCorrect = question.correctAnswers.some((letter) => {
+          const choiceIndex = letter.charCodeAt(0) - 65
+          const text = (question.choices[choiceIndex] ?? '').trim()
+          const image = (question.choiceImages[choiceIndex] ?? '').trim()
+          return !text && !image
+        })
+        if (hasEmptyCorrect) {
+          errors.push(`${label} has a correct choice that is still empty.`)
         }
       }
 
@@ -1410,16 +1495,21 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     updateQuestion(questionId, (question) => ({
                       ...question,
                       choices: [...question.choices, ''],
+                      choiceImages: [...question.choices.map((_, i) => question.choiceImages[i] ?? ''), ''],
                     }))
                   }
                   onRemoveChoice={(questionId, index) =>
                     updateQuestion(questionId, (question) => {
                       const nextChoices = question.choices.filter((_, choiceIndex) => choiceIndex !== index)
+                      const nextImages = question.choices
+                        .map((_, choiceIndex) => question.choiceImages[choiceIndex] ?? '')
+                        .filter((_, choiceIndex) => choiceIndex !== index)
                       const validLetters = new Set(nextChoices.map((_, choiceIndex) => choiceLetter(choiceIndex)))
                       const nextCorrect = question.correctAnswers.filter((answer) => validLetters.has(answer))
                       return {
                         ...question,
                         choices: nextChoices,
+                        choiceImages: nextImages,
                         correctAnswers: nextCorrect.length ? nextCorrect : [choiceLetter(0)],
                       }
                     })
