@@ -280,6 +280,7 @@ Route::middleware('auth.token')->group(function () {
     // Teacher grading of assessment submissions (manual questions: essays, uploads)
     Route::get('assessment-methods/{itemId}/submissions', [\App\Http\Controllers\AssessmentGradingController::class, 'submissions']);
     Route::post('assessment-methods/{itemId}/submissions/{attemptId}/grade', [\App\Http\Controllers\AssessmentGradingController::class, 'grade']);
+    Route::post('assessment-methods/{itemId}/submissions/recheck', [\App\Http\Controllers\AssessmentGradingController::class, 'recheck']);
     // StudentRunningGrade routes
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
     Route::post('student-running-grades/bulk-upsert-final-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'bulkUpsertFinalGrades']);

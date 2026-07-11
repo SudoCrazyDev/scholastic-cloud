@@ -125,6 +125,83 @@ class AssessmentGradingController extends Controller
     }
 
     /**
+     * Re-check every submitted attempt against the current answer key: recompute
+     * objective scores (keeping awarded manual points), persist attempt totals,
+     * refresh ECR item scores, and recalc running grades. Used after fixing an
+     * answer key or a scoring bug so stored scores match what grading shows.
+     */
+    public function recheck(Request $request, string $itemId): JsonResponse
+    {
+        $item = $this->authorizeItem($request, $itemId);
+        if ($item instanceof JsonResponse) {
+            return $item;
+        }
+
+        $questions = $item->content['questions'] ?? [];
+        $maxScore = $this->scoringService->maxScore($questions);
+
+        $attempts = StudentAssessmentAttempt::with('student')
+            ->where('subject_ecr_item_id', $item->id)
+            ->whereNotNull('submitted_at')
+            ->orderByDesc('submitted_at')
+            ->get();
+
+        $updated = 0;
+        $seenStudents = [];
+        foreach ($attempts as $attempt) {
+            $objectiveScore = $this->scoringService->objectiveScore($questions, $attempt->answers ?? []);
+
+            // Keep only manual scores that still map to a manual question, clamped to its points.
+            $manualScores = [];
+            foreach ($attempt->manual_scores ?? [] as $index => $value) {
+                $i = (int) $index;
+                $question = $questions[$i] ?? null;
+                if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
+                    continue;
+                }
+                $points = (float) ($question['points'] ?? 1);
+                $manualScores[(string) $i] = max(0.0, min($points, (float) $value));
+            }
+
+            $total = $objectiveScore + array_sum($manualScores);
+            $changed = (float) $attempt->score !== $total || (float) $attempt->max_score !== $maxScore;
+            if ($changed) {
+                $attempt->update([
+                    'manual_scores' => $manualScores,
+                    'score' => $total,
+                    'max_score' => $maxScore,
+                ]);
+                $updated++;
+            }
+
+            // Attempts are ordered latest-first; only the latest per student drives the ECR score.
+            if (!isset($seenStudents[$attempt->student_id])) {
+                $seenStudents[$attempt->student_id] = true;
+                if ($changed) {
+                    StudentEcrItemScore::updateOrCreate(
+                        ['student_id' => $attempt->student_id, 'subject_ecr_item_id' => $item->id],
+                        ['score' => $total]
+                    );
+                    $this->runningGradeRecalcService->recalculate($attempt->student_id, $item->id);
+                }
+            }
+        }
+
+        $submissions = $attempts->map(function (StudentAssessmentAttempt $attempt) use ($questions) {
+            return $this->buildSubmission($attempt, $questions);
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'updated' => $updated,
+                'total' => $attempts->count(),
+                'submissions' => $submissions,
+            ],
+        ]);
+    }
+
+    /**
      * Resolve the assessment item and confirm it belongs to the user's institution.
      * Returns the item, or a JsonResponse on failure.
      */

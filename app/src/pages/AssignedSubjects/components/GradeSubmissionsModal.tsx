@@ -6,6 +6,7 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ArrowDownTrayIcon,
+  ArrowPathIcon,
   CheckBadgeIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
@@ -117,6 +118,22 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.attempt_id])
 
+  const recheckMutation = useMutation({
+    mutationFn: () => assessmentGradingService.recheck(itemId),
+    onSuccess: (res) => {
+      const { updated, total } = res.data
+      toast.success(
+        updated === 0
+          ? `All ${total} submission score(s) are already up to date.`
+          : `Re-checked ${total} submission(s); ${updated} score(s) updated.`
+      )
+      queryClient.invalidateQueries({ queryKey: ['assessment-submissions', itemId] })
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message ?? 'Failed to re-check scores.')
+    },
+  })
+
   const gradeMutation = useMutation({
     mutationFn: (payload: { attemptId: string; manualScores: Record<string, number | null> }) =>
       assessmentGradingService.grade(itemId, payload.attemptId, payload.manualScores),
@@ -160,14 +177,25 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
             <h3 className="text-lg font-semibold text-gray-900">Submissions &amp; Grading</h3>
             <p className="text-sm text-gray-500">{title}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-            title="Close"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => recheckMutation.mutate()}
+              disabled={recheckMutation.isPending || isLoading || submissions.length === 0}
+              title="Re-grade every submission against the current answer key and update stored scores"
+            >
+              <ArrowPathIcon className={clsx('h-4 w-4', recheckMutation.isPending && 'animate-spin')} />
+              {recheckMutation.isPending ? 'Re-checking…' : 'Re-check scores'}
+            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+              title="Close"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
         </header>
 
         {isLoading ? (

@@ -64,6 +64,13 @@ class AssessmentGradingService {
     });
     return res.data;
   }
+
+  async recheck(
+    itemId: string
+  ): Promise<{ success: boolean; data: { updated: number; total: number; submissions: AssessmentSubmission[] } }> {
+    const res = await api.post(`/assessment-methods/${itemId}/submissions/recheck`);
+    return res.data;
+  }
 }
 
 export const assessmentGradingService = new AssessmentGradingService();

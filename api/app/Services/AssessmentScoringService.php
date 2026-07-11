@@ -53,7 +53,10 @@ class AssessmentScoringService
         if ($type === 'short_answer') {
             $answer = $question['answer'] ?? '';
             $values = is_array($answer) ? $answer : explode('|', (string) $answer);
-            $values = array_filter(array_map(fn ($v) => trim((string) $v), $values));
+            $values = array_filter(
+                array_map(fn ($v) => trim((string) $v), $values),
+                static fn (string $v): bool => $v !== ''
+            );
             return empty($values);
         }
         return false;
@@ -79,12 +82,12 @@ class AssessmentScoringService
             $correct = is_array($correctRaw)
                 ? array_map('trim', array_map('strtoupper', $correctRaw))
                 : array_map('trim', array_map('strtoupper', explode(',', (string) $correctRaw)));
-            $correct = array_values(array_filter($correct));
+            $correct = array_values(array_filter($correct, static fn (string $v): bool => $v !== ''));
             sort($correct);
             $given = is_array($givenRaw)
                 ? array_map('trim', array_map('strtoupper', $givenRaw))
                 : array_map('trim', array_map('strtoupper', explode(',', (string) $givenRaw)));
-            $given = array_values(array_filter($given));
+            $given = array_values(array_filter($given, static fn (string $v): bool => $v !== ''));
             sort($given);
             return $correct === $given;
         }
@@ -100,7 +103,10 @@ class AssessmentScoringService
             foreach ($correctBlanks as $idx => $correctVal) {
                 $givenVal = trim((string) ($givenBlanks[$idx] ?? ''));
                 // Allow multiple acceptable answers per blank: "answer1 | answer2 | answer3"
-                $alternatives = array_filter(array_map('trim', explode('|', (string) $correctVal)));
+                $alternatives = array_filter(
+                    array_map('trim', explode('|', (string) $correctVal)),
+                    static fn (string $alt): bool => $alt !== ''
+                );
                 $matched = false;
                 foreach ($alternatives as $alt) {
                     if (strcasecmp($alt, $givenVal) === 0) {
@@ -119,7 +125,10 @@ class AssessmentScoringService
             $correctValues = is_array($correctRaw)
                 ? $correctRaw
                 : explode('|', (string) $correctRaw);
-            $correctValues = array_values(array_filter(array_map(fn ($v) => trim((string) $v), $correctValues)));
+            $correctValues = array_values(array_filter(
+                array_map(fn ($v) => trim((string) $v), $correctValues),
+                static fn (string $v): bool => $v !== ''
+            ));
             if (empty($correctValues)) {
                 // No answer key means this should be manually graded.
                 return false;
