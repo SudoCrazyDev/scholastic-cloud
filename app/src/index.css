@@ -44,3 +44,21 @@ html {
   padding: 0;
   min-height: 0;
 }
+/* Inline-form variant (e.g. question prompts): shorter default height. */
+.lesson-quill--compact .ql-editor {
+  min-height: 5rem;
+}
+.lesson-quill .ql-editor img {
+  max-width: 100%;
+}
+/* Question prompt display: Quill content styles without editor chrome. */
+.question-prompt-view.ql-editor {
+  padding: 0;
+  min-height: 0;
+  overflow-y: visible;
+  white-space: normal;
+}
+.question-prompt-view.ql-editor img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+}

@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import type { AssessmentMethod } from '@/services/assessmentMethodService'
 import { Button } from '@/components/button'
+import { QuestionPromptView } from './QuestionPromptView'
 
 interface PreviewAssessmentModalProps {
   method: AssessmentMethod
@@ -95,12 +96,12 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                   const type = q.type
                   return (
                     <div key={q.id} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                      <p className="mb-3 font-medium text-gray-900">
-                        <span className="mr-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
+                      <div className="mb-3 flex items-start gap-2 font-medium text-gray-900">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
                           {idx + 1}
                         </span>
-                        {q.prompt}
-                      </p>
+                        <QuestionPromptView prompt={q.prompt} className="min-w-0 flex-1 pt-1.5" />
+                      </div>
                       <div className="ml-10 space-y-2">
                         {type === 'true_false' &&
                           ['True', 'False'].map((opt) => (

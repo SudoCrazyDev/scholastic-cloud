@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/button';
 import { MatchingQuestion } from './MatchingQuestion';
 import { DragPictureQuestion } from './DragPictureQuestion';
+import { QuestionPromptView } from '../AssignedSubjects/components/QuestionPromptView';
 
 const isUploadAnswer = (value: unknown): value is UploadAnswer =>
   !!value && typeof value === 'object' && !Array.isArray(value) && 'path' in (value as Record<string, unknown>);
@@ -229,12 +230,12 @@ export const TakeAssessment: React.FC = () => {
           const answerVal = answers[key];
           return (
             <div key={q.index} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-              <p className="font-medium text-gray-900 mb-3">
-                <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full text-sm font-bold mr-2">
+              <div className="flex items-start gap-2 font-medium text-gray-900 mb-3">
+                <span className="inline-flex shrink-0 items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full text-sm font-bold">
                   {idx + 1}
                 </span>
-                {q.question}
-              </p>
+                <QuestionPromptView prompt={q.question} className="min-w-0 flex-1 pt-1.5" />
+              </div>
               <div className="space-y-2 ml-10">
                 {type === 'true_false' && (
                   <>

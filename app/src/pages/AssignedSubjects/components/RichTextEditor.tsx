@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import Quill from 'quill'
+import clsx from 'clsx'
 import 'quill/dist/quill.snow.css'
 
 interface RichTextEditorProps {
@@ -7,6 +8,14 @@ interface RichTextEditorProps {
   onChange?: (html: string) => void
   editable?: boolean
   placeholder?: string
+  /** Shorter default height (matches a small textarea) for inline forms. */
+  compact?: boolean
+  /**
+   * Enables the image toolbar button. Receives the picked file, uploads it,
+   * and resolves to the public URL to embed — or null to cancel (e.g. after
+   * showing an error toast).
+   */
+  onImageUpload?: (file: File) => Promise<string | null>
 }
 
 const TOOLBAR = [
@@ -15,6 +24,10 @@ const TOOLBAR = [
   [{ list: 'ordered' }, { list: 'bullet' }],
   ['link'],
 ]
+
+const TOOLBAR_WITH_IMAGE = [...TOOLBAR.slice(0, -1), ['link', 'image']]
+
+const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
 
 // Quill represents an empty editor as "<p><br></p>" — treat that as empty so
 // blank descriptions store as "" (and placeholders show).
@@ -29,12 +42,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChange,
   editable = true,
   placeholder,
+  compact = false,
+  onImageUpload,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const quillRef = useRef<Quill | null>(null)
   const onChangeRef = useRef(onChange)
+  const onImageUploadRef = useRef(onImageUpload)
   const settingRef = useRef(false)
   onChangeRef.current = onChange
+  onImageUploadRef.current = onImageUpload
 
   // Create the Quill instance once. Wipe the host first so a prior
   // StrictMode dev pass (setup → cleanup → setup) can't leave a second editor.
@@ -45,11 +62,38 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     const editorEl = document.createElement('div')
     host.appendChild(editorEl)
 
+    const withImage = Boolean(onImageUploadRef.current)
     const quill = new Quill(editorEl, {
       theme: 'snow',
       placeholder,
       readOnly: !editable,
-      modules: { toolbar: editable ? TOOLBAR : false },
+      modules: {
+        toolbar: editable
+          ? {
+              container: withImage ? TOOLBAR_WITH_IMAGE : TOOLBAR,
+              handlers: withImage
+                ? {
+                    image: () => {
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = IMAGE_ACCEPT
+                      input.onchange = async () => {
+                        const file = input.files?.[0]
+                        const upload = onImageUploadRef.current
+                        if (!file || !upload) return
+                        const range = quill.getSelection(true)
+                        const url = await upload(file)
+                        if (!url || quillRef.current !== quill) return
+                        quill.insertEmbed(range.index, 'image', url, 'user')
+                        quill.setSelection(range.index + 1)
+                      }
+                      input.click()
+                    },
+                  }
+                : {},
+            }
+          : false,
+      },
     })
     quillRef.current = quill
 
@@ -88,7 +132,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }, [editable])
 
   return (
-    <div className={editable ? 'lesson-quill' : 'lesson-quill lesson-quill--readonly'}>
+    <div
+      className={clsx(
+        'lesson-quill',
+        !editable && 'lesson-quill--readonly',
+        compact && 'lesson-quill--compact'
+      )}
+    >
       <div ref={containerRef} />
     </div>
   )

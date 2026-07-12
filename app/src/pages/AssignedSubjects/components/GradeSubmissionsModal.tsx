@@ -18,6 +18,7 @@ import {
   type GradingQuestionMeta,
   type SubmittedAnswer,
 } from '@/services/assessmentGradingService'
+import { QuestionPromptView } from './QuestionPromptView'
 
 interface GradeSubmissionsModalProps {
   itemId: string
@@ -280,10 +281,14 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
                     return (
                       <div key={pq.index} className="rounded-xl border border-gray-200 bg-white p-4">
                         <div className="mb-2 flex items-start justify-between gap-3">
-                          <p className="font-medium text-gray-900">
-                            <span className="mr-2 text-gray-400">{pq.index + 1}.</span>
-                            {question.question || <span className="italic text-gray-400">Untitled question</span>}
-                          </p>
+                          <div className="flex items-start gap-2 font-medium text-gray-900">
+                            <span className="text-gray-400">{pq.index + 1}.</span>
+                            {question.question ? (
+                              <QuestionPromptView prompt={question.question} className="min-w-0 flex-1" />
+                            ) : (
+                              <span className="italic text-gray-400">Untitled question</span>
+                            )}
+                          </div>
                           <div className="flex shrink-0 items-center gap-2">
                             {!pq.manual && pq.auto_correct !== null && (
                               <Badge color={pq.auto_correct ? 'green' : 'red'}>

@@ -1,5 +1,6 @@
 import React from 'react'
 import { DocumentTextIcon } from '@heroicons/react/24/outline'
+import { QuestionPromptView } from './QuestionPromptView'
 
 interface Question {
   question: string
@@ -37,12 +38,12 @@ export const QuizQuestionsViewer: React.FC<QuizQuestionsViewerProps> = ({
       <div className="p-5 space-y-5 bg-gradient-to-b from-white to-gray-50">
         {questions.map((q, idx) => (
           <div key={idx} className="bg-white border-l-4 border-indigo-400 rounded-r-lg shadow-sm p-4 hover:shadow-md transition-shadow">
-            <p className="text-sm font-semibold text-gray-900 mb-3 leading-relaxed">
-              <span className="inline-flex items-center justify-center w-7 h-7 bg-indigo-600 text-white rounded-full text-xs font-bold mr-2">
+            <div className="flex items-start gap-2 text-sm font-semibold text-gray-900 mb-3 leading-relaxed">
+              <span className="inline-flex shrink-0 items-center justify-center w-7 h-7 bg-indigo-600 text-white rounded-full text-xs font-bold">
                 {idx + 1}
               </span>
-              {q.question}
-            </p>
+              <QuestionPromptView prompt={q.question} className="min-w-0 flex-1 pt-1" />
+            </div>
             
             {q.choices && q.choices.length > 0 && (
               <div className="ml-9 space-y-2">

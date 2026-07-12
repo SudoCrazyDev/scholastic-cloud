@@ -66,6 +66,7 @@ import { Switch } from '@/components/switch'
 import { Select } from '@/components/select'
 import { GradeSubmissionsModal } from './GradeSubmissionsModal'
 import { PreviewAssessmentModal } from './PreviewAssessmentModal'
+import { RichTextEditor } from './RichTextEditor'
 
 interface AssessmentBuilderTabProps {
   subjectId: string
@@ -396,6 +397,23 @@ const PaletteCard: React.FC<{
   )
 }
 
+// WYSIWYG prompts are HTML; a prompt counts as filled when it has any text
+// content or an embedded image.
+const promptIsEmpty = (prompt: string) =>
+  !prompt.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim() && !/<img\b/i.test(prompt)
+
+const uploadPromptImage = async (file: File): Promise<string | null> => {
+  try {
+    const res = await subjectEcrItemService.uploadImage(file)
+    return res.data.url
+  } catch (error) {
+    toast.error(
+      (error as any)?.response?.data?.message ?? 'Image upload failed. Please try again.'
+    )
+    return null
+  }
+}
+
 interface SortableQuestionCardProps {
   question: AssessmentMethodQuestion
   index: number
@@ -519,11 +537,12 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
 
       <div className="mb-3">
         <label className="mb-1 block text-xs font-medium text-gray-600">Question prompt</label>
-        <textarea
-          className="min-h-20 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        <RichTextEditor
           value={question.prompt}
-          onChange={(event) => onPromptChange(question.id, event.target.value)}
+          onChange={(html) => onPromptChange(question.id, html)}
           placeholder="Type your question..."
+          compact
+          onImageUpload={uploadPromptImage}
         />
       </div>
 
@@ -1047,7 +1066,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
 
     draft.questions.forEach((question, index) => {
       const label = `Question ${index + 1}`
-      if (!question.prompt.trim()) {
+      if (promptIsEmpty(question.prompt)) {
         errors.push(`${label} needs a prompt.`)
       }
       if (question.points <= 0) {
