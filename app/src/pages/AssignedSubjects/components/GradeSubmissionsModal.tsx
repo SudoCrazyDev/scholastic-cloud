@@ -42,24 +42,34 @@ const AnswerView: React.FC<{ question: GradingQuestionMeta; answer: SubmittedAns
   question,
   answer,
 }) => {
-  if (isUploadAnswer(answer)) {
+  // Image answers may hold several uploads; legacy answers are a single upload object.
+  const uploadList = isUploadAnswer(answer)
+    ? [answer]
+    : Array.isArray(answer) && answer.length > 0 && answer.every(isUploadAnswer)
+      ? answer
+      : null
+  if (uploadList) {
     return (
-      <div className="space-y-2">
-        {question.type === 'image_upload' && answer.url && (
-          <img src={answer.url} alt={answer.name} className="max-h-80 rounded-lg border border-gray-200 object-contain" />
-        )}
-        {question.type === 'video_upload' && answer.url && (
-          <video src={answer.url} controls className="max-h-80 w-full rounded-lg border border-gray-200" />
-        )}
-        <a
-          href={answer.url ?? '#'}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800"
-        >
-          <ArrowDownTrayIcon className="h-4 w-4" />
-          {answer.name}
-        </a>
+      <div className="space-y-3">
+        {uploadList.map((upload, idx) => (
+          <div key={idx} className="space-y-2">
+            {question.type === 'image_upload' && upload.url && (
+              <img src={upload.url} alt={upload.name} className="max-h-80 rounded-lg border border-gray-200 object-contain" />
+            )}
+            {question.type === 'video_upload' && upload.url && (
+              <video src={upload.url} controls className="max-h-80 w-full rounded-lg border border-gray-200" />
+            )}
+            <a
+              href={upload.url ?? '#'}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" />
+              {upload.name}
+            </a>
+          </div>
+        ))}
       </div>
     )
   }
@@ -68,11 +78,14 @@ const AnswerView: React.FC<{ question: GradingQuestionMeta; answer: SubmittedAns
     if (answer.length === 0) return <span className="text-sm italic text-gray-400">No answer</span>
     return (
       <div className="flex flex-wrap gap-1.5">
-        {answer.map((value, idx) => (
-          <span key={idx} className="rounded-md bg-gray-100 px-2 py-1 text-sm text-gray-700">
-            {value || <span className="italic text-gray-400">blank</span>}
-          </span>
-        ))}
+        {answer.map((value, idx) => {
+          const text = typeof value === 'string' ? value : value.name
+          return (
+            <span key={idx} className="rounded-md bg-gray-100 px-2 py-1 text-sm text-gray-700">
+              {text || <span className="italic text-gray-400">blank</span>}
+            </span>
+          )
+        })}
       </div>
     )
   }

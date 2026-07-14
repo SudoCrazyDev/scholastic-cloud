@@ -13,7 +13,7 @@ export interface GradingQuestionMeta {
   manual: boolean;
 }
 
-export type SubmittedAnswer = string | string[] | UploadAnswer | null;
+export type SubmittedAnswer = string | string[] | UploadAnswer | UploadAnswer[] | null;
 
 export interface SubmissionPerQuestion {
   index: number;

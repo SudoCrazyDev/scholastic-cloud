@@ -8,6 +8,7 @@ import {
   ArrowUpTrayIcon,
   PhotoIcon,
   VideoCameraIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import {
@@ -25,6 +26,12 @@ import { QuestionPromptView } from '../AssignedSubjects/components/QuestionPromp
 
 const isUploadAnswer = (value: unknown): value is UploadAnswer =>
   !!value && typeof value === 'object' && !Array.isArray(value) && 'path' in (value as Record<string, unknown>);
+
+/** Image answers hold a list of uploads; legacy answers may be a single upload object. */
+const toUploadList = (value: unknown): UploadAnswer[] =>
+  Array.isArray(value) ? value.filter(isUploadAnswer) : isUploadAnswer(value) ? [value] : [];
+
+const MAX_IMAGES_PER_QUESTION = 10;
 
 /** Choice body for single/multiple choice: image (when set) with optional text caption. */
 const ChoiceContent: React.FC<{ text: string; imageUrl?: string }> = ({ text, imageUrl }) => {
@@ -128,8 +135,9 @@ export const TakeAssessment: React.FC = () => {
     setAnswers((prev) => {
       const key = String(index);
       const current = prev[key];
-      const arr = Array.isArray(current) ? [...current] : [];
-      const next = [...arr];
+      const next: string[] = Array.isArray(current)
+        ? current.map((v) => (typeof v === 'string' ? v : ''))
+        : [];
       next[blankIdx] = value;
       return { ...prev, [key]: next };
     });
@@ -150,6 +158,40 @@ export const TakeAssessment: React.FC = () => {
     } finally {
       setUploading((prev) => ({ ...prev, [key]: false }));
     }
+  };
+
+  /** Image questions accept several files; each is uploaded separately and appended to the answer list. */
+  const handleImagesUpload = async (index: number, files: File[]) => {
+    const key = String(index);
+    const existing = toUploadList(answers[key]);
+    const room = MAX_IMAGES_PER_QUESTION - existing.length;
+    if (room <= 0) {
+      toast.error(`You can upload up to ${MAX_IMAGES_PER_QUESTION} images for this question.`);
+      return;
+    }
+    if (files.length > room) {
+      toast.error(`Only ${room} more image(s) allowed — uploading the first ${room}.`);
+      files = files.slice(0, room);
+    }
+    setUploading((prev) => ({ ...prev, [key]: true }));
+    try {
+      for (const file of files) {
+        const res = await studentAssessmentService.uploadAttachment(id!, index, file);
+        setAnswers((prev) => ({ ...prev, [key]: [...toUploadList(prev[key]), res.data] }));
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Upload failed. Please try again.');
+    } finally {
+      setUploading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleRemoveImage = (index: number, uploadIdx: number) => {
+    const key = String(index);
+    setAnswers((prev) => ({
+      ...prev,
+      [key]: toUploadList(prev[key]).filter((_, i) => i !== uploadIdx),
+    }));
   };
 
   const handleSubmit = () => {
@@ -315,7 +357,11 @@ export const TakeAssessment: React.FC = () => {
                         <label className="block text-xs text-gray-500 mb-1">Blank {bIdx + 1}</label>
                         <input
                           type="text"
-                          value={Array.isArray(answerVal) ? (answerVal[bIdx] ?? '') : ''}
+                          value={
+                            Array.isArray(answerVal) && typeof answerVal[bIdx] === 'string'
+                              ? (answerVal[bIdx] as string)
+                              : ''
+                          }
                           onChange={(e) => handleFillInBlank(q.index, bIdx, e.target.value)}
                           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                           placeholder={`Answer ${bIdx + 1}`}
@@ -347,23 +393,82 @@ export const TakeAssessment: React.FC = () => {
                     />
                   </div>
                 )}
-                {(type === 'image_upload' || type === 'video_upload') && (() => {
+                {type === 'image_upload' && (() => {
+                  const uploadList = toUploadList(answerVal);
+                  const isUploading = !!uploading[key];
+                  return (
+                    <div className="space-y-3">
+                      {q.instructions && <p className="text-sm text-gray-600">{q.instructions}</p>}
+                      {uploadList.length > 0 && (
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {uploadList.map((upload, uIdx) => (
+                            <div key={upload.path} className="relative rounded-lg border border-gray-200 p-2">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveImage(q.index, uIdx)}
+                                className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-gray-500 shadow hover:bg-red-50 hover:text-red-600"
+                                title="Remove image"
+                              >
+                                <XMarkIcon className="h-4 w-4" />
+                              </button>
+                              {upload.url && (
+                                <img
+                                  src={upload.url}
+                                  alt={upload.name}
+                                  className="h-32 w-full rounded-md object-contain"
+                                />
+                              )}
+                              <p className="mt-1 truncate text-xs text-gray-500" title={upload.name}>
+                                {upload.name}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <label
+                        className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                          isUploading
+                            ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
+                            : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <PhotoIcon className="h-4 w-4" />
+                        {isUploading ? (
+                          'Uploading…'
+                        ) : (
+                          <>
+                            <ArrowUpTrayIcon className="h-4 w-4" />
+                            {uploadList.length > 0 ? 'Add more images' : 'Upload images'}
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept={q.accept ?? 'image/*'}
+                          multiple
+                          disabled={isUploading}
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files ?? []);
+                            if (files.length > 0) handleImagesUpload(q.index, files);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      <p className="text-xs text-gray-400">
+                        You can upload up to {MAX_IMAGES_PER_QUESTION} images ({uploadList.length} uploaded).
+                      </p>
+                    </div>
+                  );
+                })()}
+                {type === 'video_upload' && (() => {
                   const upload = isUploadAnswer(answerVal) ? answerVal : null;
                   const isUploading = !!uploading[key];
-                  const accept = q.accept ?? (type === 'image_upload' ? 'image/*' : 'video/*');
                   return (
                     <div className="space-y-3">
                       {q.instructions && <p className="text-sm text-gray-600">{q.instructions}</p>}
                       {upload && (
                         <div className="rounded-lg border border-gray-200 p-3">
-                          {type === 'image_upload' && upload.url && (
-                            <img
-                              src={upload.url}
-                              alt={upload.name}
-                              className="max-h-64 rounded-md object-contain"
-                            />
-                          )}
-                          {type === 'video_upload' && upload.url && (
+                          {upload.url && (
                             <video src={upload.url} controls className="max-h-64 w-full rounded-md" />
                           )}
                           <p className="mt-2 truncate text-xs text-gray-500" title={upload.name}>
@@ -378,24 +483,18 @@ export const TakeAssessment: React.FC = () => {
                             : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
                         }`}
                       >
-                        {type === 'image_upload' ? (
-                          <PhotoIcon className="h-4 w-4" />
-                        ) : (
-                          <VideoCameraIcon className="h-4 w-4" />
-                        )}
+                        <VideoCameraIcon className="h-4 w-4" />
                         {isUploading ? (
                           'Uploading…'
                         ) : (
                           <>
                             <ArrowUpTrayIcon className="h-4 w-4" />
-                            {upload
-                              ? 'Replace file'
-                              : `Upload ${type === 'image_upload' ? 'image' : 'video'}`}
+                            {upload ? 'Replace file' : 'Upload video'}
                           </>
                         )}
                         <input
                           type="file"
-                          accept={accept}
+                          accept={q.accept ?? 'video/*'}
                           disabled={isUploading}
                           className="hidden"
                           onChange={(e) => {

@@ -363,6 +363,16 @@ class AssessmentGradingController extends Controller
     {
         if (is_array($given) && isset($given['path']) && is_string($given['path'])) {
             $given['url'] = $this->temporaryFileUrl($given['path']);
+            return $given;
+        }
+        // Multi-image answers: a list of upload references.
+        if (is_array($given) && array_is_list($given)) {
+            return array_map(function ($entry) {
+                if (is_array($entry) && isset($entry['path']) && is_string($entry['path'])) {
+                    $entry['url'] = $this->temporaryFileUrl($entry['path']);
+                }
+                return $entry;
+            }, $given);
         }
         return $given;
     }

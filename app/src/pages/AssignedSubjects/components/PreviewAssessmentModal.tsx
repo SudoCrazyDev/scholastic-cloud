@@ -179,7 +179,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                                 <VideoCameraIcon className="h-4 w-4" />
                               )}
                               <ArrowUpTrayIcon className="h-4 w-4" />
-                              Upload {type === 'image_upload' ? 'image' : 'video'}
+                              Upload {type === 'image_upload' ? 'images' : 'video'}
                             </span>
                           </div>
                         )}

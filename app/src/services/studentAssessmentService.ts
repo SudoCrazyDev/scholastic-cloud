@@ -48,7 +48,7 @@ export interface UploadAnswer {
 /** Drag The Picture answer: maps each card id to the target (drop zone) id it was placed in. */
 export type DragPictureAnswer = Record<string, string>;
 
-export type AssessmentAnswer = string | string[] | UploadAnswer | DragPictureAnswer | null;
+export type AssessmentAnswer = string | string[] | UploadAnswer | UploadAnswer[] | DragPictureAnswer | null;
 export type AssessmentAnswers = Record<string, AssessmentAnswer>;
 
 /** Student-facing drop zone for a drag_picture question. */

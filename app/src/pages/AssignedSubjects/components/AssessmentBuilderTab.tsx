@@ -192,7 +192,7 @@ const QUESTION_TYPE_OPTIONS: Array<{
   {
     type: 'image_upload',
     label: 'Image Upload',
-    hint: 'Student uploads an image',
+    hint: 'Student uploads one or more images',
     icon: PhotoIcon,
     accentClass: 'text-cyan-700 bg-cyan-100 border-cyan-200',
   },
@@ -724,7 +724,7 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
               <VideoCameraIcon className="mt-0.5 h-5 w-5 shrink-0 text-fuchsia-600" />
             )}
             <p className="text-xs text-gray-600">
-              Students will upload {question.type === 'image_upload' ? 'an image' : 'a video'} file as their answer.
+              Students will upload {question.type === 'image_upload' ? 'one or more images' : 'a video file'} as their answer.
               Submissions are graded manually.
             </p>
           </div>
