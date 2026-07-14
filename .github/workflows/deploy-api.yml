@@ -227,6 +227,12 @@ jobs:
             fi
 
             rm -f "$ZIP_FILE"
+
+            if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
+              rm -rf "$BACKUP_DIR"
+              echo "✓ Backup removed: $BACKUP_DIR"
+            fi
+
             echo "=== Deploy complete ==="
             ls -la api/ | head -5
             [ -f api/vendor/autoload.php ] && echo "✓ autoload.php OK" || echo "✗ autoload.php missing"
