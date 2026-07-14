@@ -46,6 +46,10 @@ export interface SubmissionsResponse {
     questions: GradingQuestionMeta[];
   };
   submissions: AssessmentSubmission[];
+  progress?: {
+    submitted: number;
+    total_students: number;
+  };
 }
 
 class AssessmentGradingService {

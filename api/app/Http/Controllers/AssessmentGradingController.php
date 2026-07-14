@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\StudentAssessmentAttempt;
 use App\Models\StudentEcrItemScore;
+use App\Models\StudentSection;
+use App\Models\StudentSubject;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentScoringService;
 use App\Services\RunningGradeRecalcService;
@@ -58,6 +60,10 @@ class AssessmentGradingController extends Controller
                     'questions' => $this->buildQuestionMeta($questions),
                 ],
                 'submissions' => $submissions,
+                'progress' => [
+                    'submitted' => $attempts->pluck('student_id')->unique()->count(),
+                    'total_students' => $this->expectedStudentCount($item),
+                ],
             ],
         ]);
     }
@@ -199,6 +205,33 @@ class AssessmentGradingController extends Controller
                 'submissions' => $submissions,
             ],
         ]);
+    }
+
+    /**
+     * Number of students expected to take this assessment, mirroring the student-side
+     * eligibility rules (ResolvesStudentSubjects): explicit active subject assignments
+     * always count; non-limited subjects also include the section's active students.
+     */
+    private function expectedStudentCount(SubjectEcrItem $item): int
+    {
+        $subject = $item->subjectEcr?->subject;
+        if (!$subject) {
+            return 0;
+        }
+
+        $studentIds = StudentSubject::where('subject_id', $subject->id)
+            ->where('is_active', true)
+            ->pluck('student_id');
+
+        if (!$subject->is_limited_student && $subject->class_section_id) {
+            $studentIds = $studentIds->merge(
+                StudentSection::where('section_id', $subject->class_section_id)
+                    ->where('is_active', true)
+                    ->pluck('student_id')
+            );
+        }
+
+        return $studentIds->unique()->count();
     }
 
     /**

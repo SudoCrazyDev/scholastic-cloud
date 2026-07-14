@@ -8,6 +8,7 @@ import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
   CheckBadgeIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import { Button } from '@/components/button'
@@ -95,6 +96,7 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
 
   const assessment = data?.data.assessment
   const submissions = data?.data.submissions ?? []
+  const progress = data?.data.progress
   const questionsByIndex = useMemo(() => {
     const map = new Map<number, GradingQuestionMeta>()
     assessment?.questions.forEach((q) => map.set(q.index, q))
@@ -175,7 +177,15 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
       <div className="absolute inset-0 flex flex-col bg-white">
         <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-indigo-50 via-white to-white px-6 py-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Submissions &amp; Grading</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">Submissions &amp; Grading</h3>
+              {progress && (
+                <Badge color={progress.submitted >= progress.total_students && progress.total_students > 0 ? 'green' : 'blue'}>
+                  <UserGroupIcon className="h-3.5 w-3.5" />
+                  {progress.submitted}/{progress.total_students} submitted
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-gray-500">{title}</p>
           </div>
           <div className="flex items-center gap-2">
