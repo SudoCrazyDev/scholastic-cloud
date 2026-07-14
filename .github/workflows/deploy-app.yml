@@ -80,9 +80,12 @@ jobs:
       - name: Prepare app package
         run: |
           cd app/dist
-          zip -r ../../app-deploy.zip .
+          # Unique zip name per target and run: targets can share a physical
+          # server, and /tmp is shared — a fixed name lets parallel matrix
+          # jobs overwrite each other's builds.
+          zip -r ../../app-deploy-${{ matrix.deployment_target }}-${{ github.run_id }}.zip .
           cd ../..
-          ls -la app-deploy.zip
+          ls -la app-deploy-${{ matrix.deployment_target }}-${{ github.run_id }}.zip
 
       - name: Ensure remote directory exists
         uses: appleboy/ssh-action@v1.0.3
@@ -121,7 +124,7 @@ jobs:
           username: ${{ secrets.DEPLOYMENT_SSH_USERNAME }}
           password: ${{ secrets.DEPLOYMENT_SSH_PASSWORD }}
           port: ${{ secrets.DEPLOYMENT_SSH_PORT }}
-          source: "app-deploy.zip"
+          source: "app-deploy-${{ matrix.deployment_target }}-${{ github.run_id }}.zip"
           # Upload to a deterministic location first, then move/extract via SSH.
           target: "/tmp/"
           timeout: "120s"
@@ -152,7 +155,7 @@ jobs:
             APP_DIR="$REMOTE_DIR/app"
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
-            ZIP_FILE="app-deploy.zip"
+            ZIP_FILE="app-deploy-${{ matrix.deployment_target }}-${{ github.run_id }}.zip"
             STAGE_DIR="/tmp/app-deploy-${{ github.run_id }}-${{ matrix.deployment_target }}"
             if [ -f "/tmp/$ZIP_FILE" ]; then
               mv -f "/tmp/$ZIP_FILE" "./$ZIP_FILE"
