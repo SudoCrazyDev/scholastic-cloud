@@ -42,7 +42,7 @@ function StatusBadge({ status }: { status: AdmissionFormSubmissionListItem['stat
   )
 }
 
-const ADMISSION_FORMS_ROLES = ['principal', 'institution-administrator']
+const ADMISSION_FORMS_ROLES = ['principal', 'institution-administrator', 'registrar']
 
 export default function AdmissionForms() {
   const navigate = useNavigate()

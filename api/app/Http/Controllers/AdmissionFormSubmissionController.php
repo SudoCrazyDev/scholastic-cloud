@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 class AdmissionFormSubmissionController extends Controller
 {
     /** Roles allowed to list/view admission submissions (staff UI). */
-    private const ADMISSION_SUBMISSION_ROLES = ['principal', 'institution-administrator'];
+    private const ADMISSION_SUBMISSION_ROLES = ['principal', 'institution-administrator', 'registrar'];
 
     private function canAccessAdmissionSubmissions(Request $request): bool
     {

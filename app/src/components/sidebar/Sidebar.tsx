@@ -221,7 +221,7 @@ const menuGroups: MenuGroup[] = [
         label: 'Admission Forms',
         icon: <ClipboardList className="w-5 h-5" />,
         path: '/admission-forms',
-        allowedRoles: ['principal', 'institution-administrator'],
+        allowedRoles: ['principal', 'institution-administrator', 'registrar'],
       },
       {
         id: 'gate-entries',
