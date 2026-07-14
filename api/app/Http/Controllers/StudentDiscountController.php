@@ -13,6 +13,9 @@ use Illuminate\Validation\Rule;
 
 class StudentDiscountController extends Controller
 {
+    /** Roles allowed to void a discount (same set that can request payment voids). */
+    private const VOID_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator'];
+
     /**
      * Display a listing of student discounts.
      */
@@ -306,6 +309,73 @@ class StudentDiscountController extends Controller
             'success' => true,
             'message' => 'Discount deleted successfully'
         ]);
+    }
+
+    /**
+     * Void the specified student discount. The row is kept for audit but is
+     * excluded from ledger totals, NOA, and balance forward.
+     */
+    public function void(Request $request, string $id): JsonResponse
+    {
+        if (!$this->canVoid($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not allowed to void discounts'
+            ], 403);
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (!$institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned'
+            ], 400);
+        }
+
+        $discount = StudentDiscount::where('institution_id', $institutionId)->find($id);
+        if (!$discount) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Discount not found'
+            ], 404);
+        }
+
+        if ($discount->voided_at !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This discount is already voided.'
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'void_note' => 'required|string|max:2000',
+        ]);
+
+        $discount->update([
+            'voided_at' => now(),
+            'voided_by' => $request->user()?->id,
+            'void_note' => $validated['void_note'],
+        ]);
+
+        $discount->load(['schoolFee', 'voidedBy']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Discount voided successfully',
+            'data' => $discount
+        ]);
+    }
+
+    private function canVoid(Request $request): bool
+    {
+        $user = $request->user();
+        if (!$user || $user instanceof StudentPortalUser) {
+            return false;
+        }
+
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+
+        return in_array((string) ($role->slug ?? ''), self::VOID_ROLES, true);
     }
 
     private function resolveInstitutionId(Request $request): ?string

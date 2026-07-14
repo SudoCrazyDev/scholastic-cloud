@@ -19,10 +19,14 @@ class StudentDiscount extends Model
         'value',
         'description',
         'created_by',
+        'voided_at',
+        'voided_by',
+        'void_note',
     ];
 
     protected $casts = [
         'value' => 'decimal:2',
+        'voided_at' => 'datetime',
     ];
 
     public function student()
@@ -43,5 +47,10 @@ class StudentDiscount extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function voidedBy()
+    {
+        return $this->belongsTo(User::class, 'voided_by');
     }
 }

@@ -326,6 +326,9 @@ export interface StudentDiscount {
   created_at: string;
   updated_at: string;
   school_fee?: SchoolFee;
+  voided_at?: string | null;
+  voided_by?: string | null;
+  void_note?: string | null;
 }
 
 export interface CreateStudentDiscountData {
@@ -352,6 +355,7 @@ export interface StudentLedgerEntry {
   discount_id?: string;
   discount_type?: 'fixed' | 'percentage';
   discount_value?: number;
+  discount_scope?: 'student' | 'grade_level';
   running_balance?: number;
   processed_by?: string | null;
   voided?: boolean;

@@ -331,6 +331,38 @@ const Finance: React.FC = () => {
     })
   }
 
+  // ---- Discount void workflow (direct void, no approval queue) ----
+  const [voidDiscountEntry, setVoidDiscountEntry] = useState<StudentLedgerEntry | null>(null)
+  const [voidDiscountNote, setVoidDiscountNote] = useState('')
+
+  const voidDiscountMutation = useMutation({
+    mutationFn: (payload: { id: string; void_note: string }) =>
+      studentDiscountService.voidDiscount(payload.id, payload.void_note),
+    onSuccess: () => {
+      setVoidDiscountEntry(null)
+      setVoidDiscountNote('')
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa'] })
+      toast.success('Discount voided.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to void discount.')
+    },
+  })
+
+  const handleVoidDiscountSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!voidDiscountEntry?.discount_id) return
+    if (!voidDiscountNote.trim()) {
+      toast.error('A note is required to void a discount.')
+      return
+    }
+    voidDiscountMutation.mutate({
+      id: voidDiscountEntry.discount_id,
+      void_note: voidDiscountNote.trim(),
+    })
+  }
+
   const handleLedgerAdditionalFeeSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     setLedgerAdditionalFeeError(null)
@@ -2532,6 +2564,20 @@ const Finance: React.FC = () => {
                                     >
                                       Void
                                     </button>
+                                  ) : entry.type === 'discount' &&
+                                    !entry.voided &&
+                                    entry.discount_id &&
+                                    entry.discount_scope === 'student' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setVoidDiscountEntry(entry)
+                                        setVoidDiscountNote('')
+                                      }}
+                                      className="text-red-600 hover:text-red-700 font-medium"
+                                    >
+                                      Void
+                                    </button>
                                   ) : (
                                     <span className="text-gray-300">—</span>
                                   )}
@@ -2987,6 +3033,71 @@ const Finance: React.FC = () => {
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
                   {isVoidApprover ? 'Void Payment' : 'Submit Request'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Void discount modal (from the ledger) */}
+      {voidDiscountEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <form onSubmit={handleVoidDiscountSubmit}>
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="text-base font-semibold text-gray-900">Void Discount</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  This will void the discount immediately and add it back to the balance. The entry
+                  stays on the ledger for audit. A note is required.
+                </p>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">Discount</span>
+                    <span className="text-right">{voidDiscountEntry.description}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Amount</span>
+                    <span className="tabular-nums">
+                      ₱ {Math.abs(Number(voidDiscountEntry.amount)).toLocaleString('en-PH', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Reason / Note <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={voidDiscountNote}
+                    onChange={(e) => setVoidDiscountNote(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="e.g. Applied in error, wrong amount, not eligible"
+                  />
+                </div>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setVoidDiscountEntry(null)
+                    setVoidDiscountNote('')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  loading={voidDiscountMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Void Discount
                 </Button>
               </div>
             </form>

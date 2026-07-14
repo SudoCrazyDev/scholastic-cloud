@@ -89,7 +89,7 @@ class StudentFinanceController extends Controller
         // excluded from all totals / running balance and per-fee breakdowns.
         $activePayments = $payments->whereNull('voided_at');
 
-        $discounts = StudentDiscount::with(['schoolFee', 'creator'])
+        $discounts = StudentDiscount::with(['schoolFee', 'creator', 'voidedBy'])
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -120,7 +120,12 @@ class StudentFinanceController extends Controller
         $standardCharges = (float) $feeDefaults->sum('amount');
         $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
         $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
-        $discountsTotal = (float) $discountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
+        // Voided discounts stay visible in the ledger for audit, but they are
+        // excluded from all totals / running balance and per-fee breakdowns.
+        $activeDiscountsWithAmount = $discountsWithAmount->filter(
+            fn ($payload) => $payload['discount']->voided_at === null
+        );
+        $discountsTotal = (float) $activeDiscountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $activePayments->sum('amount');
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
@@ -206,6 +211,10 @@ class StudentFinanceController extends Controller
             $processedByName = $creator
                 ? trim(($creator->first_name ?? '') . ' ' . ($creator->last_name ?? ''))
                 : null;
+            $voidedByUser = $discount->voidedBy;
+            $voidedByName = $voidedByUser
+                ? trim(($voidedByUser->first_name ?? '') . ' ' . ($voidedByUser->last_name ?? ''))
+                : null;
 
             return [
                 'type' => 'discount',
@@ -215,9 +224,14 @@ class StudentFinanceController extends Controller
                 'discount_id' => $discount->id,
                 'discount_type' => $discount->discount_type,
                 'discount_value' => (float) $discount->value,
+                'discount_scope' => 'student',
                 'fee_id' => $discount->school_fee_id,
                 'fee_name' => $feeName,
                 'processed_by' => $processedByName,
+                'voided' => $discount->voided_at !== null,
+                'voided_at' => $discount->voided_at?->toDateTimeString(),
+                'voided_by' => $voidedByName,
+                'void_note' => $discount->void_note,
             ];
         });
 
@@ -239,28 +253,10 @@ class StudentFinanceController extends Controller
                 'discount_id' => $discount->id,
                 'discount_type' => $discount->discount_type,
                 'discount_value' => (float) $discount->value,
+                'discount_scope' => 'grade_level',
                 'fee_id' => $discount->school_fee_id,
                 'fee_name' => $feeName,
                 'processed_by' => $processedByName,
-            ];
-        });
-
-        $gradeLevelDiscountEntries = $gradeLevelDiscountsWithAmount->map(function ($payload) {
-            $discount = $payload['discount'];
-            $feeName = $discount->schoolFee?->name;
-            $label = $feeName ? 'Grade Discount - ' . $feeName : 'Grade Discount';
-            $description = $discount->description ? $label . ' (' . $discount->description . ')' : $label;
-
-            return [
-                'type' => 'discount',
-                'description' => $description,
-                'amount' => -1 * (float) $payload['amount'],
-                'date' => $discount->created_at?->toDateString(),
-                'discount_id' => $discount->id,
-                'discount_type' => $discount->discount_type,
-                'discount_value' => (float) $discount->value,
-                'fee_id' => $discount->school_fee_id,
-                'fee_name' => $feeName,
             ];
         });
 
@@ -335,7 +331,7 @@ class StudentFinanceController extends Controller
             ->groupBy('school_fee_id')
             ->map(fn ($group) => (float) $group->sum('amount'));
 
-        $discountByFee = $discountsWithAmount
+        $discountByFee = $activeDiscountsWithAmount
             ->merge($gradeLevelDiscountsWithAmount)
             ->filter(fn ($payload) => $payload['discount']->school_fee_id)
             ->groupBy(fn ($payload) => $payload['discount']->school_fee_id)
@@ -474,6 +470,7 @@ class StudentFinanceController extends Controller
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
+            ->whereNull('voided_at')
             ->orderBy('created_at')
             ->get();
 
@@ -774,6 +771,7 @@ class StudentFinanceController extends Controller
                 $discounts = StudentDiscount::where('institution_id', $institutionId)
                     ->where('student_id', $studentId)
                     ->where('academic_year', $year)
+                    ->whereNull('voided_at')
                     ->get();
 
                 $discountsTotal = (float) $this->applyDiscounts($discounts, $feeAmountMap, $charges)
@@ -783,6 +781,7 @@ class StudentFinanceController extends Controller
             $payments = (float) StudentPayment::where('institution_id', $institutionId)
                 ->where('student_id', $studentId)
                 ->where('academic_year', $year)
+                ->whereNull('voided_at')
                 ->sum('amount');
 
             $balanceForward += ($charges - $discountsTotal - $payments);

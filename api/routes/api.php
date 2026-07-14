@@ -318,6 +318,7 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update']);
     Route::patch('student-discounts/{id}', [StudentDiscountController::class, 'update']);
     Route::delete('student-discounts/{id}', [StudentDiscountController::class, 'destroy']);
+    Route::post('student-discounts/{id}/void', [StudentDiscountController::class, 'void']);
 
     // Default (reusable) discounts
     Route::apiResource('default-discounts', DefaultDiscountController::class);

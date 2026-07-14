@@ -22,6 +22,13 @@ class StudentDiscountService {
   async deleteDiscount(id: string) {
     await api.delete(`${this.baseUrl}/${id}`)
   }
+
+  async voidDiscount(id: string, voidNote: string) {
+    const response = await api.post<ApiResponse<StudentDiscount>>(`${this.baseUrl}/${id}/void`, {
+      void_note: voidNote,
+    })
+    return response.data
+  }
 }
 
 export const studentDiscountService = new StudentDiscountService()
