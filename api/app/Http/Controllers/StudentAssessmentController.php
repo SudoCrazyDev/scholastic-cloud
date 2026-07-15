@@ -296,7 +296,7 @@ class StudentAssessmentController extends Controller
             ->count();
         $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
         if ($submittedCount >= $attemptsAllowed) {
-            $message = in_array($item->type, ['quiz', 'exam'], true)
+            $message = $item->type === 'exam'
                 ? 'You have already submitted this assessment. Answers can no longer be changed.'
                 : 'You have reached the maximum number of attempts for this assessment.';
             return response()->json([
@@ -364,7 +364,7 @@ class StudentAssessmentController extends Controller
             ->count();
         $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
         if ($submittedCount >= $attemptsAllowed) {
-            $message = in_array($item->type, ['quiz', 'exam'], true)
+            $message = $item->type === 'exam'
                 ? 'You have already submitted this assessment. Answers can no longer be changed.'
                 : 'You have reached the maximum number of attempts for this assessment.';
             return response()->json([
@@ -629,8 +629,8 @@ class StudentAssessmentController extends Controller
 
     private function effectiveMaxAttempts(SubjectEcrItem $item, array $rules): int
     {
-        // Business rule: quiz/exam answers are final after first submission.
-        if (in_array($item->type, ['quiz', 'exam'], true)) {
+        // Business rule: exam answers are final after first submission.
+        if ($item->type === 'exam') {
             return 1;
         }
 
