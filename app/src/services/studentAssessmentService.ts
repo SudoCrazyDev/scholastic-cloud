@@ -102,6 +102,7 @@ export interface TakeAssessmentPayload {
   };
   attempts_used?: number;
   attempts_allowed?: number;
+  can_retake?: boolean;
   questions: AssessmentQuestion[];
   attempt_id: string;
   answers: AssessmentAnswers;
@@ -112,6 +113,10 @@ export interface SubmitResult {
   max_score: number;
   attempt_id: string;
   submitted_at: string;
+  needs_manual_grading?: boolean;
+  attempts_used?: number;
+  attempts_allowed?: number;
+  can_retake?: boolean;
 }
 
 class StudentAssessmentService {

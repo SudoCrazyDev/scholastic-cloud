@@ -94,12 +94,10 @@ class StudentAssessmentController extends Controller
 
             if ($inProgress) {
                 $status = 'in_progress';
-            } elseif ($latestSubmitted && !$canRetake) {
-                $status = 'submitted';
-                $score = $latestSubmitted->score;
-                $maxScore = $latestSubmitted->max_score;
-                $submittedAt = $latestSubmitted->submitted_at?->toIso8601String();
             } elseif ($latestSubmitted) {
+                // Submitted stays submitted even when retakes remain; retaking is an
+                // explicit action, never implied by showing the item as untaken.
+                $status = 'submitted';
                 $score = $latestSubmitted->score;
                 $maxScore = $latestSubmitted->max_score;
                 $submittedAt = $latestSubmitted->submitted_at?->toIso8601String();
@@ -192,6 +190,7 @@ class StudentAssessmentController extends Controller
             'allow_late_submission' => (bool) $item->allow_late_submission,
             'attempts_used' => $submittedCount,
             'attempts_allowed' => $attemptsAllowed,
+            'can_retake' => $canRetake,
         ];
 
         $questions = $item->content['questions'] ?? [];
@@ -214,7 +213,9 @@ class StudentAssessmentController extends Controller
             ];
             $payload['attempt_status'] = 'in_progress';
             $payload['answers'] = $inProgressAttempt->answers ?? [];
-        } elseif ($latestSubmittedAttempt && !$canRetake) {
+        } elseif ($latestSubmittedAttempt) {
+            // Submitted stays submitted even when retakes remain; the client offers
+            // an explicit retake instead of treating the item as untaken.
             $payload['attempt'] = [
                 'id' => $latestSubmittedAttempt->id,
                 'started_at' => $latestSubmittedAttempt->started_at?->toIso8601String(),
@@ -227,13 +228,7 @@ class StudentAssessmentController extends Controller
             $payload['answers'] = [];
         } else {
             $payload['attempt_status'] = 'not_started';
-            $payload['attempt'] = $latestSubmittedAttempt ? [
-                'id' => $latestSubmittedAttempt->id,
-                'started_at' => $latestSubmittedAttempt->started_at?->toIso8601String(),
-                'submitted_at' => $latestSubmittedAttempt->submitted_at?->toIso8601String(),
-                'score' => $latestSubmittedAttempt->score,
-                'max_score' => $latestSubmittedAttempt->max_score,
-            ] : null;
+            $payload['attempt'] = null;
             $payload['answers'] = [];
         }
 
@@ -427,6 +422,9 @@ class StudentAssessmentController extends Controller
                 'attempt_id' => $attempt->id,
                 'submitted_at' => $attempt->submitted_at?->toIso8601String(),
                 'needs_manual_grading' => $needsManualGrading,
+                'attempts_used' => $submittedCount + 1,
+                'attempts_allowed' => $attemptsAllowed,
+                'can_retake' => ($submittedCount + 1) < $attemptsAllowed,
             ],
         ]);
     }

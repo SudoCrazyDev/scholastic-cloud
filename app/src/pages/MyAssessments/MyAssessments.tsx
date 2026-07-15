@@ -162,6 +162,12 @@ export const MyAssessments: React.FC = () => {
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
                           {item.max_score != null && <span>Max score: {item.max_score}</span>}
                           {item.due_at && <span>Due: {new Date(item.due_at).toLocaleString()}</span>}
+                          {(item.attempts_allowed ?? 1) > 1 && (
+                            <span>
+                              Attempts: {item.attempts_used ?? 0} / {item.attempts_allowed}
+                              {item.attempt_status === 'submitted' && item.can_retake && ' · Retake available'}
+                            </span>
+                          )}
                           {item.attempt_status === 'submitted' && item.attempt_score != null && item.attempt_max_score != null && (
                             <span className="font-medium text-indigo-700">
                               Score: {item.attempt_score} / {item.attempt_max_score}

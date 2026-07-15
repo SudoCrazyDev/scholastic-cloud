@@ -58,6 +58,7 @@ export const TakeAssessment: React.FC = () => {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<{ score: number; max_score: number } | null>(null);
+  const [canRetake, setCanRetake] = useState(false);
 
   const { data: showData, isLoading: showLoading } = useQuery({
     queryKey: ['student-assessment', id],
@@ -77,6 +78,7 @@ export const TakeAssessment: React.FC = () => {
     mutationFn: (ans: AssessmentAnswers) => studentAssessmentService.submit(id!, ans),
     onSuccess: (res) => {
       setResult(res.data);
+      setCanRetake(!!res.data.can_retake);
       setSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ['student-assessments'] });
     },
@@ -107,9 +109,21 @@ export const TakeAssessment: React.FC = () => {
   useEffect(() => {
     if (alreadySubmitted && payload?.attempt) {
       setResult({ score: payload.attempt.score ?? 0, max_score: payload.attempt.max_score ?? 0 });
+      setCanRetake(!!payload.can_retake);
       setSubmitted(true);
     }
-  }, [alreadySubmitted, payload?.attempt]);
+  }, [alreadySubmitted, payload?.attempt, payload?.can_retake]);
+
+  const handleRetake = () => {
+    startMutation.mutate(undefined, {
+      onSuccess: (res) => {
+        setSubmitted(false);
+        setResult(null);
+        setCanRetake(false);
+        setAnswers(res.data?.answers ?? {});
+      },
+    });
+  };
 
   const handleAnswer = (index: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [String(index)]: value }));
@@ -238,7 +252,14 @@ export const TakeAssessment: React.FC = () => {
             {result.score} / {result.max_score}
           </p>
           <p className="text-gray-600 mb-6">Your score has been recorded.</p>
-          <Button onClick={() => navigate('/my-assessments')}>Back to My Assessments</Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button onClick={() => navigate('/my-assessments')}>Back to My Assessments</Button>
+            {canRetake && (
+              <Button variant="outline" onClick={handleRetake} disabled={startMutation.isPending}>
+                {startMutation.isPending ? 'Starting…' : 'Retake assessment'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
