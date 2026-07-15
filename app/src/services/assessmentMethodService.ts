@@ -375,6 +375,15 @@ const normalizeQuestionForPayload = (question: AssessmentMethodQuestion) => {
   }
 }
 
+// datetime-local inputs produce timezone-less strings (e.g. "2026-07-15T14:00") that the
+// API would otherwise store as UTC wall time, shifting the time on every round trip.
+const toUtcIso = (value: string | null): string | null => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toISOString()
+}
+
 const toSubjectEcrItemPayload = (input: AssessmentMethodInput): Omit<SubjectEcrItem, 'id'> => {
   const totalPoints = input.questions.reduce((sum, question) => sum + (Number(question.points) || 0), 0)
   return {
@@ -385,9 +394,9 @@ const toSubjectEcrItemPayload = (input: AssessmentMethodInput): Omit<SubjectEcrI
     description: input.description.trim() || undefined,
     quarter: input.quarter,
     scheduled_date: input.scheduledDate,
-    open_at: input.openAt,
-    close_at: input.closeAt,
-    due_at: input.dueAt,
+    open_at: toUtcIso(input.openAt),
+    close_at: toUtcIso(input.closeAt),
+    due_at: toUtcIso(input.dueAt),
     allow_late_submission: input.allowLateSubmission,
     score: totalPoints,
     settings: {
