@@ -56,6 +56,14 @@ const Login: React.FC = () => {
           Object.keys(validationErrors).forEach((field) => {
             formik.setFieldError(field, validationErrors[field][0]);
           });
+        } else if (!error.response && (error.request || error.code === 'ERR_NETWORK')) {
+          // Request never got a response: DNS/TLS failure, offline, or blocked
+          setAlert({
+            type: 'error',
+            title: 'Connection Problem',
+            message: 'Unable to reach the server. Please check your internet connection and try again in a few minutes.',
+            show: true,
+          });
         } else {
           setAlert({
             type: 'error',
