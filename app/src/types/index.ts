@@ -1322,6 +1322,8 @@ export interface Student {
   created_at?: string;
   updated_at?: string;
   student_section_id: string;
+  /** Title of the student's current (active) section — provided by GET /students. */
+  current_section?: string | null;
   // Normalized admission records (loaded on GET /students/:id)
   profile?: StudentProfile | null;
   guardians?: StudentGuardian[];

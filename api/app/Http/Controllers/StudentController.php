@@ -71,7 +71,21 @@ class StudentController extends Controller
             }
         }
 
+        // Eager-load the student's active section so we can expose its title.
+        $query->with(['sections' => function ($q) {
+            $q->wherePivot('is_active', true);
+        }]);
+
         $students = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        // Attach the current (active) section title to each student and drop the
+        // full sections relation from the payload.
+        $students->getCollection()->transform(function ($student) {
+            $current = $student->sections->first();
+            $student->setAttribute('current_section', $current?->title);
+            $student->makeHidden('sections');
+            return $student;
+        });
 
         return response()->json([
             'success' => true,

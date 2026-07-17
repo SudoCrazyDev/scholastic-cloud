@@ -82,23 +82,10 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
     return student.ext_name ? `${fullName} ${student.ext_name}` : fullName
   }
 
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-
   const getGenderColor = (gender: string) => {
     switch (gender) {
       case 'male': return 'blue'
       case 'female': return 'pink'
-      default: return 'zinc'
-    }
-  }
-
-  const getReligionColor = (religion: string) => {
-    switch (religion) {
-      case 'Islam': return 'green'
-      case 'Catholic': return 'purple'
-      case 'Iglesia Ni Cristo': return 'blue'
-      case 'Baptists': return 'indigo'
       default: return 'zinc'
     }
   }
@@ -208,10 +195,7 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 Gender
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Religion
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Birthdate
+                Current Section
               </th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Actions
@@ -269,16 +253,13 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                   </Badge>
                 </td>
 
-                {/* Religion */}
+                {/* Current Section */}
                 <td className="px-4 py-2">
-                  <Badge color={getReligionColor(student.religion || 'Others')}>
-                    {student.religion || 'Others'}
-                  </Badge>
-                </td>
-
-                {/* Birthdate */}
-                <td className="px-4 py-3 text-sm text-gray-600">
-                  {formatDate(student.birthdate)}
+                  {student.current_section ? (
+                    <Badge color="indigo">{student.current_section}</Badge>
+                  ) : (
+                    <span className="text-sm text-gray-400">—</span>
+                  )}
                 </td>
 
                 {/* Actions */}
