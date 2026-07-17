@@ -324,8 +324,19 @@ class UserController extends Controller
             $query = \App\Models\ClassSection::with(['institution', 'adviserUser', 'students']);
 
             if ($userRoleSlug === 'subject-teacher') {
-                // Subject teachers see only class sections where they are the adviser
-                $query->where('adviser', $user->id);
+                // Subject teachers see class sections they advise. When include_taught
+                // is set, also include sections where they teach a subject (used by the
+                // announcement section picker, which may target either).
+                if ($request->boolean('include_taught')) {
+                    $query->where(function ($q) use ($user) {
+                        $q->where('adviser', $user->id)
+                          ->orWhereHas('subjects', function ($sq) use ($user) {
+                              $sq->where('adviser', $user->id);
+                          });
+                    });
+                } else {
+                    $query->where('adviser', $user->id);
+                }
             } else {
                 // Principal and Institution Administrator see all class sections in their institutions
                 $query->whereIn('institution_id', $userInstitutionIds);

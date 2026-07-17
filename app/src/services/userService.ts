@@ -97,13 +97,15 @@ class UserService {
     per_page?: number
     search?: string
     institution_id?: string
+    include_taught?: boolean
   }) {
     const queryParams = new URLSearchParams()
-    
+
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.per_page) queryParams.append('per_page', params.per_page.toString())
     if (params?.search) queryParams.append('search', params.search)
     if (params?.institution_id) queryParams.append('institution_id', params.institution_id)
+    if (params?.include_taught) queryParams.append('include_taught', '1')
 
     const url = `/users/my/class-sections${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     const response = await api.get<PaginatedResponse<any>>(url)

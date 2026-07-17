@@ -104,13 +104,13 @@ const AnnouncementsManage: React.FC = () => {
     queryFn: () => announcementService.getAnnouncements(),
   })
 
-  // Section picker source: teachers see only their own sections; admins see all.
+  // Section picker source: teachers see sections they advise or teach a subject in; admins see all.
   const sectionsQuery = useQuery({
     queryKey: ['announcement-sections', isAdmin],
     queryFn: async (): Promise<SectionOption[]> => {
       const res = isAdmin
         ? await classSectionService.getClassSectionsByInstitution(undefined, { per_page: 200 })
-        : await userService.getMyClassSections({ per_page: 200 })
+        : await userService.getMyClassSections({ per_page: 200, include_taught: true })
       const rows = (res.data ?? []) as Array<{ id: string; title: string; grade_level?: string }>
       return rows.map((r) => ({ id: r.id, title: r.title, grade_level: r.grade_level ?? '' }))
     },
@@ -385,7 +385,7 @@ const AnnouncementsManage: React.FC = () => {
           {showSectionPicker && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sections {!isAdmin && <span className="text-xs font-normal text-gray-500">(only sections you teach)</span>}
+                Sections {!isAdmin && <span className="text-xs font-normal text-gray-500">(only sections you teach or advise)</span>}
               </label>
               {sectionsQuery.isLoading ? (
                 <p className="text-sm text-gray-500">Loading sections…</p>
