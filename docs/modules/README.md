@@ -5,6 +5,10 @@ integrating with a module — each one covers its data model, API, frontend, and
 modules should consume its data.
 
 ## Index
+- [Announcements](Announcements/ANNOUNCEMENTS.md) — Communication. Institution-scoped posts targeted by
+  audience/scope (institution, grade levels, sections), with attachments, scheduling, and per-viewer
+  read tracking. Two surfaces: the **Announcements** board (all roles) and **Manage Announcements**
+  (teachers + admins).
 - [Staff Schedules](STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates (weekly hours + lunch),
   assigned to staff (one per staff), plus an institution calendar of holidays & events.
 
