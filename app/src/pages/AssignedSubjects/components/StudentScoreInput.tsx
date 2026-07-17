@@ -155,7 +155,7 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
   
   return (
     <Formik
-      initialValues={{ score: initialScore }}
+      initialValues={{ score: Number(initialScore) || 0 }}
       validationSchema={ScoreSchema(maxScore)}
       enableReinitialize
       onSubmit={(values, { setSubmitting }) => {
@@ -171,12 +171,14 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
                 <Input
                   {...field}
                   type="number"
+                  inputMode="decimal"
                   min={0}
                   max={maxScore}
                   step={1}
+                  size="sm"
                   disabled={disabled || isSubmitting || isLoading}
-                  className={`text-center ${hasExistingScore ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}
-                  placeholder={hasExistingScore ? 'Enter score' : 'Enter score'}
+                  className={`text-center font-medium !px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${hasExistingScore ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}
+                  placeholder="Score"
                   data-input-id={inputId}
                   onKeyDown={async (e: React.KeyboardEvent<HTMLInputElement>) => {
                     if (e.key === 'Enter') {

@@ -190,7 +190,7 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
                   <span>{scoreObj?.score ?? '-'}</span>
                   <span className="text-gray-400">/{item.score}</span>
                 </div>
-                <div className="w-24 sm:w-28">
+                <div className="w-28 sm:w-32">
                   <StudentScoreInput
                     studentId={student.id}
                     itemId={item.id}
