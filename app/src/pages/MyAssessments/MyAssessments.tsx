@@ -181,7 +181,7 @@ export const MyAssessments: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [openSubjects, setOpenSubjects] = useState<Set<string>>(new Set());
   const initializedRef = useRef(false);
-  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const now = Date.now();
   const items = (data?.data ?? []) as StudentAssessmentItem[];
