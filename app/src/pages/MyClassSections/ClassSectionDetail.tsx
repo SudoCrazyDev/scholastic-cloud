@@ -17,6 +17,7 @@ import { TransferStudentModal } from './components/TransferStudentModal'
 import { StudentModal } from '../Students/components/StudentModal'
 import { ClassSectionSubjectModal } from '../ClassSections/components/ClassSectionSubjectModal'
 import { useAuth } from '../../hooks/useAuth'
+import { useInstitutionLogo } from '../../hooks/useInstitutionLogo'
 import { useClassSectionDetailMutations } from '../../hooks/useClassSectionDetailMutations'
 import {
   ArrowLeft,
@@ -184,6 +185,9 @@ const ClassSectionDetail: React.FC = () => {
 
   const finalInstitution = institution?.data || fallbackInstitution
   const enhancedClassSectionData = classSectionData
+
+  // Auth-fetched blob URL for the institution logo (used in the Master List PDF header).
+  const { schoolLogoUrl } = useInstitutionLogo(effectiveInstitutionId || undefined)
 
 
 
@@ -596,6 +600,10 @@ const ClassSectionDetail: React.FC = () => {
                   getFullName={getFullName}
                   navigate={navigate}
                   classSectionId={id!}
+                  allStudents={students}
+                  section={classSectionData}
+                  institution={finalInstitution}
+                  schoolLogoUrl={schoolLogoUrl}
                 />
               )}
 

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { PDFDownloadLink } from '@react-pdf/renderer';
 import { Button } from '../../../components/button';
 import { Badge } from '../../../components/badge';
 import { Select } from '../../../components/select';
-import { Search, User, Plus, Edit, Trash2, ArrowRightLeft } from 'lucide-react';
-import type { Student, Subject } from '../../../types';
+import { Search, User, Plus, Edit, Trash2, ArrowRightLeft, Printer } from 'lucide-react';
+import type { Student, Subject, Institution, ClassSection } from '../../../types';
+import { ClassSectionMasterListPDF } from './ClassSectionMasterListPDF';
 
 // Student Card Component with image error handling
 const StudentCard: React.FC<{
@@ -142,6 +144,11 @@ interface ClassSectionStudentsTabProps {
   getFullName: (student: Student) => string;
   navigate: (to: string, options?: { state?: unknown }) => void;
   classSectionId: string;
+  /** Full (unfiltered) student list for the printable master list. */
+  allStudents: (Student & { assignmentId: string })[];
+  section: ClassSection | undefined;
+  institution: Institution | undefined;
+  schoolLogoUrl: string | null;
 }
 
 const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
@@ -163,7 +170,14 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   getFullName,
   navigate,
   classSectionId,
+  allStudents,
+  section,
+  institution,
+  schoolLogoUrl,
 }) => {
+  const masterListFileName = section
+    ? `master-list-grade-${section.grade_level}-${section.title}${section.academic_year ? `-${section.academic_year}` : ''}.pdf`
+    : 'master-list.pdf';
   const goToStudentDetail = (studentId: string) => {
     navigate(`/students/${studentId}`, { state: { fromClassSectionId: classSectionId } })
   }
@@ -223,6 +237,27 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
             <Plus className="w-4 h-4 mr-2" />
             Create Student
           </Button>
+          {section && institution && allStudents.length > 0 && (
+            <PDFDownloadLink
+              document={
+                <ClassSectionMasterListPDF
+                  students={allStudents}
+                  section={section}
+                  institution={institution}
+                  schoolLogoUrl={schoolLogoUrl}
+                  generatedOn={new Date().toLocaleDateString()}
+                />
+              }
+              fileName={masterListFileName}
+            >
+              {({ loading }) => (
+                <Button size="sm" variant="outline" disabled={loading}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  {loading ? 'Preparing...' : 'Print Master List'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          )}
           <Button
             onClick={onAssignStudents}
             size="sm"
