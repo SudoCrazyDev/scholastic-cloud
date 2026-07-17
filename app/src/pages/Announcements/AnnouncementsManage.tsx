@@ -67,13 +67,42 @@ const formatDate = (value: string | null): string => {
 const audienceLabel = (audience: AnnouncementAudience): string =>
   audience === 'both' ? 'Students & Teachers' : audience === 'teachers' ? 'Teachers' : 'Students'
 
-const statusBadge = (a: Announcement): { label: string; className: string } => {
-  if (a.status === 'draft') return { label: 'Draft', className: 'bg-gray-200 text-gray-600' }
-  if (a.expires_at && new Date(a.expires_at).getTime() <= Date.now())
-    return { label: 'Expired', className: 'bg-rose-100 text-rose-700' }
-  if (a.publish_at && new Date(a.publish_at).getTime() > Date.now())
-    return { label: 'Scheduled', className: 'bg-amber-100 text-amber-700' }
-  return { label: 'Published', className: 'bg-green-100 text-green-700' }
+type ComputedStatus = 'draft' | 'expired' | 'scheduled' | 'published'
+
+// The status label shown in the list — mirrors the visibility rules: draft is never
+// live; a published row is "scheduled" until publish_at, "expired" after expires_at.
+const computedStatus = (a: Announcement): ComputedStatus => {
+  if (a.status === 'draft') return 'draft'
+  if (a.expires_at && new Date(a.expires_at).getTime() <= Date.now()) return 'expired'
+  if (a.publish_at && new Date(a.publish_at).getTime() > Date.now()) return 'scheduled'
+  return 'published'
+}
+
+const STATUS_META: Record<ComputedStatus, { label: string; className: string }> = {
+  draft: { label: 'Draft', className: 'bg-gray-200 text-gray-600' },
+  expired: { label: 'Expired', className: 'bg-rose-100 text-rose-700' },
+  scheduled: { label: 'Scheduled', className: 'bg-amber-100 text-amber-700' },
+  published: { label: 'Published', className: 'bg-green-100 text-green-700' },
+}
+
+const statusBadge = (a: Announcement): { label: string; className: string } => STATUS_META[computedStatus(a)]
+
+type StatusFilter = 'all' | ComputedStatus
+
+interface FilterState {
+  status: StatusFilter
+  publishFrom: string
+  publishTo: string
+  expiresFrom: string
+  expiresTo: string
+}
+
+const EMPTY_FILTERS: FilterState = {
+  status: 'all',
+  publishFrom: '',
+  publishTo: '',
+  expiresFrom: '',
+  expiresTo: '',
 }
 
 const AnnouncementsManage: React.FC = () => {
@@ -98,10 +127,21 @@ const AnnouncementsManage: React.FC = () => {
   const [editing, setEditing] = useState<Announcement | null>(null)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
 
+  // Include the filters in the key so the server re-queries when they change.
+  // invalidate() still matches via the ['announcements-manage'] prefix.
+  const listQueryKey = ['announcements-manage', filters] as const
   const listQuery = useQuery({
-    queryKey: ['announcements-manage'],
-    queryFn: () => announcementService.getAnnouncements(),
+    queryKey: listQueryKey,
+    queryFn: () =>
+      announcementService.getAnnouncements({
+        status: filters.status,
+        publish_from: filters.publishFrom,
+        publish_to: filters.publishTo,
+        expires_from: filters.expiresFrom,
+        expires_to: filters.expiresTo,
+      }),
   })
 
   // Section picker source: teachers see sections they advise or teach a subject in; admins see all.
@@ -125,6 +165,13 @@ const AnnouncementsManage: React.FC = () => {
   const announcements = listQuery.data?.data ?? []
   const sectionOptions = sectionsQuery.data ?? []
   const gradeLevelOptions = gradeLevelsQuery.data ?? []
+
+  const filtersActive =
+    filters.status !== 'all' ||
+    !!filters.publishFrom ||
+    !!filters.publishTo ||
+    !!filters.expiresFrom ||
+    !!filters.expiresTo
 
   const resetForm = () => {
     setEditing(null)
@@ -194,7 +241,7 @@ const AnnouncementsManage: React.FC = () => {
       invalidate()
       // Refresh the editing snapshot so the new attachment shows immediately.
       const fresh = queryClient
-        .getQueryData<{ data: Announcement[] }>(['announcements-manage'])
+        .getQueryData<{ data: Announcement[] }>(listQueryKey)
         ?.data?.find((a) => a.id === payload.id)
       if (fresh) setEditing(fresh)
       toast.success('Attachment uploaded.')
@@ -595,17 +642,101 @@ const AnnouncementsManage: React.FC = () => {
       {/* List */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
-          <h3 className="text-base font-semibold text-gray-900">
-            {isAdmin ? 'All announcements' : 'Your announcements'}
-          </h3>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-base font-semibold text-gray-900">
+              {isAdmin ? 'All announcements' : 'Your announcements'}
+            </h3>
+            {filtersActive && !listQuery.isLoading && (
+              <span className="text-xs text-gray-500">
+                {announcements.length} result{announcements.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
+
+          {/* Filters: status + publish/expiry date ranges (applied client-side). */}
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+              <Select
+                value={filters.status}
+                onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value as StatusFilter }))}
+                options={[
+                  { value: 'all', label: 'All statuses' },
+                  { value: 'published', label: 'Published' },
+                  { value: 'scheduled', label: 'Scheduled' },
+                  { value: 'draft', label: 'Draft' },
+                  { value: 'expired', label: 'Expired' },
+                ]}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Publish from / to</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={filters.publishFrom}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, publishFrom: e.target.value }))}
+                  className="w-full"
+                />
+                <Input
+                  type="date"
+                  value={filters.publishTo}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, publishTo: e.target.value }))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Expires from / to</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={filters.expiresFrom}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, expiresFrom: e.target.value }))}
+                  className="w-full"
+                />
+                <Input
+                  type="date"
+                  value={filters.expiresTo}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, expiresTo: e.target.value }))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!filtersActive}
+                onClick={() => setFilters(EMPTY_FILTERS)}
+              >
+                Clear filters
+              </Button>
+            </div>
+          </div>
         </div>
         {listQuery.isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading…</div>
         ) : announcements.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-gray-500">No announcements yet.</p>
-            <p className="text-sm text-gray-400 mt-1">Use the form above to post your first one.</p>
-          </div>
+          filtersActive ? (
+            <div className="py-12 text-center">
+              <p className="text-gray-500">No announcements match your filters.</p>
+              <button
+                type="button"
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="text-sm text-indigo-600 hover:text-indigo-700 mt-1"
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            <div className="py-12 text-center">
+              <p className="text-gray-500">No announcements yet.</p>
+              <p className="text-sm text-gray-400 mt-1">Use the form above to post your first one.</p>
+            </div>
+          )
         ) : (
           <div className="divide-y divide-gray-200">
             {announcements.map((a) => {
@@ -626,7 +757,11 @@ const AnnouncementsManage: React.FC = () => {
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
                         {scopeSummary(a)} · {a.read_count} read{a.read_count === 1 ? '' : 's'}
-                        {a.publish_at ? ` · ${formatDate(a.publish_at)}` : ''}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Publish: {a.publish_at ? formatDate(a.publish_at) : 'Immediately'}
+                        {' · '}
+                        Expires: {a.expires_at ? formatDate(a.expires_at) : 'Never'}
                       </p>
                       {a.attachments.length > 0 && (
                         <p className="text-xs text-gray-400 mt-1 inline-flex items-center gap-1">

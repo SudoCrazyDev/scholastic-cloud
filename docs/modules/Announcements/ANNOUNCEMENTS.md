@@ -119,7 +119,7 @@ The feed/unread-count/read/attachment routes are declared **before** `apiResourc
 ### Authoring (teachers + admins) — `apiResource('announcements')`
 | method | path | action | notes |
 |---|---|---|---|
-| GET | `/api/announcements` | `index` | manageable list; students 403. Admins → all in institution; teachers → `author_id = self`. `?search=` LIKE on title. Includes `withCount('reads')`. |
+| GET | `/api/announcements` | `index` | manageable list; students 403. Admins → all in institution; teachers → `author_id = self`. `?search=` LIKE on title. Server-side filters: `?status=` (published/scheduled/draft/expired — "scheduled"/"expired" are computed from publish_at/expires_at vs now, expired wins), `?publish_from/publish_to`, `?expires_from/expires_to` (inclusive day bounds; null-date rows excluded once a bound is set). Includes `withCount('reads')`. |
 | POST | `/api/announcements` | `store` | validate → `resolveTargeting` → create (sets `author_id`, `author_role`) → `syncTargeting`. 201. |
 | GET | `/api/announcements/{id}` | `show` | one manageable record (`findManageable`). |
 | PUT/PATCH | `/api/announcements/{id}` | `update` | validate → resolveTargeting → update → syncTargeting. |
@@ -196,11 +196,21 @@ Local `ADMIN_ROLES` (same three slugs) drives `isAdmin`, which toggles the whole
 Form fields: title, `RichTextEditor` body, audience, scope, section/grade pickers, status,
 `publish_at`/`expires_at` (datetime-local), `is_pinned`, attachments. New announcements upload pending
 files after create; while editing, attachment upload/delete is live. List rows show a client-computed
-status badge (Draft/Expired/Scheduled/Published), audience label, scope summary, read count, attachment
-count, and edit/delete.
+status badge (Draft/Expired/Scheduled/Published), audience label, scope summary, read count, the
+`publish_at` ("Immediately" when null) and `expires_at` ("Never" when null) dates, attachment count,
+and edit/delete.
+
+The list has a **filter bar** whose values are passed to `GET /api/announcements` as query params and
+applied **server-side** (so it keeps working once the list is paginated): a **status** dropdown
+(All / Published / Scheduled / Draft / Expired) plus **publish_at** and **expires_at** from/to date
+ranges (`type="date"`). Filters are part of the React Query key (`['announcements-manage', filters]`),
+so changing one refetches. A "Clear filters" control resets them; a result count appears while any
+filter is active. Empty results render as "no matches" when a filter is active vs "no announcements
+yet" otherwise.
 
 ### Service — `announcementService.ts` (baseUrl `/announcements`)
-`getAnnouncements({search?})`, `createAnnouncement`, `updateAnnouncement`, `deleteAnnouncement`,
+`getAnnouncements({search?, status?, publish_from?, publish_to?, expires_from?, expires_to?})`,
+`createAnnouncement`, `updateAnnouncement`, `deleteAnnouncement`,
 `uploadAttachment(id, file)` (FormData), `deleteAttachment(id, attachmentId)`, `getFeed`,
 `getUnreadCount`, `markRead(id)`.
 
@@ -212,7 +222,8 @@ shape), `CreateAnnouncementData`.
 ### React Query keys
 - `['announcement-feed']` — board + dashboard widget.
 - `['announcement-unread-count']` — sidebar badge (polls every 60s).
-- `['announcements-manage']` — manage list.
+- `['announcements-manage', filters]` — manage list (filters = status + publish/expires date ranges;
+  `invalidate()` matches via the `['announcements-manage']` prefix).
 - `['announcement-sections', isAdmin]` — section picker source.
 - `['announcement-grade-levels']` — grade-level picker (admin only, `enabled: isAdmin`).
 

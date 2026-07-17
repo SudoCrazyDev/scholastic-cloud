@@ -12,9 +12,21 @@ class AnnouncementService {
 
   /* ---- Authoring (teachers + admins) ---- */
 
-  async getAnnouncements(params?: { search?: string }) {
+  async getAnnouncements(params?: {
+    search?: string
+    status?: string
+    publish_from?: string
+    publish_to?: string
+    expires_from?: string
+    expires_to?: string
+  }) {
     const query = new URLSearchParams()
     if (params?.search) query.append('search', params.search)
+    if (params?.status && params.status !== 'all') query.append('status', params.status)
+    if (params?.publish_from) query.append('publish_from', params.publish_from)
+    if (params?.publish_to) query.append('publish_to', params.publish_to)
+    if (params?.expires_from) query.append('expires_from', params.expires_from)
+    if (params?.expires_to) query.append('expires_to', params.expires_to)
     const url = `${this.baseUrl}${query.toString() ? `?${query.toString()}` : ''}`
     const response = await api.get<ApiResponse<Announcement[]>>(url)
     return response.data

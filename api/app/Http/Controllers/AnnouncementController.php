@@ -9,8 +9,10 @@ use App\Models\AnnouncementGradeLevel;
 use App\Models\AnnouncementRead;
 use App\Models\ClassSection;
 use App\Services\AnnouncementService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -41,6 +43,15 @@ class AnnouncementController extends Controller
             return $this->noInstitution();
         }
 
+        $filters = $request->validate([
+            'search' => 'nullable|string',
+            'status' => 'nullable|in:all,published,scheduled,draft,expired',
+            'publish_from' => 'nullable|date',
+            'publish_to' => 'nullable|date',
+            'expires_from' => 'nullable|date',
+            'expires_to' => 'nullable|date',
+        ]);
+
         $query = Announcement::with(['sections', 'gradeLevels', 'attachments', 'author'])
             ->withCount('reads')
             ->where('institution_id', $institutionId);
@@ -53,6 +64,10 @@ class AnnouncementController extends Controller
             $query->where('title', 'like', '%'.$request->get('search').'%');
         }
 
+        $this->applyStatusFilter($query, $filters['status'] ?? null);
+        $this->applyDateRangeFilter($query, 'publish_at', $filters['publish_from'] ?? null, $filters['publish_to'] ?? null);
+        $this->applyDateRangeFilter($query, 'expires_at', $filters['expires_from'] ?? null, $filters['expires_to'] ?? null);
+
         $announcements = $query
             ->orderByDesc('is_pinned')
             ->orderByDesc('created_at')
@@ -62,6 +77,53 @@ class AnnouncementController extends Controller
             'success' => true,
             'data' => $announcements->map(fn ($a) => $this->serialize($a))->values(),
         ]);
+    }
+
+    /**
+     * Filter by the *computed* status shown in the manage list. "Scheduled" and
+     * "expired" are not stored enum values — they are derived from publish_at /
+     * expires_at relative to now, mirroring computedStatus() on the frontend and
+     * the visibility rules in AnnouncementService (expired takes precedence over
+     * scheduled). A null/"all" status applies no filter.
+     */
+    private function applyStatusFilter(Builder $query, ?string $status): void
+    {
+        if (! $status || $status === 'all') {
+            return;
+        }
+
+        $now = now();
+
+        match ($status) {
+            'draft' => $query->where('status', 'draft'),
+            'expired' => $query->where('status', 'published')
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<=', $now),
+            'scheduled' => $query->where('status', 'published')
+                ->whereNotNull('publish_at')
+                ->where('publish_at', '>', $now)
+                // Not already expired — expired wins over scheduled.
+                ->where(fn (Builder $q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', $now)),
+            'published' => $query->where('status', 'published')
+                ->where(fn (Builder $q) => $q->whereNull('publish_at')->orWhere('publish_at', '<=', $now))
+                ->where(fn (Builder $q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', $now)),
+            default => null,
+        };
+    }
+
+    /**
+     * Bound a timestamp column to an inclusive [from, to] day range. Rows with a
+     * null value in the column are excluded once either bound is set (there is
+     * nothing to compare against) — matching the frontend range semantics.
+     */
+    private function applyDateRangeFilter(Builder $query, string $column, ?string $from, ?string $to): void
+    {
+        if ($from) {
+            $query->whereNotNull($column)->where($column, '>=', Carbon::parse($from)->startOfDay());
+        }
+        if ($to) {
+            $query->whereNotNull($column)->where($column, '<=', Carbon::parse($to)->endOfDay());
+        }
     }
 
     public function store(Request $request): JsonResponse
