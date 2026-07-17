@@ -17,26 +17,39 @@ import {
 } from 'lucide-react'
 import type { ClassSection, Student } from '../../types'
 
+const PAGE_SIZE = 10
+
 const MyClassSections: React.FC = () => {
   const navigate = useNavigate()
   const [searchValue, setSearchValue] = useState('')
+  const [perPage, setPerPage] = useState(PAGE_SIZE)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedClassSection, setSelectedClassSection] = useState<ClassSection | null>(null)
-  
+
   const {
     classSections,
+    pagination,
     loading,
+    isFetching,
     error,
     refetch,
   } = useMyClassSections({
     search: searchValue,
-    per_page: 50,
+    per_page: perPage,
   })
+
+  const hasMore = pagination ? classSections.length < pagination.total : false
 
 
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchValue(e.target.value)
+    // Reset pagination whenever the search term changes so results start fresh
+    setPerPage(PAGE_SIZE)
+  }
+
+  const handleViewMore = () => {
+    setPerPage((prev) => prev + PAGE_SIZE)
   }
 
   const handleClassSectionClick = (classSection: ClassSection) => {
@@ -128,6 +141,23 @@ const MyClassSections: React.FC = () => {
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* View More */}
+      {!loading && hasMore && (
+        <div className="flex justify-center mt-6">
+          <Button
+            onClick={handleViewMore}
+            disabled={isFetching}
+            variant="outline"
+          >
+            {isFetching ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              'View More'
+            )}
+          </Button>
         </div>
       )}
 

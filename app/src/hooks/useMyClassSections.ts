@@ -16,6 +16,7 @@ export const useMyClassSections = (options: UseMyClassSectionsOptions = {}) => {
   const {
     data: classSectionsResponse,
     isLoading: loading,
+    isFetching,
     error,
     refetch,
   } = useQuery({
@@ -23,6 +24,8 @@ export const useMyClassSections = (options: UseMyClassSectionsOptions = {}) => {
     queryFn: () => userService.getMyClassSections(options),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
+    // Keep the current list visible while a larger page is being fetched
+    placeholderData: (previousData) => previousData,
   })
 
   const classSections = classSectionsResponse?.data || []
@@ -32,6 +35,7 @@ export const useMyClassSections = (options: UseMyClassSectionsOptions = {}) => {
     classSections,
     pagination,
     loading,
+    isFetching,
     error,
     refetch,
   }
