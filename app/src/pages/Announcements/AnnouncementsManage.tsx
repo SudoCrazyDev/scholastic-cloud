@@ -653,9 +653,11 @@ const AnnouncementsManage: React.FC = () => {
             )}
           </div>
 
-          {/* Filters: status + publish/expiry date ranges (applied client-side). */}
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div>
+          {/* Filters: status + publish/expiry date ranges (applied server-side via query params).
+              Flex-wrap so the date-range groups keep their width and wrap to a new line on
+              narrower viewports instead of squeezing the other controls; stacks on mobile. */}
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="w-full sm:w-44">
               <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
               <Select
                 value={filters.status}
@@ -670,51 +672,62 @@ const AnnouncementsManage: React.FC = () => {
                 className="w-full"
               />
             </div>
-            <div>
+            <div className="w-full sm:flex-1 sm:min-w-[15rem]">
               <label className="block text-xs font-medium text-gray-500 mb-1">Publish from / to</label>
               <div className="flex items-center gap-2">
-                <Input
-                  type="date"
-                  value={filters.publishFrom}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, publishFrom: e.target.value }))}
-                  className="w-full"
-                />
-                <Input
-                  type="date"
-                  value={filters.publishTo}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, publishTo: e.target.value }))}
-                  className="w-full"
-                />
+                <div className="min-w-0 flex-1">
+                  <Input
+                    type="date"
+                    aria-label="Published on or after"
+                    value={filters.publishFrom}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, publishFrom: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Input
+                    type="date"
+                    aria-label="Published on or before"
+                    value={filters.publishTo}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, publishTo: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
               </div>
             </div>
-            <div>
+            <div className="w-full sm:flex-1 sm:min-w-[15rem]">
               <label className="block text-xs font-medium text-gray-500 mb-1">Expires from / to</label>
               <div className="flex items-center gap-2">
-                <Input
-                  type="date"
-                  value={filters.expiresFrom}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, expiresFrom: e.target.value }))}
-                  className="w-full"
-                />
-                <Input
-                  type="date"
-                  value={filters.expiresTo}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, expiresTo: e.target.value }))}
-                  className="w-full"
-                />
+                <div className="min-w-0 flex-1">
+                  <Input
+                    type="date"
+                    aria-label="Expires on or after"
+                    value={filters.expiresFrom}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, expiresFrom: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Input
+                    type="date"
+                    aria-label="Expires on or before"
+                    value={filters.expiresTo}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, expiresTo: e.target.value }))}
+                    className="w-full"
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!filtersActive}
-                onClick={() => setFilters(EMPTY_FILTERS)}
-              >
-                Clear filters
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!filtersActive}
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="w-full sm:w-auto shrink-0"
+            >
+              Clear filters
+            </Button>
           </div>
         </div>
         {listQuery.isLoading ? (
