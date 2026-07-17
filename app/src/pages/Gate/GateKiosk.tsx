@@ -183,7 +183,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
       </header>
 
       {/* ───── Main Content ───── */}
-      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-xl px-8">
+      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-3xl px-8">
         {/* Clock */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -249,10 +249,10 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 20 }}
-                  className="flex justify-center mb-6"
+                  className="flex justify-center mb-8"
                 >
                   <div
-                    className={`w-28 h-28 rounded-full border-[3px] overflow-hidden ${
+                    className={`w-56 h-56 rounded-full border-4 overflow-hidden ${
                       isEnter ? 'border-emerald-300' : 'border-rose-300'
                     } bg-gray-100`}
                   >
@@ -264,7 +264,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-14 h-14 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-28 h-28 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                           <circle cx="12" cy="7" r="4" />
                         </svg>
@@ -278,7 +278,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.25 }}
-                  className="text-3xl font-bold text-gray-900 mb-1.5"
+                  className="text-6xl font-bold text-gray-900 mb-3"
                 >
                   {studentName}
                 </motion.h2>
@@ -289,7 +289,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.35 }}
-                    className="text-base text-gray-500"
+                    className="text-3xl text-gray-500"
                   >
                     {gradeAndSection}
                   </motion.p>
