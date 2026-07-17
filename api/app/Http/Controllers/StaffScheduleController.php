@@ -339,6 +339,7 @@ class StaffScheduleController extends Controller
             'days' => 'required|array|min:1',
             'days.*.day_of_week' => ['required', 'distinct', Rule::in(StaffScheduleDay::DAYS)],
             'days.*.start_time' => ['required', 'date_format:H:i'],
+            'days.*.grace_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'days.*.end_time' => ['required', 'date_format:H:i'],
             'days.*.lunch_start' => ['nullable', 'date_format:H:i'],
             'days.*.lunch_end' => ['nullable', 'date_format:H:i'],
@@ -403,6 +404,7 @@ class StaffScheduleController extends Controller
             $rows[] = [
                 'day_of_week' => $day['day_of_week'],
                 'start_time' => $day['start_time'],
+                'grace_minutes' => (int) ($day['grace_minutes'] ?? 0),
                 'end_time' => $day['end_time'],
                 'lunch_start' => ($day['lunch_start'] ?? '') !== '' ? $day['lunch_start'] : null,
                 'lunch_end' => ($day['lunch_end'] ?? '') !== '' ? $day['lunch_end'] : null,
@@ -426,6 +428,7 @@ class StaffScheduleController extends Controller
                 'id' => $day->id,
                 'day_of_week' => $day->day_of_week,
                 'start_time' => $this->formatTime($day->start_time),
+                'grace_minutes' => (int) ($day->grace_minutes ?? 0),
                 'end_time' => $this->formatTime($day->end_time),
                 'lunch_start' => $this->formatTime($day->lunch_start),
                 'lunch_end' => $this->formatTime($day->lunch_end),

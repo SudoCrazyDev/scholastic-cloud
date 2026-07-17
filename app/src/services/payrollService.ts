@@ -7,6 +7,7 @@ import type {
   PayrollCompensation,
   PayrollDeductionType,
   PayrollPeriod,
+  PayrollSettings,
   PayrollStaffCompensation,
   PayslipTemplate,
   SavePayrollCompensationData,
@@ -17,6 +18,18 @@ import type {
 } from '../types'
 
 class PayrollService {
+  // --- Settings (late/undertime penalty rates) ---
+
+  async getSettings() {
+    const response = await api.get<ApiResponse<PayrollSettings>>('/payroll-settings')
+    return response.data
+  }
+
+  async saveSettings(payload: PayrollSettings) {
+    const response = await api.put<ApiResponse<PayrollSettings>>('/payroll-settings', payload)
+    return response.data
+  }
+
   // --- Deduction types (institution catalog) ---
 
   async getDeductionTypes() {

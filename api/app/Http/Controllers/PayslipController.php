@@ -196,6 +196,7 @@ class PayslipController extends Controller
         $validated = $request->validate([
             'time_in' => 'nullable|date_format:H:i',
             'time_out' => 'nullable|date_format:H:i',
+            'overtime_minutes' => 'sometimes|nullable|integer|min:0|max:1440',
         ]);
 
         $timeIn = ($validated['time_in'] ?? null) ? $validated['time_in'].':00' : null;
@@ -207,7 +208,13 @@ class PayslipController extends Controller
             ]);
         }
 
-        $day->update(['time_in' => $timeIn, 'time_out' => $timeOut]);
+        $update = ['time_in' => $timeIn, 'time_out' => $timeOut];
+        if (array_key_exists('overtime_minutes', $validated)) {
+            // Approved overtime — the only minutes that are actually paid.
+            $update['overtime_minutes'] = (int) ($validated['overtime_minutes'] ?? 0);
+        }
+
+        $day->update($update);
         $payrollService->recomputeDay($payslip, $day->refresh());
 
         $payslip->refresh()->load(['user', 'days', 'deductions', 'payrollPeriod', 'institution']);
@@ -229,6 +236,11 @@ class PayslipController extends Controller
             'daily_rate' => (float) $payslip->daily_rate,
             'days_worked' => (float) $payslip->days_worked,
             'hours_worked' => (float) $payslip->hours_worked,
+            'late_minutes' => (int) $payslip->late_minutes,
+            'undertime_minutes' => (int) $payslip->undertime_minutes,
+            'penalty_total' => (float) $payslip->penalty_total,
+            'overtime_minutes' => (int) $payslip->overtime_minutes,
+            'overtime_total' => (float) $payslip->overtime_total,
             'gross_pay' => (float) $payslip->gross_pay,
             'total_deductions' => (float) $payslip->total_deductions,
             'net_pay' => (float) $payslip->net_pay,
@@ -258,8 +270,16 @@ class PayslipController extends Controller
             'daily_rate' => (float) $payslip->daily_rate,
             'hourly_rate' => (float) $payslip->hourly_rate,
             'hours_per_day' => (float) $payslip->hours_per_day,
+            'late_penalty_per_minute' => (float) $payslip->late_penalty_per_minute,
+            'undertime_penalty_per_minute' => (float) $payslip->undertime_penalty_per_minute,
+            'overtime_rate_per_minute' => (float) $payslip->overtime_rate_per_minute,
             'days_worked' => (float) $payslip->days_worked,
             'hours_worked' => (float) $payslip->hours_worked,
+            'late_minutes' => (int) $payslip->late_minutes,
+            'undertime_minutes' => (int) $payslip->undertime_minutes,
+            'penalty_total' => (float) $payslip->penalty_total,
+            'overtime_minutes' => (int) $payslip->overtime_minutes,
+            'overtime_total' => (float) $payslip->overtime_total,
             'gross_pay' => (float) $payslip->gross_pay,
             'deductions' => $payslip->deductions->map(fn (PayslipDeduction $deduction) => [
                 'id' => $deduction->id,
@@ -278,6 +298,12 @@ class PayslipController extends Controller
                 'time_out' => $this->formatTime($day->time_out),
                 'required_hours' => (float) $day->required_hours,
                 'hours_worked' => (float) $day->hours_worked,
+                'late_minutes' => (int) $day->late_minutes,
+                'undertime_minutes' => (int) $day->undertime_minutes,
+                'penalty_amount' => (float) $day->penalty_amount,
+                'detected_overtime_minutes' => (int) $day->detected_overtime_minutes,
+                'overtime_minutes' => (int) $day->overtime_minutes,
+                'overtime_amount' => (float) $day->overtime_amount,
                 'amount_earned' => (float) $day->amount_earned,
                 'is_holiday' => (bool) $day->is_holiday,
                 'is_rest_day' => (bool) $day->is_rest_day,

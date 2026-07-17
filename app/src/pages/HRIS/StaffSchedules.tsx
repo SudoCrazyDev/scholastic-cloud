@@ -49,6 +49,7 @@ const WEEKDAYS: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'fr
 interface DayRow {
   enabled: boolean
   start_time: string
+  grace_minutes: string
   end_time: string
   lunch_start: string
   lunch_end: string
@@ -79,6 +80,7 @@ const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const defaultDay = (enabled: boolean): DayRow => ({
   enabled,
   start_time: '08:00',
+  grace_minutes: '0',
   end_time: '17:00',
   lunch_start: '12:00',
   lunch_end: '13:00',
@@ -99,6 +101,7 @@ const emptyForm = () => ({
 
 const defaultCommon = () => ({
   start_time: '08:00',
+  grace_minutes: '0',
   end_time: '17:00',
   lunch_start: '12:00',
   lunch_end: '13:00',
@@ -455,6 +458,7 @@ const StaffSchedules: React.FC = () => {
         ? {
             enabled: true,
             start_time: match.start_time,
+            grace_minutes: String(match.grace_minutes ?? 0),
             end_time: match.end_time,
             lunch_start: match.lunch_start || '',
             lunch_end: match.lunch_end || '',
@@ -466,6 +470,7 @@ const StaffSchedules: React.FC = () => {
       first
         ? {
             start_time: first.start_time,
+            grace_minutes: String(first.grace_minutes ?? 0),
             end_time: first.end_time,
             lunch_start: first.lunch_start || '',
             lunch_end: first.lunch_end || '',
@@ -531,6 +536,11 @@ const StaffSchedules: React.FC = () => {
         setFormError(`${label}: end time must be after start time.`)
         return null
       }
+      const grace = row.grace_minutes === '' ? 0 : Number(row.grace_minutes)
+      if (!Number.isInteger(grace) || grace < 0 || grace > 240) {
+        setFormError(`${label}: grace period must be a whole number of minutes (0–240).`)
+        return null
+      }
       const hasLunchStart = !!row.lunch_start
       const hasLunchEnd = !!row.lunch_end
       if (hasLunchStart !== hasLunchEnd) {
@@ -550,6 +560,7 @@ const StaffSchedules: React.FC = () => {
       days.push({
         day_of_week: key,
         start_time: row.start_time,
+        grace_minutes: grace,
         end_time: row.end_time,
         lunch_start: hasLunchStart ? row.lunch_start : null,
         lunch_end: hasLunchEnd ? row.lunch_end : null,
@@ -629,19 +640,22 @@ const StaffSchedules: React.FC = () => {
             Apply to all working days
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {(
             [
-              ['start_time', 'Start'],
-              ['end_time', 'End'],
-              ['lunch_start', 'Lunch start'],
-              ['lunch_end', 'Lunch end'],
+              ['start_time', 'Start', 'time'],
+              ['grace_minutes', 'Grace (min)', 'number'],
+              ['end_time', 'End', 'time'],
+              ['lunch_start', 'Lunch start', 'time'],
+              ['lunch_end', 'Lunch end', 'time'],
             ] as const
-          ).map(([field, label]) => (
+          ).map(([field, label, type]) => (
             <div key={field}>
               <label className="mb-1 block text-xs font-medium text-gray-500">{label}</label>
               <Input
-                type="time"
+                type={type}
+                min={type === 'number' ? 0 : undefined}
+                max={type === 'number' ? 240 : undefined}
                 value={common[field]}
                 onChange={(e) => setCommon((c) => ({ ...c, [field]: e.target.value }))}
                 disabled={isSavingForm}
@@ -684,13 +698,24 @@ const StaffSchedules: React.FC = () => {
 
                 {row.enabled && (
                   <div className="mt-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="mb-1 block text-[11px] font-medium text-gray-400">Start</label>
                         <Input
                           type="time"
                           value={row.start_time}
                           onChange={(e) => updateDay(key, 'start_time', e.target.value)}
+                          disabled={isSavingForm}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-gray-400">Grace (min)</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={240}
+                          value={row.grace_minutes}
+                          onChange={(e) => updateDay(key, 'grace_minutes', e.target.value)}
                           disabled={isSavingForm}
                         />
                       </div>
@@ -856,6 +881,9 @@ const StaffSchedules: React.FC = () => {
                       <span className="font-medium text-gray-700">{dayShort(day.day_of_week)}</span>
                       <span className="mx-1 text-gray-300">·</span>
                       {day.start_time}–{day.end_time}
+                      {day.grace_minutes ? (
+                        <span className="ml-1 text-gray-400">+{day.grace_minutes}m grace</span>
+                      ) : null}
                       {day.lunch_start && day.lunch_end ? (
                         <span className="ml-1 text-gray-400">(lunch {day.lunch_start}–{day.lunch_end})</span>
                       ) : null}

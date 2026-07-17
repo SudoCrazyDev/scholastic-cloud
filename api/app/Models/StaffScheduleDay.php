@@ -24,9 +24,14 @@ class StaffScheduleDay extends Model
         'staff_schedule_id',
         'day_of_week',
         'start_time',
+        'grace_minutes',
         'end_time',
         'lunch_start',
         'lunch_end',
+    ];
+
+    protected $casts = [
+        'grace_minutes' => 'integer',
     ];
 
     public function staffSchedule()

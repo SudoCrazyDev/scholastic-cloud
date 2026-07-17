@@ -50,7 +50,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
   const queryClient = useQueryClient()
   const [showPrint, setShowPrint] = useState<'slip' | 'record' | null>(null)
   const [editingDay, setEditingDay] = useState<PayslipDay | null>(null)
-  const [dayForm, setDayForm] = useState({ time_in: '', time_out: '' })
+  const [dayForm, setDayForm] = useState({ time_in: '', time_out: '', overtime: '' })
   const [form, setForm] = useState<RatesForm | null>(null)
   const [deductionRows, setDeductionRows] = useState<DeductionRow[]>([])
   const [addSelection, setAddSelection] = useState('')
@@ -93,10 +93,16 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
   })
 
   const dayMutation = useMutation({
-    mutationFn: (payload: { dayId: string; time_in: string | null; time_out: string | null }) =>
+    mutationFn: (payload: {
+      dayId: string
+      time_in: string | null
+      time_out: string | null
+      overtime_minutes: number
+    }) =>
       payrollService.updatePayslipDay(payslipId, payload.dayId, {
         time_in: payload.time_in,
         time_out: payload.time_out,
+        overtime_minutes: payload.overtime_minutes,
       }),
     onSuccess: () => {
       invalidate()
@@ -225,6 +231,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                   <th className="px-4 py-2.5">In</th>
                   <th className="px-4 py-2.5">Out</th>
                   <th className="px-4 py-2.5 text-right">Hours</th>
+                  <th className="px-4 py-2.5 text-right">Penalty</th>
+                  <th className="px-4 py-2.5 text-right">OT</th>
                   <th className="px-4 py-2.5 text-right">Earned</th>
                   <th className="px-4 py-2.5" />
                 </tr>
@@ -240,7 +248,11 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                       }`}
                       onClick={() => {
                         if (readOnly) return
-                        setDayForm({ time_in: day.time_in || '', time_out: day.time_out || '' })
+                        setDayForm({
+                          time_in: day.time_in || '',
+                          time_out: day.time_out || '',
+                          overtime: day.overtime_minutes > 0 ? String(day.overtime_minutes) : '',
+                        })
                         setEditingDay(day)
                       }}
                     >
@@ -258,6 +270,39 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                         {day.hours_worked > 0 ? day.hours_worked : '—'}
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums">
+                        {day.penalty_amount > 0 ? (
+                          <span
+                            className="text-red-600"
+                            title={[
+                              day.late_minutes > 0 ? `${day.late_minutes} min late` : null,
+                              day.undertime_minutes > 0 ? `${day.undertime_minutes} min undertime` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          >
+                            −{peso(day.penalty_amount)}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {day.overtime_minutes > 0 ? (
+                          <span className="text-green-700" title={`${day.overtime_minutes} min approved`}>
+                            +{peso(day.overtime_amount)}
+                          </span>
+                        ) : day.detected_overtime_minutes > 0 ? (
+                          <span
+                            className="text-xs italic text-gray-400"
+                            title="Punched out past the scheduled end — unpaid until approved"
+                          >
+                            {day.detected_overtime_minutes}m detected
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
                         {day.amount_earned > 0 ? peso(day.amount_earned) : '—'}
                       </td>
                       <td className="px-4 py-2 text-right">
@@ -273,6 +318,12 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     {payslip.days_worked} day(s) worked
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{payslip.hours_worked}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-red-600">
+                    {payslip.penalty_total > 0 ? `−${peso(payslip.penalty_total)}` : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-green-700">
+                    {payslip.overtime_total > 0 ? `+${peso(payslip.overtime_total)}` : '—'}
+                  </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{peso(payslip.gross_pay)}</td>
                   <td />
                 </tr>
@@ -418,6 +469,21 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                 <dt className="text-gray-500">Total salary earned</dt>
                 <dd className="font-medium tabular-nums">{peso(payslip.gross_pay)}</dd>
               </div>
+              {payslip.penalty_total > 0 && (
+                <p className="text-xs text-gray-400">
+                  Already includes −{peso(payslip.penalty_total)} in late/undertime penalties (
+                  {payslip.late_minutes} min late, {payslip.undertime_minutes} min undertime at{' '}
+                  {peso(payslip.late_penalty_per_minute)}/{peso(payslip.undertime_penalty_per_minute)}{' '}
+                  per minute).
+                </p>
+              )}
+              {payslip.overtime_total > 0 && (
+                <p className="text-xs text-gray-400">
+                  Already includes +{peso(payslip.overtime_total)} approved overtime (
+                  {payslip.overtime_minutes} min at {peso(payslip.overtime_rate_per_minute)} per
+                  minute).
+                </p>
+              )}
               {payslip.deductions.map((deduction) => (
                 <div key={deduction.id || deduction.name} className="flex justify-between">
                   <dt className="text-gray-500">{deduction.name}</dt>
@@ -465,6 +531,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                   dayId: editingDay.id,
                   time_in: dayForm.time_in || null,
                   time_out: dayForm.time_out || null,
+                  overtime_minutes: Math.max(0, Math.round(numberOrZero(dayForm.overtime))),
                 })
               }}
               className="space-y-4 p-6"
@@ -486,6 +553,27 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     onChange={(e) => setDayForm((prev) => ({ ...prev, time_out: e.target.value }))}
                   />
                 </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Approved overtime (minutes)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="1440"
+                  step="1"
+                  value={dayForm.overtime}
+                  placeholder="0"
+                  onChange={(e) => setDayForm((prev) => ({ ...prev, overtime: e.target.value }))}
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  {editingDay.detected_overtime_minutes > 0
+                    ? `Punched out ${editingDay.detected_overtime_minutes} min past the scheduled end. `
+                    : ''}
+                  Paid at {peso(payslip.overtime_rate_per_minute)} per minute
+                  {payslip.overtime_rate_per_minute <= 0 && ' (rate is 0 — set it in Payroll Settings)'}.
+                </p>
               </div>
               <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
                 <Button type="button" variant="ghost" onClick={() => setEditingDay(null)}>

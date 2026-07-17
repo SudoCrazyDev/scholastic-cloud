@@ -49,6 +49,7 @@ surfaced in the UI but do **not** automatically mutate schedules/attendance (see
 | staff_schedule_id | uuid | FK → staff_schedules, cascade |
 | day_of_week | string | one of `monday`..`sunday` (lowercase, full name) |
 | start_time | time | stored `HH:MM:SS`, served as `HH:MM` |
+| grace_minutes | unsigned smallint | default 0; minutes after `start_time` before a punch-in counts as late |
 | end_time | time | |
 | lunch_start | time nullable | optional |
 | lunch_end | time nullable | optional |
@@ -120,14 +121,14 @@ Template request body:
   "description": "Mon–Fri 8–5",
   "is_active": true,
   "days": [
-    { "day_of_week": "monday", "start_time": "08:00", "end_time": "17:00",
+    { "day_of_week": "monday", "start_time": "08:00", "grace_minutes": 15, "end_time": "17:00",
       "lunch_start": "12:00", "lunch_end": "13:00" }
   ]
 }
 ```
 Validation: `name` required & unique per institution; `days` required (≥1); `day_of_week` in the weekday
-list and distinct; times `H:i`; `end_time > start_time`; lunch optional but if present both ends required,
-within working hours, `lunch_end > lunch_start`.
+list and distinct; times `H:i`; `end_time > start_time`; `grace_minutes` optional integer 0–240 (defaults
+to 0); lunch optional but if present both ends required, within working hours, `lunch_end > lunch_start`.
 
 Template response (`serialize`):
 ```json
@@ -136,7 +137,7 @@ Template response (`serialize`):
   "name": "Regular Office Hours", "description": null,
   "is_active": true, "assigned_count": 12, "day_count": 5,
   "days": [{ "id": "uuid", "day_of_week": "monday",
-             "start_time": "08:00", "end_time": "17:00",
+             "start_time": "08:00", "grace_minutes": 15, "end_time": "17:00",
              "lunch_start": "12:00", "lunch_end": "13:00" }],
   "created_at": "…", "updated_at": "…"
 }

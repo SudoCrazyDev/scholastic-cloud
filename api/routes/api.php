@@ -389,6 +389,8 @@ Route::middleware('auth.token')->group(function () {
     // HRIS — Payroll (compensation settings, deduction types, periods, payslips)
     Route::apiResource('payroll-deduction-types', \App\Http\Controllers\PayrollDeductionTypeController::class)
         ->only(['index', 'store', 'update', 'destroy']);
+    Route::get('payroll-settings', [\App\Http\Controllers\PayrollSettingController::class, 'show']);
+    Route::put('payroll-settings', [\App\Http\Controllers\PayrollSettingController::class, 'update']);
     Route::get('payroll-compensations', [\App\Http\Controllers\PayrollCompensationController::class, 'index']);
     Route::put('payroll-compensations/{userId}', [\App\Http\Controllers\PayrollCompensationController::class, 'upsert']);
     Route::post('payroll-periods/{id}/generate', [\App\Http\Controllers\PayrollPeriodController::class, 'generate']);

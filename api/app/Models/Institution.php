@@ -31,6 +31,9 @@ class Institution extends Model
         'default_department_id',
         'current_academic_year',
         'admission_form_open',
+        'late_penalty_per_minute',
+        'undertime_penalty_per_minute',
+        'overtime_rate_per_minute',
     ];
 
     /**
@@ -41,6 +44,9 @@ class Institution extends Model
     protected $casts = [
         'subscription_id' => 'string',
         'admission_form_open' => 'boolean',
+        'late_penalty_per_minute' => 'decimal:2',
+        'undertime_penalty_per_minute' => 'decimal:2',
+        'overtime_rate_per_minute' => 'decimal:2',
     ];
 
     /**

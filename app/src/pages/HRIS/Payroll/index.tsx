@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import {
   BanknotesIcon,
   CalendarDaysIcon,
+  Cog6ToothIcon,
   PaintBrushIcon,
   ReceiptPercentIcon,
 } from '@heroicons/react/24/outline'
@@ -11,8 +12,9 @@ import CompensationTab from './CompensationTab'
 import DeductionTypesTab from './DeductionTypesTab'
 import PayslipDesignerTab from './PayslipDesignerTab'
 import PeriodsTab from './PeriodsTab'
+import SettingsTab from './SettingsTab'
 
-type Tab = 'periods' | 'rates' | 'deductions' | 'designer'
+type Tab = 'periods' | 'rates' | 'deductions' | 'designer' | 'settings'
 
 const Payroll: React.FC = () => {
   const [tab, setTab] = useState<Tab>('periods')
@@ -65,6 +67,14 @@ const Payroll: React.FC = () => {
           <PaintBrushIcon className="h-4 w-4" />
           Payslip Designer
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('settings')}
+          className={tabClass(tab === 'settings')}
+        >
+          <Cog6ToothIcon className="h-4 w-4" />
+          Settings
+        </button>
       </div>
 
       {tab === 'periods' ? (
@@ -73,8 +83,10 @@ const Payroll: React.FC = () => {
         <CompensationTab />
       ) : tab === 'deductions' ? (
         <DeductionTypesTab />
-      ) : (
+      ) : tab === 'designer' ? (
         <PayslipDesignerTab />
+      ) : (
+        <SettingsTab />
       )}
     </motion.div>
   )

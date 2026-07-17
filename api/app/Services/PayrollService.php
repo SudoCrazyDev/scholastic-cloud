@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AttendanceLog;
+use App\Models\Institution;
 use App\Models\PayrollCompensation;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
@@ -27,6 +28,12 @@ class PayrollService
         $institutionId = $period->institution_id;
         $from = $period->date_from->copy()->startOfDay();
         $to = $period->date_to->copy()->endOfDay();
+
+        // Institution-wide penalty/overtime rates, snapshotted per payslip.
+        $institution = Institution::find($institutionId);
+        $lateRate = (float) ($institution->late_penalty_per_minute ?? 0);
+        $undertimeRate = (float) ($institution->undertime_penalty_per_minute ?? 0);
+        $overtimeRate = (float) ($institution->overtime_rate_per_minute ?? 0);
 
         $compensations = PayrollCompensation::with('deductions.deductionType')
             ->where('institution_id', $institutionId)
@@ -59,11 +66,11 @@ class PayrollService
 
         $generated = 0;
 
-        DB::transaction(function () use ($period, $compensations, $assignments, $punches, $holidayDates, &$generated) {
+        DB::transaction(function () use ($period, $compensations, $assignments, $punches, $holidayDates, $lateRate, $undertimeRate, $overtimeRate, &$generated) {
             $period->payslips()->delete();
 
             foreach ($compensations as $compensation) {
-                $this->buildPayslip($period, $compensation, $assignments->get($compensation->user_id), $punches[$compensation->user_id] ?? [], $holidayDates);
+                $this->buildPayslip($period, $compensation, $assignments->get($compensation->user_id), $punches[$compensation->user_id] ?? [], $holidayDates, $lateRate, $undertimeRate, $overtimeRate);
                 $generated++;
             }
         });
@@ -76,7 +83,10 @@ class PayrollService
         PayrollCompensation $compensation,
         ?StaffScheduleAssignment $assignment,
         array $userPunches,
-        \Illuminate\Support\Collection $holidayDates
+        \Illuminate\Support\Collection $holidayDates,
+        float $lateRate,
+        float $undertimeRate,
+        float $overtimeRate
     ): Payslip {
         $hourlyRate = $compensation->effectiveHourlyRate();
         $scheduleDays = $assignment?->staffSchedule?->days;
@@ -89,6 +99,9 @@ class PayrollService
             'daily_rate' => $compensation->daily_rate,
             'hourly_rate' => $hourlyRate,
             'hours_per_day' => $compensation->hours_per_day,
+            'late_penalty_per_minute' => $lateRate,
+            'undertime_penalty_per_minute' => $undertimeRate,
+            'overtime_rate_per_minute' => $overtimeRate,
         ]);
 
         $rows = [];
@@ -120,8 +133,24 @@ class PayrollService
                 ? $this->netScheduleHours($scheduleDay->start_time, $scheduleDay->end_time, $lunchStart, $lunchEnd)
                 : (float) $compensation->hours_per_day;
 
+            $isHoliday = $holidayDates->has($dateKey);
             $hours = $this->workedHours($timeIn, $timeOut, $lunchStart, $lunchEnd);
-            $earned = $this->earnedAmount($hours, $requiredHours, (float) $compensation->daily_rate, $hourlyRate);
+            $priced = $this->priceDay(
+                $timeIn,
+                $timeOut,
+                $scheduleDay?->start_time,
+                $scheduleDay?->end_time,
+                (int) ($scheduleDay->grace_minutes ?? 0),
+                $isHoliday,
+                $hours,
+                $requiredHours,
+                (float) $compensation->daily_rate,
+                $hourlyRate,
+                $lateRate,
+                $undertimeRate,
+                0, // approved overtime starts at zero — a payroll manager grants it per day
+                $overtimeRate
+            );
 
             $rows[] = new PayslipDay([
                 'work_date' => $dateKey,
@@ -129,10 +158,19 @@ class PayrollService
                 'time_out' => $timeOut,
                 'lunch_start' => $lunchStart,
                 'lunch_end' => $lunchEnd,
+                'schedule_start' => $scheduleDay?->start_time,
+                'schedule_end' => $scheduleDay?->end_time,
+                'grace_minutes' => (int) ($scheduleDay->grace_minutes ?? 0),
                 'required_hours' => round($requiredHours, 2),
                 'hours_worked' => $hours,
-                'amount_earned' => $earned,
-                'is_holiday' => $holidayDates->has($dateKey),
+                'late_minutes' => $priced['late_minutes'],
+                'undertime_minutes' => $priced['undertime_minutes'],
+                'penalty_amount' => $priced['penalty_amount'],
+                'detected_overtime_minutes' => $priced['detected_overtime_minutes'],
+                'overtime_minutes' => 0,
+                'overtime_amount' => $priced['overtime_amount'],
+                'amount_earned' => $priced['amount_earned'],
+                'is_holiday' => $isHoliday,
                 'is_rest_day' => $isRestDay,
             ]);
         }
@@ -165,16 +203,16 @@ class PayrollService
     public function recomputeDay(Payslip $payslip, PayslipDay $day): void
     {
         $hours = $this->workedHours($day->time_in, $day->time_out, $day->lunch_start, $day->lunch_end);
-        $earned = $this->earnedAmount(
-            $hours,
-            (float) $day->required_hours,
-            (float) $payslip->daily_rate,
-            (float) $payslip->hourly_rate
-        );
+        $priced = $this->priceDayFromSnapshots($payslip, $day, $hours);
 
         $day->update([
             'hours_worked' => $hours,
-            'amount_earned' => $earned,
+            'late_minutes' => $priced['late_minutes'],
+            'undertime_minutes' => $priced['undertime_minutes'],
+            'penalty_amount' => $priced['penalty_amount'],
+            'detected_overtime_minutes' => $priced['detected_overtime_minutes'],
+            'overtime_amount' => $priced['overtime_amount'],
+            'amount_earned' => $priced['amount_earned'],
         ]);
 
         $this->recomputeTotals($payslip);
@@ -187,13 +225,15 @@ class PayrollService
     public function applyRates(Payslip $payslip): void
     {
         foreach ($payslip->days()->get() as $day) {
+            $priced = $this->priceDayFromSnapshots($payslip, $day, (float) $day->hours_worked);
+
             $day->update([
-                'amount_earned' => $this->earnedAmount(
-                    (float) $day->hours_worked,
-                    (float) $day->required_hours,
-                    (float) $payslip->daily_rate,
-                    (float) $payslip->hourly_rate
-                ),
+                'late_minutes' => $priced['late_minutes'],
+                'undertime_minutes' => $priced['undertime_minutes'],
+                'penalty_amount' => $priced['penalty_amount'],
+                'detected_overtime_minutes' => $priced['detected_overtime_minutes'],
+                'overtime_amount' => $priced['overtime_amount'],
+                'amount_earned' => $priced['amount_earned'],
             ]);
         }
 
@@ -213,6 +253,11 @@ class PayrollService
         $payslip->update([
             'days_worked' => $days->filter(fn ($day) => (float) $day->hours_worked > 0)->count(),
             'hours_worked' => round((float) $days->sum('hours_worked'), 2),
+            'late_minutes' => (int) $days->sum('late_minutes'),
+            'undertime_minutes' => (int) $days->sum('undertime_minutes'),
+            'penalty_total' => round((float) $days->sum('penalty_amount'), 2),
+            'overtime_minutes' => (int) $days->sum('overtime_minutes'),
+            'overtime_total' => round((float) $days->sum('overtime_amount'), 2),
             'gross_pay' => $gross,
             'total_deductions' => $totalDeductions,
             'net_pay' => round($gross - $totalDeductions, 2),
@@ -238,6 +283,103 @@ class PayrollService
         }
 
         return round(max(0, $seconds) / 3600, 2);
+    }
+
+    /**
+     * Price one day.
+     *
+     * Penalty model — applies when the day has a schedule, is not a holiday,
+     * both punches exist, and at least one penalty rate is set: the day earns
+     * the full daily rate minus ₱/minute for arriving beyond start + grace
+     * (late) and for punching out before the end time (undertime), never
+     * below zero. Only completed minutes count (seconds are dropped).
+     *
+     * Otherwise falls back to the V1 hours-based pricing, with no penalties
+     * (rest days, holidays, staff without a schedule, incomplete punches,
+     * or both rates set to 0).
+     *
+     * Overtime: minutes punched out past the scheduled end are only detected
+     * (informational) — pay comes solely from the approved $overtimeMinutes
+     * a payroll manager granted on the day, at ₱/minute, on top of the base.
+     *
+     * @return array{late_minutes: int, undertime_minutes: int, penalty_amount: float, detected_overtime_minutes: int, overtime_amount: float, amount_earned: float}
+     */
+    private function priceDay(
+        ?string $timeIn,
+        ?string $timeOut,
+        ?string $scheduleStart,
+        ?string $scheduleEnd,
+        int $graceMinutes,
+        bool $isHoliday,
+        float $hours,
+        float $requiredHours,
+        float $dailyRate,
+        float $hourlyRate,
+        float $lateRate,
+        float $undertimeRate,
+        int $overtimeMinutes,
+        float $overtimeRate
+    ): array {
+        $detectedOvertime = 0;
+        if (! $isHoliday && $scheduleEnd && $timeOut) {
+            $detectedOvertime = intdiv(max(0, $this->toSeconds($timeOut) - $this->toSeconds($scheduleEnd)), 60);
+        }
+
+        $overtimeAmount = round($overtimeMinutes * $overtimeRate, 2);
+
+        $usePenalties = ! $isHoliday
+            && $scheduleStart && $scheduleEnd
+            && $timeIn && $timeOut
+            && ($lateRate > 0 || $undertimeRate > 0);
+
+        if (! $usePenalties) {
+            return [
+                'late_minutes' => 0,
+                'undertime_minutes' => 0,
+                'penalty_amount' => 0.0,
+                'detected_overtime_minutes' => $detectedOvertime,
+                'overtime_amount' => $overtimeAmount,
+                'amount_earned' => round($this->earnedAmount($hours, $requiredHours, $dailyRate, $hourlyRate) + $overtimeAmount, 2),
+            ];
+        }
+
+        $graceEnd = $this->toSeconds($scheduleStart) + $graceMinutes * 60;
+        $lateMinutes = intdiv(max(0, $this->toSeconds($timeIn) - $graceEnd), 60);
+        $undertimeMinutes = intdiv(max(0, $this->toSeconds($scheduleEnd) - $this->toSeconds($timeOut)), 60);
+        $penalty = round($lateMinutes * $lateRate + $undertimeMinutes * $undertimeRate, 2);
+
+        return [
+            'late_minutes' => $lateMinutes,
+            'undertime_minutes' => $undertimeMinutes,
+            'penalty_amount' => $penalty,
+            'detected_overtime_minutes' => $detectedOvertime,
+            'overtime_amount' => $overtimeAmount,
+            'amount_earned' => round(max(0, $dailyRate - $penalty) + $overtimeAmount, 2),
+        ];
+    }
+
+    /**
+     * priceDay() fed from the snapshots stored on the payslip and its day row
+     * (used after manual time or rate edits).
+     */
+    private function priceDayFromSnapshots(Payslip $payslip, PayslipDay $day, float $hours): array
+    {
+        return $this->priceDay(
+            $day->time_in,
+            $day->time_out,
+            $day->schedule_start,
+            $day->schedule_end,
+            (int) $day->grace_minutes,
+            (bool) $day->is_holiday,
+            $hours,
+            (float) $day->required_hours,
+            (float) $payslip->daily_rate,
+            (float) $payslip->hourly_rate,
+            (float) $payslip->late_penalty_per_minute,
+            (float) $payslip->undertime_penalty_per_minute,
+            (int) $day->overtime_minutes,
+            (float) $payslip->overtime_rate_per_minute
+        );
     }
 
     /**

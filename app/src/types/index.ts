@@ -463,6 +463,7 @@ export interface StaffScheduleDay {
   id?: string;
   day_of_week: DayOfWeek;
   start_time: string; // "HH:MM"
+  grace_minutes?: number; // minutes after start_time before a punch-in counts as late
   end_time: string; // "HH:MM"
   lunch_start?: string | null; // "HH:MM"
   lunch_end?: string | null; // "HH:MM"
@@ -1961,6 +1962,15 @@ export interface CreatePayrollPeriodData {
   date_to: string;
 }
 
+// Institution-wide penalty/overtime rates (₱ per minute), snapshotted onto
+// payslips at generation time. Penalty rates both 0 = penalties disabled
+// (hours-based pay). Overtime pays only manager-approved minutes; 0 = off.
+export interface PayrollSettings {
+  late_penalty_per_minute: number;
+  undertime_penalty_per_minute: number;
+  overtime_rate_per_minute: number;
+}
+
 export interface PayslipSummary {
   id: string;
   user_id: string;
@@ -1969,6 +1979,11 @@ export interface PayslipSummary {
   daily_rate: number;
   days_worked: number;
   hours_worked: number;
+  late_minutes: number;
+  undertime_minutes: number;
+  penalty_total: number;
+  overtime_minutes: number;
+  overtime_total: number;
   gross_pay: number;
   total_deductions: number;
   net_pay: number;
@@ -1981,6 +1996,12 @@ export interface PayslipDay {
   time_out: string | null;
   required_hours: number;
   hours_worked: number;
+  late_minutes: number;
+  undertime_minutes: number;
+  penalty_amount: number;
+  detected_overtime_minutes: number; // punched out past the scheduled end (unpaid until approved)
+  overtime_minutes: number; // approved by the payroll manager — these are paid
+  overtime_amount: number;
   amount_earned: number;
   is_holiday: boolean;
   is_rest_day: boolean;
@@ -2005,8 +2026,16 @@ export interface Payslip {
   daily_rate: number;
   hourly_rate: number;
   hours_per_day: number;
+  late_penalty_per_minute: number;
+  undertime_penalty_per_minute: number;
+  overtime_rate_per_minute: number;
   days_worked: number;
   hours_worked: number;
+  late_minutes: number;
+  undertime_minutes: number;
+  penalty_total: number;
+  overtime_minutes: number;
+  overtime_total: number;
   gross_pay: number;
   deductions: PayslipDeduction[];
   employer_share_total: number;
@@ -2040,6 +2069,7 @@ export interface UpdatePayslipData {
 export interface UpdatePayslipDayData {
   time_in: string | null;
   time_out: string | null;
+  overtime_minutes?: number; // approved OT minutes for the day
 }
 
 // =====================
