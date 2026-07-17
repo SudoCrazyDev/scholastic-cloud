@@ -340,8 +340,8 @@ export const MyAssessments: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Sticky filter + search bar */}
-          <div className="sticky top-0 z-10 -mx-6 px-6 py-3 bg-white/90 backdrop-blur border-b border-gray-100 space-y-3">
+          {/* Sticky filter + search bar (no boxed background — blends into the page) */}
+          <div className="sticky top-0 z-10 -mx-6 px-6 pt-1 pb-3 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               {filterChips.map((chip) => {
                 const active = statusFilter === chip.key;
@@ -393,30 +393,46 @@ export const MyAssessments: React.FC = () => {
               </div>
             </div>
 
-            {/* Subject jump nav */}
+            {/* Subject jump nav — each chip is its own mini progress bar */}
             {allGroups.length > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                {allGroups.map((g) => {
-                  const submittedCount = g.assessments.filter((a) => a.attempt_status === 'submitted').length;
-                  const pct = Math.round((submittedCount / g.assessments.length) * 100);
-                  const pending = g.assessments.length - submittedCount;
-                  return (
-                    <button
-                      key={g.subjectTitle}
-                      type="button"
-                      onClick={() => jumpToSubject(g.subjectTitle)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white pl-1.5 pr-3 py-1 text-xs font-medium text-gray-700 hover:border-indigo-300 hover:bg-indigo-50 shrink-0 transition-colors"
-                    >
-                      <ProgressRing percent={pct} size={20} strokeWidth={2.5} />
-                      <span className="max-w-[9rem] truncate">{g.subjectTitle}</span>
-                      {pending > 0 ? (
-                        <span className="text-gray-400">{pending} left</span>
-                      ) : (
-                        <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-500" />
-                      )}
-                    </button>
-                  );
-                })}
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400 mb-1.5">Jump to subject</p>
+                <div className="relative">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {allGroups.map((g) => {
+                      const submittedCount = g.assessments.filter((a) => a.attempt_status === 'submitted').length;
+                      const pct = Math.round((submittedCount / g.assessments.length) * 100);
+                      const pending = g.assessments.length - submittedCount;
+                      const done = pending === 0;
+                      return (
+                        <button
+                          key={g.subjectTitle}
+                          type="button"
+                          onClick={() => jumpToSubject(g.subjectTitle)}
+                          className={clsx(
+                            'relative isolate overflow-hidden inline-flex items-center gap-1.5 rounded-full pl-3 pr-3 py-1.5 text-xs font-medium shrink-0 transition-colors',
+                            done ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'bg-indigo-50/70 text-indigo-900 hover:bg-indigo-100'
+                          )}
+                        >
+                          <span
+                            aria-hidden
+                            className={clsx(
+                              '-z-10 absolute inset-y-0 left-0 transition-all duration-500 ease-out',
+                              done ? 'bg-emerald-200/60' : 'bg-indigo-200/60'
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                          {done && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                          <span className="max-w-[9rem] truncate">{g.subjectTitle}</span>
+                          <span className={done ? 'text-emerald-600' : 'text-indigo-500'}>
+                            {submittedCount}/{g.assessments.length}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent" />
+                </div>
               </div>
             )}
           </div>
