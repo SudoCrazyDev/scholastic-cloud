@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\RfidScanLog;
+use App\Models\Student;
 use App\Models\StudentRfidTag;
 use App\Models\StudentSection;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class RfidScanLogController extends Controller
 {
@@ -155,7 +157,29 @@ class RfidScanLogController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$tag) {
+        $studentId = $tag?->student_id;
+        $tagId = $tag?->id;
+
+        // Fallback: the scanned value may be a student ID QR code (the raw
+        // student UUID) rather than an RFID tag UID. Resolve the student
+        // directly, but only if they are an active member of the scanning
+        // institution, and link their active RFID tag if they have one.
+        if (!$studentId && Str::isUuid($request->rfid_uid)) {
+            $student = Student::where('id', $request->rfid_uid)
+                ->where('is_active', true)
+                ->whereHas('studentInstitutions', function ($query) use ($request) {
+                    $query->where('institution_id', $request->institution_id)
+                        ->where('is_active', true);
+                })
+                ->first();
+
+            if ($student) {
+                $studentId = $student->id;
+                $tagId = $student->rfidTag()->where('is_active', true)->value('id');
+            }
+        }
+
+        if (!$studentId) {
             return response()->json([
                 'success' => false,
                 'message' => 'RFID tag not recognized or inactive',
@@ -164,8 +188,8 @@ class RfidScanLogController extends Controller
 
         try {
             $log = RfidScanLog::create([
-                'student_rfid_tag_id' => $tag->id,
-                'student_id' => $tag->student_id,
+                'student_rfid_tag_id' => $tagId,
+                'student_id' => $studentId,
                 'institution_id' => $request->institution_id,
                 'scanned_at' => now(),
                 'type' => $request->type,
@@ -175,7 +199,7 @@ class RfidScanLogController extends Controller
             $log->load(['student', 'studentRfidTag', 'institution']);
 
             $activeSection = StudentSection::with('classSection')
-                ->where('student_id', $tag->student_id)
+                ->where('student_id', $studentId)
                 ->where('is_active', true)
                 ->latest()
                 ->first();
