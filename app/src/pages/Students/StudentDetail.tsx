@@ -21,10 +21,11 @@ import {
   DocumentIcon,
   CreditCardIcon,
   ArrowRightOnRectangleIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline'
 import { Badge } from '../../components/badge'
 import { Button } from '../../components/button'
-import { StudentFinanceTab, CrossCheckModal, StudentIdTab, StudentFamilyTab, StudentMedicalTab, StudentPasswordResetModal } from './components'
+import { StudentFinanceTab, CrossCheckModal, StudentIdTab, StudentFamilyTab, StudentMedicalTab, StudentSiblingsTab, StudentPasswordResetModal } from './components'
 import { studentService } from '../../services/studentService'
 import { studentDocumentService } from '../../services/studentDocumentService'
 import { useAuth } from '../../hooks/useAuth'
@@ -35,6 +36,7 @@ import type { Student, StudentDocument } from '../../types'
 const tabs = [
   { id: 'personal', name: 'Personal Details', icon: UserIcon },
   { id: 'family', name: 'Family & Background', icon: UsersIcon },
+  { id: 'siblings', name: 'Siblings', icon: UserGroupIcon },
   { id: 'academic', name: 'Academic Information', icon: AcademicCapIcon },
   { id: 'medical', name: 'Medical Records', icon: HeartIcon },
   { id: 'documents', name: 'Documents', icon: IdentificationIcon },
@@ -597,6 +599,8 @@ export default function StudentDetail() {
         return renderPersonalDetails()
       case 'family':
         return <StudentFamilyTab student={student} onUpdated={setStudent} />
+      case 'siblings':
+        return <StudentSiblingsTab studentId={student.id} />
       case 'academic':
         return renderAcademicInfo()
       case 'medical':

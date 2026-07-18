@@ -14,6 +14,7 @@ class StudentDiscount extends Model
         'institution_id',
         'student_id',
         'school_fee_id',
+        'sibling_group_id',
         'academic_year',
         'discount_type',
         'value',
@@ -37,6 +38,11 @@ class StudentDiscount extends Model
     public function schoolFee()
     {
         return $this->belongsTo(SchoolFee::class);
+    }
+
+    public function siblingGroup()
+    {
+        return $this->belongsTo(SiblingGroup::class);
     }
 
     public function institution()

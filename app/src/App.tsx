@@ -171,6 +171,7 @@ function App() {
               <Route path="finance/collections" element={<Finance />} />
               <Route path="finance/discounts" element={<Finance />} />
               <Route path="finance/default-discounts" element={<Finance />} />
+              <Route path="finance/sibling-discounts" element={<Finance />} />
               <Route path="finance/receipt-builder" element={<Finance />} />
               <Route path="finance/receipt-approvals" element={<Finance />} />
               <Route path="finance/void-requests" element={<Finance />} />

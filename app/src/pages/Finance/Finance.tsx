@@ -36,6 +36,7 @@ import CollectionsView from './CollectionsView'
 import ReceiptApprovalsView from './ReceiptApprovalsView'
 import DiscountsView from './DiscountsView'
 import DefaultDiscountsView from './DefaultDiscountsView'
+import SiblingDiscountsView from './SiblingDiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
 import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
@@ -51,6 +52,7 @@ type FinanceView =
   | 'collections'
   | 'discounts'
   | 'default-discounts'
+  | 'sibling-discounts'
   | 'receipt-builder'
   | 'receipt-approvals'
   | 'void-requests'
@@ -60,6 +62,7 @@ const SETUP_VIEWS: FinanceView[] = [
   'default-amounts',
   'discounts',
   'default-discounts',
+  'sibling-discounts',
   'receipt-builder',
 ]
 
@@ -98,6 +101,7 @@ const SETUP_NAV: { label: string; to: string; view: FinanceView }[] = [
   { label: 'Default Amounts', to: '/finance/default-amounts', view: 'default-amounts' },
   { label: 'Grade Level Discounts', to: '/finance/discounts', view: 'discounts' },
   { label: 'Default Discounts', to: '/finance/default-discounts', view: 'default-discounts' },
+  { label: 'Sibling Discounts', to: '/finance/sibling-discounts', view: 'sibling-discounts' },
   { label: 'Receipt Builder', to: '/finance/receipt-builder', view: 'receipt-builder' },
 ]
 
@@ -112,6 +116,7 @@ const VIEW_SUBTITLES: Record<FinanceView, string> = {
   'default-amounts': 'Set default fee amounts per grade level and academic year.',
   discounts: 'Apply discounts in bulk to every student in a grade level.',
   'default-discounts': 'Maintain reusable discount templates for the cashier and ledger.',
+  'sibling-discounts': "Link students as siblings and apply each sibling's own discount for the academic year.",
   'receipt-builder': 'Customize the layout of printed receipts.',
 }
 
@@ -126,6 +131,7 @@ const Finance: React.FC = () => {
     if (pathname.endsWith('/ledger')) return 'ledger'
     if (pathname.endsWith('/collections')) return 'collections'
     if (pathname.endsWith('/default-discounts')) return 'default-discounts'
+    if (pathname.endsWith('/sibling-discounts')) return 'sibling-discounts'
     if (pathname.endsWith('/discounts')) return 'discounts'
     if (pathname.endsWith('/receipt-builder')) return 'receipt-builder'
     if (pathname.endsWith('/receipt-approvals')) return 'receipt-approvals'
@@ -2858,6 +2864,8 @@ const Finance: React.FC = () => {
       )}
 
       {view === 'default-discounts' && <DefaultDiscountsView />}
+
+      {view === 'sibling-discounts' && <SiblingDiscountsView />}
 
       {view === 'receipt-builder' && <ReceiptBuilderView />}
 

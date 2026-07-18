@@ -319,6 +319,7 @@ export interface StudentDiscount {
   institution_id: string;
   student_id: string;
   school_fee_id?: string | null;
+  sibling_group_id?: string | null;
   academic_year: string;
   discount_type: 'fixed' | 'percentage';
   value: number;
@@ -329,6 +330,46 @@ export interface StudentDiscount {
   voided_at?: string | null;
   voided_by?: string | null;
   void_note?: string | null;
+}
+
+export interface SiblingGroupMember {
+  id: string;
+  sibling_group_id: string;
+  student_id: string;
+  discount_type?: 'fixed' | 'percentage' | null;
+  discount_value?: number | string | null;
+  student?: Student;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SiblingGroup {
+  id: string;
+  institution_id: string;
+  name?: string | null;
+  notes?: string | null;
+  members?: SiblingGroupMember[];
+  /** Non-voided sibling discounts for the requested academic year. */
+  discounts?: StudentDiscount[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSiblingGroupData {
+  name?: string;
+  notes?: string;
+  student_ids: string[];
+}
+
+export interface UpdateSiblingMemberData {
+  discount_type?: 'fixed' | 'percentage' | null;
+  discount_value?: number | null;
+}
+
+export interface ApplySiblingDiscountData {
+  academic_year: string;
+  discount_type?: 'fixed' | 'percentage';
+  value?: number;
 }
 
 export interface CreateStudentDiscountData {

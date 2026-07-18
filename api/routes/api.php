@@ -28,6 +28,7 @@ use App\Http\Controllers\SchoolFeeController;
 use App\Http\Controllers\SchoolFeeDefaultController;
 use App\Http\Controllers\SectionConsolidatedGradesController;
 use App\Http\Controllers\SF9Controller;
+use App\Http\Controllers\SiblingGroupController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StrandController;
 use App\Http\Controllers\StudentAdditionalFeeController;
@@ -179,6 +180,7 @@ Route::middleware('auth.token')->group(function () {
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
     Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show']);
     Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store']);
+    Route::get('students/{id}/sibling-group', [SiblingGroupController::class, 'showForStudent']);
     Route::get('payment-plan-changes', [StudentPaymentPlanChangeController::class, 'index']);
     Route::apiResource('payment-plans', PaymentPlanController::class);
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
@@ -330,6 +332,15 @@ Route::middleware('auth.token')->group(function () {
     Route::put('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
     Route::patch('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
     Route::delete('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'destroy']);
+
+    // Sibling groups & per-sibling discounts
+    Route::get('sibling-groups', [SiblingGroupController::class, 'index']);
+    Route::post('sibling-groups', [SiblingGroupController::class, 'store']);
+    Route::delete('sibling-groups/{id}', [SiblingGroupController::class, 'destroy']);
+    Route::post('sibling-groups/{id}/members', [SiblingGroupController::class, 'addMember']);
+    Route::put('sibling-groups/{id}/members/{memberId}', [SiblingGroupController::class, 'updateMember']);
+    Route::delete('sibling-groups/{id}/members/{memberId}', [SiblingGroupController::class, 'removeMember']);
+    Route::post('sibling-groups/{id}/members/{memberId}/apply-discount', [SiblingGroupController::class, 'applyDiscount']);
 
     // Student additional fees
     Route::get('student-additional-fees', [StudentAdditionalFeeController::class, 'index']);

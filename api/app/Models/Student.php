@@ -144,6 +144,14 @@ class Student extends Model
     }
 
     /**
+     * Membership in a sibling group (a student belongs to at most one).
+     */
+    public function siblingGroupMember()
+    {
+        return $this->hasOne(SiblingGroupMember::class);
+    }
+
+    /**
      * Get the profile picture URL. Tries R2 first (temporary or R2_URL), then S3 for legacy paths.
      */
     public function getProfilePictureAttribute($value)
