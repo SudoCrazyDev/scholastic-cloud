@@ -6,46 +6,12 @@ import { toast } from 'react-hot-toast'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Select } from '../../components/select'
+import { MonthDayPicker } from '../../components/month-day-picker'
+import { MONTH_NAMES } from '../../utils/monthNames'
 import { paymentPlanService } from '../../services/paymentPlanService'
 import type { CreatePaymentPlanData, PaymentPlan } from '../../types'
 
-const MONTH_OPTIONS = [
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
-]
-
-const monthName = (month: number) =>
-  MONTH_OPTIONS.find((option) => option.value === String(month))?.label ?? String(month)
-
-// The date picker is just a friendlier way to choose a month + day — only those are
-// persisted. The picked year is ignored; the backend resolves the real year from the
-// academic year. A leap year is used as the reference so Feb 29 stays selectable.
-const REF_YEAR = 2024
-const pad = (n: number) => String(n).padStart(2, '0')
-
-const toDateValue = (month: string, day: string): string => {
-  const m = Number(month)
-  const d = Number(day)
-  if (!m || !d) return ''
-  const maxDay = new Date(REF_YEAR, m, 0).getDate()
-  return `${REF_YEAR}-${pad(m)}-${pad(Math.min(d, maxDay))}`
-}
-
-const fromDateValue = (value: string): { month: string; day: string } | null => {
-  const match = /^\d{4}-(\d{2})-(\d{2})$/.exec(value)
-  if (!match) return null
-  return { month: String(Number(match[1])), day: String(Number(match[2])) }
-}
+const monthName = (month: number) => MONTH_NAMES[month - 1] ?? String(month)
 
 const errorMessage = (err: unknown, fallback: string): string => {
   const response = (err as { response?: { data?: { message?: string } } })?.response
@@ -356,15 +322,12 @@ const PaymentPlansView: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Due Date</label>
-                    <Input
-                      type="date"
-                      value={toDateValue(inst.due_month, inst.due_day)}
-                      onChange={(e) => {
-                        const parsed = fromDateValue(e.target.value)
-                        if (parsed) {
-                          patchInstallment(index, { due_month: parsed.month, due_day: parsed.day })
-                        }
-                      }}
+                    <MonthDayPicker
+                      month={Number(inst.due_month) || 0}
+                      day={Number(inst.due_day) || 0}
+                      onChange={({ month, day }) =>
+                        patchInstallment(index, { due_month: String(month), due_day: String(day) })
+                      }
                       disabled={isSaving}
                     />
                   </div>
@@ -404,9 +367,9 @@ const PaymentPlansView: React.FC = () => {
               ))}
             </div>
             <p className="mt-2 text-xs text-gray-500">
-              Pick any date — only the month and day are used; the academic year is applied
-              automatically (August–December fall in the start year, January–July in the following
-              year). Grace days are how long after the due date before the late fee applies; the
+              Due dates repeat every school year, so only a month and day are needed — the year is
+              applied automatically (August–December fall in the start year, January–July in the
+              following year). Grace days are how long after the due date before the late fee applies; the
               late fee is a one-time charge of that percent of the installment, added to the
               student's balance while the installment stays unpaid.
             </p>
