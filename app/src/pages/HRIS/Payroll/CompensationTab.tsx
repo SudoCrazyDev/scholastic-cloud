@@ -17,6 +17,7 @@ interface CompensationForm {
   daily_rate: string
   hourly_rate: string
   hours_per_day: string
+  overtime_rate: string
   // deduction_type_id -> amount (as entered)
   deductions: Record<string, string>
   employerDeductions: Record<string, string>
@@ -27,6 +28,7 @@ const emptyForm = (): CompensationForm => ({
   daily_rate: '',
   hourly_rate: '',
   hours_per_day: '8',
+  overtime_rate: '',
   deductions: {},
   employerDeductions: {},
 })
@@ -108,6 +110,7 @@ const CompensationTab: React.FC = () => {
       daily_rate: c ? String(c.daily_rate) : '',
       hourly_rate: c?.hourly_rate != null ? String(c.hourly_rate) : '',
       hours_per_day: c ? String(c.hours_per_day) : '8',
+      overtime_rate: c?.overtime_rate_per_minute != null ? String(c.overtime_rate_per_minute) : '',
       deductions: deductionAmounts,
       employerDeductions: employerAmounts,
     })
@@ -125,6 +128,8 @@ const CompensationTab: React.FC = () => {
         daily_rate: numberOrZero(form.daily_rate),
         hourly_rate: form.hourly_rate.trim() === '' ? null : numberOrZero(form.hourly_rate),
         hours_per_day: numberOrZero(form.hours_per_day) || 8,
+        overtime_rate_per_minute:
+          form.overtime_rate.trim() === '' ? null : numberOrZero(form.overtime_rate),
         deductions: activeTypes.map((type) => ({
           deduction_type_id: type.id,
           amount: numberOrZero(form.deductions[type.id] ?? ''),
@@ -179,6 +184,7 @@ const CompensationTab: React.FC = () => {
               <th className="px-4 py-3">Designation</th>
               <th className="px-4 py-3 text-right">Daily Rate</th>
               <th className="px-4 py-3 text-right">Hourly Rate</th>
+              <th className="px-4 py-3 text-right">Overtime / min</th>
               <th className="px-4 py-3">Deductions / period</th>
               <th className="px-4 py-3" />
             </tr>
@@ -186,13 +192,13 @@ const CompensationTab: React.FC = () => {
           <tbody>
             {compensationsQuery.isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                   Loading staff…
                 </td>
               </tr>
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                   No staff found.
                 </td>
               </tr>
@@ -218,6 +224,20 @@ const CompensationTab: React.FC = () => {
                             <span className="ml-1 text-xs text-gray-400">(auto)</span>
                           )}
                         </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-600">
+                      {c ? (
+                        c.overtime_rate_per_minute == null ? (
+                          <>
+                            {peso(row.default_overtime_rate)}
+                            <span className="ml-1 text-xs text-gray-400">(default)</span>
+                          </>
+                        ) : (
+                          peso(c.overtime_rate_per_minute)
+                        )
                       ) : (
                         '—'
                       )}
@@ -316,6 +336,24 @@ const CompensationTab: React.FC = () => {
                     value={form.hours_per_day}
                     onChange={setField('hours_per_day')}
                   />
+                </div>
+                <div className="sm:col-span-3">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Overtime rate (₱ per minute)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.overtime_rate}
+                    onChange={setField('overtime_rate')}
+                    placeholder={`default: ${peso(editing.default_overtime_rate)}/min`}
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    Leave blank to use the institution default ({peso(editing.default_overtime_rate)}
+                    /min, set in the Settings tab). Enter 0 to disable overtime for this staff
+                    member. Only manager-approved minutes on the payslip are paid.
+                  </p>
                 </div>
               </div>
 

@@ -1916,6 +1916,9 @@ export interface PayrollCompensation {
   hourly_rate: number | null;
   effective_hourly_rate: number;
   hours_per_day: number;
+  // null = inherit the institution default; a value overrides; 0 = OT off for this staff.
+  overtime_rate_per_minute: number | null;
+  effective_overtime_rate: number;
   deductions: PayrollCompensationDeduction[];
   deductions_total: number;
   employer_share_total: number;
@@ -1928,6 +1931,7 @@ export interface PayrollStaffCompensation {
   staff_name: string;
   email: string;
   role_title: string | null;
+  default_overtime_rate: number; // institution default, shown when a staff has no override
   compensation: PayrollCompensation | null;
 }
 
@@ -1936,6 +1940,7 @@ export interface SavePayrollCompensationData {
   daily_rate: number;
   hourly_rate?: number | null;
   hours_per_day: number;
+  overtime_rate_per_minute?: number | null;
   deductions?: { deduction_type_id: string; amount: number; employer_amount?: number }[];
 }
 

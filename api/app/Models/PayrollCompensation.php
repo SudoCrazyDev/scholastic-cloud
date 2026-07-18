@@ -21,6 +21,7 @@ class PayrollCompensation extends Model
         'daily_rate',
         'hourly_rate',
         'hours_per_day',
+        'overtime_rate_per_minute',
         'created_by',
     ];
 
@@ -28,6 +29,7 @@ class PayrollCompensation extends Model
         'daily_rate' => 'decimal:2',
         'hourly_rate' => 'decimal:2',
         'hours_per_day' => 'decimal:2',
+        'overtime_rate_per_minute' => 'decimal:2',
     ];
 
     public function institution(): BelongsTo
@@ -57,5 +59,17 @@ class PayrollCompensation extends Model
         $hoursPerDay = (float) $this->hours_per_day ?: 8.0;
 
         return round((float) $this->daily_rate / $hoursPerDay, 2);
+    }
+
+    /**
+     * Overtime rate falls back to the institution default when this staff
+     * member has no per-staff rate set (null). An explicit 0 disables
+     * overtime for this staff member.
+     */
+    public function effectiveOvertimeRate(float $institutionDefault): float
+    {
+        return $this->overtime_rate_per_minute !== null
+            ? (float) $this->overtime_rate_per_minute
+            : $institutionDefault;
     }
 }

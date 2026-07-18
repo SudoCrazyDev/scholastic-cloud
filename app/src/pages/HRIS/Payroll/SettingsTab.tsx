@@ -102,7 +102,7 @@ const SettingsTab: React.FC = () => {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">
-                Overtime pay (₱ per minute)
+                Overtime pay (₱ per minute, default)
               </label>
               <Input
                 type="number"
@@ -133,7 +133,9 @@ const SettingsTab: React.FC = () => {
             Overtime is never paid automatically: minutes punched out past the scheduled end are
             only <span className="font-medium">detected</span> on the payslip, and pay applies once
             a payroll manager approves the minutes on that day
-            {numberOrZero(form.overtime) <= 0 && ' (rate is 0 — overtime is currently off)'}.
+            {numberOrZero(form.overtime) <= 0 && ' (rate is 0 — overtime is off by default)'}. This
+            rate is the institution default — you can override it per staff on the{' '}
+            <span className="font-medium">Employee Rates</span> tab.
           </p>
 
           <p className="text-xs text-gray-400">

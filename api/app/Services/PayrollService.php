@@ -29,11 +29,12 @@ class PayrollService
         $from = $period->date_from->copy()->startOfDay();
         $to = $period->date_to->copy()->endOfDay();
 
-        // Institution-wide penalty/overtime rates, snapshotted per payslip.
+        // Institution-wide penalty rates plus the default overtime rate,
+        // snapshotted per payslip. Overtime can be overridden per staff.
         $institution = Institution::find($institutionId);
         $lateRate = (float) ($institution->late_penalty_per_minute ?? 0);
         $undertimeRate = (float) ($institution->undertime_penalty_per_minute ?? 0);
-        $overtimeRate = (float) ($institution->overtime_rate_per_minute ?? 0);
+        $defaultOvertimeRate = (float) ($institution->overtime_rate_per_minute ?? 0);
 
         $compensations = PayrollCompensation::with('deductions.deductionType')
             ->where('institution_id', $institutionId)
@@ -66,10 +67,12 @@ class PayrollService
 
         $generated = 0;
 
-        DB::transaction(function () use ($period, $compensations, $assignments, $punches, $holidayDates, $lateRate, $undertimeRate, $overtimeRate, &$generated) {
+        DB::transaction(function () use ($period, $compensations, $assignments, $punches, $holidayDates, $lateRate, $undertimeRate, $defaultOvertimeRate, &$generated) {
             $period->payslips()->delete();
 
             foreach ($compensations as $compensation) {
+                // Per-staff overtime rate, falling back to the institution default.
+                $overtimeRate = $compensation->effectiveOvertimeRate($defaultOvertimeRate);
                 $this->buildPayslip($period, $compensation, $assignments->get($compensation->user_id), $punches[$compensation->user_id] ?? [], $holidayDates, $lateRate, $undertimeRate, $overtimeRate);
                 $generated++;
             }

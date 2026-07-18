@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Models\Institution;
 use App\Models\PayrollCompensation;
 use App\Models\Role;
 use App\Models\User;
@@ -57,15 +58,18 @@ class PayrollCompensationController extends Controller
             ->get()
             ->keyBy('user_id');
 
+        $defaultOvertimeRate = $this->defaultOvertimeRate($institutionId);
+
         return response()->json([
             'success' => true,
-            'data' => $staff->map(function (User $user) use ($compensations) {
+            'data' => $staff->map(function (User $user) use ($compensations, $defaultOvertimeRate) {
                 return [
                     'user_id' => $user->id,
                     'staff_name' => $this->staffName($user),
                     'email' => $user->email,
                     'role_title' => $user->userInstitutions->first()?->role?->title,
-                    'compensation' => $this->serialize($compensations->get($user->id)),
+                    'default_overtime_rate' => $defaultOvertimeRate,
+                    'compensation' => $this->serialize($compensations->get($user->id), $defaultOvertimeRate),
                 ];
             })->values(),
         ]);
@@ -95,6 +99,7 @@ class PayrollCompensationController extends Controller
             'daily_rate' => 'required|numeric|min:0|max:999999',
             'hourly_rate' => 'nullable|numeric|min:0|max:999999',
             'hours_per_day' => 'required|numeric|min:1|max:24',
+            'overtime_rate_per_minute' => 'nullable|numeric|min:0|max:9999',
             'deductions' => 'nullable|array',
             'deductions.*.deduction_type_id' => [
                 'required',
@@ -118,6 +123,7 @@ class PayrollCompensationController extends Controller
                     'daily_rate' => $validated['daily_rate'],
                     'hourly_rate' => $validated['hourly_rate'] ?? null,
                     'hours_per_day' => $validated['hours_per_day'],
+                    'overtime_rate_per_minute' => $validated['overtime_rate_per_minute'] ?? null,
                     'created_by' => $request->user()?->id,
                 ]
             );
@@ -138,11 +144,14 @@ class PayrollCompensationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Compensation saved successfully',
-            'data' => $this->serialize($compensation->fresh('deductions.deductionType')),
+            'data' => $this->serialize(
+                $compensation->fresh('deductions.deductionType'),
+                $this->defaultOvertimeRate($institutionId)
+            ),
         ]);
     }
 
-    private function serialize(?PayrollCompensation $compensation): ?array
+    private function serialize(?PayrollCompensation $compensation, float $defaultOvertimeRate = 0): ?array
     {
         if (! $compensation) {
             return null;
@@ -156,6 +165,8 @@ class PayrollCompensationController extends Controller
             'hourly_rate' => $compensation->hourly_rate !== null ? (float) $compensation->hourly_rate : null,
             'effective_hourly_rate' => $compensation->effectiveHourlyRate(),
             'hours_per_day' => (float) $compensation->hours_per_day,
+            'overtime_rate_per_minute' => $compensation->overtime_rate_per_minute !== null ? (float) $compensation->overtime_rate_per_minute : null,
+            'effective_overtime_rate' => $compensation->effectiveOvertimeRate($defaultOvertimeRate),
             'deductions' => $compensation->deductions->map(fn ($deduction) => [
                 'deduction_type_id' => $deduction->deduction_type_id,
                 'name' => $deduction->deductionType?->name,
@@ -166,6 +177,15 @@ class PayrollCompensationController extends Controller
             'employer_share_total' => round((float) $compensation->deductions->sum('employer_amount'), 2),
             'updated_at' => $compensation->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * The institution's default overtime rate — used as the fallback shown
+     * for staff without a per-staff override.
+     */
+    private function defaultOvertimeRate(string $institutionId): float
+    {
+        return (float) (Institution::find($institutionId)?->overtime_rate_per_minute ?? 0);
     }
 
     private function staffName(?User $user): ?string
