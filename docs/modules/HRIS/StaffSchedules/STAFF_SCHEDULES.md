@@ -1,6 +1,7 @@
 # Module: Staff Schedules (HRIS)
 
 > Context doc for working on or integrating with the **Staff Schedules** module.
+> Use the [file map](#file-map) to jump straight to whatever a new feature touches.
 > If another module needs a staff member's working hours / day-off / holiday status,
 > read the [Integration](#integrating-from-other-modules) section.
 
@@ -26,6 +27,32 @@ A separate **Calendar** records institution-wide **holidays** and **events** per
 (multiple entries per day allowed). Holidays are currently **informational** — they are
 surfaced in the UI but do **not** automatically mutate schedules/attendance (see
 [Not yet wired](#not-yet-wired)).
+
+---
+
+## File map
+
+Everything the module touches, so a new feature knows exactly what to open. Paths are
+repo-relative; line numbers drift — search the symbol if it has moved.
+
+**Backend (`api/`)**
+- Migrations (`database/migrations/`):
+  - `2026_06_18_000001_create_staff_schedules_table.php` — `staff_schedules` + `staff_schedule_days` + `staff_schedule_assignments`.
+  - `2026_06_18_000002_create_staff_calendar_events_table.php` — `staff_calendar_events`.
+  - `2026_07_18_000001_add_grace_minutes_to_staff_schedule_days.php` — adds `grace_minutes` to the days table.
+- Models (`app/Models/`): `StaffSchedule.php`, `StaffScheduleDay.php`, `StaffScheduleAssignment.php`, `StaffCalendarEvent.php`.
+- Controllers (`app/Http/Controllers/`): `StaffScheduleController.php` (templates + assignments; validation in `validatePayload`/`validateDayTimes`, day writes in `syncDays`, output in `serialize`), `StaffCalendarEventController.php` (holidays/events).
+- Routes: `routes/api.php` lines ~380–386 (inside the `auth.token` group) — `staff-schedules` apiResource + `/assign`, `staff-schedule-assignments` (list/unassign), `staff-calendar-events` apiResource.
+
+**Frontend (`app/`)**
+- Page: `src/pages/HRIS/StaffSchedules.tsx` — single file, four tabs (see [Frontend](#frontend)). The per-day editor state is `DayRow`/`DayState`; payload is assembled in `buildDaysPayload`.
+- Services: `src/services/staffScheduleService.ts`, `src/services/staffCalendarService.ts`.
+- Types: `src/types/index.ts` — `DayOfWeek` (L453), `StaffScheduleDay` (L462), `StaffSchedule` (L473), `CreateStaffScheduleData` (L486), `StaffScheduleAssignment` (L494), `AssignStaffScheduleData`/`Result` (L504/L508), `CalendarEventType` (L515), `StaffCalendarEvent` (L517), `CreateStaffCalendarEventData` (L528).
+- Route registration: `src/App.tsx` (`hris/staff-schedules`); nav item in `src/components/sidebar/Sidebar.tsx` (HRIS group).
+- React Query keys: `['staff-schedules']`, `['staff-schedule-assignments']`, `['staff-calendar-events', …]`.
+
+**Consumers (read this module's data — keep in sync when the schema changes)**
+- Payroll: `api/app/Services/PayrollService.php` reads assignments + `staff_schedule_days` (incl. `grace_minutes`) and `staff_calendar_events` holidays to compute lateness/undertime/overtime. See [Consumed by Payroll](#consumed-by-payroll). Docs: `docs/modules/HRIS/Payroll/` (if present).
 
 ---
 
@@ -233,10 +260,33 @@ $working = $day !== null && ! $isHoliday;
 - Institution scope everything (mirror `resolveInstitutionId` in the controllers).
 - Deleting a template is blocked while it has assignments (409).
 
+### Consumed by Payroll
+
+`api/app/Services/PayrollService.php` (`generateForPeriod` → `buildPayslip`) is the one live
+consumer today. When a payroll period is generated it, per staff per date:
+
+- Loads the staff's assignment + template `days`; **absent weekday row = rest day** (`is_rest_day`).
+- Uses `staff_schedule_days.start_time` + **`grace_minutes`** to detect **lateness** — minutes the
+  first punch lands past `start_time + grace_minutes` (within grace = not late).
+- Uses `end_time` to detect **undertime** (punch-out before end) and **overtime** (punch-out past end).
+- Uses `lunch_start`/`lunch_end` to exclude the break from worked/required hours.
+- Treats a `staff_calendar_events` **holiday** on that date as a non-penalized day (no late/undertime/OT).
+
+Each payslip **snapshots** the schedule fields it used (`payslip_days.schedule_start/end`,
+`grace_minutes`) so later template edits don't retroactively change a generated payroll.
+
+**If you change the day schema** (rename/alter `start_time`, `end_time`, `grace_minutes`,
+`lunch_*`, or the "absent row = day off" rule), update `PayrollService` and the `payslip_days`
+snapshot columns together, or payroll math silently drifts.
+
 ---
 
 ## Not yet wired (good follow-ups)
-- Holidays are informational only — they do **not** yet auto-zero expected hours in attendance/payroll.
+- **Payroll** consumes schedules (lateness/undertime/overtime + rest days) — but the **Attendance /
+  ZKTeco** screens still don't (no live expected-vs-actual / tardiness display outside payroll).
+- Holidays skip payroll penalties but are otherwise informational — they do **not** auto-zero
+  expected hours or add holiday premium pay.
 - No multi-day holiday ranges (one `event_date` per entry).
-- Schedules are not yet consumed by the Attendance / ZKTeco modules (no tardiness/expected-vs-actual calc).
-- No per-staff schedule overrides (everyone on a template shares identical hours).
+- No per-staff schedule overrides (everyone on a template shares identical hours, including
+  `grace_minutes`). Overtime *rate* is per-staff (on Payroll → Employee Rates), but the schedule
+  itself is not.

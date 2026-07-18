@@ -9,10 +9,15 @@ modules should consume its data.
   audience/scope (institution, grade levels, sections), with attachments, scheduling, and per-viewer
   read tracking. Two surfaces: the **Announcements** board (all roles) and **Manage Announcements**
   (teachers + admins).
-- [Staff Schedules](STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates (weekly hours + lunch),
-  assigned to staff (one per staff), plus an institution calendar of holidays & events.
+- [Staff Schedules](HRIS/StaffSchedules/STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates
+  (weekly hours + lunch + per-day grace period), assigned to staff (one per staff), plus an
+  institution calendar of holidays & events. Consumed by Payroll for lateness/undertime/overtime.
 
 ## Conventions
-- One file per module, named in `SCREAMING_SNAKE_CASE.md`.
-- Keep an **Integration** section showing how other modules pull data from this one.
+- One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder
+  (`Announcements/`, `HRIS/<Module>/`); single-module areas can sit directly in `modules/`.
+- Open with a **File map** listing every file/route/type the module touches, so an agent can find
+  what to edit without re-discovering the layout.
+- Keep an **Integration** section showing how other modules pull data from this one, and flag the
+  live **consumers** so a schema change knows what it will break.
 - Note anything **not yet wired** so future work doesn't assume it exists.
