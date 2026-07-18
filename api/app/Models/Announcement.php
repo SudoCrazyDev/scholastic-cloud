@@ -14,6 +14,7 @@ class Announcement extends Model
         'institution_id',
         'author_id',
         'author_role',
+        'category',
         'title',
         'body',
         'audience',

@@ -45,6 +45,7 @@ class AnnouncementController extends Controller
 
         $filters = $request->validate([
             'search' => 'nullable|string',
+            'category' => 'nullable|in:all,general,finance',
             'status' => 'nullable|in:all,published,scheduled,draft,expired',
             'publish_from' => 'nullable|date',
             'publish_to' => 'nullable|date',
@@ -62,6 +63,10 @@ class AnnouncementController extends Controller
 
         if ($request->filled('search')) {
             $query->where('title', 'like', '%'.$request->get('search').'%');
+        }
+
+        if (($filters['category'] ?? null) && $filters['category'] !== 'all') {
+            $query->where('category', $filters['category']);
         }
 
         $this->applyStatusFilter($query, $filters['status'] ?? null);
@@ -149,6 +154,7 @@ class AnnouncementController extends Controller
                 'institution_id' => $institutionId,
                 'author_id' => $user->id,
                 'author_role' => $user->getRole()?->slug,
+                'category' => $resolved['category'],
                 'title' => $validated['title'],
                 'body' => $validated['body'] ?? null,
                 'audience' => $resolved['audience'],
@@ -200,13 +206,14 @@ class AnnouncementController extends Controller
         }
 
         $validated = $this->validatePayload($request);
-        $resolved = $this->resolveTargeting($request, $announcement->institution_id, $validated);
+        $resolved = $this->resolveTargeting($request, $announcement->institution_id, $validated, $announcement->category);
         if ($resolved instanceof JsonResponse) {
             return $resolved;
         }
 
         DB::transaction(function () use ($announcement, $validated, $resolved) {
             $announcement->update([
+                'category' => $resolved['category'],
                 'title' => $validated['title'],
                 'body' => $validated['body'] ?? null,
                 'audience' => $resolved['audience'],
@@ -405,6 +412,7 @@ class AnnouncementController extends Controller
         return $request->validate([
             'title' => 'required|string|max:255',
             'body' => 'nullable|string',
+            'category' => 'nullable|in:general,finance',
             'audience' => 'required|in:students,teachers,both',
             'scope' => 'required|in:institution,grade_levels,sections',
             'is_pinned' => 'nullable|boolean',
@@ -419,18 +427,34 @@ class AnnouncementController extends Controller
     }
 
     /**
-     * Apply role-based targeting rules and return the resolved audience/scope/
-     * section_ids/grade_levels, or a JsonResponse error when the request is
+     * Apply role-based targeting rules and return the resolved category/audience/
+     * scope/section_ids/grade_levels, or a JsonResponse error when the request is
      * not allowed.
      *
-     * @return array{audience:string,scope:string,section_ids:array,grade_levels:array}|JsonResponse
+     * @return array{category:string,audience:string,scope:string,section_ids:array,grade_levels:array}|JsonResponse
      */
-    private function resolveTargeting(Request $request, string $institutionId, array $validated)
+    private function resolveTargeting(Request $request, string $institutionId, array $validated, ?string $currentCategory = null)
     {
         $isAdmin = $this->isAdmin($request);
         $user = $request->user();
 
-        if ($isAdmin) {
+        // Finance staff always author finance announcements; admins keep an
+        // existing announcement's category unless the payload changes it.
+        // Teachers can never author finance posts (it would grant them an
+        // institution-wide audience).
+        if ($this->isFinance($request)) {
+            $category = 'finance';
+        } elseif ($isAdmin) {
+            $category = $validated['category'] ?? $currentCategory ?? 'general';
+        } else {
+            $category = 'general';
+        }
+
+        if ($category === 'finance') {
+            // Finance announcements are always for every student.
+            $audience = 'students';
+            $scope = 'institution';
+        } elseif ($isAdmin) {
             $audience = $validated['audience'];
             $scope = $validated['scope'];
         } else {
@@ -476,6 +500,7 @@ class AnnouncementController extends Controller
         }
 
         return [
+            'category' => $category,
             'audience' => $audience,
             'scope' => $scope,
             'section_ids' => $sectionIds,
@@ -538,6 +563,7 @@ class AnnouncementController extends Controller
             'institution_id' => $a->institution_id,
             'title' => $a->title,
             'body' => $a->body,
+            'category' => $a->category,
             'audience' => $a->audience,
             'scope' => $a->scope,
             'is_pinned' => (bool) $a->is_pinned,
@@ -626,6 +652,18 @@ class AnnouncementController extends Controller
         $role = method_exists($user, 'getRole') ? $user->getRole() : null;
 
         return in_array((string) ($role->slug ?? ''), self::ADMIN_ROLES, true);
+    }
+
+    private function isFinance(Request $request): bool
+    {
+        $user = $request->user();
+        if (! $user || $user instanceof StudentPortalUser) {
+            return false;
+        }
+
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+
+        return (string) ($role->slug ?? '') === 'finance';
     }
 
     private function isStudentUser(Request $request): bool

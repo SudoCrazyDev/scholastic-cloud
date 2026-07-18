@@ -6,10 +6,11 @@
 > whatever a new feature touches, and [Adding a new Finance view](#adding-a-new-finance-view) for
 > the exact steps to extend the page.
 
-Location in nav: **Finance → Finance** (`/finance` and `/finance/*`) and **Finance → Payment
-Plans** (`/payment-plans`, a standalone page **outside** the Finance tab shell). Sidebar
-`allowedRoles` for both: `super-administrator`, `principal`, `institution-administrator`,
-`finance`. Students see their own money at **My Finance** (`/my-finance`) — a separate page, not
+Location in nav: **Finance → Finance** (`/finance` and `/finance/*`), **Finance → Payment
+Plans** (`/payment-plans`, a standalone page **outside** the Finance tab shell), and **Finance →
+Announcements** (`/finance-announcements`, also standalone — a separate module, see
+[Finance Announcements](Announcements/FINANCE_ANNOUNCEMENTS.md)). Sidebar `allowedRoles` for all
+three: `super-administrator`, `principal`, `institution-administrator`, `finance`. Students see their own money at **My Finance** (`/my-finance`) — a separate page, not
 part of this shell.
 
 Everything is **institution-scoped**: backend controllers resolve the institution from the
@@ -115,8 +116,10 @@ views' requests.
 - Types: `src/types/index.ts` (`SchoolFee`, `SchoolFeeDefault`, `PaymentTransaction`,
   `StudentLedgerEntry`, `CreateStudentDiscountData`, `DefaultDiscount`, `PaymentVoidStatus`, …).
 - Routes: `src/App.tsx` — `finance` + nine `finance/*` routes all render `<Finance />`;
-  `payment-plans` renders `<PaymentPlansView />` directly. Sidebar: `src/components/sidebar/Sidebar.tsx`
-  (Finance section).
+  `payment-plans` renders `<PaymentPlansView />` directly, as does `finance-announcements`
+  (`FinanceAnnouncementsView.tsx`, a separate module — see
+  [Finance Announcements](Announcements/FINANCE_ANNOUNCEMENTS.md)). Sidebar:
+  `src/components/sidebar/Sidebar.tsx` (Finance section).
 
 **Backend (`api/`)**
 - Routes: `routes/api.php`, all inside the `auth.token` group — school-fees apiResource + finance
@@ -250,7 +253,7 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 ## Roles & permissions
 
 - **Sidebar/UI access**: `super-administrator`, `principal`, `institution-administrator`,
-  `finance` (both Finance and Payment Plans links). The routes themselves are not role-guarded in
+  `finance` (the Finance, Payment Plans, and Announcements links). The routes themselves are not role-guarded in
   the frontend router — the sidebar is the gate.
 - **Void workflow** (mirrored front + back):
   - `VOID_APPROVER_ROLES` in `Finance.tsx` = `institution-administrator`, `principal`,

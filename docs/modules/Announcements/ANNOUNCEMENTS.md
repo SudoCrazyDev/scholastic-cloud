@@ -42,7 +42,7 @@ cache the `url` field long-term; re-fetch it.
 ## File map
 
 **Backend (`api/`)**
-- Migrations: `database/migrations/2026_06_28_000003_create_announcements_table.php` (+ `..._000004` sections, `..._000005` grade_levels, `..._000006` attachments, `..._000007` reads).
+- Migrations: `database/migrations/2026_06_28_000003_create_announcements_table.php` (+ `..._000004` sections, `..._000005` grade_levels, `..._000006` attachments, `..._000007` reads; `2026_07_18_000005` adds `category`).
 - Models: `app/Models/Announcement.php`, `AnnouncementAttachment.php`, `AnnouncementGradeLevel.php`, `AnnouncementRead.php`, `AnnouncementSection.php` (pivot).
 - Service: `app/Services/AnnouncementService.php` — viewer resolution + visibility query + `staffSectionIds`.
 - Controller: `app/Http/Controllers/AnnouncementController.php` — authoring, attachments, feed, read-tracking.
@@ -67,6 +67,7 @@ cache the `url` field long-term; re-fetch it.
 | institution_id | uuid | FK → institutions, cascade |
 | author_id | uuid nullable | FK → users, nullOnDelete |
 | author_role | string nullable | snapshot of author's role slug at creation (avoids a join for "Posted by") |
+| category | string | `general` \| `finance`, default `general` — which authoring surface owns the post; `finance` posts are forced to `students`/`institution` (see [Finance Announcements](../Finance/Announcements/FINANCE_ANNOUNCEMENTS.md)) |
 | title | string | |
 | body | longText nullable | rich-text HTML |
 | audience | enum | `students` \| `teachers` \| `both`, default `students` |
@@ -77,7 +78,8 @@ cache the `url` field long-term; re-fetch it.
 | expires_at | timestamp nullable | past value ⇒ hidden |
 | timestamps | | |
 
-Indexes: `(institution_id, status)`, `(institution_id, is_pinned)`, `(publish_at)`, `(expires_at)`.
+Indexes: `(institution_id, status)`, `(institution_id, is_pinned)`, `(institution_id, category)`,
+`(publish_at)`, `(expires_at)`.
 
 ### `announcement_sections` — targeting rows when scope=`sections`
 `id`, `announcement_id` (FK cascade), `class_section_id` (FK cascade), timestamps.
@@ -119,7 +121,7 @@ The feed/unread-count/read/attachment routes are declared **before** `apiResourc
 ### Authoring (teachers + admins) — `apiResource('announcements')`
 | method | path | action | notes |
 |---|---|---|---|
-| GET | `/api/announcements` | `index` | manageable list; students 403. Admins → all in institution; teachers → `author_id = self`. `?search=` LIKE on title. Server-side filters: `?status=` (published/scheduled/draft/expired — "scheduled"/"expired" are computed from publish_at/expires_at vs now, expired wins), `?publish_from/publish_to`, `?expires_from/expires_to` (inclusive day bounds; null-date rows excluded once a bound is set). Includes `withCount('reads')`. |
+| GET | `/api/announcements` | `index` | manageable list; students 403. Admins → all in institution; teachers → `author_id = self`. `?search=` LIKE on title. Server-side filters: `?category=` (general/finance), `?status=` (published/scheduled/draft/expired — "scheduled"/"expired" are computed from publish_at/expires_at vs now, expired wins), `?publish_from/publish_to`, `?expires_from/expires_to` (inclusive day bounds; null-date rows excluded once a bound is set). Includes `withCount('reads')`. |
 | POST | `/api/announcements` | `store` | validate → `resolveTargeting` → create (sets `author_id`, `author_role`) → `syncTargeting`. 201. |
 | GET | `/api/announcements/{id}` | `show` | one manageable record (`findManageable`). |
 | PUT/PATCH | `/api/announcements/{id}` | `update` | validate → resolveTargeting → update → syncTargeting. |
@@ -139,8 +141,8 @@ The feed/unread-count/read/attachment routes are declared **before** `apiResourc
 | POST | `/api/announcements/{id}/read` | `markRead` | only for announcements the viewer can see (else 404); `updateOrCreate` a read with `read_at = now()`. |
 
 ### Serialization
-- `serialize` — full author shape (used by manage endpoints): id, institution_id, title, body, audience,
-  scope, is_pinned, status, publish_at, expires_at, author_id, author_role, author_name, `read_count`,
+- `serialize` — full author shape (used by manage endpoints): id, institution_id, title, body, category,
+  audience, scope, is_pinned, status, publish_at, expires_at, author_id, author_role, author_name, `read_count`,
   `section_ids`, `sections`, `grade_levels`, `attachments`, timestamps.
 - `serializeForViewer` — trimmed feed shape: id, title, body, is_pinned, audience, author_role,
   author_name, `is_read`, publish_at, attachments, created_at.
@@ -166,8 +168,12 @@ a viewer, **route through `visibleQuery`** rather than re-implementing the filte
   the staff viewer and by write-side authoring guards.
 
 ### Authoring guards — `resolveTargeting` (controller)
+- `category` is resolved first: the `finance` role always gets `finance`; admins may submit it
+  (an update without it keeps the row's current value); teachers are forced to `general`. Any
+  `finance`-category post is forced to `audience=students`, `scope=institution` — see
+  [Finance Announcements](../Finance/Announcements/FINANCE_ANNOUNCEMENTS.md).
 - Admins keep the submitted `audience`/`scope`.
-- Non-admins are forced to `audience=students`, `scope=sections`.
+- Non-admin, non-finance authors are forced to `audience=students`, `scope=sections`.
 - `scope=sections`: ≥1 section required; all must belong to the institution; for teachers they must
   intersect `staffSectionIds` ("You can only post to sections you advise or teach").
 - `scope=grade_levels`: ≥1 grade level required.
@@ -209,13 +215,13 @@ filter is active. Empty results render as "no matches" when a filter is active v
 yet" otherwise.
 
 ### Service — `announcementService.ts` (baseUrl `/announcements`)
-`getAnnouncements({search?, status?, publish_from?, publish_to?, expires_from?, expires_to?})`,
+`getAnnouncements({search?, category?, status?, publish_from?, publish_to?, expires_from?, expires_to?})`,
 `createAnnouncement`, `updateAnnouncement`, `deleteAnnouncement`,
 `uploadAttachment(id, file)` (FormData), `deleteAttachment(id, attachmentId)`, `getFeed`,
 `getUnreadCount`, `markRead(id)`.
 
 ### Types — `src/types/index.ts`
-`AnnouncementAudience`, `AnnouncementScope`, `AnnouncementStatus`, `AnnouncementAttachment`,
+`AnnouncementAudience`, `AnnouncementScope`, `AnnouncementStatus`, `AnnouncementCategory`, `AnnouncementAttachment`,
 `AnnouncementSectionRef`, `Announcement` (full manage shape), `AnnouncementFeedItem` (trimmed feed
 shape), `CreateAnnouncementData`.
 

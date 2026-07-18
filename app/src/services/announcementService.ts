@@ -14,6 +14,7 @@ class AnnouncementService {
 
   async getAnnouncements(params?: {
     search?: string
+    category?: string
     status?: string
     publish_from?: string
     publish_to?: string
@@ -22,6 +23,7 @@ class AnnouncementService {
   }) {
     const query = new URLSearchParams()
     if (params?.search) query.append('search', params.search)
+    if (params?.category && params.category !== 'all') query.append('category', params.category)
     if (params?.status && params.status !== 'all') query.append('status', params.status)
     if (params?.publish_from) query.append('publish_from', params.publish_from)
     if (params?.publish_to) query.append('publish_to', params.publish_to)

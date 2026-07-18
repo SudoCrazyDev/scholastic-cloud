@@ -249,6 +249,13 @@ const menuGroups: MenuGroup[] = [
         path: '/payment-plans',
         allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
       },
+      {
+        id: 'finance-announcements',
+        label: 'Announcements',
+        icon: <Megaphone className="w-5 h-5" />,
+        path: '/finance-announcements',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+      },
     ],
   },
   {

@@ -1809,6 +1809,9 @@ export interface AttendanceLog {
 export type AnnouncementAudience = 'students' | 'teachers' | 'both';
 export type AnnouncementScope = 'institution' | 'grade_levels' | 'sections';
 export type AnnouncementStatus = 'draft' | 'published';
+// Which authoring surface owns the post. 'finance' posts (Finance > Announcements)
+// are always audience=students + scope=institution, enforced server-side.
+export type AnnouncementCategory = 'general' | 'finance';
 
 export interface AnnouncementAttachment {
   id: string;
@@ -1830,6 +1833,7 @@ export interface Announcement {
   institution_id: string;
   title: string;
   body: string | null;
+  category: AnnouncementCategory;
   audience: AnnouncementAudience;
   scope: AnnouncementScope;
   is_pinned: boolean;
@@ -1866,6 +1870,7 @@ export interface AnnouncementFeedItem {
 export interface CreateAnnouncementData {
   title: string;
   body?: string | null;
+  category?: AnnouncementCategory;
   audience: AnnouncementAudience;
   scope: AnnouncementScope;
   is_pinned?: boolean;

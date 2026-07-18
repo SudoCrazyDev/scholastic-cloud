@@ -13,6 +13,10 @@ modules should consume its data.
   cashiering (POS with printed receipts), per-student ledgers/NOA, collections reports, three
   discount mechanisms, receipt templates, payment plans, and a payment-void approval queue. One
   page (`/finance/*`) with a grouped two-level nav; Payment Plans is a standalone sibling page.
+- [Finance Announcements](Finance/Announcements/FINANCE_ANNOUNCEMENTS.md) — Finance office's
+  announcements channel (`/finance-announcements`, below Payment Plans in the sidebar). A thin
+  surface over the Announcements module: posts get `category='finance'` and are **always for all
+  students** (server-forced `audience=students`, `scope=institution`).
 - [Staff Schedules](HRIS/StaffSchedules/STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates
   (weekly hours + lunch + per-day grace period), assigned to staff (one per staff), plus an
   institution calendar of holidays & events. Consumed by Payroll for lateness/undertime/overtime.
