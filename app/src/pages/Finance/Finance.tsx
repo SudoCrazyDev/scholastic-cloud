@@ -11,6 +11,7 @@ import {
   BookOpenIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  DocumentCheckIcon,
   ReceiptRefundIcon,
 } from '@heroicons/react/24/outline'
 import { NavLink, useLocation } from 'react-router-dom'
@@ -32,6 +33,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import DashboardCharts from './DashboardCharts'
 import CollectionsView from './CollectionsView'
+import ReceiptApprovalsView from './ReceiptApprovalsView'
 import DiscountsView from './DiscountsView'
 import DefaultDiscountsView from './DefaultDiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
@@ -50,6 +52,7 @@ type FinanceView =
   | 'discounts'
   | 'default-discounts'
   | 'receipt-builder'
+  | 'receipt-approvals'
   | 'void-requests'
 
 const SETUP_VIEWS: FinanceView[] = [
@@ -75,6 +78,12 @@ const PRIMARY_NAV: FinanceNavItem[] = [
   { label: 'Ledger', to: '/finance/ledger', icon: BookOpenIcon, views: ['ledger'] },
   { label: 'Collections', to: '/finance/collections', icon: ChartBarIcon, views: ['collections'] },
   {
+    label: 'Receipt Approvals',
+    to: '/finance/receipt-approvals',
+    icon: DocumentCheckIcon,
+    views: ['receipt-approvals'],
+  },
+  {
     label: 'Void Requests',
     to: '/finance/void-requests',
     icon: ReceiptRefundIcon,
@@ -97,6 +106,7 @@ const VIEW_SUBTITLES: Record<FinanceView, string> = {
   cashiering: 'Search for a student, take payments, and print official receipts.',
   ledger: "Review a student's charges, payments, discounts, and running balance.",
   collections: 'View payment collections by month or quarter for the school year.',
+  'receipt-approvals': 'Verify student-uploaded payment receipts and post approved payments.',
   'void-requests': 'Request and approve voiding of posted payments.',
   'school-fees': 'Define the fee types your school charges.',
   'default-amounts': 'Set default fee amounts per grade level and academic year.',
@@ -118,6 +128,7 @@ const Finance: React.FC = () => {
     if (pathname.endsWith('/default-discounts')) return 'default-discounts'
     if (pathname.endsWith('/discounts')) return 'discounts'
     if (pathname.endsWith('/receipt-builder')) return 'receipt-builder'
+    if (pathname.endsWith('/receipt-approvals')) return 'receipt-approvals'
     if (pathname.endsWith('/void-requests')) return 'void-requests'
     return 'dashboard'
   }, [location.pathname])
@@ -2849,6 +2860,8 @@ const Finance: React.FC = () => {
       {view === 'default-discounts' && <DefaultDiscountsView />}
 
       {view === 'receipt-builder' && <ReceiptBuilderView />}
+
+      {view === 'receipt-approvals' && <ReceiptApprovalsView />}
 
       {view === 'void-requests' && canRequestVoid && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">

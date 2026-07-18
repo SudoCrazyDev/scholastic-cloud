@@ -388,6 +388,30 @@ export interface PaymentVoidRequest {
   reviewer?: { id: string; first_name: string; last_name: string } | null;
 }
 
+export type ReceiptSubmissionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PaymentReceiptSubmission {
+  id: string;
+  institution_id: string;
+  student_id: string;
+  academic_year: string;
+  installment_sequence: number;
+  installment_label?: string | null;
+  amount?: number | string | null;
+  file_name: string;
+  mime_type?: string | null;
+  url?: string | null;
+  status: ReceiptSubmissionStatus;
+  review_note?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  student_payment_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  student?: { id: string; first_name: string; middle_name?: string | null; last_name: string };
+  reviewer?: { id: string; first_name: string; last_name: string } | null;
+}
+
 // Legacy enum kept for back-compat; plans are now identified by payment_plan_id + name.
 export type StudentPaymentPlanType = 'monthly' | 'quarterly';
 

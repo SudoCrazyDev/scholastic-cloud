@@ -115,7 +115,7 @@ export default function MyFinance() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">My Finance</h1>
               <p className="mt-1 text-gray-600">
-                View your balance, notice of account, ledger, and pay online.
+                View your balance, notice of account, and ledger.
               </p>
             </div>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>

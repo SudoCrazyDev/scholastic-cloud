@@ -29,7 +29,7 @@ views are bookmarkable and there is no tab state to persist.
 Navigation is **two-level** (data-driven constants at the top of `Finance.tsx`):
 
 - `PRIMARY_NAV` — the top row: **Dashboard**, **Cashiering**, **Ledger**, **Collections**,
-  **Void Requests** (only when `canRequestVoid`), and **Setup**.
+  **Receipt Approvals**, **Void Requests** (only when `canRequestVoid`), and **Setup**.
 - `SETUP_NAV` — a sub-row that appears only while a setup view is active: **School Fees**,
   **Default Amounts**, **Grade Level Discounts**, **Default Discounts**, **Receipt Builder**.
   The "Setup" primary item links to `/finance/school-fees` and is highlighted whenever `view` is
@@ -42,6 +42,7 @@ Navigation is **two-level** (data-driven constants at the top of `Finance.tsx`):
 | `cashiering` | `/finance/cashiering` | POS: take a multi-line payment, print receipt |
 | `ledger` | `/finance/ledger` | Per-student account: charges, payments, discounts, NOA |
 | `collections` | `/finance/collections` | Monthly/quarterly collections by payment method |
+| `receipt-approvals` | `/finance/receipt-approvals` | Student-uploaded payment receipt review queue |
 | `void-requests` | `/finance/void-requests` | Payment void request queue (role-gated) |
 | `school-fees` | `/finance/school-fees` | Setup: fee type catalog |
 | `default-amounts` | `/finance/default-amounts` | Setup: fee amount per grade level per year |
@@ -91,6 +92,15 @@ views' requests.
   request themselves it is auto-approved and the payment is voided immediately** (backend
   behavior in `PaymentVoidRequestController@store`). Voided payments keep their rows —
   `student_payments` gets `voided_at/voided_by/void_note`.
+- **Receipt submissions** (`payment_receipt_submissions`) — a student uploads a proof-of-payment
+  image/PDF for an installment on My Finance (status `pending`; file stored on R2 under
+  `{institution}/student/{student}/payment-receipts/`). Reviewer roles (finance + admin roles)
+  view the image on **Receipt Approvals**, enter the verified amount, and approve — which posts a
+  `student_payments` row (`payment_method: 'Online - Receipt Upload'`, linked via
+  `student_payment_id`) so the installment schedule updates automatically — or reject with a
+  required `review_note` the student sees on My Finance. Installments are computed live, so the
+  target is `academic_year` + `installment_sequence`, not a foreign key. One pending submission
+  per installment at a time.
 - **NOA (Notice of Account)** — printable statement per student+year, rendered client-side by
   `StudentNOAPDF` (`@react-pdf/renderer`) from `GET /students/{id}/noa`.
 - **Receipts** — printed via `ReceiptPrintModal`, which lays the transaction out according to the
@@ -178,6 +188,16 @@ here staff can:
 `GET /finance/collections?academic_year=` → monthly/quarterly totals with a per-payment-method
 breakdown (school year June–March). Read-only.
 
+### Receipt Approvals (`/finance/receipt-approvals`) — `ReceiptApprovalsView.tsx`
+Queue of student-uploaded payment receipts (`GET /payment-receipt-submissions?status=`), with a
+pending/approved/rejected filter (pending auto-refetches every 60s). "Review" opens a modal with
+the receipt image (or a file link for PDFs), a verified-amount input, and Approve / Reject
+actions. Approve → `POST /payment-receipt-submissions/{id}/approve` with `{amount}` (posts the
+payment); Reject → `POST …/{id}/reject` with a required `review_note`. Invalidates ledger, NOA,
+and dashboard queries afterwards. Backend role gate: `REVIEWER_ROLES` in
+`PaymentReceiptSubmissionController` (`finance`, `institution-administrator`, `principal`,
+`super-administrator`).
+
 ### Void Requests (`/finance/void-requests`)
 Visible only when `canRequestVoid` (frontend) — `finance` role or an approver role. Lists
 `GET /payment-void-requests?status=` with a status filter. Approvers get Approve / Disapprove
@@ -225,6 +245,7 @@ the academic year. Routed as a sibling of `/finance` in `App.tsx` with its own s
 | `gradeLevelDiscountService` | CRUD `/grade-level-discounts` |
 | `studentAdditionalFeeService` | CRUD `/student-additional-fees` |
 | `paymentVoidService` | GET/POST `/payment-void-requests`, POST `…/{id}/approve`, POST `…/{id}/disapprove` |
+| `paymentReceiptService` | GET/POST `/payment-receipt-submissions` (POST is student multipart upload), POST `…/{id}/approve`, POST `…/{id}/reject` |
 | `paymentPlanService` | CRUD `/payment-plans`, GET `/payment-plan-changes` |
 | `receiptTemplateService` | CRUD `/receipt-templates` |
 
@@ -245,6 +266,7 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 | `grade_level_discounts` | Bulk per-grade discounts |
 | `student_additional_fees` | Ad-hoc per-student charges (name, amount) |
 | `payment_void_requests` | `receipt_number`, `status` pending/approved/disapproved, request/review notes, requested_by/reviewed_by |
+| `payment_receipt_submissions` | Student-uploaded receipt: `installment_sequence/label`, R2 `file_path`, `status` pending/approved/rejected, `review_note`, `amount` (verified), `student_payment_id` (set on approval) |
 | `payment_plans` / `payment_plan_installments` | Plans + installment rows (sequence, label, due_month/day, share_percentage, grace, late fee) |
 | `student_payment_plans` | Student's chosen plan, unique(institution, student, year); changes audited in `student_payment_plan_changes` |
 

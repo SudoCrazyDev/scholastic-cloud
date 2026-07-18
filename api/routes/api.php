@@ -17,6 +17,7 @@ use App\Http\Controllers\IdCardTemplateController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\InternalPaymentCallbackController;
 use App\Http\Controllers\PaymentPlanController;
+use App\Http\Controllers\PaymentReceiptSubmissionController;
 use App\Http\Controllers\PaymentTransactionController;
 use App\Http\Controllers\PaymentVoidRequestController;
 use App\Http\Controllers\ReceiptTemplateController;
@@ -336,6 +337,12 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::patch('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::delete('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'destroy']);
+
+    // Payment receipt submissions (student uploads proof of payment, finance verifies)
+    Route::get('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'index']);
+    Route::post('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'store']);
+    Route::post('payment-receipt-submissions/{id}/approve', [PaymentReceiptSubmissionController::class, 'approve']);
+    Route::post('payment-receipt-submissions/{id}/reject', [PaymentReceiptSubmissionController::class, 'reject']);
 
     // Payment void requests (finance requests, admin approves/disapproves)
     Route::get('payment-void-requests', [PaymentVoidRequestController::class, 'index']);

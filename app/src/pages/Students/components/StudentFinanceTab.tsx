@@ -1,11 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import {
+  ArrowUpTrayIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
+  ClockIcon,
   CreditCardIcon,
   DocumentTextIcon,
+  ExclamationTriangleIcon,
   PencilSquareIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
@@ -16,10 +19,12 @@ import { useAuth } from '../../../hooks/useAuth'
 import { studentFinanceService } from '../../../services/studentFinanceService'
 import { paymentPlanService } from '../../../services/paymentPlanService'
 import { studentOnlinePaymentService } from '../../../services/studentOnlinePaymentService'
+import { paymentReceiptService } from '../../../services/paymentReceiptService'
 import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
 import type {
   CreateStudentOnlinePaymentCheckoutData,
   PaymentPlan,
+  PaymentReceiptSubmission,
   Student,
 } from '../../../types'
 
@@ -27,6 +32,9 @@ interface StudentFinanceTabProps {
   student: Student
   studentId: string
 }
+
+// Temporarily hidden; flip back to true to restore the Pay Online (Maya Checkout) form.
+const SHOW_PAY_ONLINE_SECTION = false
 
 export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, studentId }) => {
   const queryClient = useQueryClient()
@@ -42,6 +50,11 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const [onlinePaymentMessage, setOnlinePaymentMessage] = useState<string | null>(null)
   const [showPlanOverride, setShowPlanOverride] = useState(false)
   const [payingInstallment, setPayingInstallment] = useState<number | null>(null)
+  const receiptFileInputRef = useRef<HTMLInputElement | null>(null)
+  const [receiptUploadTarget, setReceiptUploadTarget] = useState<{
+    sequence: number
+    label: string
+  } | null>(null)
 
   const activePlansQuery = useQuery({
     queryKey: ['active-payment-plans'],
@@ -72,6 +85,12 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       studentOnlinePaymentService.getTransactions({
         academic_year: resolvedAcademicYear,
       }),
+    enabled: Boolean(studentId && resolvedAcademicYear && isStudentUser),
+  })
+
+  const receiptSubmissionsQuery = useQuery({
+    queryKey: ['payment-receipt-submissions', studentId, resolvedAcademicYear],
+    queryFn: () => paymentReceiptService.list({ academic_year: resolvedAcademicYear }),
     enabled: Boolean(studentId && resolvedAcademicYear && isStudentUser),
   })
 
@@ -193,6 +212,36 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     },
   })
 
+  const uploadReceiptMutation = useMutation({
+    mutationFn: (payload: { sequence: number; label: string; file: File }) =>
+      paymentReceiptService.upload({
+        academic_year: resolvedAcademicYear,
+        installment_sequence: payload.sequence,
+        installment_label: payload.label,
+        file: payload.file,
+      }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['payment-receipt-submissions', studentId] })
+      toast.success(response.message || 'Receipt uploaded. It will be reviewed by the finance office.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to upload receipt.')
+    },
+    onSettled: () => setReceiptUploadTarget(null),
+  })
+
+  const handleUploadReceiptClick = (installment: { sequence: number; label: string }) => {
+    setReceiptUploadTarget({ sequence: installment.sequence, label: installment.label })
+    receiptFileInputRef.current?.click()
+  }
+
+  const handleReceiptFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !receiptUploadTarget) return
+    uploadReceiptMutation.mutate({ ...receiptUploadTarget, file })
+  }
+
   const formatAmount = (amount?: number | null) => {
     const value = Number(amount || 0)
     return new Intl.NumberFormat('en-PH', {
@@ -313,8 +362,35 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const noaData = noaQuery.data?.data
   const onlineTransactions = onlinePaymentsQuery.data?.data || []
   const paymentPlan = ledgerData?.payment_plan ?? null
-  const installments = ledgerData?.installments ?? []
+  const installmentsData = ledgerData?.installments
+  const installments = useMemo(() => installmentsData ?? [], [installmentsData])
   const needsPlanSelection = isStudentUser && !paymentPlan && !ledgerQuery.isLoading
+
+  const receiptSubmissions = useMemo(
+    () => receiptSubmissionsQuery.data?.data || [],
+    [receiptSubmissionsQuery.data?.data]
+  )
+
+  // Latest submission per installment (API returns newest first).
+  const latestReceiptBySequence = useMemo(() => {
+    const map = new Map<number, PaymentReceiptSubmission>()
+    for (const submission of receiptSubmissions) {
+      if (!map.has(submission.installment_sequence)) {
+        map.set(submission.installment_sequence, submission)
+      }
+    }
+    return map
+  }, [receiptSubmissions])
+
+  const rejectedReceipts = useMemo(() => {
+    const paidSequences = new Set(
+      installments.filter((installment) => installment.status === 'paid').map((i) => i.sequence)
+    )
+    return [...latestReceiptBySequence.values()].filter(
+      (submission) =>
+        submission.status === 'rejected' && !paidSequences.has(submission.installment_sequence)
+    )
+  }, [latestReceiptBySequence, installments])
 
   const handlePlanSubmit = (paymentPlanId: string) => {
     setPaymentPlanMutation.mutate(paymentPlanId, {
@@ -355,6 +431,45 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
   return (
     <div className="space-y-8">
+      {isStudentUser && (
+        <input
+          ref={receiptFileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,application/pdf"
+          className="hidden"
+          onChange={handleReceiptFileChange}
+        />
+      )}
+
+      {isStudentUser && rejectedReceipts.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <div className="flex items-start gap-3">
+            <ExclamationTriangleIcon className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-red-800">
+                {rejectedReceipts.length === 1
+                  ? 'Your uploaded payment receipt was rejected'
+                  : `${rejectedReceipts.length} of your uploaded payment receipts were rejected`}
+              </p>
+              <ul className="mt-1 space-y-1 text-sm text-red-700">
+                {rejectedReceipts.map((submission) => (
+                  <li key={submission.id}>
+                    <span className="font-medium">
+                      {submission.installment_label ||
+                        `Installment #${submission.installment_sequence}`}
+                    </span>
+                    {submission.review_note ? ` — ${submission.review_note}` : ''}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-red-600">
+                Please upload a new receipt from the installment schedule below.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold text-gray-900">Student Finance</h3>
@@ -503,6 +618,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
       {isStudentUser && (
         <div className="space-y-6">
+          {SHOW_PAY_ONLINE_SECTION && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h4 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
               <CreditCardIcon className="w-5 h-5 text-indigo-600" />
@@ -535,6 +651,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               </Button>
             </form>
           </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h4 className="text-lg font-semibold text-gray-900 mb-4">Recent Online Payments</h4>
@@ -573,6 +690,83 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                           >
                             {tx.status}
                           </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h4 className="text-lg font-semibold text-gray-900 mb-1">Uploaded Payment Receipts</h4>
+            <p className="text-sm text-gray-500 mb-4">
+              Receipts you upload are reviewed by the finance office. Approved receipts are posted
+              to your ledger automatically.
+            </p>
+            {receiptSubmissionsQuery.isLoading ? (
+              <p className="text-gray-500">Loading uploaded receipts...</p>
+            ) : !receiptSubmissions.length ? (
+              <p className="text-sm text-gray-500">No uploaded receipts yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Installment</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Uploaded</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Receipt</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verified Amount</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {receiptSubmissions.map((submission) => (
+                      <tr key={submission.id}>
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {submission.installment_label ||
+                            `Installment #${submission.installment_sequence}`}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-600">
+                          {submission.created_at
+                            ? new Date(submission.created_at).toLocaleString('en-PH')
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          {submission.url ? (
+                            <a
+                              href={submission.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800 hover:underline"
+                            >
+                              {submission.file_name}
+                            </a>
+                          ) : (
+                            <span className="text-gray-600">{submission.file_name}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
+                          {submission.amount != null ? formatAmount(Number(submission.amount)) : '—'}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize ${
+                              submission.status === 'approved'
+                                ? 'bg-green-100 text-green-700'
+                                : submission.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {submission.status}
+                          </span>
+                          {submission.status === 'rejected' && submission.review_note && (
+                            <span className="block text-xs text-red-600 mt-1 max-w-xs ml-auto">
+                              {submission.review_note}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -724,6 +918,11 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                 createOnlinePaymentMutation.isPending && payingInstallment === installment.sequence
               const isPaid = installment.status === 'paid'
               const remaining = Math.max(0, installment.amount - installment.paid_amount)
+              const receipt = latestReceiptBySequence.get(installment.sequence)
+              const receiptStatus = !isPaid && receipt?.status !== 'approved' ? receipt?.status : undefined
+              const isUploading =
+                uploadReceiptMutation.isPending &&
+                receiptUploadTarget?.sequence === installment.sequence
               return (
                 <li
                   key={installment.sequence}
@@ -770,31 +969,68 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                     </div>
                   ) : (
                     isStudentUser && (
-                      <button
-                        type="button"
-                        disabled={createOnlinePaymentMutation.isPending}
-                        onClick={() =>
-                          handlePayInstallment({ ...installment, amount: remaining })
-                        }
-                        className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                      >
-                        {isPaying ? (
-                          <>
-                            <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <CreditCardIcon className="w-4 h-4" />
-                            Pay {formatAmount(remaining)}
-                            {installment.status === 'partial' && (
-                              <span className="ml-1 text-[10px] uppercase tracking-wide bg-white/20 rounded px-1.5 py-0.5">
-                                Remaining
-                              </span>
-                            )}
-                          </>
+                      <div className="border-t border-gray-100">
+                        {receiptStatus === 'pending' && (
+                          <div className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-yellow-800 bg-yellow-50">
+                            <ClockIcon className="w-4 h-4" />
+                            Receipt pending review
+                          </div>
                         )}
-                      </button>
+                        {receiptStatus === 'rejected' && (
+                          <div className="flex items-start gap-2 px-4 py-2 text-xs font-medium text-red-700 bg-red-50">
+                            <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <span>
+                              Receipt rejected
+                              {receipt?.review_note ? `: ${receipt.review_note}` : ''}
+                            </span>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2">
+                          <button
+                            type="button"
+                            disabled={createOnlinePaymentMutation.isPending}
+                            onClick={() =>
+                              handlePayInstallment({ ...installment, amount: remaining })
+                            }
+                            className="flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                          >
+                            {isPaying ? (
+                              <>
+                                <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCardIcon className="w-4 h-4" />
+                                Pay {formatAmount(remaining)}
+                                {installment.status === 'partial' && (
+                                  <span className="ml-1 text-[10px] uppercase tracking-wide bg-white/20 rounded px-1.5 py-0.5">
+                                    Remaining
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={uploadReceiptMutation.isPending || receiptStatus === 'pending'}
+                            onClick={() => handleUploadReceiptClick(installment)}
+                            className="flex items-center justify-center gap-2 py-3 text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 disabled:opacity-60 disabled:cursor-not-allowed transition border-l border-gray-100"
+                          >
+                            {isUploading ? (
+                              <>
+                                <span className="inline-block w-4 h-4 border-2 border-indigo-300 border-t-indigo-700 rounded-full animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <ArrowUpTrayIcon className="w-4 h-4" />
+                                {receiptStatus === 'rejected' ? 'Re-upload' : 'Upload Receipt'}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
                     )
                   )}
                 </li>
@@ -820,7 +1056,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                     Amount Due
                   </th>
                   {isStudentUser && (
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-28">
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-64">
                       Action
                     </th>
                   )}
@@ -833,6 +1069,12 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                     payingInstallment === installment.sequence
                   const isPaid = installment.status === 'paid'
                   const remaining = Math.max(0, installment.amount - installment.paid_amount)
+                  const receipt = latestReceiptBySequence.get(installment.sequence)
+                  const receiptStatus =
+                    !isPaid && receipt?.status !== 'approved' ? receipt?.status : undefined
+                  const isUploading =
+                    uploadReceiptMutation.isPending &&
+                    receiptUploadTarget?.sequence === installment.sequence
                   return (
                     <tr key={installment.sequence} className={isPaid ? 'bg-green-50/30' : undefined}>
                       <td className="px-4 py-2 text-sm text-gray-600">{installment.sequence}</td>
@@ -860,19 +1102,51 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                               Paid
                             </span>
                           ) : (
-                            <Button
-                              size="sm"
-                              loading={isPaying}
-                              disabled={createOnlinePaymentMutation.isPending}
-                              onClick={() =>
-                                handlePayInstallment({ ...installment, amount: remaining })
-                              }
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                            >
-                              {installment.status === 'partial'
-                                ? `Pay ${formatAmount(remaining)}`
-                                : 'Pay'}
-                            </Button>
+                            <div className="flex flex-col items-end gap-1.5">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  loading={isPaying}
+                                  disabled={createOnlinePaymentMutation.isPending}
+                                  onClick={() =>
+                                    handlePayInstallment({ ...installment, amount: remaining })
+                                  }
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                >
+                                  {installment.status === 'partial'
+                                    ? `Pay ${formatAmount(remaining)}`
+                                    : 'Pay'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  loading={isUploading}
+                                  disabled={
+                                    uploadReceiptMutation.isPending || receiptStatus === 'pending'
+                                  }
+                                  onClick={() => handleUploadReceiptClick(installment)}
+                                  className="flex items-center gap-1.5 whitespace-nowrap"
+                                >
+                                  <ArrowUpTrayIcon className="w-4 h-4" />
+                                  {receiptStatus === 'rejected' ? 'Re-upload' : 'Upload Receipt'}
+                                </Button>
+                              </div>
+                              {receiptStatus === 'pending' && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 text-yellow-800 px-2.5 py-1 text-xs font-medium">
+                                  <ClockIcon className="w-3.5 h-3.5" />
+                                  Receipt pending review
+                                </span>
+                              )}
+                              {receiptStatus === 'rejected' && (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2.5 py-1 text-xs font-medium"
+                                  title={receipt?.review_note || undefined}
+                                >
+                                  <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+                                  Receipt rejected
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
                       )}

@@ -172,6 +172,7 @@ function App() {
               <Route path="finance/discounts" element={<Finance />} />
               <Route path="finance/default-discounts" element={<Finance />} />
               <Route path="finance/receipt-builder" element={<Finance />} />
+              <Route path="finance/receipt-approvals" element={<Finance />} />
               <Route path="finance/void-requests" element={<Finance />} />
               <Route path="settings" element={<Settings />} />
               <Route path="hris/devices" element={<HrisDevices />} />
