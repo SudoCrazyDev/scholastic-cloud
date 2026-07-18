@@ -87,7 +87,9 @@ const FinanceAnnouncementsView: React.FC = () => {
       announcementService.getAnnouncements({ category: 'finance', status: statusFilter }),
   })
 
-  const announcements = listQuery.data?.data ?? []
+  // The server filters by category; the client-side filter guards against a
+  // backend that doesn't know `category` yet and returns every announcement.
+  const announcements = (listQuery.data?.data ?? []).filter((a) => a.category === 'finance')
 
   const resetForm = () => {
     setEditing(null)
