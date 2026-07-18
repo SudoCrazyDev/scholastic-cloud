@@ -9,6 +9,10 @@ modules should consume its data.
   audience/scope (institution, grade levels, sections), with attachments, scheduling, and per-viewer
   read tracking. Two surfaces: the **Announcements** board (all roles) and **Manage Announcements**
   (teachers + admins).
+- [Finance](Finance/FINANCE.md) — Staff-facing student money: fee setup + default amounts,
+  cashiering (POS with printed receipts), per-student ledgers/NOA, collections reports, three
+  discount mechanisms, receipt templates, payment plans, and a payment-void approval queue. One
+  page (`/finance/*`) with a grouped two-level nav; Payment Plans is a standalone sibling page.
 - [Staff Schedules](HRIS/StaffSchedules/STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates
   (weekly hours + lunch + per-day grace period), assigned to staff (one per staff), plus an
   institution calendar of holidays & events. Consumed by Payroll for lateness/undertime/overtime.

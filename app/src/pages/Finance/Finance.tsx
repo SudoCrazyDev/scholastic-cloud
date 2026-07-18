@@ -2,7 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PDFDownloadLink } from '@react-pdf/renderer'
-import { PencilSquareIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline'
+import {
+  PencilSquareIcon,
+  TrashIcon,
+  PlusIcon,
+  ChartPieIcon,
+  BanknotesIcon,
+  BookOpenIcon,
+  ChartBarIcon,
+  Cog6ToothIcon,
+  ReceiptRefundIcon,
+} from '@heroicons/react/24/outline'
 import { NavLink, useLocation } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../components/button'
@@ -30,10 +40,75 @@ import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, Student, CreateStude
 
 const VOID_APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator']
 
+type FinanceView =
+  | 'dashboard'
+  | 'school-fees'
+  | 'default-amounts'
+  | 'cashiering'
+  | 'ledger'
+  | 'collections'
+  | 'discounts'
+  | 'default-discounts'
+  | 'receipt-builder'
+  | 'void-requests'
+
+const SETUP_VIEWS: FinanceView[] = [
+  'school-fees',
+  'default-amounts',
+  'discounts',
+  'default-discounts',
+  'receipt-builder',
+]
+
+interface FinanceNavItem {
+  label: string
+  to: string
+  end?: boolean
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  views: FinanceView[]
+  requiresVoidAccess?: boolean
+}
+
+const PRIMARY_NAV: FinanceNavItem[] = [
+  { label: 'Dashboard', to: '/finance', end: true, icon: ChartPieIcon, views: ['dashboard'] },
+  { label: 'Cashiering', to: '/finance/cashiering', icon: BanknotesIcon, views: ['cashiering'] },
+  { label: 'Ledger', to: '/finance/ledger', icon: BookOpenIcon, views: ['ledger'] },
+  { label: 'Collections', to: '/finance/collections', icon: ChartBarIcon, views: ['collections'] },
+  {
+    label: 'Void Requests',
+    to: '/finance/void-requests',
+    icon: ReceiptRefundIcon,
+    views: ['void-requests'],
+    requiresVoidAccess: true,
+  },
+  { label: 'Setup', to: '/finance/school-fees', icon: Cog6ToothIcon, views: SETUP_VIEWS },
+]
+
+const SETUP_NAV: { label: string; to: string; view: FinanceView }[] = [
+  { label: 'School Fees', to: '/finance/school-fees', view: 'school-fees' },
+  { label: 'Default Amounts', to: '/finance/default-amounts', view: 'default-amounts' },
+  { label: 'Grade Level Discounts', to: '/finance/discounts', view: 'discounts' },
+  { label: 'Default Discounts', to: '/finance/default-discounts', view: 'default-discounts' },
+  { label: 'Receipt Builder', to: '/finance/receipt-builder', view: 'receipt-builder' },
+]
+
+const VIEW_SUBTITLES: Record<FinanceView, string> = {
+  dashboard: 'Collections overview and outstanding balances for the academic year.',
+  cashiering: 'Search for a student, take payments, and print official receipts.',
+  ledger: "Review a student's charges, payments, discounts, and running balance.",
+  collections: 'View payment collections by month or quarter for the school year.',
+  'void-requests': 'Request and approve voiding of posted payments.',
+  'school-fees': 'Define the fee types your school charges.',
+  'default-amounts': 'Set default fee amounts per grade level and academic year.',
+  discounts: 'Apply discounts in bulk to every student in a grade level.',
+  'default-discounts': 'Maintain reusable discount templates for the cashier and ledger.',
+  'receipt-builder': 'Customize the layout of printed receipts.',
+}
+
 const Finance: React.FC = () => {
   const queryClient = useQueryClient()
   const location = useLocation()
-  const view = useMemo(() => {
+  const view = useMemo<FinanceView>(() => {
     const pathname = location.pathname
     if (pathname.endsWith('/school-fees')) return 'school-fees'
     if (pathname.endsWith('/default-amounts')) return 'default-amounts'
@@ -879,115 +954,54 @@ const Finance: React.FC = () => {
     >
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Finance</h1>
-        <p className="text-gray-600 mt-1">Manage school fees, defaults, and yearly amounts.</p>
+        <p className="text-gray-600 mt-1">{VIEW_SUBTITLES[view]}</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-2 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          <NavLink
-            to="/finance"
-            end
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Dashboard
-          </NavLink>
-          <NavLink
-            to="/finance/school-fees"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            School Fees
-          </NavLink>
-          <NavLink
-            to="/finance/default-amounts"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Default Amounts
-          </NavLink>
-          <NavLink
-            to="/finance/cashiering"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Cashiering (POS)
-          </NavLink>
-          <NavLink
-            to="/finance/ledger"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Ledger
-          </NavLink>
-          <NavLink
-            to="/finance/collections"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Collections
-          </NavLink>
-          <NavLink
-            to="/finance/discounts"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Discounts
-          </NavLink>
-          <NavLink
-            to="/finance/default-discounts"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Default Discounts
-          </NavLink>
-          <NavLink
-            to="/finance/receipt-builder"
-            className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
-          >
-            Receipt Builder
-          </NavLink>
-          {canRequestVoid && (
-            <NavLink
-              to="/finance/void-requests"
-              className={({ isActive }) =>
-                `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+        <nav aria-label="Finance sections" className="flex flex-wrap gap-1 p-2">
+          {PRIMARY_NAV.filter((item) => !item.requiresVoidAccess || canRequestVoid).map((item) => {
+            const isActive = item.views.includes(view)
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                end={item.end}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                }`
-              }
-            >
-              Void Requests
-            </NavLink>
-          )}
-        </div>
+                }`}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {item.label}
+              </NavLink>
+            )
+          })}
+        </nav>
+        {SETUP_VIEWS.includes(view) && (
+          <nav
+            aria-label="Finance setup"
+            className="flex flex-wrap gap-1 border-t border-gray-100 bg-gray-50 rounded-b-xl px-2 py-2"
+          >
+            {SETUP_NAV.map((item) => {
+              const isActive = view === item.view
+              return (
+                <NavLink
+                  key={item.view}
+                  to={item.to}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    isActive
+                      ? 'bg-white text-indigo-700 border border-gray-200 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-white/70'
+                  }`}
+                >
+                  {item.label}
+                </NavLink>
+              )
+            })}
+          </nav>
+        )}
       </div>
 
       {view === 'dashboard' && (
