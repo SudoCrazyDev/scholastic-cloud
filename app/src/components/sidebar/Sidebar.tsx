@@ -141,7 +141,7 @@ const menuGroups: MenuGroup[] = [
         label: 'My Class Sections',
         icon: <BookOpen className="w-5 h-5" />,
         path: '/my-class-sections',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head'],
       },
       {
         id: 'assigned-subjects',
