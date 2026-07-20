@@ -12,6 +12,7 @@ type StudentsQueryResponse =
 export function useStudents(options?: { class_section_id?: string }) {
   const queryClient = useQueryClient()
   const [searchValue, setSearchValue] = useState('')
+  const [page, setPage] = useState(1)
   const [selectedRows, setSelectedRows] = useState<Student[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
@@ -32,7 +33,7 @@ export function useStudents(options?: { class_section_id?: string }) {
     error,
     refetch,
   } = useQuery<StudentsQueryResponse>({
-    queryKey: ['students', { search: searchValue, ...options }],
+    queryKey: ['students', { search: searchValue, page, ...options }],
     queryFn: async () => {
       // If class_section_id is provided, use getStudentsByClassSection
       if (options?.class_section_id) {
@@ -42,6 +43,7 @@ export function useStudents(options?: { class_section_id?: string }) {
       // Otherwise, use the general getStudents method
       const response = await studentService.getStudents({
         search: searchValue,
+        page,
         per_page: 70,
       });
       return { type: 'paginated', data: response };
@@ -73,9 +75,8 @@ export function useStudents(options?: { class_section_id?: string }) {
         currentPage: studentsData.data.pagination.current_page,
         totalPages: studentsData.data.pagination.last_page,
         totalItems: studentsData.data.pagination.total,
-        onPageChange: (page: number) => {
-          // This would need to be implemented with a separate query for pagination
-          console.log('Navigate to page:', page)
+        onPageChange: (newPage: number) => {
+          setPage(newPage)
         },
       } : null
 
@@ -112,7 +113,10 @@ export function useStudents(options?: { class_section_id?: string }) {
 
   const search = {
     value: searchValue,
-    onSearch: (value: string) => setSearchValue(value)
+    onSearch: (value: string) => {
+      setSearchValue(value)
+      setPage(1)
+    }
   }
 
   const handleCreate = useCallback(() => {
