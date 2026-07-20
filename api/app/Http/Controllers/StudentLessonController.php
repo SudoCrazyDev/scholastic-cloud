@@ -102,7 +102,7 @@ class StudentLessonController extends Controller
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
-        $blocks = is_array($topic->content) ? $this->enrichAssessmentBlocks($topic->content) : [];
+        $blocks = $this->enrichAssessmentBlocks($topic->contentWithFreshUrls());
 
         $p = StudentLessonProgress::where('student_id', $student->id)
             ->where('topic_id', $topic->id)

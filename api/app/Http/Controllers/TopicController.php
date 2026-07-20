@@ -37,7 +37,8 @@ class TopicController extends Controller
         try {
             $topics = Topic::where('subject_id', $request->subject_id)
                 ->orderBy('order')
-                ->get();
+                ->get()
+                ->each(fn (Topic $topic) => $this->refreshContentUrls($topic));
 
             Log::info('Topics retrieved:', ['count' => $topics->count(), 'subject_id' => $request->subject_id]);
 
@@ -97,7 +98,7 @@ class TopicController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $topic,
+                'data' => $this->refreshContentUrls($topic),
                 'message' => 'Topic created successfully',
             ], 201);
         } catch (\Exception $e) {
@@ -119,7 +120,7 @@ class TopicController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $topic,
+                'data' => $this->refreshContentUrls($topic),
                 'message' => 'Topic retrieved successfully',
             ]);
         } catch (\Exception $e) {
@@ -163,7 +164,7 @@ class TopicController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $topic,
+                'data' => $this->refreshContentUrls($topic),
                 'message' => 'Topic updated successfully',
             ]);
         } catch (\Exception $e) {
@@ -226,7 +227,8 @@ class TopicController extends Controller
 
             $topics = Topic::where('subject_id', $request->subject_id)
                 ->orderBy('order')
-                ->get();
+                ->get()
+                ->each(fn (Topic $topic) => $this->refreshContentUrls($topic));
 
             return response()->json([
                 'success' => true,
@@ -253,7 +255,7 @@ class TopicController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $topic,
+                'data' => $this->refreshContentUrls($topic),
                 'message' => 'Topic completion status updated successfully',
             ]);
         } catch (\Exception $e) {
@@ -301,7 +303,7 @@ class TopicController extends Controller
                 'success' => true,
                 'data' => [
                     'path' => $path,
-                    'url' => $this->temporaryFileUrl($path),
+                    'url' => Topic::freshFileUrl($path),
                     'name' => $file->getClientOriginalName(),
                     'mime' => $file->getMimeType() ?? $file->getClientMimeType(),
                     'size' => $file->getSize(),
@@ -318,18 +320,16 @@ class TopicController extends Controller
     }
 
     /**
-     * Best-effort viewable URL for an R2 object: presigned if supported, else public URL.
+     * Re-sign file-block URLs before returning content to the client. Stored
+     * URLs are presigned at upload time and expire, so responses must never
+     * echo them back as-is.
      */
-    private function temporaryFileUrl(string $path): ?string
+    private function refreshContentUrls(Topic $topic): Topic
     {
-        try {
-            return Storage::disk('r2')->temporaryUrl($path, now()->addDays(7));
-        } catch (\Throwable) {
-            try {
-                return Storage::disk('r2')->url($path);
-            } catch (\Throwable) {
-                return null;
-            }
+        if (is_array($topic->content)) {
+            $topic->setAttribute('content', $topic->contentWithFreshUrls());
         }
+
+        return $topic;
     }
 }
