@@ -1,0 +1,145 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: radial-gradient(ellipse at top, #1b1b2f 0%, #0f0f17 60%);
+  color: #e8e8f0;
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  align-items: center;
+}
+
+.header {
+  text-align: center;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  letter-spacing: 0.02em;
+  background: linear-gradient(90deg, #8ab4ff, #c58aff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.header p {
+  margin: 4px 0 0;
+  color: #9a9ab0;
+}
+
+.room {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+}
+
+.visualizer-card {
+  width: 100%;
+  padding: 32px 24px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+}
+
+.visualizer {
+  width: 100%;
+  height: 160px;
+  --lk-va-bar-width: 24px;
+  --lk-va-bar-gap: 12px;
+  --lk-fg: #8ab4ff;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c0c0d4;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6a6a80;
+}
+
+.status-listening .status-dot {
+  background: #4ade80;
+}
+
+.status-thinking .status-dot {
+  background: #facc15;
+}
+
+.status-speaking .status-dot {
+  background: #8ab4ff;
+}
+
+.lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.connect-button {
+  padding: 14px 40px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f0f17;
+  background: linear-gradient(90deg, #8ab4ff, #c58aff);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.connect-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(138, 180, 255, 0.3);
+}
+
+.connect-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.error {
+  color: #f87171;
+  max-width: 420px;
+  text-align: center;
+}
+
+.hint {
+  color: #7a7a90;
+  font-size: 0.85rem;
+}
+
+.hint code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
