@@ -16,7 +16,7 @@ class UserController extends Controller
      * Roles that see every subject in their institution(s) instead of only
      * the subjects they advise.
      */
-    private const SUBJECT_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator'];
+    private const SUBJECT_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator', 'department-head'];
 
     /**
      * Display a listing of the resource with pagination and filtering.

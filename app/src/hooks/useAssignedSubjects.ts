@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { userService } from '../services/userService'
 import { useAuth } from './useAuth'
 
-const INSTITUTION_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator']
+const INSTITUTION_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator', 'department-head']
 
 export const useAssignedSubjects = () => {
   const { user } = useAuth()

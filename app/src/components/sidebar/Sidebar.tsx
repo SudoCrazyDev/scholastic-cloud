@@ -148,7 +148,7 @@ const menuGroups: MenuGroup[] = [
         label: 'My Assigned Subjects',
         icon: <AssignedSubjectsIcon className="w-5 h-5" />,
         path: '/assigned-subjects',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head'],
       },
     ],
   },

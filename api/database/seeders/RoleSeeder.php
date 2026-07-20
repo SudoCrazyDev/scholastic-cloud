@@ -21,6 +21,7 @@ class RoleSeeder extends Seeder
             'HR Admin',
             'HR',
             'Staff',
+            'Department Head',
         ];
 
         foreach ($roles as $roleTitle) {
