@@ -323,10 +323,11 @@ class UserController extends Controller
             // Build query for class sections based on user role
             $query = \App\Models\ClassSection::with(['institution', 'adviserUser', 'students']);
 
-            if ($userRoleSlug === 'subject-teacher') {
-                // Subject teachers see class sections they advise. When include_taught
-                // is set, also include sections where they teach a subject (used by the
-                // announcement section picker, which may target either).
+            if ($userRoleSlug === 'subject-teacher' || $userRoleSlug === 'finance') {
+                // Subject teachers (and the finance role) see only class sections
+                // assigned to them. When include_taught is set, also include sections
+                // where they teach a subject (used by the announcement section picker,
+                // which may target either).
                 if ($request->boolean('include_taught')) {
                     $query->where(function ($q) use ($user) {
                         $q->where('adviser', $user->id)
