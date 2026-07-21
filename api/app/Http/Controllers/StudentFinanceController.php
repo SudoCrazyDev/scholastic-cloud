@@ -352,7 +352,7 @@ class StudentFinanceController extends Controller
                 'paid' => round($paid, 2),
                 'outstanding' => round($charge - $discount - $paid, 2),
             ];
-        })->merge($additionalFees->map(function ($af) use ($paidByFee, $discountByFee) {
+        })->toBase()->merge($additionalFees->map(function ($af) use ($paidByFee, $discountByFee) {
             $charge = (float) $af->amount;
             $discount = (float) ($discountByFee[$af->id] ?? 0);
             $paid = (float) ($paidByFee[$af->id] ?? 0);
@@ -555,7 +555,7 @@ class StudentFinanceController extends Controller
                 'amount' => (float) $default->amount,
                 'is_additional' => false,
             ];
-        })->merge($additionalFees->map(function ($af) {
+        })->toBase()->merge($additionalFees->map(function ($af) {
             return [
                 'fee_id' => $af->id,
                 'fee_name' => $af->name,
@@ -811,6 +811,9 @@ class StudentFinanceController extends Controller
 
     private function applyDiscounts($discounts, $feeAmountMap, float $chargesTotal)
     {
+        // toBase(): an empty $discounts leaves map() as an Eloquent Collection, whose
+        // merge() calls getKey() on the plain-array payloads and crashes. Force a base
+        // Support collection so downstream merge()s are always safe.
         return $discounts->map(function ($discount) use ($feeAmountMap, $chargesTotal) {
             $baseAmount = $chargesTotal;
             if ($discount->school_fee_id) {
@@ -833,6 +836,6 @@ class StudentFinanceController extends Controller
                 'amount' => round($amount, 2),
                 'base' => round($baseAmount, 2),
             ];
-        });
+        })->toBase();
     }
 }
