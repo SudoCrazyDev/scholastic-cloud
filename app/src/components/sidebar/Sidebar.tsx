@@ -89,7 +89,7 @@ const menuGroups: MenuGroup[] = [
         label: 'Manage Announcements',
         icon: <Send className="w-5 h-5" />,
         path: '/announcements/manage',
-        allowedRoles: ['subject-teacher', 'super-administrator', 'principal', 'institution-administrator'],
+        allowedRoles: ['subject-teacher', 'super-administrator', 'principal', 'institution-administrator', 'finance'],
       },
     ],
   },
@@ -141,14 +141,14 @@ const menuGroups: MenuGroup[] = [
         label: 'My Class Sections',
         icon: <BookOpen className="w-5 h-5" />,
         path: '/my-class-sections',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head'],
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head', 'finance'],
       },
       {
         id: 'assigned-subjects',
         label: 'My Assigned Subjects',
         icon: <AssignedSubjectsIcon className="w-5 h-5" />,
         path: '/assigned-subjects',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head'],
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head', 'finance'],
       },
     ],
   },
@@ -367,21 +367,21 @@ const menuGroups: MenuGroup[] = [
         label: 'Certificate Builder',
         icon: <FileText className="w-5 h-5" />,
         path: '/certificate-builder',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'finance'],
       },
       {
         id: 'form-builder',
         label: 'Form Builder',
         icon: <LayoutTemplate className="w-5 h-5" />,
         path: '/form-builder',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'finance'],
       },
       {
         id: 'id-card-builder',
         label: 'Student ID Builder',
         icon: <CreditCard className="w-5 h-5" />,
         path: '/id-card-builder',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator'],
+        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'finance'],
       },
     ],
   },
@@ -419,9 +419,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   const unreadCount = unreadResponse?.data?.count ?? 0;
 
   const filteredGroups = useMemo(() => {
-    if (userRoleSlug === 'finance') {
-      return menuGroups.filter((group) => group.label === 'Finance');
-    }
     return menuGroups
       .map((group) => ({
         ...group,
