@@ -674,6 +674,10 @@ const Finance: React.FC = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-fee-defaults'] })
+      // Fee defaults drive charges, so refresh anything that totals them.
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa'] })
       setDefaultForm({
         school_fee_id: '',
         grade_level: defaultForm.grade_level,
@@ -701,6 +705,10 @@ const Finance: React.FC = () => {
       }),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['school-fee-defaults'] })
+      // Fee defaults drive charges, so refresh anything that totals them.
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa'] })
       setDefaultForm({
         school_fee_id: '',
         grade_level: defaultForm.grade_level,
@@ -724,6 +732,10 @@ const Finance: React.FC = () => {
       schoolFeeDefaultService.updateDefault(payload.id, { amount: Number(payload.amount) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-fee-defaults'] })
+      // Fee defaults drive charges, so refresh anything that totals them.
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa'] })
       setEditingDefault(null)
       setDefaultForm({
         school_fee_id: '',
@@ -746,6 +758,10 @@ const Finance: React.FC = () => {
     mutationFn: (id: string) => schoolFeeDefaultService.deleteDefault(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['school-fee-defaults'] })
+      // Fee defaults drive charges, so refresh anything that totals them.
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa'] })
       toast.success('Default amount removed.')
     },
     onError: (error: any) => {
