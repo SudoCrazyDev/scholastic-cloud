@@ -26,6 +26,7 @@ import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import { studentDiscountService } from '../../services/studentDiscountService'
+import { gradeLevelDiscountService } from '../../services/gradeLevelDiscountService'
 import { defaultDiscountService } from '../../services/defaultDiscountService'
 import { studentAdditionalFeeService } from '../../services/studentAdditionalFeeService'
 import { paymentVoidService } from '../../services/paymentVoidService'
@@ -442,11 +443,40 @@ const Finance: React.FC = () => {
     },
   })
 
+  // Grade-level discounts are shared across the grade, so voiding one from a
+  // student's ledger only suppresses it for that student.
+  const voidGradeDiscountMutation = useMutation({
+    mutationFn: (payload: { id: string; student_id: string; void_note: string }) =>
+      gradeLevelDiscountService.voidForStudent(payload.id, payload.student_id, payload.void_note),
+    onSuccess: () => {
+      setVoidDiscountEntry(null)
+      setVoidDiscountNote('')
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa'] })
+      toast.success('Grade discount voided for this student.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to void discount.')
+    },
+  })
+
   const handleVoidDiscountSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     if (!voidDiscountEntry?.discount_id) return
     if (!voidDiscountNote.trim()) {
       toast.error('A note is required to void a discount.')
+      return
+    }
+    if (voidDiscountEntry.discount_scope === 'grade_level') {
+      if (!selectedLedgerStudent?.id) {
+        toast.error('No student selected.')
+        return
+      }
+      voidGradeDiscountMutation.mutate({
+        id: voidDiscountEntry.discount_id,
+        student_id: selectedLedgerStudent.id,
+        void_note: voidDiscountNote.trim(),
+      })
       return
     }
     voidDiscountMutation.mutate({
@@ -2614,7 +2644,8 @@ const Finance: React.FC = () => {
                                   ) : entry.type === 'discount' &&
                                     !entry.voided &&
                                     entry.discount_id &&
-                                    entry.discount_scope === 'student' ? (
+                                    (entry.discount_scope === 'student' ||
+                                      entry.discount_scope === 'grade_level') ? (
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -3102,6 +3133,12 @@ const Finance: React.FC = () => {
                   This will void the discount immediately and add it back to the balance. The entry
                   stays on the ledger for audit. A note is required.
                 </p>
+                {voidDiscountEntry.discount_scope === 'grade_level' && (
+                  <p className="text-sm text-amber-600 mt-1">
+                    This is a grade-level discount. Voiding it here affects this student only — it
+                    stays active for the rest of the grade.
+                  </p>
+                )}
               </div>
               <div className="px-5 py-4 space-y-3">
                 <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
@@ -3145,7 +3182,7 @@ const Finance: React.FC = () => {
                 </Button>
                 <Button
                   type="submit"
-                  loading={voidDiscountMutation.isPending}
+                  loading={voidDiscountMutation.isPending || voidGradeDiscountMutation.isPending}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
                   Void Discount

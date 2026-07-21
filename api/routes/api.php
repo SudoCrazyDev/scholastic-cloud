@@ -329,6 +329,7 @@ Route::middleware('auth.token')->group(function () {
     // Grade-level discounts
     Route::get('grade-level-discounts', [GradeLevelDiscountController::class, 'index']);
     Route::post('grade-level-discounts', [GradeLevelDiscountController::class, 'store']);
+    Route::post('grade-level-discounts/{id}/void-for-student', [GradeLevelDiscountController::class, 'voidForStudent']);
     Route::put('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
     Route::patch('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
     Route::delete('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'destroy']);

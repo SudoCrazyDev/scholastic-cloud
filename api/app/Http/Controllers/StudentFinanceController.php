@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
 use App\Models\GradeLevelDiscount;
+use App\Models\GradeLevelDiscountStudentVoid;
 use App\Models\Student;
 use App\Models\StudentAdditionalFee;
 use App\Models\StudentPaymentPlan;
@@ -106,6 +107,12 @@ class StudentFinanceController extends Controller
                 ->get();
         }
 
+        // Grade-level discounts voided for THIS student only, keyed by discount id.
+        $gradeLevelDiscountVoids = $this->gradeLevelDiscountVoidsFor(
+            $studentId,
+            $gradeLevelDiscounts
+        );
+
         $additionalFees = StudentAdditionalFee::where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -125,7 +132,10 @@ class StudentFinanceController extends Controller
         $activeDiscountsWithAmount = $discountsWithAmount->filter(
             fn ($payload) => $payload['discount']->voided_at === null
         );
-        $discountsTotal = (float) $activeDiscountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
+        $activeGradeLevelDiscountsWithAmount = $gradeLevelDiscountsWithAmount->filter(
+            fn ($payload) => ! $gradeLevelDiscountVoids->has($payload['discount']->id)
+        );
+        $discountsTotal = (float) $activeDiscountsWithAmount->sum('amount') + (float) $activeGradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $activePayments->sum('amount');
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
@@ -235,7 +245,7 @@ class StudentFinanceController extends Controller
             ];
         });
 
-        $gradeLevelDiscountEntries = $gradeLevelDiscountsWithAmount->map(function ($payload) {
+        $gradeLevelDiscountEntries = $gradeLevelDiscountsWithAmount->map(function ($payload) use ($gradeLevelDiscountVoids) {
             $discount = $payload['discount'];
             $feeName = $discount->schoolFee?->name;
             $label = $feeName ? 'Grade Discount - ' . $feeName : 'Grade Discount';
@@ -243,6 +253,13 @@ class StudentFinanceController extends Controller
             $creator = $discount->creator;
             $processedByName = $creator
                 ? trim(($creator->first_name ?? '') . ' ' . ($creator->last_name ?? ''))
+                : null;
+
+            // A void row (if any) suppresses this grade discount for the student.
+            $void = $gradeLevelDiscountVoids->get($discount->id);
+            $voidedByUser = $void?->voidedBy;
+            $voidedByName = $voidedByUser
+                ? trim(($voidedByUser->first_name ?? '') . ' ' . ($voidedByUser->last_name ?? ''))
                 : null;
 
             return [
@@ -257,6 +274,10 @@ class StudentFinanceController extends Controller
                 'fee_id' => $discount->school_fee_id,
                 'fee_name' => $feeName,
                 'processed_by' => $processedByName,
+                'voided' => $void !== null,
+                'voided_at' => $void?->voided_at?->toDateTimeString(),
+                'voided_by' => $voidedByName,
+                'void_note' => $void?->void_note,
             ];
         });
 
@@ -483,6 +504,12 @@ class StudentFinanceController extends Controller
                 ->orderBy('created_at')
                 ->get();
         }
+
+        // Drop grade-level discounts that were voided for this student.
+        $gradeLevelDiscountVoids = $this->gradeLevelDiscountVoidsFor($studentId, $gradeLevelDiscounts);
+        $gradeLevelDiscounts = $gradeLevelDiscounts->reject(
+            fn ($discount) => $gradeLevelDiscountVoids->has($discount->id)
+        )->values();
 
         $additionalFees = StudentAdditionalFee::where('institution_id', $institutionId)
             ->where('student_id', $studentId)
@@ -807,6 +834,24 @@ class StudentFinanceController extends Controller
     {
         $currentYear = now()->year;
         return $currentYear . '-' . ($currentYear + 1);
+    }
+
+    /**
+     * Load per-student void rows for the given grade-level discounts, keyed by
+     * grade_level_discount_id. Returns an empty collection when there are no
+     * grade discounts to check.
+     */
+    private function gradeLevelDiscountVoidsFor(string $studentId, $gradeLevelDiscounts)
+    {
+        if ($gradeLevelDiscounts->isEmpty()) {
+            return collect();
+        }
+
+        return GradeLevelDiscountStudentVoid::with('voidedBy')
+            ->where('student_id', $studentId)
+            ->whereIn('grade_level_discount_id', $gradeLevelDiscounts->pluck('id'))
+            ->get()
+            ->keyBy('grade_level_discount_id');
     }
 
     private function applyDiscounts($discounts, $feeAmountMap, float $chargesTotal)

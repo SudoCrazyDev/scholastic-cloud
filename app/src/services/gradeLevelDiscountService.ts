@@ -26,6 +26,18 @@ class GradeLevelDiscountService {
   async deleteDiscount(id: string) {
     await api.delete(`${this.baseUrl}/${id}`)
   }
+
+  /**
+   * Void a grade-level discount for a single student only. The shared discount
+   * stays active for the rest of the grade.
+   */
+  async voidForStudent(id: string, studentId: string, voidNote: string) {
+    const response = await api.post<ApiResponse<unknown>>(
+      `${this.baseUrl}/${id}/void-for-student`,
+      { student_id: studentId, void_note: voidNote }
+    )
+    return response.data
+  }
 }
 
 export const gradeLevelDiscountService = new GradeLevelDiscountService()

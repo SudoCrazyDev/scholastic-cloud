@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
 use App\Models\GradeLevelDiscount;
+use App\Models\GradeLevelDiscountStudentVoid;
 use App\Models\SchoolFee;
+use App\Models\Student;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class GradeLevelDiscountController extends Controller
 {
+    private const VOID_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator'];
+
     public function index(Request $request): JsonResponse
     {
         if ($this->isStudentUser($request)) {
@@ -139,6 +143,91 @@ class GradeLevelDiscountController extends Controller
         $discount->delete();
 
         return response()->json(['success' => true, 'message' => 'Deleted']);
+    }
+
+    /**
+     * Void a grade-level discount for a single student. The shared discount
+     * record is left untouched (it still applies to the rest of the grade);
+     * we only record a per-student exclusion so it drops off this student's
+     * ledger totals, running balance, and NOA.
+     */
+    public function voidForStudent(Request $request, string $id): JsonResponse
+    {
+        if (! $this->canVoid($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not allowed to void discounts',
+            ], 403);
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (! $institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned',
+            ], 400);
+        }
+
+        $discount = GradeLevelDiscount::where('institution_id', $institutionId)->find($id);
+        if (! $discount) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Grade level discount not found',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'student_id' => 'required|uuid',
+            'void_note' => 'required|string|max:2000',
+        ]);
+
+        $student = Student::whereHas('studentInstitutions', function ($query) use ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        })->find($validated['student_id']);
+        if (! $student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student not found',
+            ], 404);
+        }
+
+        $existing = GradeLevelDiscountStudentVoid::where('student_id', $validated['student_id'])
+            ->where('grade_level_discount_id', $discount->id)
+            ->first();
+        if ($existing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This discount is already voided for this student.',
+            ], 422);
+        }
+
+        $void = GradeLevelDiscountStudentVoid::create([
+            'institution_id' => $institutionId,
+            'student_id' => $validated['student_id'],
+            'grade_level_discount_id' => $discount->id,
+            'academic_year' => $discount->academic_year,
+            'voided_at' => now(),
+            'voided_by' => $request->user()?->id,
+            'void_note' => $validated['void_note'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Grade level discount voided for student',
+            'data' => $void,
+        ]);
+    }
+
+    private function canVoid(Request $request): bool
+    {
+        $user = $request->user();
+        if (! $user || $user instanceof StudentPortalUser) {
+            return false;
+        }
+
+        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+
+        return in_array((string) ($role->slug ?? ''), self::VOID_ROLES, true);
     }
 
     private function resolveInstitutionId(Request $request): ?string
