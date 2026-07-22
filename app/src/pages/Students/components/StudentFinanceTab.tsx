@@ -36,6 +36,9 @@ interface StudentFinanceTabProps {
 // Temporarily hidden; flip back to true to restore the Pay Online (Maya Checkout) form.
 const SHOW_PAY_ONLINE_SECTION = false
 
+// Temporarily hidden; flip back to true to restore the per-installment Pay button.
+const SHOW_PAY_INSTALLMENT_BUTTON = false
+
 export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, studentId }) => {
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -985,7 +988,8 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                             </span>
                           </div>
                         )}
-                        <div className="grid grid-cols-2">
+                        <div className={SHOW_PAY_INSTALLMENT_BUTTON ? 'grid grid-cols-2' : 'grid grid-cols-1'}>
+                          {SHOW_PAY_INSTALLMENT_BUTTON && (
                           <button
                             type="button"
                             disabled={createOnlinePaymentMutation.isPending}
@@ -1011,11 +1015,12 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                               </>
                             )}
                           </button>
+                          )}
                           <button
                             type="button"
                             disabled={uploadReceiptMutation.isPending || receiptStatus === 'pending'}
                             onClick={() => handleUploadReceiptClick(installment)}
-                            className="flex items-center justify-center gap-2 py-3 text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 disabled:opacity-60 disabled:cursor-not-allowed transition border-l border-gray-100"
+                            className={`flex items-center justify-center gap-2 py-3 text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 disabled:opacity-60 disabled:cursor-not-allowed transition${SHOW_PAY_INSTALLMENT_BUTTON ? ' border-l border-gray-100' : ''}`}
                           >
                             {isUploading ? (
                               <>
@@ -1104,6 +1109,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                           ) : (
                             <div className="flex flex-col items-end gap-1.5">
                               <div className="flex items-center justify-end gap-2">
+                                {SHOW_PAY_INSTALLMENT_BUTTON && (
                                 <Button
                                   size="sm"
                                   loading={isPaying}
@@ -1117,6 +1123,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                                     ? `Pay ${formatAmount(remaining)}`
                                     : 'Pay'}
                                 </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="outline"
