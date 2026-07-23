@@ -20,8 +20,12 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('institution_id')->constrained()->onDelete('cascade');
             $table->foreignUuid('student_id')->constrained('students')->onDelete('cascade');
-            $table->foreignUuid('grade_level_discount_id')
-                ->constrained('grade_level_discounts')->onDelete('cascade');
+            // Explicit short FK name: the auto-generated
+            // "grade_level_discount_student_voids_grade_level_discount_id_foreign" is 65 chars,
+            // over MySQL's 64-char identifier limit, which made this migration fail.
+            $table->foreignUuid('grade_level_discount_id');
+            $table->foreign('grade_level_discount_id', 'gl_disc_student_void_gld_fk')
+                ->references('id')->on('grade_level_discounts')->onDelete('cascade');
             $table->string('academic_year');
             $table->timestamp('voided_at')->nullable();
             $table->foreignUuid('voided_by')->nullable()
