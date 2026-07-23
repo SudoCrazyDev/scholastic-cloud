@@ -24,6 +24,19 @@ class AssessmentScoringService
     }
 
     /**
+     * The student's answer for a question. v2 answers are keyed by the question's stable id;
+     * v1 answers are keyed by array index. Prefer id, fall back to index — so one path serves both.
+     */
+    public function answerFor(array $question, int $index, array $answers): mixed
+    {
+        $id = $question['id'] ?? null;
+        if ($id !== null && array_key_exists((string) $id, $answers)) {
+            return $answers[(string) $id];
+        }
+        return $answers[(string) $index] ?? $answers[$index] ?? null;
+    }
+
+    /**
      * Sum of points from auto-gradable (objective) questions the student got right.
      */
     public function objectiveScore(array $questions, array $answers): float
@@ -32,7 +45,7 @@ class AssessmentScoringService
         foreach ($questions as $i => $q) {
             $type = (string) ($q['type'] ?? 'single_choice');
             $points = (float) ($q['points'] ?? 1);
-            $given = $answers[(string) $i] ?? $answers[$i] ?? null;
+            $given = $this->answerFor($q, $i, $answers);
             if ($this->isQuestionCorrect($type, $q, $given)) {
                 $score += $points;
             }

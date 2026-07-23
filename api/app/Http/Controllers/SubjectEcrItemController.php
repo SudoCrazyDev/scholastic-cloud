@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Subject;
 use App\Models\SubjectEcrItem;
+use App\Services\AssessmentV2Service;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +16,24 @@ use Illuminate\Support\Str;
 
 class SubjectEcrItemController extends Controller
 {
+    public function __construct(protected AssessmentV2Service $v2)
+    {
+    }
+
+    /**
+     * Response shape for a single item. For v2, resolved question rows (with stable ids) are
+     * folded back into content->questions so the client reads questions the same way as v1.
+     */
+    private function present(SubjectEcrItem $item): array
+    {
+        $data = $item->toArray();
+        if ($item->isV2()) {
+            $content = is_array($item->content) ? $item->content : [];
+            $content['questions'] = $item->resolvedQuestions();
+            $data['content'] = $content;
+        }
+        return $data;
+    }
     /**
      * Display a listing of the resource.
      */
@@ -98,11 +117,14 @@ class SubjectEcrItemController extends Controller
             $query->whereDate('scheduled_date', '<=', $validated['date_to']);
         }
 
-        $items = $query->orderByRaw('scheduled_date IS NULL, scheduled_date ASC')
+        $items = $query->with('questions')
+            ->orderByRaw('scheduled_date IS NULL, scheduled_date ASC')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return response()->json(['success' => true, 'data' => $items]);
+        $data = $items->map(fn (SubjectEcrItem $item) => $this->present($item));
+
+        return response()->json(['success' => true, 'data' => $data]);
     }
 
     /**
@@ -118,12 +140,14 @@ class SubjectEcrItemController extends Controller
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string',
                 'content' => 'nullable|array',
+                'content_version' => 'nullable|integer|in:1,2',
                 'settings' => 'nullable|array',
                 'settings.max_attempts' => 'nullable|integer|min:1|max:50',
                 'settings.time_limit_minutes' => 'nullable|integer|min:1|max:1440',
                 'settings.pass_mark' => 'nullable|numeric|min:0|max:100',
                 'settings.randomize_questions' => 'nullable|boolean',
                 'content.questions' => 'nullable|array',
+                'content.questions.*.id' => 'nullable|string',
                 'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload', 'matching', 'drag_picture'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
@@ -158,11 +182,25 @@ class SubjectEcrItemController extends Controller
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 
-            $item = SubjectEcrItem::create($validatedData);
+            $isV2 = (int) ($validatedData['content_version'] ?? 1) === 2;
+            $questions = $isV2 ? ($validatedData['content']['questions'] ?? []) : null;
+            if ($isV2 && isset($validatedData['content']['questions'])) {
+                // v2 stores questions as rows, not inside the content JSON.
+                unset($validatedData['content']['questions']);
+            }
+
+            $item = DB::transaction(function () use ($validatedData, $isV2, $questions) {
+                $item = SubjectEcrItem::create($validatedData);
+                if ($isV2) {
+                    $this->v2->syncQuestions($item, $questions ?? []);
+                    $item->refresh()->load('questions');
+                }
+                return $item;
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $item,
+                'data' => $this->present($item),
                 'message' => 'Subject ECR item created successfully'
             ], 201);
         } catch (ValidationException $e) {
@@ -187,10 +225,13 @@ class SubjectEcrItemController extends Controller
     {
         try {
             $item = SubjectEcrItem::findOrFail($id);
-            
+            if ($item->isV2()) {
+                $item->load('questions');
+            }
+
             return response()->json([
                 'success' => true,
-                'data' => $item
+                'data' => $this->present($item)
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -215,12 +256,14 @@ class SubjectEcrItemController extends Controller
                 'title' => 'sometimes|required|string|max:255',
                 'description' => 'nullable|string',
                 'content' => 'nullable|array',
+                'content_version' => 'nullable|integer|in:1,2',
                 'settings' => 'nullable|array',
                 'settings.max_attempts' => 'nullable|integer|min:1|max:50',
                 'settings.time_limit_minutes' => 'nullable|integer|min:1|max:1440',
                 'settings.pass_mark' => 'nullable|numeric|min:0|max:100',
                 'settings.randomize_questions' => 'nullable|boolean',
                 'content.questions' => 'nullable|array',
+                'content.questions.*.id' => 'nullable|string',
                 'content.questions.*.type' => ['required_with:content.questions', 'string', Rule::in(['true_false', 'single_choice', 'multiple_choice', 'fill_in_the_blanks', 'short_answer', 'essay', 'image_upload', 'video_upload', 'matching', 'drag_picture'])],
                 'content.questions.*.question' => 'required_with:content.questions|string',
                 'content.questions.*.choices' => 'nullable|array',
@@ -254,11 +297,30 @@ class SubjectEcrItemController extends Controller
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 
-            $item->update($validatedData);
+            // v2 is sticky: an item already on v2 stays v2 even if the client omits the flag.
+            $isV2 = $item->isV2() || (int) ($validatedData['content_version'] ?? 0) === 2;
+            $questionsProvided = array_key_exists('questions', $validatedData['content'] ?? []);
+            $questions = $isV2 && $questionsProvided ? $validatedData['content']['questions'] : null;
+            if ($isV2 && isset($validatedData['content']['questions'])) {
+                unset($validatedData['content']['questions']);
+            }
+
+            DB::transaction(function () use ($item, $validatedData, $isV2, $questions, $questionsProvided) {
+                $item->update($validatedData);
+                // Only touch question rows when the client actually sent a questions array,
+                // so a metadata-only PATCH (e.g. status/dates) never disturbs them.
+                if ($isV2 && $questionsProvided) {
+                    $this->v2->syncQuestions($item, $questions ?? []);
+                }
+                $item->refresh();
+                if ($isV2) {
+                    $item->load('questions');
+                }
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $item->fresh(),
+                'data' => $this->present($item),
                 'message' => 'Subject ECR item updated successfully'
             ]);
         } catch (ValidationException $e) {
@@ -283,6 +345,17 @@ class SubjectEcrItemController extends Controller
     {
         try {
             $item = SubjectEcrItem::findOrFail($id);
+
+            // v2 answers reference questions with a restrict FK; block deleting an assessment
+            // that already has submissions rather than hitting a raw DB error (and to avoid
+            // silently destroying student work).
+            if ($item->isV2() && $item->assessmentAttempts()->whereNotNull('submitted_at')->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This assessment has student submissions and cannot be deleted.',
+                ], 422);
+            }
+
             $item->delete();
 
             return response()->json([

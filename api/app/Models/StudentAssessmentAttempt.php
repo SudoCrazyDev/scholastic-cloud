@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StudentAssessmentAttempt extends Model
 {
@@ -43,6 +44,15 @@ class StudentAssessmentAttempt extends Model
     public function subjectEcrItem(): BelongsTo
     {
         return $this->belongsTo(SubjectEcrItem::class);
+    }
+
+    /**
+     * v2 normalized answers (one row per question). Empty for v1 attempts, which keep
+     * their answers in the `answers` JSON column keyed by question index.
+     */
+    public function assessmentAnswers(): HasMany
+    {
+        return $this->hasMany(StudentAssessmentAnswer::class, 'attempt_id');
     }
 
     public function isSubmitted(): bool

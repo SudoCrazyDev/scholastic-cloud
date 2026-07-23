@@ -27,6 +27,9 @@ interface GradeSubmissionsModalProps {
   onClose: () => void
 }
 
+// Manual-score draft/payload key: stable question id (v2) or the question index (v1).
+const gradeKey = (q: { id?: string | null; index: number }): string => q.id ?? String(q.index)
+
 const isUploadAnswer = (
   value: unknown
 ): value is { path: string; url: string | null; name: string; mime: string; size: number } =>
@@ -123,7 +126,7 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
     setSelectedId(submission.attempt_id)
     const draft: Record<string, string> = {}
     submission.per_question.forEach((pq) => {
-      if (pq.manual) draft[String(pq.index)] = pq.awarded === null ? '' : String(pq.awarded)
+      if (pq.manual) draft[gradeKey(pq)] = pq.awarded === null ? '' : String(pq.awarded)
     })
     setScoreDraft(draft)
   }
@@ -166,9 +169,10 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
     if (!selected) return
     const manualScores: Record<string, number | null> = {}
     for (const q of manualQuestions) {
-      const raw = scoreDraft[String(q.index)]
+      const key = gradeKey(q)
+      const raw = scoreDraft[key]
       if (raw === undefined || raw === '') {
-        manualScores[String(q.index)] = null
+        manualScores[key] = null
         continue
       }
       const num = Number(raw)
@@ -180,7 +184,7 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
         toast.error(`Question ${q.index + 1}: max is ${q.points} point(s).`)
         return
       }
-      manualScores[String(q.index)] = num
+      manualScores[key] = num
     }
     gradeMutation.mutate({ attemptId: selected.attempt_id, manualScores })
   }
@@ -337,9 +341,9 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
                               min={0}
                               max={question.points}
                               step="0.5"
-                              value={scoreDraft[String(pq.index)] ?? ''}
+                              value={scoreDraft[gradeKey(pq)] ?? ''}
                               onChange={(e) =>
-                                setScoreDraft((prev) => ({ ...prev, [String(pq.index)]: e.target.value }))
+                                setScoreDraft((prev) => ({ ...prev, [gradeKey(pq)]: e.target.value }))
                               }
                               className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               placeholder="0"

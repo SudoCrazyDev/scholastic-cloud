@@ -23,6 +23,7 @@ class SubjectEcrItem extends Model
         'title',
         'description',
         'content',
+        'content_version',
         'settings',
         'quarter',
         'academic_year',
@@ -36,6 +37,7 @@ class SubjectEcrItem extends Model
 
     protected $casts = [
         'content' => 'array',
+        'content_version' => 'integer',
         'settings' => 'array',
         'score' => 'decimal:2',
         'scheduled_date' => 'date:Y-m-d',
@@ -59,6 +61,33 @@ class SubjectEcrItem extends Model
     public function assessmentAttempts()
     {
         return $this->hasMany(StudentAssessmentAttempt::class, 'subject_ecr_item_id');
+    }
+
+    /**
+     * v2 question rows, ordered. Soft-deleted questions are excluded automatically.
+     */
+    public function questions()
+    {
+        return $this->hasMany(AssessmentQuestion::class, 'subject_ecr_item_id')->orderBy('position');
+    }
+
+    public function isV2(): bool
+    {
+        return (int) $this->content_version === 2;
+    }
+
+    /**
+     * The single seam every read path uses to get questions. Returns the ordered question
+     * array in the legacy shape (each entry carries a stable `id` in v2). v1 reads the JSON;
+     * v2 hydrates from active question rows.
+     */
+    public function resolvedQuestions(): array
+    {
+        if ($this->isV2()) {
+            return $this->questions->map->toResolvedArray()->all();
+        }
+
+        return is_array($this->content['questions'] ?? null) ? $this->content['questions'] : [];
     }
 
     /**

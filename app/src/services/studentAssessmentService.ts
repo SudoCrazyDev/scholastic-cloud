@@ -66,6 +66,8 @@ export interface DragCardView {
 
 export interface AssessmentQuestion {
   index: number;
+  /** Stable question id (v2). Null for legacy v1 questions; the client keys answers by it when present. */
+  id?: string | null;
   type: QuestionType;
   question: string;
   choices?: string[];

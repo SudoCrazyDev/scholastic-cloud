@@ -87,6 +87,8 @@ interface BuilderDraft {
   allowLateSubmission: boolean
   rules: AssessmentMethodRules
   questions: AssessmentMethodQuestion[]
+  /** 1 = legacy JSON, 2 = normalized rows. New drafts default to 2; existing keep their model. */
+  contentVersion?: number
 }
 
 type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>
@@ -309,6 +311,7 @@ const makeQuestion = (type: AssessmentQuestionType): AssessmentMethodQuestion =>
 
 const draftFromAssessment = (assessment: AssessmentMethod): BuilderDraft => ({
   id: assessment.id,
+  contentVersion: assessment.contentVersion ?? 1,
   subjectEcrId: assessment.subjectEcrId,
   type: assessment.type,
   status: assessment.status,
@@ -340,6 +343,7 @@ const draftFromAssessment = (assessment: AssessmentMethod): BuilderDraft => ({
 
 const newDraft = (type: AssessmentMethodType, subjectEcrId: string): BuilderDraft => ({
   subjectEcrId,
+  contentVersion: 2,
   type,
   status: 'draft',
   title: '',
@@ -1009,18 +1013,31 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
     (error as any)?.message ||
     fallback
 
+  // After a save, adopt the server-assigned question ids (v2) into the draft so a subsequent
+  // edit in the same session updates the existing rows instead of duplicating them. The
+  // response's content.questions are in the same order the draft sent them.
+  const syncDraftFromResponse = (response: any, createdId?: string) => {
+    const item = response?.data ?? response
+    const serverQs: Array<{ id?: string }> = item?.content?.questions ?? []
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            id: createdId ?? item?.id ?? current.id,
+            contentVersion: item?.content_version ?? current.contentVersion,
+            questions: current.questions.map((q, i) =>
+              serverQs[i]?.id ? { ...q, id: String(serverQs[i].id) } : q
+            ),
+          }
+        : current
+    )
+  }
+
   const saveCreateMutation = useMutation({
     mutationFn: (payload: AssessmentMethodInput) => assessmentMethodService.create(payload),
     onSuccess: (response, payload) => {
       const createdId = (response as any)?.data?.id ?? (response as any)?.id
-      setDraft((current) =>
-        current
-          ? {
-              ...current,
-              id: createdId ?? current.id,
-            }
-          : current
-      )
+      syncDraftFromResponse(response, createdId)
       toast.success(`${labelForType(payload.type)} saved successfully! You can continue editing.`)
       queryClient.invalidateQueries({ queryKey: ['assessment-methods', subjectId] })
     },
@@ -1032,7 +1049,8 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
   const saveUpdateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: AssessmentMethodInput }) =>
       assessmentMethodService.update(id, payload),
-    onSuccess: (_, variables) => {
+    onSuccess: (response, variables) => {
+      syncDraftFromResponse(response)
       toast.success(`${labelForType(variables.payload.type)} updated successfully! You can continue editing.`)
       queryClient.invalidateQueries({ queryKey: ['assessment-methods', subjectId] })
     },
@@ -1204,6 +1222,8 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
       allowLateSubmission: draft.allowLateSubmission,
       rules: draft.rules,
       questions: draft.questions,
+      // New drafts default to v2; editing an existing item preserves its stored model.
+      contentVersion: draft.contentVersion ?? (draft.id ? 1 : 2),
     }
 
     if (draft.id) {

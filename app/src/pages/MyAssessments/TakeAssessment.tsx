@@ -125,13 +125,14 @@ export const TakeAssessment: React.FC = () => {
     });
   };
 
-  const handleAnswer = (index: number, value: string) => {
-    setAnswers((prev) => ({ ...prev, [String(index)]: value }));
+  // Answers are keyed by the question's stable id (v2) or its index (v1). The backend accepts
+  // either, so a single `key` string drives all state; uploads still pass the numeric index.
+  const handleAnswer = (key: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleMultipleChoice = (index: number, letter: string) => {
+  const handleMultipleChoice = (key: string, letter: string) => {
     setAnswers((prev) => {
-      const key = String(index);
       const current = prev[key];
       const arr: string[] = Array.isArray(current)
         ? current.filter((v): v is string => typeof v === 'string')
@@ -145,9 +146,8 @@ export const TakeAssessment: React.FC = () => {
     });
   };
 
-  const handleFillInBlank = (index: number, blankIdx: number, value: string) => {
+  const handleFillInBlank = (key: string, blankIdx: number, value: string) => {
     setAnswers((prev) => {
-      const key = String(index);
       const current = prev[key];
       const next: string[] = Array.isArray(current)
         ? current.map((v) => (typeof v === 'string' ? v : ''))
@@ -157,12 +157,11 @@ export const TakeAssessment: React.FC = () => {
     });
   };
 
-  const handleTextAnswer = (index: number, value: string) => {
-    setAnswers((prev) => ({ ...prev, [String(index)]: value }));
+  const handleTextAnswer = (key: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleFileUpload = async (index: number, file: File) => {
-    const key = String(index);
+  const handleFileUpload = async (key: string, index: number, file: File) => {
     setUploading((prev) => ({ ...prev, [key]: true }));
     try {
       const res = await studentAssessmentService.uploadAttachment(id!, index, file);
@@ -175,8 +174,7 @@ export const TakeAssessment: React.FC = () => {
   };
 
   /** Image questions accept several files; each is uploaded separately and appended to the answer list. */
-  const handleImagesUpload = async (index: number, files: File[]) => {
-    const key = String(index);
+  const handleImagesUpload = async (key: string, index: number, files: File[]) => {
     const existing = toUploadList(answers[key]);
     const room = MAX_IMAGES_PER_QUESTION - existing.length;
     if (room <= 0) {
@@ -200,8 +198,7 @@ export const TakeAssessment: React.FC = () => {
     }
   };
 
-  const handleRemoveImage = (index: number, uploadIdx: number) => {
-    const key = String(index);
+  const handleRemoveImage = (key: string, uploadIdx: number) => {
     setAnswers((prev) => ({
       ...prev,
       [key]: toUploadList(prev[key]).filter((_, i) => i !== uploadIdx),
@@ -289,7 +286,8 @@ export const TakeAssessment: React.FC = () => {
       <div className="space-y-6">
         {currentQuestions.map((q, idx) => {
           const type = q.type ?? 'single_choice';
-          const key = String(q.index);
+          // v2 questions carry a stable id; key answers by it (falls back to index for v1).
+          const key = q.id ?? String(q.index);
           const answerVal = answers[key];
           return (
             <div key={q.index} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
@@ -316,7 +314,7 @@ export const TakeAssessment: React.FC = () => {
                             name={`q-${q.index}`}
                             value={opt}
                             checked={isSelected}
-                            onChange={() => handleAnswer(q.index, opt)}
+                            onChange={() => handleAnswer(key, opt)}
                             className="text-indigo-600"
                           />
                           <span className="text-gray-800">{opt}</span>
@@ -341,7 +339,7 @@ export const TakeAssessment: React.FC = () => {
                           name={`q-${q.index}`}
                           value={letter}
                           checked={isSelected}
-                          onChange={() => handleAnswer(q.index, letter)}
+                          onChange={() => handleAnswer(key, letter)}
                           className="text-indigo-600"
                         />
                         <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
@@ -363,7 +361,7 @@ export const TakeAssessment: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => handleMultipleChoice(q.index, letter)}
+                          onChange={() => handleMultipleChoice(key, letter)}
                           className="rounded border-gray-300 text-indigo-600"
                         />
                         <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
@@ -383,7 +381,7 @@ export const TakeAssessment: React.FC = () => {
                               ? (answerVal[bIdx] as string)
                               : ''
                           }
-                          onChange={(e) => handleFillInBlank(q.index, bIdx, e.target.value)}
+                          onChange={(e) => handleFillInBlank(key, bIdx, e.target.value)}
                           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                           placeholder={`Answer ${bIdx + 1}`}
                         />
@@ -397,7 +395,7 @@ export const TakeAssessment: React.FC = () => {
                     <input
                       type="text"
                       value={typeof answerVal === 'string' ? answerVal : ''}
-                      onChange={(e) => handleTextAnswer(q.index, e.target.value)}
+                      onChange={(e) => handleTextAnswer(key, e.target.value)}
                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                       placeholder={q.placeholder ?? 'Write your answer'}
                     />
@@ -408,7 +406,7 @@ export const TakeAssessment: React.FC = () => {
                     <label className="block text-xs text-gray-500 mb-1">Your answer</label>
                     <textarea
                       value={typeof answerVal === 'string' ? answerVal : ''}
-                      onChange={(e) => handleTextAnswer(q.index, e.target.value)}
+                      onChange={(e) => handleTextAnswer(key, e.target.value)}
                       className="w-full min-h-32 border border-gray-300 rounded-md px-3 py-2 text-sm"
                       placeholder={q.placeholder ?? 'Write your detailed response'}
                     />
@@ -426,7 +424,7 @@ export const TakeAssessment: React.FC = () => {
                             <div key={upload.path} className="relative rounded-lg border border-gray-200 p-2">
                               <button
                                 type="button"
-                                onClick={() => handleRemoveImage(q.index, uIdx)}
+                                onClick={() => handleRemoveImage(key, uIdx)}
                                 className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-gray-500 shadow hover:bg-red-50 hover:text-red-600"
                                 title="Remove image"
                               >
@@ -470,7 +468,7 @@ export const TakeAssessment: React.FC = () => {
                           className="hidden"
                           onChange={(e) => {
                             const files = Array.from(e.target.files ?? []);
-                            if (files.length > 0) handleImagesUpload(q.index, files);
+                            if (files.length > 0) handleImagesUpload(key, q.index, files);
                             e.target.value = '';
                           }}
                         />
@@ -520,7 +518,7 @@ export const TakeAssessment: React.FC = () => {
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) handleFileUpload(q.index, file);
+                            if (file) handleFileUpload(key, q.index, file);
                             e.target.value = '';
                           }}
                         />

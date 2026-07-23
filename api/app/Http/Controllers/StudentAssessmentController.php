@@ -13,6 +13,7 @@ use App\Models\Subject;
 use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentScoringService;
+use App\Services\AssessmentV2Service;
 use App\Services\RunningGradeRecalcService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,8 @@ class StudentAssessmentController extends Controller
 
     public function __construct(
         protected RunningGradeRecalcService $runningGradeRecalcService,
-        protected AssessmentScoringService $scoringService
+        protected AssessmentScoringService $scoringService,
+        protected AssessmentV2Service $v2
     ) {
     }
 
@@ -58,7 +60,7 @@ class StudentAssessmentController extends Controller
             return response()->json(['success' => true, 'data' => []]);
         }
 
-        $items = SubjectEcrItem::with(['subjectEcr.subject'])
+        $items = SubjectEcrItem::with(['subjectEcr.subject', 'questions'])
             ->whereIn('subject_ecr_id', $ecrIds)
             ->whereIn('type', ['quiz', 'activity', 'assignment', 'exam'])
             ->where(function ($q) {
@@ -86,7 +88,7 @@ class StudentAssessmentController extends Controller
             $inProgress = $group->first(fn (StudentAssessmentAttempt $a) => $a->submitted_at === null);
             $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
             $canRetake = $submittedCount < $attemptsAllowed;
-            $hasQuestions = !empty($item->content['questions'] ?? []);
+            $hasQuestions = !empty($item->resolvedQuestions());
             $status = 'not_started';
             $score = null;
             $maxScore = null;
@@ -193,7 +195,7 @@ class StudentAssessmentController extends Controller
             'can_retake' => $canRetake,
         ];
 
-        $questions = $item->content['questions'] ?? [];
+        $questions = $item->resolvedQuestions();
         if (!empty($questions)) {
             $payload['questions'] = $this->stripAnswersFromQuestions($questions);
             $payload['max_score_possible'] = $this->scoringService->maxScore($questions);
@@ -203,16 +205,20 @@ class StudentAssessmentController extends Controller
         }
 
         if ($inProgressAttempt) {
+            // v2 answers live in normalized rows (keyed by question id); v1 in the JSON column.
+            $inProgressAnswers = $item->isV2()
+                ? $this->v2->answersMap($inProgressAttempt)
+                : ($inProgressAttempt->answers ?? []);
             $payload['attempt'] = [
                 'id' => $inProgressAttempt->id,
                 'started_at' => $inProgressAttempt->started_at?->toIso8601String(),
                 'submitted_at' => $inProgressAttempt->submitted_at?->toIso8601String(),
                 'score' => $inProgressAttempt->score,
                 'max_score' => $inProgressAttempt->max_score,
-                'answers' => $inProgressAttempt->answers,
+                'answers' => $inProgressAnswers,
             ];
             $payload['attempt_status'] = 'in_progress';
-            $payload['answers'] = $inProgressAttempt->answers ?? [];
+            $payload['answers'] = $inProgressAnswers;
         } elseif ($latestSubmittedAttempt) {
             // Submitted stays submitted even when retakes remain; the client offers
             // an explicit retake instead of treating the item as untaken.
@@ -264,7 +270,7 @@ class StudentAssessmentController extends Controller
             ], 422);
         }
 
-        $questions = $item->content['questions'] ?? [];
+        $questions = $item->resolvedQuestions();
         if (empty($questions)) {
             return response()->json([
                 'success' => false,
@@ -381,27 +387,41 @@ class StudentAssessmentController extends Controller
             ], 422);
         }
 
-        $questions = $item->content['questions'] ?? [];
+        $questions = $item->resolvedQuestions();
         if (empty($questions)) {
             return response()->json(['success' => false, 'message' => 'Assessment has no questions.'], 422);
         }
 
-        $objectiveScore = $this->scoringService->objectiveScore($questions, $validated['answers']);
         $maxScore = $this->scoringService->maxScore($questions);
-        $attempt->update([
-            'submitted_at' => now(),
-            'score' => $objectiveScore,
-            'max_score' => $maxScore,
-            'answers' => $validated['answers'],
-        ]);
+        $objectiveScore = 0.0;
 
-        StudentEcrItemScore::updateOrCreate(
-            [
-                'student_id' => $student->id,
-                'subject_ecr_item_id' => $item->id,
-            ],
-            ['score' => $objectiveScore]
-        );
+        DB::transaction(function () use ($item, $attempt, $questions, $validated, $maxScore, &$objectiveScore) {
+            if ($item->isV2()) {
+                // Normalized answer rows are the source of truth; the JSON column stays empty.
+                $objectiveScore = $this->v2->writeSubmissionAnswers($attempt, $questions, $validated['answers']);
+                $attempt->update([
+                    'submitted_at' => now(),
+                    'score' => $objectiveScore,
+                    'max_score' => $maxScore,
+                ]);
+            } else {
+                $objectiveScore = $this->scoringService->objectiveScore($questions, $validated['answers']);
+                $attempt->update([
+                    'submitted_at' => now(),
+                    'score' => $objectiveScore,
+                    'max_score' => $maxScore,
+                    'answers' => $validated['answers'],
+                ]);
+            }
+
+            StudentEcrItemScore::updateOrCreate(
+                [
+                    'student_id' => $attempt->student_id,
+                    'subject_ecr_item_id' => $item->id,
+                ],
+                ['score' => $objectiveScore]
+            );
+        });
 
         $this->runningGradeRecalcService->recalculate($student->id, $item->id);
 
@@ -475,7 +495,7 @@ class StudentAssessmentController extends Controller
             ], 422);
         }
 
-        $questions = $item->content['questions'] ?? [];
+        $questions = $item->resolvedQuestions();
         $qIndex = (int) $validated['question_index'];
         $question = $questions[$qIndex] ?? null;
         $type = $question['type'] ?? null;
@@ -540,6 +560,9 @@ class StudentAssessmentController extends Controller
             $type = (string) ($q['type'] ?? 'single_choice');
             $entry = [
                 'index' => $i,
+                // v2 questions carry a stable id; the client keys its answers by id when present,
+                // falling back to index for v1. This is what makes reordering/removal safe.
+                'id' => $q['id'] ?? null,
                 'type' => $type,
                 'question' => $q['question'] ?? '',
                 'points' => (float) ($q['points'] ?? 1),
@@ -681,8 +704,9 @@ class StudentAssessmentController extends Controller
 
     private function buildTakePayload(SubjectEcrItem $item, StudentAssessmentAttempt $attempt): array
     {
-        $questions = $item->content['questions'] ?? [];
+        $questions = $item->resolvedQuestions();
         $rules = $this->assessmentRules($item);
+        $answers = $item->isV2() ? $this->v2->answersMap($attempt) : ($attempt->answers ?? []);
         return [
             'id' => $item->id,
             'type' => $item->type,
@@ -699,7 +723,7 @@ class StudentAssessmentController extends Controller
             'allow_late_submission' => (bool) $item->allow_late_submission,
             'questions' => $this->stripAnswersFromQuestions($questions),
             'attempt_id' => $attempt->id,
-            'answers' => $attempt->answers ?? [],
+            'answers' => $answers,
         ];
     }
 }

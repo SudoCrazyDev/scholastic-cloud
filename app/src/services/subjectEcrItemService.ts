@@ -13,6 +13,8 @@ export interface SubjectEcrItem {
     pass_mark?: number | null;
     randomize_questions?: boolean;
   };
+  /** 1 = legacy JSON questions/answers (index-keyed); 2 = normalized rows (id-keyed). */
+  content_version?: number;
   content?: {
     settings?: {
       max_attempts?: number;
@@ -21,6 +23,7 @@ export interface SubjectEcrItem {
       randomize_questions?: boolean;
     };
     questions?: Array<{
+      id?: string;
       type:
         | 'true_false'
         | 'single_choice'

@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\StudentAssessmentAnswer;
 use App\Models\StudentAssessmentAttempt;
 use App\Models\StudentEcrItemScore;
 use App\Models\StudentSection;
 use App\Models\StudentSubject;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentScoringService;
+use App\Services\AssessmentV2Service;
 use App\Services\RunningGradeRecalcService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -21,8 +24,21 @@ class AssessmentGradingController extends Controller
 {
     public function __construct(
         protected AssessmentScoringService $scoringService,
-        protected RunningGradeRecalcService $runningGradeRecalcService
+        protected RunningGradeRecalcService $runningGradeRecalcService,
+        protected AssessmentV2Service $v2
     ) {
+    }
+
+    /**
+     * The (answers, manualScores) maps for an attempt, keyed the same way its questions are:
+     * by stable question id for v2 (from normalized rows), by index for v1 (from JSON columns).
+     */
+    private function attemptMaps(StudentAssessmentAttempt $attempt, SubjectEcrItem $item): array
+    {
+        if ($item->isV2()) {
+            return [$this->v2->answersMap($attempt), $this->v2->manualMap($attempt)];
+        }
+        return [$attempt->answers ?? [], $attempt->manual_scores ?? []];
     }
 
     /**
@@ -35,17 +51,18 @@ class AssessmentGradingController extends Controller
             return $item;
         }
 
-        $questions = $item->content['questions'] ?? [];
+        $questions = $item->resolvedQuestions();
         $maxScore = $this->scoringService->maxScore($questions);
 
-        $attempts = StudentAssessmentAttempt::with('student')
+        $attempts = StudentAssessmentAttempt::with(['student', 'assessmentAnswers'])
             ->where('subject_ecr_item_id', $item->id)
             ->whereNotNull('submitted_at')
             ->orderByDesc('submitted_at')
             ->get();
 
-        $submissions = $attempts->map(function (StudentAssessmentAttempt $attempt) use ($questions) {
-            return $this->buildSubmission($attempt, $questions);
+        $submissions = $attempts->map(function (StudentAssessmentAttempt $attempt) use ($questions, $item) {
+            [$answers, $manual] = $this->attemptMaps($attempt, $item);
+            return $this->buildSubmission($attempt, $questions, $answers, $manual);
         })->values();
 
         return response()->json([
@@ -90,43 +107,76 @@ class AssessmentGradingController extends Controller
             return response()->json(['success' => false, 'message' => 'Submission not found.'], 404);
         }
 
-        $questions = $item->content['questions'] ?? [];
-        $answers = $attempt->answers ?? [];
-
-        // Keep only valid manual-question indices, clamped to each question's points.
-        $manualScores = [];
-        foreach ($validated['manual_scores'] as $index => $value) {
-            $i = (int) $index;
-            $question = $questions[$i] ?? null;
-            if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
-                continue;
-            }
-            $points = (float) ($question['points'] ?? 1);
-            $manualScores[(string) $i] = max(0.0, min($points, (float) $value));
-        }
-
-        $objectiveScore = $this->scoringService->objectiveScore($questions, $answers);
-        $total = $objectiveScore + array_sum($manualScores);
+        $questions = $item->resolvedQuestions();
         $maxScore = $this->scoringService->maxScore($questions);
+        $graderId = $request->user()->id;
+        $total = 0.0;
 
-        $attempt->update([
-            'manual_scores' => $manualScores,
-            'score' => $total,
-            'max_score' => $maxScore,
-            'graded_at' => now(),
-            'graded_by' => $request->user()->id,
-        ]);
+        DB::transaction(function () use ($item, $attempt, $questions, $validated, $maxScore, $graderId, &$total) {
+            if ($item->isV2()) {
+                // manual_scores keyed by question id; award onto the normalized answer rows.
+                $byId = [];
+                foreach ($questions as $q) {
+                    if (!empty($q['id'])) {
+                        $byId[$q['id']] = $q;
+                    }
+                }
+                foreach ($validated['manual_scores'] as $qid => $value) {
+                    $question = $byId[$qid] ?? null;
+                    if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
+                        continue;
+                    }
+                    $points = (float) ($question['points'] ?? 1);
+                    StudentAssessmentAnswer::updateOrCreate(
+                        ['attempt_id' => $attempt->id, 'question_id' => $qid],
+                        ['awarded' => max(0.0, min($points, (float) $value)), 'graded_at' => now(), 'graded_by' => $graderId]
+                    );
+                }
+                $attempt->load('assessmentAnswers');
+                [$answers, $manual] = $this->attemptMaps($attempt, $item);
+                $total = $this->scoringService->objectiveScore($questions, $answers) + array_sum($manual);
+                $attempt->update([
+                    'score' => $total,
+                    'max_score' => $maxScore,
+                    'graded_at' => now(),
+                    'graded_by' => $graderId,
+                ]);
+            } else {
+                $answers = $attempt->answers ?? [];
+                // Keep only valid manual-question indices, clamped to each question's points.
+                $manualScores = [];
+                foreach ($validated['manual_scores'] as $index => $value) {
+                    $i = (int) $index;
+                    $question = $questions[$i] ?? null;
+                    if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
+                        continue;
+                    }
+                    $points = (float) ($question['points'] ?? 1);
+                    $manualScores[(string) $i] = max(0.0, min($points, (float) $value));
+                }
+                $total = $this->scoringService->objectiveScore($questions, $answers) + array_sum($manualScores);
+                $attempt->update([
+                    'manual_scores' => $manualScores,
+                    'score' => $total,
+                    'max_score' => $maxScore,
+                    'graded_at' => now(),
+                    'graded_by' => $graderId,
+                ]);
+            }
 
-        StudentEcrItemScore::updateOrCreate(
-            ['student_id' => $attempt->student_id, 'subject_ecr_item_id' => $item->id],
-            ['score' => $total]
-        );
+            StudentEcrItemScore::updateOrCreate(
+                ['student_id' => $attempt->student_id, 'subject_ecr_item_id' => $item->id],
+                ['score' => $total]
+            );
+        });
 
         $this->runningGradeRecalcService->recalculate($attempt->student_id, $item->id);
 
+        $attempt->load(['student', 'assessmentAnswers']);
+        [$answers, $manual] = $this->attemptMaps($attempt, $item);
         return response()->json([
             'success' => true,
-            'data' => $this->buildSubmission($attempt->fresh('student'), $questions),
+            'data' => $this->buildSubmission($attempt, $questions, $answers, $manual),
         ]);
     }
 
@@ -143,10 +193,11 @@ class AssessmentGradingController extends Controller
             return $item;
         }
 
-        $questions = $item->content['questions'] ?? [];
+        $questions = $item->resolvedQuestions();
         $maxScore = $this->scoringService->maxScore($questions);
+        $isV2 = $item->isV2();
 
-        $attempts = StudentAssessmentAttempt::with('student')
+        $attempts = StudentAssessmentAttempt::with(['student', 'assessmentAnswers'])
             ->where('subject_ecr_item_id', $item->id)
             ->whereNotNull('submitted_at')
             ->orderByDesc('submitted_at')
@@ -155,28 +206,35 @@ class AssessmentGradingController extends Controller
         $updated = 0;
         $seenStudents = [];
         foreach ($attempts as $attempt) {
-            $objectiveScore = $this->scoringService->objectiveScore($questions, $attempt->answers ?? []);
+            if ($isV2) {
+                // Refresh auto rows against the current key; keep manual awards.
+                $objectiveScore = $this->v2->regradeObjective($attempt, $questions);
+                $attempt->load('assessmentAnswers');
+                $manualScores = $this->v2->manualMap($attempt);
+            } else {
+                $objectiveScore = $this->scoringService->objectiveScore($questions, $attempt->answers ?? []);
 
-            // Keep only manual scores that still map to a manual question, clamped to its points.
-            $manualScores = [];
-            foreach ($attempt->manual_scores ?? [] as $index => $value) {
-                $i = (int) $index;
-                $question = $questions[$i] ?? null;
-                if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
-                    continue;
+                // Keep only manual scores that still map to a manual question, clamped to its points.
+                $manualScores = [];
+                foreach ($attempt->manual_scores ?? [] as $index => $value) {
+                    $i = (int) $index;
+                    $question = $questions[$i] ?? null;
+                    if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
+                        continue;
+                    }
+                    $points = (float) ($question['points'] ?? 1);
+                    $manualScores[(string) $i] = max(0.0, min($points, (float) $value));
                 }
-                $points = (float) ($question['points'] ?? 1);
-                $manualScores[(string) $i] = max(0.0, min($points, (float) $value));
             }
 
             $total = $objectiveScore + array_sum($manualScores);
             $changed = (float) $attempt->score !== $total || (float) $attempt->max_score !== $maxScore;
             if ($changed) {
-                $attempt->update([
-                    'manual_scores' => $manualScores,
-                    'score' => $total,
-                    'max_score' => $maxScore,
-                ]);
+                $payload = ['score' => $total, 'max_score' => $maxScore];
+                if (!$isV2) {
+                    $payload['manual_scores'] = $manualScores;
+                }
+                $attempt->update($payload);
                 $updated++;
             }
 
@@ -193,8 +251,9 @@ class AssessmentGradingController extends Controller
             }
         }
 
-        $submissions = $attempts->map(function (StudentAssessmentAttempt $attempt) use ($questions) {
-            return $this->buildSubmission($attempt, $questions);
+        $submissions = $attempts->map(function (StudentAssessmentAttempt $attempt) use ($questions, $item) {
+            [$answers, $manual] = $this->attemptMaps($attempt, $item);
+            return $this->buildSubmission($attempt, $questions, $answers, $manual);
         })->values();
 
         return response()->json([
@@ -273,6 +332,7 @@ class AssessmentGradingController extends Controller
             $type = (string) ($q['type'] ?? 'single_choice');
             $meta[] = [
                 'index' => $i,
+                'id' => $q['id'] ?? null,
                 'type' => $type,
                 'question' => $q['question'] ?? '',
                 'points' => (float) ($q['points'] ?? 1),
@@ -287,11 +347,8 @@ class AssessmentGradingController extends Controller
         return $meta;
     }
 
-    private function buildSubmission(StudentAssessmentAttempt $attempt, array $questions): array
+    private function buildSubmission(StudentAssessmentAttempt $attempt, array $questions, array $answers, array $manualScores): array
     {
-        $answers = $attempt->answers ?? [];
-        $manualScores = $attempt->manual_scores ?? [];
-
         $perQuestion = [];
         $objectiveScore = 0.0;
         $manualTotal = 0.0;
@@ -300,11 +357,13 @@ class AssessmentGradingController extends Controller
         foreach ($questions as $i => $q) {
             $type = (string) ($q['type'] ?? 'single_choice');
             $points = (float) ($q['points'] ?? 1);
-            $given = $answers[(string) $i] ?? $answers[$i] ?? null;
+            $given = $this->scoringService->answerFor($q, $i, $answers);
             $isManual = $this->scoringService->isManualQuestion($q);
+            $qid = $q['id'] ?? null;
 
             if ($isManual) {
-                $awarded = $manualScores[(string) $i] ?? $manualScores[$i] ?? null;
+                $awarded = ($qid !== null ? ($manualScores[$qid] ?? null) : null)
+                    ?? $manualScores[(string) $i] ?? $manualScores[$i] ?? null;
                 if ($awarded === null) {
                     $allManualGraded = false;
                 } else {
@@ -312,6 +371,7 @@ class AssessmentGradingController extends Controller
                 }
                 $perQuestion[] = [
                     'index' => $i,
+                    'id' => $qid,
                     'manual' => true,
                     'answer' => $this->resolveAnswerForView($given),
                     'awarded' => $awarded === null ? null : (float) $awarded,
@@ -324,6 +384,7 @@ class AssessmentGradingController extends Controller
                 }
                 $perQuestion[] = [
                     'index' => $i,
+                    'id' => $qid,
                     'manual' => false,
                     'answer' => $this->resolveAnswerForView($given),
                     'awarded' => $correct ? $points : 0.0,

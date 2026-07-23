@@ -3,6 +3,8 @@ import type { QuestionType, UploadAnswer } from './studentAssessmentService';
 
 export interface GradingQuestionMeta {
   index: number;
+  /** Stable question id (v2); null for v1. Manual scores are keyed by it when present. */
+  id?: string | null;
   type: QuestionType;
   question: string;
   points: number;
@@ -17,6 +19,7 @@ export type SubmittedAnswer = string | string[] | UploadAnswer | UploadAnswer[] 
 
 export interface SubmissionPerQuestion {
   index: number;
+  id?: string | null;
   manual: boolean;
   answer: SubmittedAnswer;
   awarded: number | null;

@@ -73,6 +73,8 @@ export interface AssessmentMethod {
   allowLateSubmission: boolean
   rules: AssessmentMethodRules
   questions: AssessmentMethodQuestion[]
+  /** Storage model: 1 = legacy JSON (index-keyed), 2 = normalized question/answer rows (id-keyed). */
+  contentVersion?: number
   createdAt?: string
   updatedAt?: string
 }
@@ -142,6 +144,7 @@ const normalizeChoiceAnswers = (value: unknown): string[] => {
 }
 
 interface RawAssessmentQuestion {
+  id?: string
   type?: string
   question?: string
   choices?: string[]
@@ -169,7 +172,9 @@ const mapQuestionFromItem = (question: RawAssessmentQuestion): AssessmentMethodQ
         : (question.choices ?? defaultChoiceList()).map((choice) => String(choice ?? ''))
 
   const baseQuestion: AssessmentMethodQuestion = {
-    id: nanoid(),
+    // Preserve the server's stable question id (v2); v1 questions have none, so mint a
+    // client-only key. This id is what keeps answers aligned across edits in v2.
+    id: question.id ?? nanoid(),
     type,
     prompt: question.question ?? '',
     points: typeof question.points === 'number' ? question.points : 1,
@@ -276,13 +281,17 @@ const fromSubjectEcrItem = (item: SubjectEcrItem): AssessmentMethod => {
     allowLateSubmission: Boolean(item.allow_late_submission),
     rules: mapRulesFromItem(item, type),
     questions,
+    contentVersion: Number((item as any).content_version ?? 1),
     createdAt: (item as any).created_at,
     updatedAt: (item as any).updated_at,
   }
 }
 
-const normalizeQuestionForPayload = (question: AssessmentMethodQuestion) => {
+const normalizeQuestionForPayload = (question: AssessmentMethodQuestion, includeId = false) => {
   const base = {
+    // v2 round-trips the stable id so the server can match/update the right question row.
+    // v1 omits it to keep legacy content byte-for-byte as before.
+    ...(includeId ? { id: question.id } : {}),
     type: question.type,
     question: question.prompt.trim(),
     points: Number.isFinite(question.points) ? question.points : 1,
@@ -386,10 +395,13 @@ const toUtcIso = (value: string | null): string | null => {
 
 const toSubjectEcrItemPayload = (input: AssessmentMethodInput): Omit<SubjectEcrItem, 'id'> => {
   const totalPoints = input.questions.reduce((sum, question) => sum + (Number(question.points) || 0), 0)
+  const contentVersion = Number(input.contentVersion ?? 1)
+  const isV2 = contentVersion === 2
   return {
     subject_ecr_id: input.subjectEcrId,
     type: input.type,
     status: input.status,
+    content_version: contentVersion,
     title: input.title.trim(),
     description: input.description.trim() || undefined,
     quarter: input.quarter,
@@ -412,7 +424,7 @@ const toSubjectEcrItemPayload = (input: AssessmentMethodInput): Omit<SubjectEcrI
         pass_mark: input.rules.passMark,
         randomize_questions: input.rules.randomizeQuestions,
       },
-      questions: input.questions.map(normalizeQuestionForPayload),
+      questions: input.questions.map((q) => normalizeQuestionForPayload(q, isV2)),
     },
   }
 }
@@ -431,7 +443,8 @@ class AssessmentMethodService {
   }
 
   async create(input: AssessmentMethodInput) {
-    return subjectEcrItemService.create(toSubjectEcrItemPayload(input))
+    // New assessment methods are created on the v2 (normalized) model by default.
+    return subjectEcrItemService.create(toSubjectEcrItemPayload({ ...input, contentVersion: input.contentVersion ?? 2 }))
   }
 
   async update(id: string, input: AssessmentMethodInput) {
