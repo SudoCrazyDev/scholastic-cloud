@@ -1175,6 +1175,13 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         </div>
       )}
 
+      {(() => {
+      // Students see only active transactions; voided ones are hidden from My Finance
+      // (staff keep them visible for audit).
+      const visibleLedgerEntries = isStudentUser
+        ? ledgerData?.entries?.filter((entry) => !entry.voided)
+        : ledgerData?.entries
+      return (
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <h4 className="text-lg font-semibold text-gray-900 mb-4">Ledger</h4>
         {ledgerQuery.isLoading ? (
@@ -1194,7 +1201,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {ledgerData?.entries?.map((entry, index) => (
+                {visibleLedgerEntries?.map((entry, index) => (
                   <tr key={`${entry.type}-${entry.payment_id || entry.discount_id || entry.fee_id || index}`}>
                     <td className="px-4 py-2 text-sm text-gray-600 capitalize">{entry.type.replace('_', ' ')}</td>
                     <td className="px-4 py-2 text-sm text-gray-700">{entry.description}</td>
@@ -1211,7 +1218,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                     </td>
                   </tr>
                 ))}
-                {!ledgerData?.entries?.length && (
+                {!visibleLedgerEntries?.length && (
                   <tr>
                     <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                       No ledger entries found for this academic year.
@@ -1223,6 +1230,8 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           </div>
         )}
       </div>
+      )
+      })()}
 
     </div>
   )
