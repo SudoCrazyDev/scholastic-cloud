@@ -812,6 +812,57 @@ export interface FinanceCollectionsResponse {
   quarterly: QuarterlyCollection[];
 }
 
+export interface CollectionReportBreakdownRow {
+  label: string;
+  entries: number;
+  transactions?: number;
+  amount: number;
+}
+
+export interface CollectionReportDailyRow {
+  label: string;
+  transactions: number;
+  entries: number;
+  amount: number;
+}
+
+export interface CollectionReportTransaction {
+  date: string;
+  or_number: string | null;
+  receipt_number: string | null;
+  student: string;
+  lrn?: string | null;
+  method: string;
+  cashier: string;
+  entries: number;
+  amount: number;
+}
+
+export interface CollectionReportResponse {
+  start_date: string;
+  end_date: string;
+  institution: {
+    title: string;
+    abbr: string;
+    address?: string | null;
+  } | null;
+  summary: {
+    total_collected: number;
+    transaction_count: number;
+    entry_count: number;
+    student_count: number;
+    voided_count: number;
+    voided_amount: number;
+    average_per_transaction: number;
+    method_count: number;
+  };
+  by_method: CollectionReportBreakdownRow[];
+  by_fee: CollectionReportBreakdownRow[];
+  by_cashier: CollectionReportBreakdownRow[];
+  by_day: CollectionReportDailyRow[];
+  transactions: CollectionReportTransaction[];
+}
+
 // Department types
 export interface Department {
   id: string;

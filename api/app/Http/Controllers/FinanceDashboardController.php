@@ -367,6 +367,205 @@ class FinanceDashboardController extends Controller
         ]);
     }
 
+    /**
+     * Detailed, printable collection report for an arbitrary date range (defaults to a single day).
+     *
+     * Reports transaction / entry counts, amount collected, and breakdowns by payment method,
+     * fee type, cashier, and day. Voided entries are excluded from collected totals but reported
+     * separately so the figures reconcile.
+     */
+    public function collectionsReport(Request $request): JsonResponse
+    {
+        if ($this->isStudentUser($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (! $institutionId) {
+            return response()->json(['success' => false, 'message' => 'No institution assigned'], 400);
+        }
+
+        $validated = $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        $startDate = \Illuminate\Support\Carbon::parse($validated['start_date'])->startOfDay();
+        $endDate = \Illuminate\Support\Carbon::parse($validated['end_date'])->startOfDay();
+
+        $institution = \App\Models\Institution::find($institutionId);
+
+        $payments = StudentPayment::with([
+            'student:id,lrn,first_name,middle_name,last_name,ext_name',
+            'schoolFee:id,name',
+            'receivedBy:id,first_name,last_name',
+            'paymentTransaction:id,or_number,receipt_number,payment_method',
+        ])
+            ->where('institution_id', $institutionId)
+            ->whereBetween('payment_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->orderBy('payment_date')
+            ->orderBy('created_at')
+            ->get();
+
+        $totalCollected = 0.0;
+        $entryCount = 0;
+        $voidedCount = 0;
+        $voidedAmount = 0.0;
+
+        $byMethod = [];   // method => ['entries' => n, 'amount' => x, 'txns' => Set]
+        $byFee = [];      // fee name => ['entries' => n, 'amount' => x]
+        $byDay = [];      // Y-m-d => ['entries' => n, 'amount' => x, 'txns' => Set]
+        $byCashier = [];  // name => ['entries' => n, 'amount' => x, 'txns' => Set]
+
+        $txnKeys = [];        // unique transaction keys (non-voided)
+        $studentKeys = [];    // unique paying students (non-voided)
+        $transactions = [];   // grouped transaction rows for the detailed listing
+
+        foreach ($payments as $payment) {
+            $isVoided = $payment->voided_at !== null;
+            $amount = (float) $payment->amount;
+
+            if ($isVoided) {
+                $voidedCount++;
+                $voidedAmount += $amount;
+
+                continue;
+            }
+
+            $dateKey = $payment->payment_date ? $payment->payment_date->format('Y-m-d') : 'unknown';
+            $txnId = $payment->payment_transaction_id;
+            $txnKey = $txnId ?: 'entry:' . $payment->id;
+            $method = $payment->payment_method
+                ?: ($payment->paymentTransaction?->payment_method ?: 'Unspecified');
+            $feeName = $payment->schoolFee?->name ?: 'General / Other';
+            $cashier = $payment->receivedBy
+                ? trim($payment->receivedBy->first_name . ' ' . $payment->receivedBy->last_name)
+                : 'Unknown';
+            $cashier = $cashier !== '' ? $cashier : 'Unknown';
+
+            $totalCollected += $amount;
+            $entryCount++;
+            $txnKeys[$txnKey] = true;
+            if ($payment->student_id) {
+                $studentKeys[$payment->student_id] = true;
+            }
+
+            $byMethod[$method] ??= ['entries' => 0, 'amount' => 0.0, 'txns' => []];
+            $byMethod[$method]['entries']++;
+            $byMethod[$method]['amount'] += $amount;
+            $byMethod[$method]['txns'][$txnKey] = true;
+
+            $byFee[$feeName] ??= ['entries' => 0, 'amount' => 0.0];
+            $byFee[$feeName]['entries']++;
+            $byFee[$feeName]['amount'] += $amount;
+
+            $byDay[$dateKey] ??= ['entries' => 0, 'amount' => 0.0, 'txns' => []];
+            $byDay[$dateKey]['entries']++;
+            $byDay[$dateKey]['amount'] += $amount;
+            $byDay[$dateKey]['txns'][$txnKey] = true;
+
+            $byCashier[$cashier] ??= ['entries' => 0, 'amount' => 0.0, 'txns' => []];
+            $byCashier[$cashier]['entries']++;
+            $byCashier[$cashier]['amount'] += $amount;
+            $byCashier[$cashier]['txns'][$txnKey] = true;
+
+            if (! isset($transactions[$txnKey])) {
+                $studentName = $payment->student
+                    ? trim(implode(' ', array_filter([
+                        $payment->student->last_name . ',',
+                        $payment->student->first_name,
+                        $payment->student->middle_name,
+                        $payment->student->ext_name,
+                    ])))
+                    : 'Unknown';
+
+                $transactions[$txnKey] = [
+                    'date' => $dateKey,
+                    'or_number' => $payment->or_number
+                        ?: ($payment->paymentTransaction?->or_number ?: null),
+                    'receipt_number' => $payment->receipt_number
+                        ?: ($payment->paymentTransaction?->receipt_number ?: null),
+                    'student' => $studentName,
+                    'lrn' => $payment->student?->lrn,
+                    'method' => $method,
+                    'cashier' => $cashier,
+                    'entries' => 0,
+                    'amount' => 0.0,
+                ];
+            }
+            $transactions[$txnKey]['entries']++;
+            $transactions[$txnKey]['amount'] += $amount;
+        }
+
+        $formatBreakdown = function (array $group, bool $withTxns = true) {
+            $rows = [];
+            foreach ($group as $key => $data) {
+                $rows[] = array_filter([
+                    'label' => $key,
+                    'entries' => $data['entries'],
+                    'transactions' => $withTxns && isset($data['txns']) ? count($data['txns']) : null,
+                    'amount' => round($data['amount'], 2),
+                ], fn ($v) => $v !== null);
+            }
+            usort($rows, fn ($a, $b) => $b['amount'] <=> $a['amount']);
+
+            return $rows;
+        };
+
+        $dailyRows = [];
+        foreach ($byDay as $key => $data) {
+            $dailyRows[] = [
+                'label' => $key,
+                'transactions' => count($data['txns']),
+                'entries' => $data['entries'],
+                'amount' => round($data['amount'], 2),
+            ];
+        }
+        usort($dailyRows, fn ($a, $b) => strcmp($a['label'], $b['label']));
+
+        $transactionRows = array_values($transactions);
+        foreach ($transactionRows as &$row) {
+            $row['amount'] = round($row['amount'], 2);
+        }
+        unset($row);
+        usort($transactionRows, function ($a, $b) {
+            return [$a['date'], $a['or_number'] ?? '', $a['receipt_number'] ?? '']
+                <=> [$b['date'], $b['or_number'] ?? '', $b['receipt_number'] ?? ''];
+        });
+
+        $transactionCount = count($txnKeys);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'start_date' => $startDate->toDateString(),
+                'end_date' => $endDate->toDateString(),
+                'institution' => $institution ? [
+                    'title' => $institution->title,
+                    'abbr' => $institution->abbr,
+                    'address' => $institution->address,
+                ] : null,
+                'summary' => [
+                    'total_collected' => round($totalCollected, 2),
+                    'transaction_count' => $transactionCount,
+                    'entry_count' => $entryCount,
+                    'student_count' => count($studentKeys),
+                    'voided_count' => $voidedCount,
+                    'voided_amount' => round($voidedAmount, 2),
+                    'average_per_transaction' => $transactionCount > 0
+                        ? round($totalCollected / $transactionCount, 2)
+                        : 0.0,
+                    'method_count' => count($byMethod),
+                ],
+                'by_method' => $formatBreakdown($byMethod),
+                'by_fee' => $formatBreakdown($byFee, false),
+                'by_cashier' => $formatBreakdown($byCashier),
+                'by_day' => $dailyRows,
+                'transactions' => $transactionRows,
+            ],
+        ]);
+    }
+
     private function calculateDiscountTotal(array $discounts, array $feeDefaults, float $chargesTotal): float
     {
         $total = 0.0;

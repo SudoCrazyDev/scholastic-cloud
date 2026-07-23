@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Select } from '../../components/select'
 import { financeDashboardService } from '../../services/financeDashboardService'
+import CollectionReportView from './CollectionReportView'
 
 interface CollectionsViewProps {
   academicYearOptions: { value: string; label: string }[]
@@ -213,6 +214,8 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({
           </div>
         </>
       )}
+
+      <CollectionReportView />
     </div>
   )
 }

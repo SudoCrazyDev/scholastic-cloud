@@ -368,6 +368,9 @@ Route::middleware('auth.token')->group(function () {
     // Finance collections (monthly/quarterly breakdown)
     Route::get('finance/collections', [FinanceDashboardController::class, 'collections']);
 
+    // Finance collections detailed report (arbitrary date range)
+    Route::get('finance/collections/report', [FinanceDashboardController::class, 'collectionsReport']);
+
     // Section Consolidated Grades route
     Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
     Route::get('proficiency', [\App\Http\Controllers\ProficiencyController::class, 'index']);
