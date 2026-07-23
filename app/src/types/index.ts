@@ -1468,7 +1468,7 @@ export interface CreateStudentData {
   ext_name?: string;
   birthdate: string;
   gender: 'male' | 'female' | 'other';
-  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
+  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'PMCC (4w)' | 'Others';
   lrn: string;
   profile_picture?: string | File;
   is_active?: boolean;
@@ -1481,7 +1481,7 @@ export interface UpdateStudentData {
   ext_name?: string;
   birthdate?: string;
   gender?: 'male' | 'female' | 'other';
-  religion?: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others';
+  religion?: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'PMCC (4w)' | 'Others';
   lrn?: string;
   profile_picture?: string | File;
   is_active?: boolean;

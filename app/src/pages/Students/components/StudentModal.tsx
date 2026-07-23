@@ -25,6 +25,7 @@ const RELIGION_OPTIONS = [
   { value: 'Catholic', label: 'Catholic' },
   { value: 'Iglesia Ni Cristo', label: 'Iglesia Ni Cristo' },
   { value: 'Baptists', label: 'Baptists' },
+  { value: 'PMCC (4w)', label: 'PMCC (4w)' },
   { value: 'Others', label: 'Others' },
 ]
 
@@ -79,7 +80,7 @@ const validationSchema = Yup.object({
   
   religion: Yup.string()
     .required('Religion is required')
-    .oneOf(['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'Others'], 'Please select a valid religion'),
+    .oneOf(['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'PMCC (4w)', 'Others'], 'Please select a valid religion'),
 })
 
 export function StudentModal({ 
@@ -265,7 +266,7 @@ export function StudentModal({
                     const submitData: CreateStudentData = {
                       ...values,
                       gender: values.gender as 'male' | 'female' | 'other',
-                      religion: values.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others',
+                      religion: values.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'PMCC (4w)' | 'Others',
                       profile_picture: fileToSubmit || undefined,
                     }
                     

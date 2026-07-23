@@ -136,7 +136,7 @@ class StudentController extends Controller
             'last_name' => 'nullable|string|max:255',
             'ext_name' => 'nullable|string|max:255',
             'gender' => 'required|string',
-            'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,Others',
+            'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,PMCC (4w),Others',
             'birthdate' => 'required|date',
             'is_active' => 'boolean',
         ];
@@ -440,7 +440,7 @@ class StudentController extends Controller
             'last_name' => 'nullable|string|max:255',
             'ext_name' => 'nullable|string|max:255',
             'gender' => 'sometimes|required|string',
-            'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,Others',
+            'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,PMCC (4w),Others',
             'birthdate' => 'sometimes|required|date',
             'is_active' => 'boolean',
         ];
@@ -539,7 +539,7 @@ class StudentController extends Controller
             'last_name' => 'nullable|string|max:255',
             'ext_name' => 'nullable|string|max:255',
             'gender' => 'sometimes|required|string',
-            'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,Others',
+            'religion' => 'nullable|string|in:Islam,Catholic,Iglesia Ni Cristo,Baptists,PMCC (4w),Others',
             'birthdate' => 'sometimes|required|date',
             'is_active' => 'boolean',
         ];

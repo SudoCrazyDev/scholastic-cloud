@@ -23,6 +23,7 @@ const RELIGION_OPTIONS = [
   { value: 'Catholic', label: 'Catholic' },
   { value: 'Iglesia Ni Cristo', label: 'Iglesia Ni Cristo' },
   { value: 'Baptists', label: 'Baptists' },
+  { value: 'PMCC (4w)', label: 'PMCC (4w)' },
   { value: 'Others', label: 'Others' },
 ]
 
@@ -40,7 +41,7 @@ type FormValues = {
   ext_name: string
   birthdate: string
   gender: 'male' | 'female' | 'other'
-  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others'
+  religion: 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'PMCC (4w)' | 'Others'
   lrn: string
 }
 
@@ -89,7 +90,7 @@ const validationSchema = Yup.object({
   
   religion: Yup.string()
     .required('Religion is required')
-    .oneOf(['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'Others'] as const, 'Please select a valid religion'),
+    .oneOf(['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'PMCC (4w)', 'Others'] as const, 'Please select a valid religion'),
   
   lrn: Yup.string()
     .required('LRN is required')
@@ -194,7 +195,7 @@ export function StudentQuickEditModal({
     ext_name: student.ext_name || '',
     birthdate: student.birthdate ? new Date(student.birthdate).toISOString().split('T')[0] : '',
     gender: (student.gender as 'male' | 'female' | 'other') || 'male',
-    religion: (student.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'Others') || 'Others',
+    religion: (student.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'PMCC (4w)' | 'Others') || 'Others',
     lrn: student.lrn || '',
   }
 
