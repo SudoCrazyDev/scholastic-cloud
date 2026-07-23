@@ -33,11 +33,17 @@ const formatSize = (bytes: number | null): string => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+const isImage = (att: AnnouncementFeedItem['attachments'][number]): boolean =>
+  Boolean(att.url) && (att.mime?.startsWith('image/') ?? false)
+
 const AnnouncementCard: React.FC<{
   announcement: AnnouncementFeedItem
   onMarkRead: (id: string) => void
 }> = ({ announcement, onMarkRead }) => {
   const unread = !announcement.is_read
+
+  const imageAttachments = announcement.attachments.filter(isImage)
+  const fileAttachments = announcement.attachments.filter((att) => !isImage(att))
 
   // Reading an unread announcement marks it read; a card that's already read
   // does nothing on click.
@@ -80,14 +86,37 @@ const AnnouncementCard: React.FC<{
         />
       )}
 
-      {announcement.attachments.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {announcement.attachments.map((att) => (
+      {imageAttachments.length > 0 && (
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {imageAttachments.map((att) => (
             <a
               key={att.id}
               href={att.url ?? '#'}
               target="_blank"
               rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="block overflow-hidden rounded-lg border border-gray-200"
+            >
+              <img
+                src={att.url ?? ''}
+                alt={att.name}
+                loading="lazy"
+                className="max-h-80 w-full object-contain bg-gray-50"
+              />
+            </a>
+          ))}
+        </div>
+      )}
+
+      {fileAttachments.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {fileAttachments.map((att) => (
+            <a
+              key={att.id}
+              href={att.url ?? '#'}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
             >
               <Paperclip className="w-3.5 h-3.5" />
