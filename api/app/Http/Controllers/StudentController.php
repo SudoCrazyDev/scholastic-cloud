@@ -83,6 +83,7 @@ class StudentController extends Controller
         $students->getCollection()->transform(function ($student) {
             $current = $student->sections->first();
             $student->setAttribute('current_section', $current?->title);
+            $student->setAttribute('current_grade_level', $current?->grade_level);
             $student->makeHidden('sections');
             return $student;
         });

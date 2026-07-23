@@ -256,7 +256,11 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
                 {/* Current Section */}
                 <td className="px-4 py-2">
                   {student.current_section ? (
-                    <Badge color="indigo">{student.current_section}</Badge>
+                    <Badge color="indigo">
+                      {[student.current_grade_level, student.current_section]
+                        .filter(Boolean)
+                        .join(' - ')}
+                    </Badge>
                   ) : (
                     <span className="text-sm text-gray-400">—</span>
                   )}

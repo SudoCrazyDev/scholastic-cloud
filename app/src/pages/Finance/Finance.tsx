@@ -2066,9 +2066,21 @@ const Finance: React.FC = () => {
               </div>
               {selectedLedgerStudent && (
                 <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
-                  <span className="text-sm font-medium text-indigo-900">
-                    {getStudentFullName(selectedLedgerStudent)}
-                    {selectedLedgerStudent.lrn && ` (LRN: ${selectedLedgerStudent.lrn})`}
+                  <span className="flex items-center gap-2 text-sm font-medium text-indigo-900">
+                    <span>
+                      {getStudentFullName(selectedLedgerStudent)}
+                      {selectedLedgerStudent.lrn && ` (LRN: ${selectedLedgerStudent.lrn})`}
+                    </span>
+                    {(ledgerQuery.data?.data?.grade_level || ledgerQuery.data?.data?.section) && (
+                      <>
+                        <span className="text-indigo-300">•</span>
+                        <span className="font-normal text-indigo-700">
+                          {[ledgerQuery.data?.data?.grade_level, ledgerQuery.data?.data?.section]
+                            .filter(Boolean)
+                            .join(' - ')}
+                        </span>
+                      </>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <Select
