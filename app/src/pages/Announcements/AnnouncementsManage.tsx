@@ -57,6 +57,14 @@ const toLocalInput = (iso: string | null): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// <input type="datetime-local"> value (local wall-clock) -> UTC ISO string for the API
+const fromLocalInput = (value: string | null): string | null => {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString()
+}
+
 const formatDate = (value: string | null): string => {
   if (!value) return ''
   const d = new Date(value)
@@ -331,8 +339,8 @@ const AnnouncementsManage: React.FC = () => {
       scope: isAdmin ? form.scope : 'sections',
       is_pinned: form.is_pinned,
       status: form.status,
-      publish_at: form.publish_at || null,
-      expires_at: form.expires_at || null,
+      publish_at: fromLocalInput(form.publish_at),
+      expires_at: fromLocalInput(form.expires_at),
       section_ids: form.section_ids,
       grade_levels: form.grade_levels,
     }

@@ -87,7 +87,13 @@ const AnnouncementCard: React.FC<{
       )}
 
       {imageAttachments.length > 0 && (
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div
+          className={`mt-4 gap-3 ${
+            imageAttachments.length === 1
+              ? 'flex'
+              : 'grid grid-cols-2 sm:grid-cols-3'
+          }`}
+        >
           {imageAttachments.map((att) => (
             <a
               key={att.id}
@@ -95,13 +101,18 @@ const AnnouncementCard: React.FC<{
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="block overflow-hidden rounded-lg border border-gray-200"
+              title={`${att.name} — click to open full size`}
+              className="group block overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-shadow hover:shadow-md"
             >
               <img
                 src={att.url ?? ''}
                 alt={att.name}
                 loading="lazy"
-                className="max-h-80 w-full object-contain bg-gray-50"
+                className={`w-full object-contain transition-transform group-hover:scale-[1.01] ${
+                  imageAttachments.length === 1
+                    ? 'max-h-[36rem] max-w-md'
+                    : 'aspect-square object-cover'
+                }`}
               />
             </a>
           ))}
