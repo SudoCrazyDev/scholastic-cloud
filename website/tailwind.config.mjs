@@ -9,6 +9,32 @@ export default {
 				display: ['"Syne"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
 			},
 			colors: {
+				// Academic-modern identity: deep indigo "ink" base + warm "gold" accent.
+				ink: {
+					50: '#f4f5fb',
+					100: '#e6e8f5',
+					200: '#c7cbe6',
+					300: '#9aa0cf',
+					400: '#6b73b3',
+					500: '#474e94',
+					600: '#333a78',
+					700: '#252a5c',
+					800: '#171b3d',
+					900: '#0e1230',
+					950: '#070a1c',
+				},
+				gold: {
+					50: '#fdf9ef',
+					100: '#f9edcf',
+					200: '#f2d99c',
+					300: '#ebc169',
+					400: '#e3ac44',
+					500: '#d4a955',
+					600: '#b8863a',
+					700: '#93662d',
+					800: '#78522a',
+					900: '#664526',
+				},
 				primary: {
 					50: '#eef2ff',
 					100: '#e0e7ff',
