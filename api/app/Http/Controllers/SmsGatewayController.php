@@ -124,6 +124,68 @@ class SmsGatewayController extends Controller
         ]);
     }
 
+    /**
+     * Download a ready-to-use agent config (.env) for this gateway. The API base URL
+     * is derived from the tenant portal the admin is on, and a valid pairing code is
+     * baked in so the on-site tech only has to drop the file and run the installer.
+     */
+    public function installer(Request $request, string $id)
+    {
+        $gateway = $this->findScoped($request, $id);
+        if (! $gateway) {
+            return response('Gateway not found', 404);
+        }
+
+        $apiBaseUrl = rtrim($request->getSchemeAndHttpHost(), '/').'/api';
+
+        if (! $gateway->sms_token_hash) {
+            // Ensure a currently-valid pairing code so the download works right away.
+            if (! $gateway->pairing_code
+                || ! $gateway->pairing_code_expires_at
+                || $gateway->pairing_code_expires_at->isPast()) {
+                $gateway->update([
+                    'pairing_code' => strtoupper(Str::random(6)),
+                    'pairing_code_expires_at' => now()->addMinutes(15),
+                ]);
+            }
+            $pairingNote = "# Pairing code: {$gateway->pairing_code} (expires {$gateway->pairing_code_expires_at->toDateTimeString()})\n"
+                ."# After install, pair with:  npm run pair -- {$gateway->pairing_code}";
+        } else {
+            $pairingNote = "# This gateway is already paired. Its token stays on the device;\n"
+                .'# to re-provision, remove it in the portal and add a new gateway.';
+        }
+
+        $generatedAt = now()->toDateTimeString();
+
+        $env = <<<ENV
+# ScholasticCloud SMS Gateway config for "{$gateway->name}"
+# Generated {$generatedAt}. Place this file in the sms_gateway folder as
+# `.env` (or keep the name `sms-gateway.env` — the agent reads either).
+
+API_BASE_URL={$apiBaseUrl}
+SMS_GATEWAY_TOKEN=
+
+# Leave SERIAL_PORT blank to auto-detect the modem.
+SERIAL_PORT=
+SERIAL_BAUD=115200
+SMS_MODE=pdu
+
+OUTBOX_POLL_MS=5000
+INBOX_POLL_MS=10000
+HEARTBEAT_MS=45000
+OUTBOX_BATCH=10
+USSD_BALANCE_CODE=
+LOG_LEVEL=info
+
+{$pairingNote}
+
+ENV;
+
+        return response($env, 200)
+            ->header('Content-Type', 'text/plain; charset=utf-8')
+            ->header('Content-Disposition', 'attachment; filename="sms-gateway.env"');
+    }
+
     private function findScoped(Request $request, string $id): ?SmsGateway
     {
         $institutionId = $this->institutionId($request);

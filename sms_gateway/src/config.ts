@@ -4,7 +4,17 @@ import { dirname, join } from 'node:path'
 import dotenv from 'dotenv'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-export const ENV_PATH = join(__dirname, '..', '.env')
+
+// Prefer `.env`, but accept the portal-downloaded `sms-gateway.env` as-is so the
+// pre-filled config is drop-in with no rename. Writes go to whichever exists.
+function resolveEnvPath(): string {
+  const primary = join(__dirname, '..', '.env')
+  const alt = join(__dirname, '..', 'sms-gateway.env')
+  if (!existsSync(primary) && existsSync(alt)) return alt
+  return primary
+}
+
+export const ENV_PATH = resolveEnvPath()
 
 dotenv.config({ path: ENV_PATH })
 

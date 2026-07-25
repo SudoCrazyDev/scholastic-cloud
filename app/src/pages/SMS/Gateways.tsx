@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import {
-  Smartphone, Plus, Trash2, RefreshCw, Wifi, WifiOff, HelpCircle, Copy, Check, Signal,
+  Smartphone, Plus, Trash2, RefreshCw, Wifi, WifiOff, HelpCircle, Copy, Check, Signal, Download,
 } from 'lucide-react'
 import { smsService } from '../../services/smsService'
 import { Button } from '../../components/button'
@@ -125,6 +125,26 @@ const Gateways: React.FC = () => {
     onError: () => toast.error('Could not refresh pairing code (already paired?)'),
   })
 
+  const handleDownloadConfig = async (g: SmsGateway) => {
+    try {
+      const text = await smsService.getInstallerConfig(g.id)
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'sms-gateway.env'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      // Downloading an unpaired gateway may mint a fresh pairing code.
+      queryClient.invalidateQueries({ queryKey: ['sms-gateways'] })
+      toast.success('Installer config downloaded')
+    } catch {
+      toast.error('Could not download config')
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -211,6 +231,13 @@ const Gateways: React.FC = () => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => handleDownloadConfig(g)}
+                        className="p-1.5 rounded hover:bg-gray-100 text-indigo-600"
+                        title="Download installer config (.env)"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
                       {!g.is_paired && (
                         <button
                           onClick={() => refreshMutation.mutate(g.id)}

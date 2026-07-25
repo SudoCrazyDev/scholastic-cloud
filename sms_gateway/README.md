@@ -76,6 +76,14 @@ port survives reboots.
 nssm start ScholasticCloudSmsGateway
 ```
 
+## Pre-filled config from the portal (recommended)
+
+Instead of editing `.env` by hand, open the gateway in the portal (SMS Gateway →
+Gateways) and click **Download config**. It gives you an `sms-gateway.env` with
+`API_BASE_URL` already set to your institution's API and a valid pairing code
+baked in. Drop it into this folder (the agent reads `.env` or `sms-gateway.env`),
+run the installer, then `npm run pair -- <CODE>`.
+
 ## Configuration (`.env`)
 
 | Key | Meaning |

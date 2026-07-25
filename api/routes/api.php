@@ -485,6 +485,7 @@ Route::middleware('auth.token')->group(function () {
     Route::patch('sms/gateways/{id}', [SmsGatewayController::class, 'update']);
     Route::delete('sms/gateways/{id}', [SmsGatewayController::class, 'destroy']);
     Route::post('sms/gateways/{id}/refresh-pairing-code', [SmsGatewayController::class, 'refreshPairingCode']);
+    Route::get('sms/gateways/{id}/installer', [SmsGatewayController::class, 'installer']);
 
     // SMS Gateway — messages
     Route::get('sms/messages', [SmsMessageController::class, 'index']);

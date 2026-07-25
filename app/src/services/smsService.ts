@@ -63,6 +63,12 @@ class SmsService {
     return response.data
   }
 
+  /** Fetch the pre-filled agent config (.env text) for this gateway. */
+  async getInstallerConfig(id: string) {
+    const response = await api.get(`/sms/gateways/${id}/installer`, { responseType: 'text' })
+    return response.data as string
+  }
+
   // --- Messages ---
 
   async getMessages(filters: SmsMessageFilters = {}) {
