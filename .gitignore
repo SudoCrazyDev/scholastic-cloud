@@ -6,3 +6,5 @@ node_modules
 recordings/
 .playwright-mcp/
 .claude
+.agents
+skills-lock.json
