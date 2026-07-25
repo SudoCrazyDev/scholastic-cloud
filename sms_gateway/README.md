@@ -70,11 +70,16 @@ port survives reboots.
 
 ### Windows
 ```powershell
-# Elevated PowerShell, with Node 18+ and NSSM on PATH
+# Elevated PowerShell, Node 18+ required. No third-party tools needed:
+# the installer registers a native Scheduled Task (starts at boot, restarts on failure).
 .\deploy\install.ps1
-# edit .env (SERIAL_PORT e.g. COM3), pair, then:
-nssm start ScholasticCloudSmsGateway
+# set SERIAL_PORT (e.g. COM3) in .env / sms-gateway.env if auto-detect fails, pair, then:
+npm run pair -- <CODE>
+Start-ScheduledTask -TaskName ScholasticCloudSmsGateway
+Get-Content .\agent.log -Wait
 ```
+Prefer a real Windows service? Install [NSSM](https://nssm.cc), put it on PATH,
+and run `.\deploy\install.ps1 -UseNssm`.
 
 ## Get the installer from the portal (recommended)
 
