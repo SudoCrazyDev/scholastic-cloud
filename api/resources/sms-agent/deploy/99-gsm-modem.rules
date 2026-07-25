@@ -1,0 +1,9 @@
+# Stable symlink for a USB GSM modem so SERIAL_PORT never shifts across reboots.
+#
+# 1. Plug in the modem and find its idVendor/idProduct + the AT interface:
+#      udevadm info -a -n /dev/ttyUSB0 | grep -E 'idVendor|idProduct|bInterfaceNumber'
+# 2. Fill the values below (example is a Huawei E3531; AT port is usually if02).
+# 3. Install:  sudo cp 99-gsm-modem.rules /etc/udev/rules.d/ && sudo udevadm control --reload && sudo udevadm trigger
+# 4. Set SERIAL_PORT=/dev/gsm-modem in .env
+#
+SUBSYSTEM=="tty", ATTRS{idVendor}=="12d1", ATTRS{idProduct}=="1506", ATTRS{bInterfaceNumber}=="02", SYMLINK+="gsm-modem", GROUP="dialout", MODE="0660"

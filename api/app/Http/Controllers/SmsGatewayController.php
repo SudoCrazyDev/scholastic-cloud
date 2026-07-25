@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmsGateway;
+use App\Support\ZipBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -125,9 +126,9 @@ class SmsGatewayController extends Controller
     }
 
     /**
-     * Download a ready-to-use agent config (.env) for this gateway. The API base URL
-     * is derived from the tenant portal the admin is on, and a valid pairing code is
-     * baked in so the on-site tech only has to drop the file and run the installer.
+     * Download a ready-to-run installer bundle (.zip) for this gateway: the full
+     * agent source plus a pre-filled sms-gateway.env (tenant API URL + a valid
+     * pairing code baked in). The on-site tech extracts it and runs the installer.
      */
     public function installer(Request $request, string $id)
     {
@@ -136,10 +137,70 @@ class SmsGatewayController extends Controller
             return response('Gateway not found', 404);
         }
 
+        // Vendored snapshot (present on API-only deploys) preferred; fall back to
+        // the sibling sms_gateway/ folder in a full monorepo checkout.
+        $agentPath = is_dir(resource_path('sms-agent'))
+            ? resource_path('sms-agent')
+            : base_path('..'.DIRECTORY_SEPARATOR.'sms_gateway');
+
+        if (! is_dir($agentPath)) {
+            return response('Agent bundle unavailable. Run: php artisan sms:bundle-agent', 503);
+        }
+
+        $zip = new ZipBuilder;
+        foreach ($this->agentFiles($agentPath) as $relative => $absolute) {
+            $zip->addFile('sms_gateway/'.$relative, (string) file_get_contents($absolute));
+        }
+        $zip->addFile('sms_gateway/sms-gateway.env', $this->buildEnvContent($request, $gateway));
+
+        $slug = Str::slug($gateway->name ?: 'sms-gateway') ?: 'sms-gateway';
+
+        return response($zip->build(), 200)
+            ->header('Content-Type', 'application/zip')
+            ->header('Content-Disposition', "attachment; filename=\"sms-gateway-{$slug}.zip\"");
+    }
+
+    /**
+     * Relative => absolute paths of the agent source, excluding build/runtime
+     * artifacts (so the sibling-folder fallback doesn't drag in node_modules).
+     *
+     * @return array<string,string>
+     */
+    private function agentFiles(string $root): array
+    {
+        $excludeDirs = ['node_modules', 'dist', '.git'];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveCallbackFilterIterator(
+                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+                function (\SplFileInfo $current) use ($excludeDirs) {
+                    if ($current->isDir()) {
+                        return ! in_array($current->getFilename(), $excludeDirs, true);
+                    }
+
+                    return $current->getFilename() !== '.env'
+                        && ! str_ends_with($current->getFilename(), '.log');
+                }
+            )
+        );
+
+        $files = [];
+        foreach ($iterator as $file) {
+            /** @var \SplFileInfo $file */
+            if ($file->isFile()) {
+                $relative = ltrim(str_replace($root, '', $file->getPathname()), '/\\');
+                $files[str_replace('\\', '/', $relative)] = $file->getPathname();
+            }
+        }
+
+        return $files;
+    }
+
+    /** Build the pre-filled agent .env, minting a fresh pairing code when needed. */
+    private function buildEnvContent(Request $request, SmsGateway $gateway): string
+    {
         $apiBaseUrl = rtrim($request->getSchemeAndHttpHost(), '/').'/api';
 
         if (! $gateway->sms_token_hash) {
-            // Ensure a currently-valid pairing code so the download works right away.
             if (! $gateway->pairing_code
                 || ! $gateway->pairing_code_expires_at
                 || $gateway->pairing_code_expires_at->isPast()) {
@@ -157,10 +218,9 @@ class SmsGatewayController extends Controller
 
         $generatedAt = now()->toDateTimeString();
 
-        $env = <<<ENV
+        return <<<ENV
 # ScholasticCloud SMS Gateway config for "{$gateway->name}"
-# Generated {$generatedAt}. Place this file in the sms_gateway folder as
-# `.env` (or keep the name `sms-gateway.env` — the agent reads either).
+# Generated {$generatedAt}. The agent reads this file (.env or sms-gateway.env).
 
 API_BASE_URL={$apiBaseUrl}
 SMS_GATEWAY_TOKEN=
@@ -180,10 +240,6 @@ LOG_LEVEL=info
 {$pairingNote}
 
 ENV;
-
-        return response($env, 200)
-            ->header('Content-Type', 'text/plain; charset=utf-8')
-            ->header('Content-Disposition', 'attachment; filename="sms-gateway.env"');
     }
 
     private function findScoped(Request $request, string $id): ?SmsGateway

@@ -125,23 +125,24 @@ const Gateways: React.FC = () => {
     onError: () => toast.error('Could not refresh pairing code (already paired?)'),
   })
 
-  const handleDownloadConfig = async (g: SmsGateway) => {
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sms-gateway'
+
+  const handleDownloadInstaller = async (g: SmsGateway) => {
     try {
-      const text = await smsService.getInstallerConfig(g.id)
-      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+      const blob = await smsService.getInstaller(g.id)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'sms-gateway.env'
+      a.download = `sms-gateway-${slugify(g.name)}.zip`
       document.body.appendChild(a)
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
       // Downloading an unpaired gateway may mint a fresh pairing code.
       queryClient.invalidateQueries({ queryKey: ['sms-gateways'] })
-      toast.success('Installer config downloaded')
+      toast.success('Installer downloaded')
     } catch {
-      toast.error('Could not download config')
+      toast.error('Could not download installer')
     }
   }
 
@@ -232,9 +233,9 @@ const Gateways: React.FC = () => {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => handleDownloadConfig(g)}
+                        onClick={() => handleDownloadInstaller(g)}
                         className="p-1.5 rounded hover:bg-gray-100 text-indigo-600"
-                        title="Download installer config (.env)"
+                        title="Download installer (.zip — agent + pre-filled config)"
                       >
                         <Download className="w-4 h-4" />
                       </button>
