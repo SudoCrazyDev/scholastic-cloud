@@ -2,6 +2,7 @@ import React from 'react';
 import { EnvelopeIcon, CakeIcon, UserIcon } from '@heroicons/react/24/outline';
 import { Pencil, UserCog, Key } from 'lucide-react';
 import type { User } from '../../../types';
+import { formatDateOnly } from '../../../utils/date';
 
 interface StaffGridProps {
   staffs: User[];
@@ -20,11 +21,11 @@ const iconBtnClass =
   'inline-flex items-center justify-center w-8 h-8 rounded-full border border-transparent text-gray-400 hover:text-blue-500 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-200';
 
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  return formatDateOnly(dateString, {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
-  });
+  }, 'en-US');
 };
 
 const getFullName = (staff: User) => {

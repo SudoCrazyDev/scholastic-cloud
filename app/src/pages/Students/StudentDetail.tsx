@@ -31,6 +31,8 @@ import { studentDocumentService } from '../../services/studentDocumentService'
 import { useAuth } from '../../hooks/useAuth'
 import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { toast } from 'react-hot-toast'
+import { formatDateOnly } from '../../utils/date'
+import { calculateAge } from '../../utils/gradeUtils'
 import type { Student, StudentDocument } from '../../types'
 
 const tabs = [
@@ -234,24 +236,11 @@ export default function StudentDetail() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return formatDateOnly(dateString, {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
-    })
-  }
-
-  const calculateAge = (birthdate: string) => {
-    const birth = new Date(birthdate)
-    const today = new Date()
-    let age = today.getFullYear() - birth.getFullYear()
-    const monthDiff = today.getMonth() - birth.getMonth()
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--
-    }
-    
-    return age
+    }, 'en-US')
   }
 
   const getGenderColor = (gender: string) => {

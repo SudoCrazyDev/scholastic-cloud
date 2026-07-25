@@ -15,6 +15,8 @@ import { Button } from '../components/button'
 import { StudentFinanceTab } from './Students/components'
 import { studentService } from '../services/studentService'
 import { useAuth } from '../hooks/useAuth'
+import { formatDateOnly } from '../utils/date'
+import { calculateAge } from '../utils/gradeUtils'
 import type { Student } from '../types'
 
 const tabs = [
@@ -99,20 +101,11 @@ export default function MyPersonalInfo() {
   }
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('en-US', {
+    formatDateOnly(dateString, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-    })
-
-  const calculateAge = (birthdate: string) => {
-    const birth = new Date(birthdate)
-    const today = new Date()
-    let age = today.getFullYear() - birth.getFullYear()
-    const monthDiff = today.getMonth() - birth.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--
-    return age
-  }
+    }, 'en-US')
 
   const getGenderColor = (gender: string) => {
     switch (gender) {

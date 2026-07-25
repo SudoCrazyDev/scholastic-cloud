@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 import type { SF9Data } from '../services/sf9Service';
+import { formatDateOnly } from '../utils/date';
 
 // Register fonts
 Font.register({
@@ -226,7 +227,7 @@ export const SF9PDF: React.FC<SF9PDFProps> = ({ data }) => {
           
           <View style={styles.row}>
             <Text style={styles.label}>Birth Date:</Text>
-            <Text style={styles.value}>{new Date(student.birthdate).toLocaleDateString()}</Text>
+            <Text style={styles.value}>{formatDateOnly(student.birthdate, {})}</Text>
           </View>
           
           <View style={styles.row}>

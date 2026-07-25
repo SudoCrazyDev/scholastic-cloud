@@ -12,6 +12,7 @@ import {
 import { Checkbox } from '../../../components/checkbox'
 import { Badge } from '../../../components/badge'
 import type { User } from '../../../types'
+import { formatDateOnly } from '../../../utils/date'
 
 interface UserGridProps {
   users: User[]
@@ -61,11 +62,11 @@ export const UserGrid: React.FC<UserGridProps> = ({
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return formatDateOnly(dateString, {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
-    })
+    }, 'en-US')
   }
 
   const getGenderColor = (gender: string | null) => {

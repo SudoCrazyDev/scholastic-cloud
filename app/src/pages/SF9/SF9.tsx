@@ -13,6 +13,7 @@ import { Alert } from '../../components/alert';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { SF9PDF } from '../../components/SF9PDF';
 import type { SF9Data } from '../../services/sf9Service';
+import { formatDateOnly } from '../../utils/date';
 
 const SF9: React.FC = () => {
   const { user } = useAuth();
@@ -221,7 +222,7 @@ const SF9: React.FC = () => {
                     <div><span className="font-medium">Name:</span> {getStudentName(selectedStudent)}</div>
                     <div><span className="font-medium">LRN:</span> {sf9Data.student.lrn}</div>
                     <div><span className="font-medium">Gender:</span> {sf9Data.student.gender}</div>
-                    <div><span className="font-medium">Birth Date:</span> {new Date(sf9Data.student.birthdate).toLocaleDateString()}</div>
+                    <div><span className="font-medium">Birth Date:</span> {formatDateOnly(sf9Data.student.birthdate, {})}</div>
                     <div><span className="font-medium">Religion:</span> {sf9Data.student.religion}</div>
                   </div>
                 </div>

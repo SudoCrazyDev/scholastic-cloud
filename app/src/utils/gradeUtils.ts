@@ -1,3 +1,5 @@
+import { parseDateOnly } from './date'
+
 /**
  * Safely formats a grade number to one decimal place
  * @param grade - The grade number or string to format
@@ -148,7 +150,8 @@ export const getQuarterGrade = (grades: StudentRunningGrade[], quarter: '1' | '2
  * Computes age in completed years as of a given reference date.
  */
 export const calculateAgeAsOf = (birthdate: string, referenceDate: Date): number => {
-  const birth = new Date(birthdate)
+  const birth = parseDateOnly(birthdate)
+  if (!birth) return 0
   let age = referenceDate.getFullYear() - birth.getFullYear()
   const monthDiff = referenceDate.getMonth() - birth.getMonth()
   if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < birth.getDate())) {

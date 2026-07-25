@@ -193,7 +193,7 @@ export function StudentQuickEditModal({
     middle_name: student.middle_name || '',
     last_name: student.last_name || '',
     ext_name: student.ext_name || '',
-    birthdate: student.birthdate ? new Date(student.birthdate).toISOString().split('T')[0] : '',
+    birthdate: student.birthdate ? student.birthdate.split('T')[0] : '',
     gender: (student.gender as 'male' | 'female' | 'other') || 'male',
     religion: (student.religion as 'Islam' | 'Catholic' | 'Iglesia Ni Cristo' | 'Baptists' | 'PMCC (4w)' | 'Others') || 'Others',
     lrn: student.lrn || '',
