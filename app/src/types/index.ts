@@ -894,6 +894,13 @@ export interface DisbursementType {
   updated_at: string;
 }
 
+export interface DisbursementReceipt {
+  id: string;
+  url: string | null;
+  name: string | null;
+  mime: string | null;
+}
+
 export interface Disbursement {
   id: string;
   institution_id: string;
@@ -905,9 +912,7 @@ export interface Disbursement {
   date_issued: string;
   in_charge_user_id: string | null;
   in_charge_name: string | null;
-  receipt_url: string | null;
-  receipt_name: string | null;
-  receipt_mime: string | null;
+  receipts: DisbursementReceipt[];
   created_at: string;
   updated_at: string;
 }
@@ -919,8 +924,8 @@ export interface DisbursementFormData {
   date_issued: string;
   disbursement_type_id?: string | null;
   in_charge_user_id?: string | null;
-  receipt?: File | null;
-  remove_receipt?: boolean;
+  receipts?: File[];
+  remove_receipt_ids?: string[];
 }
 
 // Institution types

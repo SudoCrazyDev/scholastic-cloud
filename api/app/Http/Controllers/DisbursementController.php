@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Disbursement;
+use App\Models\DisbursementReceipt;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -26,7 +28,7 @@ class DisbursementController extends Controller
             return response()->json(['success' => false, 'message' => 'No default institution'], 403);
         }
 
-        $disbursements = Disbursement::with(['type', 'inCharge'])
+        $disbursements = Disbursement::with(['type', 'inCharge', 'receipts'])
             ->where('institution_id', $institutionId)
             ->orderBy('date_issued', 'desc')
             ->orderBy('created_at', 'desc')
@@ -45,7 +47,7 @@ class DisbursementController extends Controller
 
         $validated = $this->validatePayload($request, $institutionId);
 
-        $data = [
+        $disbursement = Disbursement::create([
             'institution_id' => $institutionId,
             'disbursement_type_id' => $validated['disbursement_type_id'] ?? null,
             'title' => $validated['title'],
@@ -53,17 +55,13 @@ class DisbursementController extends Controller
             'amount' => $validated['amount'],
             'date_issued' => $validated['date_issued'],
             'in_charge_user_id' => $validated['in_charge_user_id'] ?? null,
-        ];
+        ]);
 
-        if ($request->hasFile('receipt')) {
-            $data = array_merge($data, $this->storeReceipt($request, $institutionId));
-        }
-
-        $disbursement = Disbursement::create($data);
+        $this->storeReceiptFiles($disbursement, $request->file('receipts', []));
 
         return response()->json([
             'success' => true,
-            'data' => $this->format($disbursement->load(['type', 'inCharge'])),
+            'data' => $this->format($disbursement->load(['type', 'inCharge', 'receipts'])),
         ], 201);
     }
 
@@ -76,7 +74,7 @@ class DisbursementController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->format($disbursement->load(['type', 'inCharge'])),
+            'data' => $this->format($disbursement->load(['type', 'inCharge', 'receipts'])),
         ]);
     }
 
@@ -92,7 +90,7 @@ class DisbursementController extends Controller
 
         $validated = $this->validatePayload($request, $disbursement->institution_id);
 
-        $disbursement->fill([
+        $disbursement->update([
             'disbursement_type_id' => $validated['disbursement_type_id'] ?? null,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
@@ -101,19 +99,22 @@ class DisbursementController extends Controller
             'in_charge_user_id' => $validated['in_charge_user_id'] ?? null,
         ]);
 
-        if ($request->hasFile('receipt')) {
-            $this->deleteReceipt($disbursement);
-            $disbursement->fill($this->storeReceipt($request, $disbursement->institution_id));
-        } elseif ($request->boolean('remove_receipt')) {
-            $this->deleteReceipt($disbursement);
-            $disbursement->fill(['receipt_path' => null, 'receipt_name' => null, 'receipt_mime' => null]);
+        // Remove any receipts the user marked for deletion.
+        $removeIds = $validated['remove_receipt_ids'] ?? [];
+        if (! empty($removeIds)) {
+            $toRemove = $disbursement->receipts()->whereIn('id', $removeIds)->get();
+            foreach ($toRemove as $receipt) {
+                $this->deleteReceiptFile($receipt->path);
+                $receipt->delete();
+            }
         }
 
-        $disbursement->save();
+        // Append any newly uploaded receipts.
+        $this->storeReceiptFiles($disbursement, $request->file('receipts', []));
 
         return response()->json([
             'success' => true,
-            'data' => $this->format($disbursement->fresh()->load(['type', 'inCharge'])),
+            'data' => $this->format($disbursement->fresh()->load(['type', 'inCharge', 'receipts'])),
         ]);
     }
 
@@ -124,7 +125,11 @@ class DisbursementController extends Controller
             return response()->json(['success' => false, 'message' => 'Disbursement not found'], 404);
         }
 
-        $this->deleteReceipt($disbursement);
+        foreach ($disbursement->receipts as $receipt) {
+            $this->deleteReceiptFile($receipt->path);
+        }
+
+        // Receipt rows cascade on delete; the R2 objects are cleaned up above.
         $disbursement->delete();
 
         return response()->json(['success' => true, 'message' => 'Disbursement deleted']);
@@ -142,34 +147,44 @@ class DisbursementController extends Controller
                 Rule::exists('disbursement_types', 'id')->where('institution_id', $institutionId),
             ],
             'in_charge_user_id' => ['nullable', Rule::exists('users', 'id')],
-            'receipt' => 'nullable|file|mimes:png,jpg,jpeg,webp,pdf|max:10240',
+            'receipts' => 'nullable|array',
+            'receipts.*' => 'file|mimes:png,jpg,jpeg,webp,pdf|max:10240',
+            'remove_receipt_ids' => 'nullable|array',
+            'remove_receipt_ids.*' => 'string',
         ]);
     }
 
-    private function storeReceipt(Request $request, string $institutionId): array
+    /**
+     * @param  UploadedFile[]  $files
+     */
+    private function storeReceiptFiles(Disbursement $disbursement, array $files): void
     {
-        $file = $request->file('receipt');
-        $extension = $file->getClientOriginalExtension() ?: 'jpg';
-        $fileName = Str::uuid() . '.' . $extension;
-        $r2Path = $institutionId . '/disbursements/' . $fileName;
+        foreach ($files as $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+            $extension = $file->getClientOriginalExtension() ?: 'jpg';
+            $fileName = Str::uuid() . '.' . $extension;
+            $r2Path = $disbursement->institution_id . '/disbursements/' . $fileName;
 
-        Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
+            Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
 
-        return [
-            'receipt_path' => $r2Path,
-            'receipt_name' => $file->getClientOriginalName(),
-            'receipt_mime' => $file->getClientMimeType(),
-        ];
+            $disbursement->receipts()->create([
+                'path' => $r2Path,
+                'name' => $file->getClientOriginalName(),
+                'mime' => $file->getClientMimeType(),
+            ]);
+        }
     }
 
-    private function deleteReceipt(Disbursement $disbursement): void
+    private function deleteReceiptFile(?string $path): void
     {
-        if (! $disbursement->receipt_path) {
+        if (! $path) {
             return;
         }
 
         try {
-            Storage::disk('r2')->delete($disbursement->receipt_path);
+            Storage::disk('r2')->delete($path);
         } catch (\Throwable $e) {
             // Ignore storage errors on cleanup; the DB record is the source of truth.
         }
@@ -198,9 +213,12 @@ class DisbursementController extends Controller
             'date_issued' => $d->date_issued?->toDateString(),
             'in_charge_user_id' => $d->in_charge_user_id,
             'in_charge_name' => $d->inCharge ? $this->userName($d->inCharge) : null,
-            'receipt_url' => $d->receipt_url,
-            'receipt_name' => $d->receipt_name,
-            'receipt_mime' => $d->receipt_mime,
+            'receipts' => $d->receipts->map(fn ($r) => [
+                'id' => $r->id,
+                'url' => $r->url,
+                'name' => $r->name,
+                'mime' => $r->mime,
+            ])->values(),
             'created_at' => $d->created_at?->toISOString(),
             'updated_at' => $d->updated_at?->toISOString(),
         ];

@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class Disbursement extends Model
 {
@@ -19,17 +18,12 @@ class Disbursement extends Model
         'amount',
         'date_issued',
         'in_charge_user_id',
-        'receipt_path',
-        'receipt_name',
-        'receipt_mime',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'date_issued' => 'date',
     ];
-
-    protected $appends = ['receipt_url'];
 
     public function institution()
     {
@@ -46,20 +40,8 @@ class Disbursement extends Model
         return $this->belongsTo(User::class, 'in_charge_user_id');
     }
 
-    public function getReceiptUrlAttribute(): ?string
+    public function receipts()
     {
-        if (! $this->receipt_path) {
-            return null;
-        }
-
-        try {
-            $r2Url = config('filesystems.disks.r2.url');
-            if ($r2Url) {
-                return rtrim($r2Url, '/') . '/' . ltrim($this->receipt_path, '/');
-            }
-            return Storage::disk('r2')->temporaryUrl($this->receipt_path, now()->addHours(24));
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return $this->hasMany(DisbursementReceipt::class);
     }
 }

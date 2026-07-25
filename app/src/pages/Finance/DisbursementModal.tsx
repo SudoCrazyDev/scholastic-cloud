@@ -38,8 +38,8 @@ export function DisbursementModal({
   const [typeId, setTypeId] = useState('')
   const [dateIssued, setDateIssued] = useState(today())
   const [inChargeId, setInChargeId] = useState('')
-  const [receipt, setReceipt] = useState<File | null>(null)
-  const [removeReceipt, setRemoveReceipt] = useState(false)
+  const [newFiles, setNewFiles] = useState<File[]>([])
+  const [removeIds, setRemoveIds] = useState<string[]>([])
 
   useEffect(() => {
     if (!isOpen) return
@@ -58,8 +58,8 @@ export function DisbursementModal({
       setDateIssued(today())
       setInChargeId('')
     }
-    setReceipt(null)
-    setRemoveReceipt(false)
+    setNewFiles([])
+    setRemoveIds([])
   }, [isOpen, disbursement])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -72,14 +72,14 @@ export function DisbursementModal({
       date_issued: dateIssued,
       disbursement_type_id: typeId || null,
       in_charge_user_id: inChargeId || null,
-      receipt: receipt || undefined,
-      remove_receipt: removeReceipt,
+      receipts: newFiles,
+      remove_receipt_ids: removeIds,
     })
   }
 
   if (!isOpen) return null
 
-  const existingReceipt = disbursement?.receipt_url && !removeReceipt && !receipt
+  const existingReceipts = (disbursement?.receipts ?? []).filter((r) => !removeIds.includes(r.id))
   const userOptions = users.map((u) => ({ id: u.id, label: userLabel(u) }))
   const selectedUser = userOptions.find((o) => o.id === inChargeId) ?? null
   const typeOptions = types.map((t) => ({ id: t.id, label: t.name }))
@@ -159,43 +159,67 @@ export function DisbursementModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Receipt (optional)</label>
-            {existingReceipt ? (
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                <a
-                  href={disbursement!.receipt_url!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-primary-600 hover:underline truncate"
-                >
-                  <FileText className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{disbursement!.receipt_name || 'View current receipt'}</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setRemoveReceipt(true)}
-                  className="text-gray-400 hover:text-red-600"
-                  title="Remove receipt"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Receipts (optional)</label>
+
+            {existingReceipts.length > 0 && (
+              <div className="mb-2 space-y-1">
+                {existingReceipts.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                    <a
+                      href={r.url ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-primary-600 hover:underline truncate"
+                    >
+                      <FileText className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{r.name || 'View receipt'}</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setRemoveIds((ids) => [...ids, r.id])}
+                      className="text-gray-400 hover:text-red-600 shrink-0 ml-2"
+                      title="Remove receipt"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,application/pdf"
-                onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
-              />
             )}
-            {removeReceipt && disbursement?.receipt_url && (
-              <p className="mt-1 text-xs text-gray-500">
-                Current receipt will be removed on save.{' '}
-                <button type="button" className="text-primary-600 hover:underline" onClick={() => setRemoveReceipt(false)}>
-                  Undo
-                </button>
-              </p>
+
+            {newFiles.length > 0 && (
+              <div className="mb-2 space-y-1">
+                {newFiles.map((f, i) => (
+                  <div key={`${f.name}-${i}`} className="flex items-center justify-between rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
+                    <span className="inline-flex items-center gap-2 text-sm text-gray-700 truncate">
+                      <FileText className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{f.name}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setNewFiles((files) => files.filter((_, idx) => idx !== i))}
+                      className="text-gray-400 hover:text-red-600 shrink-0 ml-2"
+                      title="Remove"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
+
+            <input
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp,application/pdf"
+              onChange={(e) => {
+                const picked = Array.from(e.target.files ?? [])
+                if (picked.length) setNewFiles((files) => [...files, ...picked])
+                e.target.value = ''
+              }}
+              className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+            />
+            <p className="mt-1 text-xs text-gray-500">You can add multiple files (images or PDF, up to 10&nbsp;MB each).</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

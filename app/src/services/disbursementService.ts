@@ -15,8 +15,8 @@ function toFormData(data: DisbursementFormData): FormData {
   fd.append('date_issued', data.date_issued)
   if (data.disbursement_type_id) fd.append('disbursement_type_id', data.disbursement_type_id)
   if (data.in_charge_user_id) fd.append('in_charge_user_id', data.in_charge_user_id)
-  if (data.receipt) fd.append('receipt', data.receipt)
-  if (data.remove_receipt) fd.append('remove_receipt', '1')
+  ;(data.receipts ?? []).forEach((file) => fd.append('receipts[]', file))
+  ;(data.remove_receipt_ids ?? []).forEach((id) => fd.append('remove_receipt_ids[]', id))
   return fd
 }
 

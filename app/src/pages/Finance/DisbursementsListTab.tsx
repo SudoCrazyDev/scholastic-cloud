@@ -111,16 +111,22 @@ export function DisbursementsListTab({ dm }: { dm: Dm }) {
                     </td>
                     <td className="py-3 text-gray-700">{d.in_charge_name || <span className="text-gray-400">—</span>}</td>
                     <td className="py-3">
-                      {d.receipt_url ? (
-                        <a
-                          href={d.receipt_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-primary-600 hover:underline text-sm"
-                        >
-                          <FileText className="w-4 h-4" />
-                          View
-                        </a>
+                      {d.receipts.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {d.receipts.map((r, i) => (
+                            <a
+                              key={r.id}
+                              href={r.url ?? '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-primary-600 hover:underline text-sm"
+                              title={r.name ?? undefined}
+                            >
+                              <FileText className="w-4 h-4 shrink-0" />
+                              {d.receipts.length > 1 ? `View ${i + 1}` : 'View'}
+                            </a>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-gray-400">—</span>
                       )}
