@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Textarea } from '../../components/textarea'
-import { Select } from '../../components/select'
+import { Listbox, ListboxOption, ListboxLabel } from '../../components/listbox'
+import { Autocomplete } from '../../components/autocomplete'
 import { FileText, X } from 'lucide-react'
 import type { Disbursement, DisbursementType, DisbursementFormData, User } from '../../types'
 
@@ -80,6 +81,8 @@ export function DisbursementModal({
   if (!isOpen) return null
 
   const existingReceipt = disbursement?.receipt_url && !removeReceipt && !receipt
+  const userOptions = users.map((u) => ({ id: u.id, label: userLabel(u) }))
+  const selectedUser = userOptions.find((o) => o.id === inChargeId) ?? null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -136,21 +139,32 @@ export function DisbursementModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <Select
+            <Listbox
               value={typeId}
-              onChange={(e) => setTypeId(e.target.value)}
+              onChange={(v: string) => setTypeId(v)}
               placeholder="Select a type"
-              options={types.map((t) => ({ value: t.id, label: t.name }))}
-            />
+              aria-label="Type"
+            >
+              <ListboxOption value="">
+                <ListboxLabel>
+                  <span className="text-zinc-500">No type</span>
+                </ListboxLabel>
+              </ListboxOption>
+              {types.map((t) => (
+                <ListboxOption key={t.id} value={t.id}>
+                  <ListboxLabel>{t.name}</ListboxLabel>
+                </ListboxOption>
+              ))}
+            </Listbox>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">In-Charge of (optional)</label>
-            <Select
-              value={inChargeId}
-              onChange={(e) => setInChargeId(e.target.value)}
-              placeholder="Not assigned"
-              options={users.map((u) => ({ value: u.id, label: userLabel(u) }))}
+            <Autocomplete
+              value={selectedUser}
+              onChange={(opt) => setInChargeId(opt?.id ?? '')}
+              options={userOptions}
+              placeholder="Search a staff member..."
             />
           </div>
 
