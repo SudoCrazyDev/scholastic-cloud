@@ -68,14 +68,14 @@ if ($UseNssm) {
 }
 
 Write-Host ''
-Write-Host 'Installed. Next steps:'
-Write-Host ('  1. Check config: ' + $SrcDir + '\sms-gateway.env (or .env). API_BASE_URL is preset; add SERIAL_PORT (e.g. COM3) or leave blank to auto-detect.')
-Write-Host ('  2. Pair the kiosk:   cd ' + $SrcDir + ' ; npm run pair -- YOUR_PAIRING_CODE')
+Write-Host 'Installed. From this folder run these (short) commands:'
+Write-Host ('  cd ' + $SrcDir)
+Write-Host '  1. Check config: sms-gateway.env (or .env). API_BASE_URL is preset; add SERIAL_PORT (e.g. COM3) or leave blank to auto-detect.'
+Write-Host '  2. Pair:           npm run pair -- YOUR_PAIRING_CODE'
 if ($UseNssm) {
-  Write-Host ('  3. Start now:        nssm start ' + $TaskName)
-  Write-Host ('  4. Logs:             Get-Content ' + $logPath + ' -Wait')
+  Write-Host ('  3. Start now:      nssm start ' + $TaskName)
 } else {
-  Write-Host ('  3. Start now:        Start-ScheduledTask -TaskName ' + $TaskName)
-  Write-Host ('  4. Logs:             Get-Content ' + $logPath + ' -Wait')
-  Write-Host ('     Stop / remove:    Stop-ScheduledTask -TaskName ' + $TaskName + ' ; Unregister-ScheduledTask -TaskName ' + $TaskName + ' -Confirm:$false')
+  Write-Host '  3. Start now:      npm run enable-start'
 }
+Write-Host '  4. Logs:           npm run logs'
+Write-Host '  Also available:    npm run status | npm run restart | npm run stop | npm run list-ports'

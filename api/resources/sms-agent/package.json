@@ -9,12 +9,18 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
-    "pair": "tsx src/index.ts --pair",
+    "start": "node dist/index.js",
+    "pair": "node dist/index.js --pair",
+    "list-ports": "node dist/index.js --list-ports",
+    "pair:dev": "tsx src/index.ts --pair",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx pdu.selftest.ts",
-    "list-ports": "tsx src/index.ts --list-ports"
+    "enable-start": "node scripts/ctl.mjs enable-start",
+    "restart": "node scripts/ctl.mjs restart",
+    "stop": "node scripts/ctl.mjs stop",
+    "status": "node scripts/ctl.mjs status",
+    "logs": "node scripts/ctl.mjs logs"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

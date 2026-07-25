@@ -61,10 +61,10 @@ npm run dev
 ### Linux / Raspberry Pi OS Lite
 ```bash
 sudo ./deploy/install.sh      # installs build tools + usb-modeswitch, builds, adds the service
-# pair, then:
-sudo -u smsgw node /opt/sms_gateway/dist/index.js --pair <CODE>
-sudo systemctl enable --now sms-gateway
-journalctl -u sms-gateway -f
+cd /opt/sms_gateway
+sudo -u smsgw npm run pair -- <CODE>   # code is at the bottom of sms-gateway.env
+npm run enable-start                   # enable at boot + start now
+npm run logs                           # follow the logs
 ```
 The modem is **auto-detected**, so `SERIAL_PORT` can stay blank and no udev
 symlink is required. If you'd still like a stable `/dev/gsm-modem` path, see
@@ -83,13 +83,28 @@ flagged). Set `SERIAL_PORT` explicitly only to override.
 # Elevated PowerShell, Node 18+ required. No third-party tools needed:
 # the installer registers a native Scheduled Task (starts at boot, restarts on failure).
 .\deploy\install.ps1
-# set SERIAL_PORT (e.g. COM3) in .env / sms-gateway.env if auto-detect fails, pair, then:
-npm run pair -- <CODE>
-Start-ScheduledTask -TaskName ScholasticCloudSmsGateway
-Get-Content .\agent.log -Wait
+npm run pair -- <CODE>       # set SERIAL_PORT in sms-gateway.env first if auto-detect fails
+npm run enable-start         # start now
+npm run logs                 # follow the logs
 ```
 Prefer a real Windows service? Install [NSSM](https://nssm.cc), put it on PATH,
 and run `.\deploy\install.ps1 -UseNssm`.
+
+### Managing the agent
+
+The same commands work on Linux (systemd) and Windows (Scheduled Task):
+
+| Command | What it does |
+| --- | --- |
+| `npm run pair -- <CODE>` | Exchange the pairing code for a token (one-time) |
+| `npm run enable-start` | Start the agent (and enable at boot on Linux) |
+| `npm run restart` | Restart the agent |
+| `npm run stop` | Stop the agent |
+| `npm run status` | Show service/task status |
+| `npm run logs` | Follow the logs (Ctrl-C to exit) |
+| `npm run list-ports` | List serial ports (likely modems flagged) |
+
+On Linux the service-control commands auto-elevate with `sudo` when needed.
 
 ## Get the installer from the portal (recommended)
 

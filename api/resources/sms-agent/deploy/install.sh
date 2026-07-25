@@ -49,9 +49,8 @@ usermod -aG dialout "$SERVICE_USER"
 
 echo "==> Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
-cp -r "$SRC_DIR/package.json" "$SRC_DIR/package-lock.json" "$SRC_DIR/tsconfig.json" "$SRC_DIR/src" "$APP_DIR/" 2>/dev/null || \
-  cp -r "$SRC_DIR/package.json" "$SRC_DIR/tsconfig.json" "$SRC_DIR/src" "$APP_DIR/"
-cp -r "$SRC_DIR/deploy" "$APP_DIR/"
+cp -r "$SRC_DIR/package.json" "$SRC_DIR/tsconfig.json" "$SRC_DIR/src" "$SRC_DIR/scripts" "$SRC_DIR/deploy" "$APP_DIR/"
+[ -f "$SRC_DIR/package-lock.json" ] && cp "$SRC_DIR/package-lock.json" "$APP_DIR/"
 # Config precedence: portal-downloaded sms-gateway.env, then .env, then the example.
 if [ -f "$SRC_DIR/sms-gateway.env" ]; then
   cp "$SRC_DIR/sms-gateway.env" "$APP_DIR/sms-gateway.env"
@@ -74,11 +73,13 @@ systemctl daemon-reload
 
 cat <<EOF
 
-Installed. Next steps:
-  1. (Optional) Set SERIAL_PORT in $APP_DIR/sms-gateway.env — leave blank to auto-detect the modem.
-  2. Pair the kiosk:   cd $APP_DIR && sudo -u $SERVICE_USER node dist/index.js --pair <PAIRING_CODE>
-  3. Enable + start:   sudo systemctl enable --now sms-gateway
-  4. Logs:             journalctl -u sms-gateway -f
+Installed. From $APP_DIR run these (short) commands:
+  cd $APP_DIR
+  1. (Optional) Set SERIAL_PORT in sms-gateway.env — leave blank to auto-detect the modem.
+  2. Pair:           sudo -u $SERVICE_USER npm run pair -- <PAIRING_CODE>
+  3. Enable + start: npm run enable-start
+  4. Logs:           npm run logs
+  Also available:    npm run status | npm run restart | npm run stop | npm run list-ports
 
 The agent auto-detects the USB GSM modem, so a udev symlink is optional. If you
 want a stable device path anyway, see deploy/99-gsm-modem.rules.
