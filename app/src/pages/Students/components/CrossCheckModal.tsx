@@ -86,7 +86,7 @@ export function CrossCheckModal({ studentId, document, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-2">
-            <MagnifyingGlassIcon className="w-5 h-5 text-indigo-500" />
+            <MagnifyingGlassIcon className="w-5 h-5 text-primary-500" />
             <h2 className="text-lg font-semibold text-gray-900">Cross Check — {document.file_name}</h2>
           </div>
           <button
@@ -124,7 +124,7 @@ export function CrossCheckModal({ studentId, document, onClose }: Props) {
 
             {loading && (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
                 <span className="text-sm">Reading document...</span>
               </div>
             )}

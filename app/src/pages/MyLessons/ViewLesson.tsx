@@ -99,7 +99,7 @@ export const ViewLesson: React.FC = () => {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           <span className="ml-3 text-gray-600">Loading lesson...</span>
         </div>
       </div>
@@ -111,7 +111,7 @@ export const ViewLesson: React.FC = () => {
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
           <p className="text-red-800 mb-4">This lesson is unavailable or you don't have access to it.</p>
-          <Link to="/my-lessons" className="text-indigo-700 font-medium">← Back to My Lessons</Link>
+          <Link to="/my-lessons" className="text-primary-700 font-medium">← Back to My Lessons</Link>
         </div>
       </div>
     );
@@ -164,12 +164,12 @@ export const ViewLesson: React.FC = () => {
 
       {/* Learning objectives */}
       {lesson.learning_objectives && lesson.learning_objectives.length > 0 && (
-        <div className="rounded-xl border-l-4 border-indigo-500 bg-indigo-50 p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-indigo-900">
+        <div className="rounded-xl border-l-4 border-primary-500 bg-primary-50 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary-900">
             <AcademicCapIcon className="h-4 w-4" />
             Learning objectives
           </div>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-indigo-900">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-primary-900">
             {lesson.learning_objectives.map((obj, i) => (
               <li key={i}>{obj}</li>
             ))}
@@ -203,7 +203,7 @@ export const ViewLesson: React.FC = () => {
             onClick={() => completeMutation.mutate()}
             disabled={isCompleted || completeMutation.isPending || !allSectionsViewed}
             title={!isCompleted && !allSectionsViewed ? 'Go through every section first' : undefined}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <CheckCircleIcon className="h-4 w-4" />
             {isCompleted ? 'Completed' : completeMutation.isPending ? 'Saving…' : 'Mark as complete'}
@@ -211,7 +211,7 @@ export const ViewLesson: React.FC = () => {
           {isCompleted && nextLesson && (
             <Link
               to={`/my-lessons/${nextLesson.id}/view`}
-              className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+              className="inline-flex items-center gap-1 rounded-lg border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 transition hover:bg-primary-100"
               title={nextLesson.title}
             >
               Next lesson <ChevronRightIcon className="h-4 w-4" />

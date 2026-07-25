@@ -197,7 +197,7 @@ export function StudentPasswordResetModal({
     <Dialog open={isOpen} onClose={handleClose} size="md" light>
       <div className="flex items-center justify-between">
         <DialogTitle light className="flex items-center gap-2 text-gray-900">
-          <KeyIcon className="w-5 h-5 text-indigo-600" />
+          <KeyIcon className="w-5 h-5 text-primary-600" />
           Reset student portal
         </DialogTitle>
         <button

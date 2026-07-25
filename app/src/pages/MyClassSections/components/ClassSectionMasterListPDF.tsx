@@ -23,7 +23,12 @@ interface ClassSectionMasterListPDFProps {
   schoolLogoUrl?: string | null;
   /** When the document was generated (pass in to keep render deterministic). */
   generatedOn?: string;
+  /** Institution brand color for accents (header rule, title, group headings). */
+  brandColor?: string;
 }
+
+// Default brand accent (primary-700) when the institution has no custom theme.
+const DEFAULT_BRAND_COLOR = '#4338ca';
 
 const styles = StyleSheet.create({
   page: {
@@ -179,6 +184,7 @@ export const ClassSectionMasterListPDF: React.FC<ClassSectionMasterListPDFProps>
   institution,
   schoolLogoUrl,
   generatedOn,
+  brandColor = DEFAULT_BRAND_COLOR,
 }) => {
   // Group by gender, then sort each group alphabetically.
   const grouped: Record<string, Student[]> = {};
@@ -203,7 +209,7 @@ export const ClassSectionMasterListPDF: React.FC<ClassSectionMasterListPDFProps>
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: brandColor }]}>
           {schoolLogoUrl ? <Image src={schoolLogoUrl} style={styles.headerLogo} /> : null}
           <View style={styles.headerText}>
             <Text style={styles.institutionTitle}>{institution.title}</Text>
@@ -213,7 +219,7 @@ export const ClassSectionMasterListPDF: React.FC<ClassSectionMasterListPDFProps>
           </View>
         </View>
 
-        <Text style={styles.docTitle}>MASTER LIST OF STUDENTS</Text>
+        <Text style={[styles.docTitle, { color: brandColor }]}>MASTER LIST OF STUDENTS</Text>
         <Text style={styles.sectionInfo}>
           Grade {section.grade_level} - {section.title}
           {section.academic_year ? ` • A.Y. ${section.academic_year}` : ''}
@@ -223,7 +229,7 @@ export const ClassSectionMasterListPDF: React.FC<ClassSectionMasterListPDFProps>
           const list = grouped[gender];
           return (
             <View key={gender} wrap={false}>
-              <Text style={styles.groupHeading}>
+              <Text style={[styles.groupHeading, { backgroundColor: brandColor }]}>
                 {GENDER_LABELS[gender]} ({list.length})
               </Text>
               <View style={styles.table}>

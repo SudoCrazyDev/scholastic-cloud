@@ -85,7 +85,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
       <div className="space-y-3">
         {loading ? (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-3"></div>
             <p className="text-gray-500">Loading class sections...</p>
           </div>
         ) : classSections.length === 0 ? (
@@ -102,7 +102,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
               transition={{ duration: 0.2 }}
               className={`group relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
                 selectedClassSection?.id === classSection.id
-                  ? 'border-indigo-500 bg-indigo-50'
+                  ? 'border-primary-500 bg-primary-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
               onClick={() => onSelectClassSection(classSection)}
@@ -111,7 +111,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-2">
-                    <AcademicCapIcon className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                    <AcademicCapIcon className="w-5 h-5 text-primary-600 flex-shrink-0" />
                     <h3 className="font-semibold text-gray-900 truncate">
                       {classSection.title}
                     </h3>
@@ -136,7 +136,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
                       e.stopPropagation()
                       onEdit(classSection)
                     }}
-                    className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors rounded"
+                    className="p-1.5 text-gray-400 hover:text-primary-600 transition-colors rounded"
                     title="Edit class section"
                   >
                     <PencilIcon className="w-4 h-4" />
@@ -156,7 +156,7 @@ export const ClassSectionList: React.FC<ClassSectionListProps> = ({
 
               {/* Selection indicator */}
               {selectedClassSection?.id === classSection.id && (
-                <div className="absolute top-2 right-2 w-3 h-3 bg-indigo-600 rounded-full"></div>
+                <div className="absolute top-2 right-2 w-3 h-3 bg-primary-600 rounded-full"></div>
               )}
             </motion.div>
           ))

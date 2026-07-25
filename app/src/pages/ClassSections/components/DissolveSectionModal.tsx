@@ -600,7 +600,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
       {/* Loading State */}
       {loading && (
         <div className="p-8 text-center bg-gray-50 rounded-lg">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-3"></div>
           <p className="text-gray-500">Loading students...</p>
         </div>
       )}
@@ -711,7 +711,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
             <Button
               onClick={handleCreateGroup}
               size="sm"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="bg-primary-600 hover:bg-primary-700 text-white"
             >
               <PlusIcon className="w-4 h-4 mr-1" />
               Create Group
@@ -751,13 +751,13 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                                   setEditingGroupName('')
                                 }
                               }}
-                              className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                               autoFocus
                             />
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">
-                            <UserGroupIcon className="w-5 h-5 text-indigo-600" />
+                            <UserGroupIcon className="w-5 h-5 text-primary-600" />
                             <h5 className="font-medium text-gray-900">{groupName}</h5>
                             <span className="text-sm text-gray-500">
                               ({groupStudentIds.size} student{groupStudentIds.size !== 1 ? 's' : ''})
@@ -770,7 +770,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                           <>
                             <button
                               onClick={() => handleStartEditGroupName(groupId)}
-                              className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                              className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
                               title="Edit group name"
                             >
                               <PencilIcon className="w-4 h-4" />
@@ -983,7 +983,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                         <select
                           value={assignedSectionId || ''}
                           onChange={(e) => handleAssignGroupToSection(groupId, e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[200px]"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[200px]"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <option value="">Assign group to section...</option>
@@ -1023,7 +1023,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                               <select
                                 value={studentSectionId || ''}
                                 onChange={(e) => handleAssignStudent(student.id, e.target.value)}
-                                className="ml-4 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                className="ml-4 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                               >
                                 <option value="">Select section...</option>
                                 {sections.map(sec => (
@@ -1085,7 +1085,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                           <select
                             value={studentAssignments.get(student.id) || ''}
                             onChange={(e) => handleAssignStudent(student.id, e.target.value)}
-                            className="ml-4 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            className="ml-4 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                           >
                             <option value="">Select section...</option>
                             {sections.map(sec => (
@@ -1187,7 +1187,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                       ) : (
                         <ChevronRightIcon className="w-5 h-5 text-gray-500" />
                       )}
-                      <UserGroupIcon className="w-5 h-5 text-indigo-600" />
+                      <UserGroupIcon className="w-5 h-5 text-primary-600" />
                       <div className="text-left">
                         <span className="font-medium text-gray-900">{groupName}</span>
                         <span className="text-sm text-gray-500 ml-2">
@@ -1202,7 +1202,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                       <div className="space-y-4">
                         {targetSubjectsLoading ? (
                           <div className="p-8 text-center">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto mb-3"></div>
                             <p className="text-sm text-gray-500">Loading subjects for {assignedSection?.title}...</p>
                           </div>
                         ) : targetSubjectsError ? (
@@ -1284,7 +1284,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                                                 handleMapSubject(parentSubject.id, '', '')
                                               }
                                             }}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                           >
                                             <option value="">Select subject...</option>
                                             {availableParentSubjects.map(subject => (
@@ -1350,7 +1350,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                                                   }
                                                 }}
                                                 disabled={!currentParentMapping?.targetSubjectId}
-                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                                                   !currentParentMapping?.targetSubjectId ? 'bg-gray-100 cursor-not-allowed' : ''
                                                 }`}
                                               >
@@ -1550,7 +1550,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                                 isCompleted
                                   ? 'bg-green-500 text-white'
                                   : isActive
-                                  ? 'bg-indigo-600 text-white'
+                                  ? 'bg-primary-600 text-white'
                                   : 'bg-gray-300 text-gray-600'
                               }`}
                             >
@@ -1562,7 +1562,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                             </div>
                             <span
                               className={`text-xs font-medium ${
-                                isActive ? 'text-indigo-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
+                                isActive ? 'text-primary-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
                               }`}
                             >
                               {step.title}
@@ -1621,7 +1621,7 @@ export const DissolveSectionModal: React.FC<DissolveSectionModalProps> = ({
                         (currentStep === 2 && !canProceedToStep3) ||
                         (currentStep === 3 && !canProceedToStep4)
                       }
-                      className="bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500"
+                      className="bg-primary-600 hover:bg-primary-700 focus:ring-primary-500"
                     >
                       Next
                     </Button>

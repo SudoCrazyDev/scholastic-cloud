@@ -24,12 +24,12 @@ export const QuizQuestionsViewer: React.FC<QuizQuestionsViewerProps> = ({
   }
 
   return (
-    <div className="mt-4 border-2 border-indigo-200 rounded-lg bg-white shadow-sm">
-      <div className="px-5 py-4 border-b-2 border-indigo-200 bg-gradient-to-r from-indigo-50 to-blue-50">
+    <div className="mt-4 border-2 border-primary-200 rounded-lg bg-white shadow-sm">
+      <div className="px-5 py-4 border-b-2 border-primary-200 bg-gradient-to-r from-primary-50 to-blue-50">
         <div className="flex items-center gap-2">
-          <DocumentTextIcon className="w-6 h-6 text-indigo-600" />
+          <DocumentTextIcon className="w-6 h-6 text-primary-600" />
           <h3 className="text-base font-bold text-gray-900">{title}</h3>
-          <span className="ml-auto text-xs font-semibold px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full">
+          <span className="ml-auto text-xs font-semibold px-3 py-1 bg-primary-100 text-primary-700 rounded-full">
             {questions.length} {questions.length === 1 ? 'question' : 'questions'}
           </span>
         </div>
@@ -37,9 +37,9 @@ export const QuizQuestionsViewer: React.FC<QuizQuestionsViewerProps> = ({
       
       <div className="p-5 space-y-5 bg-gradient-to-b from-white to-gray-50">
         {questions.map((q, idx) => (
-          <div key={idx} className="bg-white border-l-4 border-indigo-400 rounded-r-lg shadow-sm p-4 hover:shadow-md transition-shadow">
+          <div key={idx} className="bg-white border-l-4 border-primary-400 rounded-r-lg shadow-sm p-4 hover:shadow-md transition-shadow">
             <div className="flex items-start gap-2 text-sm font-semibold text-gray-900 mb-3 leading-relaxed">
-              <span className="inline-flex shrink-0 items-center justify-center w-7 h-7 bg-indigo-600 text-white rounded-full text-xs font-bold">
+              <span className="inline-flex shrink-0 items-center justify-center w-7 h-7 bg-primary-600 text-white rounded-full text-xs font-bold">
                 {idx + 1}
               </span>
               <QuestionPromptView prompt={q.question} className="min-w-0 flex-1 pt-1" />

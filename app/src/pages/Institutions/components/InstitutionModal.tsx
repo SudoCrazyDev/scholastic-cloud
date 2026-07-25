@@ -317,7 +317,7 @@ export function InstitutionModal({
                           accept="image/*"
                           onChange={handleLogoChange}
                           disabled={loading}
-                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         {errors.logo && (
                           <p className="mt-2 text-sm text-red-600 flex items-center gap-1">

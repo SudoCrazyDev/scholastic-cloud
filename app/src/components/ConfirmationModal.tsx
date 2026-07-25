@@ -42,31 +42,31 @@ export function ConfirmationModal({
     switch (variant) {
       case 'danger':
         return {
-          icon: 'text-red-600',
-          bg: 'bg-red-50',
-          border: 'border-red-200',
-          button: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+          icon: 'text-danger-600',
+          bg: 'bg-danger-50',
+          border: 'border-danger-200',
+          button: 'bg-danger-600 hover:bg-danger-700 focus:ring-danger-500',
         }
       case 'warning':
         return {
-          icon: 'text-yellow-600',
-          bg: 'bg-yellow-50',
-          border: 'border-yellow-200',
-          button: 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
+          icon: 'text-warning-600',
+          bg: 'bg-warning-50',
+          border: 'border-warning-200',
+          button: 'bg-warning-600 hover:bg-warning-700 focus:ring-warning-500',
         }
       case 'info':
         return {
-          icon: 'text-blue-600',
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
-          button: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+          icon: 'text-info-600',
+          bg: 'bg-info-50',
+          border: 'border-info-200',
+          button: 'bg-info-600 hover:bg-info-700 focus:ring-info-500',
         }
       default:
         return {
-          icon: 'text-red-600',
-          bg: 'bg-red-50',
-          border: 'border-red-200',
-          button: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+          icon: 'text-danger-600',
+          bg: 'bg-danger-50',
+          border: 'border-danger-200',
+          button: 'bg-danger-600 hover:bg-danger-700 focus:ring-danger-500',
         }
     }
   }

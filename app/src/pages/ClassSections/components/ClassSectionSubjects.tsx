@@ -218,20 +218,20 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
       onDrop={(e) => handleDrop(e, subject.id)}
       className={`group relative p-4 rounded-lg border-2 transition-all duration-200 ${
         isDragging && draggedSubject?.id === subject.id
-          ? 'border-indigo-500 bg-indigo-50 shadow-lg scale-105'
+          ? 'border-primary-500 bg-primary-50 shadow-lg scale-105'
           : dragOverSubject === subject.id
           ? 'border-green-500 bg-green-50'
           : isSaving
           ? 'border-gray-200 bg-gray-50 opacity-75'
           : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md'
-      } ${isChild ? 'ml-6 border-l-4 border-l-indigo-200' : ''}`}
+      } ${isChild ? 'ml-6 border-l-4 border-l-primary-200' : ''}`}
     >
       {/* Drag Handle */}
       <div className={`absolute left-2 top-1/2 transform -translate-y-1/2 p-1 rounded transition-colors ${
         isSaving ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing hover:bg-gray-100'
       }`}>
         {isSaving ? (
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
         ) : (
           <Bars3Icon className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
         )}
@@ -241,7 +241,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
       <div className="flex items-start justify-between pl-8">
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2 mb-2">
-            <AcademicCapIcon className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-indigo-600' : 'text-green-600'}`} />
+            <AcademicCapIcon className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-primary-600' : 'text-green-600'}`} />
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-gray-900 truncate">
                 {subject.title}
@@ -289,7 +289,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
         <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-3">
           <button
             onClick={() => onEditSubject(subject)}
-            className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors rounded"
+            className="p-1.5 text-gray-400 hover:text-primary-600 transition-colors rounded"
             title="Edit subject"
           >
             <PencilIcon className="w-4 h-4" />
@@ -306,8 +306,8 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
 
       {/* Reorder indicator */}
       {isDragging && (
-        <div className="absolute inset-0 bg-indigo-50 border-2 border-dashed border-indigo-300 rounded-lg flex items-center justify-center">
-          <span className="text-indigo-600 font-medium">Drop to reorder</span>
+        <div className="absolute inset-0 bg-primary-50 border-2 border-dashed border-primary-300 rounded-lg flex items-center justify-center">
+          <span className="text-primary-600 font-medium">Drop to reorder</span>
         </div>
       )}
     </motion.div>
@@ -355,7 +355,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onCreateSubject}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
+            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
           >
             <PlusIcon className="w-4 h-4" />
             <span>Add Subject</span>
@@ -389,7 +389,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
       <div className="space-y-3">
         {loading ? (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-3"></div>
             <p className="text-gray-500">Loading subjects...</p>
           </div>
         ) : localSubjects.length === 0 ? (
@@ -400,7 +400,7 @@ export const ClassSectionSubjects: React.FC<ClassSectionSubjectsProps> = ({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={onCreateSubject}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
+              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 cursor-pointer flex items-center space-x-2"
             >
               <PlusIcon className="w-4 h-4" />
               <span>Add First Subject</span>

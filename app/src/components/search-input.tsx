@@ -67,7 +67,7 @@ export function SearchInput({
           onChange={(e) => setLocalValue(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-50 disabled:text-gray-500"
+          className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-50 disabled:text-gray-500"
         />
         <AnimatePresence>
           {localValue && (
@@ -85,7 +85,7 @@ export function SearchInput({
         </AnimatePresence>
         {loading && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
           </div>
         )}
       </div>

@@ -86,7 +86,7 @@ export default function MySubjects() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         <span className="ml-3 text-gray-600">Loading subjects...</span>
       </div>
     )
@@ -129,7 +129,7 @@ export default function MySubjects() {
               <span className="sm:hidden ml-2">Back</span>
             </Button>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <BookOpenIcon className="w-7 h-7 sm:w-8 sm:h-8 text-indigo-600" />
+              <BookOpenIcon className="w-7 h-7 sm:w-8 sm:h-8 text-primary-600" />
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">My Subject</h1>
             </div>
           </div>
@@ -186,9 +186,9 @@ export default function MySubjects() {
                       <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Q4</p>
                       <p className="text-base sm:text-lg font-semibold text-gray-900 mt-0.5 sm:mt-1">{subject.quarter4 ?? '—'}</p>
                     </div>
-                    <div className="bg-indigo-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
-                      <p className="text-[10px] sm:text-xs font-medium text-indigo-600 uppercase">Final</p>
-                      <p className="text-base sm:text-lg font-semibold text-indigo-900 mt-0.5 sm:mt-1">{subject.final_grade ?? '—'}</p>
+                    <div className="bg-primary-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
+                      <p className="text-[10px] sm:text-xs font-medium text-primary-600 uppercase">Final</p>
+                      <p className="text-base sm:text-lg font-semibold text-primary-900 mt-0.5 sm:mt-1">{subject.final_grade ?? '—'}</p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0 col-span-2 sm:col-span-1">
                       <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Remarks</p>

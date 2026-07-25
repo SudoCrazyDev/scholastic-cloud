@@ -40,24 +40,24 @@ const PairingCodeDisplay: React.FC<{ code: string; expiresAt: string | null }> =
   }
 
   return (
-    <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-      <p className="text-sm font-medium text-indigo-800 mb-1">Pairing Code</p>
+    <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+      <p className="text-sm font-medium text-primary-800 mb-1">Pairing Code</p>
       <div className="flex items-center gap-3">
-        <span className="text-2xl font-mono font-bold tracking-widest text-indigo-700">{code}</span>
+        <span className="text-2xl font-mono font-bold tracking-widest text-primary-700">{code}</span>
         <button
           onClick={handleCopy}
-          className="p-1.5 rounded hover:bg-indigo-100 transition-colors"
+          className="p-1.5 rounded hover:bg-primary-100 transition-colors"
           title="Copy code"
         >
-          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-indigo-500" />}
+          {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-primary-500" />}
         </button>
       </div>
       {expiresAt && (
-        <p className="text-xs text-indigo-500 mt-1">
+        <p className="text-xs text-primary-500 mt-1">
           Expires {new Date(expiresAt).toLocaleTimeString()}
         </p>
       )}
-      <p className="text-xs text-indigo-600 mt-2">
+      <p className="text-xs text-primary-600 mt-2">
         Enter this code in the ZKTeco Bridge app on the device's local machine.
       </p>
     </div>
@@ -153,7 +153,7 @@ const Devices: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Fingerprint className="w-7 h-7 text-indigo-600" />
+          <Fingerprint className="w-7 h-7 text-primary-600" />
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Biometric Devices</h1>
             <p className="text-sm text-gray-500">Manage ZKTeco devices and bridge connections</p>
@@ -232,7 +232,7 @@ const Devices: React.FC = () => {
                     {device.connection === 'bridge' ? (
                       <span className="text-xs text-green-700 font-medium">Bridge</span>
                     ) : device.connection === 'adms' ? (
-                      <span className="text-xs text-indigo-600 font-medium">ADMS</span>
+                      <span className="text-xs text-primary-600 font-medium">ADMS</span>
                     ) : (
                       <span className="text-xs text-amber-600 font-medium">Awaiting device</span>
                     )}
@@ -250,7 +250,7 @@ const Devices: React.FC = () => {
                       <button
                         onClick={() => fetchUsersMutation.mutate(device.id)}
                         disabled={fetchUsersMutation.isPending}
-                        className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-indigo-600 disabled:opacity-40"
+                        className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-primary-600 disabled:opacity-40"
                         title="Fetch enrolled users from this device"
                       >
                         <DownloadCloud className={`w-4 h-4 ${fetchUsersMutation.isPending && fetchUsersMutation.variables === device.id ? 'animate-pulse' : ''}`} />
@@ -259,7 +259,7 @@ const Devices: React.FC = () => {
                         <button
                           onClick={() => handleRefreshCode(device.id)}
                           disabled={refreshingId === device.id}
-                          className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-indigo-600"
+                          className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-400 hover:text-primary-600"
                           title="Regenerate pairing code"
                         >
                           <RefreshCw className={`w-4 h-4 ${refreshingId === device.id ? 'animate-spin' : ''}`} />

@@ -477,14 +477,14 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
               className={[
                 'min-h-[96px] rounded-lg border p-2 text-left transition-colors',
                 inMonth ? 'border-gray-200 bg-white hover:border-gray-300' : 'border-gray-100 bg-gray-50 text-gray-400',
-                hasAnything ? 'ring-1 ring-indigo-100' : '',
+                hasAnything ? 'ring-1 ring-primary-100' : '',
               ].join(' ')}
               onClick={() => setSelectedDate(d)}
               disabled={isLoading}
             >
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold text-gray-900">{d.getDate()}</div>
-                {!!lp && <span className="text-[10px] rounded bg-indigo-100 px-2 py-0.5 text-indigo-700">Plan</span>}
+                {!!lp && <span className="text-[10px] rounded bg-primary-100 px-2 py-0.5 text-primary-700">Plan</span>}
               </div>
 
               {its.length > 0 && (
@@ -552,7 +552,7 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
                 {selectedItems.length > 0 && (
                   <div className="border-t border-gray-200 pt-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <CalendarIcon className="w-5 h-5 text-indigo-600" />
+                      <CalendarIcon className="w-5 h-5 text-primary-600" />
                       Scheduled Assessments for this Day
                     </h3>
                     <div className="space-y-4">
@@ -561,7 +561,7 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
                           <div className="flex items-center gap-2 mb-3">
                             <TypeBadge type={it.type} />
                             {typeof it.score === 'number' && (
-                              <span className="text-sm font-semibold text-indigo-600">
+                              <span className="text-sm font-semibold text-primary-600">
                                 {it.score} points
                               </span>
                             )}

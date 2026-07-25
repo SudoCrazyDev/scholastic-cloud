@@ -196,7 +196,7 @@ const IdPropertiesPanel: React.FC<PropertiesPanelProps> = ({ element, onChange, 
 									<div>
 										<label className="block text-sm font-medium text-gray-700 mb-1.5">Upload Image (Cloudflare)</label>
 										<label className="flex items-center justify-center gap-2 w-full px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm text-gray-600 cursor-pointer transition-colors">
-											{uploading ? <Loader2 className="w-4 h-4 animate-spin text-indigo-500" /> : <ImageIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+											{uploading ? <Loader2 className="w-4 h-4 animate-spin text-primary-500" /> : <ImageIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />}
 											<span>{uploading ? 'Uploading...' : element.src ? 'Replace image...' : 'Choose image...'}</span>
 											<input
 												type="file"

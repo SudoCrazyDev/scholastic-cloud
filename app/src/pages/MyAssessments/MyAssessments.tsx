@@ -74,7 +74,7 @@ const ProgressRing: React.FC<{ percent: number; size?: number; strokeWidth?: num
         strokeDashoffset={offset}
         strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        className={clsx('transition-[stroke-dashoffset] duration-500 ease-out', percent >= 100 ? 'text-emerald-500' : 'text-indigo-500')}
+        className={clsx('transition-[stroke-dashoffset] duration-500 ease-out', percent >= 100 ? 'text-emerald-500' : 'text-primary-500')}
       />
     </svg>
   );
@@ -106,7 +106,7 @@ const StatusPill: React.FC<{ item: StudentAssessmentItem; overdue: boolean }> = 
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700">
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-700">
       <PlayIcon className="w-4 h-4" />
       Ready
     </span>
@@ -122,7 +122,7 @@ const AssessmentRow: React.FC<{ item: StudentAssessmentItem; now: number }> = ({
   const content = (
     <div
       className={clsx(
-        'p-4 flex items-start justify-between gap-4 border-l-[3px] transition-colors hover:bg-indigo-50/40',
+        'p-4 flex items-start justify-between gap-4 border-l-[3px] transition-colors hover:bg-primary-50/40',
         TYPE_ACCENT[item.type] ?? TYPE_ACCENT.other
       )}
     >
@@ -148,13 +148,13 @@ const AssessmentRow: React.FC<{ item: StudentAssessmentItem; now: number }> = ({
             </span>
           )}
           {item.attempt_status === 'submitted' && item.attempt_score != null && item.attempt_max_score != null && (
-            <span className="font-medium text-indigo-700">
+            <span className="font-medium text-primary-700">
               Score: {item.attempt_score} / {item.attempt_max_score}
             </span>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-1 text-indigo-700 text-sm font-medium shrink-0">
+      <div className="flex items-center gap-1 text-primary-700 text-sm font-medium shrink-0">
         {canOpen ? (
           <>
             <span>{ctaLabel}</span>
@@ -299,7 +299,7 @@ export const MyAssessments: React.FC = () => {
     return (
       <div className="max-w-5xl mx-auto p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           <span className="ml-3 text-gray-600">Loading assessments...</span>
         </div>
       </div>
@@ -355,7 +355,7 @@ export const MyAssessments: React.FC = () => {
                       active
                         ? chip.key === 'overdue'
                           ? 'bg-red-600 text-white'
-                          : 'bg-indigo-600 text-white'
+                          : 'bg-primary-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     )}
                   >
@@ -379,7 +379,7 @@ export const MyAssessments: React.FC = () => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search assessments..."
-                  className="w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-8 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                  className="w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-8 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white"
                 />
                 {search && (
                   <button
@@ -411,20 +411,20 @@ export const MyAssessments: React.FC = () => {
                           onClick={() => jumpToSubject(g.subjectTitle)}
                           className={clsx(
                             'relative isolate overflow-hidden inline-flex items-center gap-1.5 rounded-full pl-3 pr-3 py-1.5 text-xs font-medium shrink-0 transition-colors',
-                            done ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'bg-indigo-50/70 text-indigo-900 hover:bg-indigo-100'
+                            done ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'bg-primary-50/70 text-primary-900 hover:bg-primary-100'
                           )}
                         >
                           <span
                             aria-hidden
                             className={clsx(
                               '-z-10 absolute inset-y-0 left-0 transition-all duration-500 ease-out',
-                              done ? 'bg-emerald-200/60' : 'bg-indigo-200/60'
+                              done ? 'bg-emerald-200/60' : 'bg-primary-200/60'
                             )}
                             style={{ width: `${pct}%` }}
                           />
                           {done && <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
                           <span className="max-w-[9rem] truncate">{g.subjectTitle}</span>
-                          <span className={done ? 'text-emerald-600' : 'text-indigo-500'}>
+                          <span className={done ? 'text-emerald-600' : 'text-primary-500'}>
                             {submittedCount}/{g.assessments.length}
                           </span>
                         </button>
@@ -467,7 +467,7 @@ export const MyAssessments: React.FC = () => {
                           <span className="text-gray-400">
                             {item.due_at ? `Due ${new Date(item.due_at).toLocaleDateString()}` : 'No due date'}
                           </span>
-                          <span className="inline-flex items-center gap-0.5 font-medium text-indigo-700">
+                          <span className="inline-flex items-center gap-0.5 font-medium text-primary-700">
                             {cta}
                             <ChevronRightIcon className="w-3.5 h-3.5" />
                           </span>
@@ -490,7 +490,7 @@ export const MyAssessments: React.FC = () => {
                   setSearch('');
                   setStatusFilter('all');
                 }}
-                className="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                className="mt-3 text-sm font-medium text-primary-600 hover:text-primary-700"
               >
                 Clear filters
               </button>
@@ -520,7 +520,7 @@ export const MyAssessments: React.FC = () => {
                       )}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
                           <BookOpenIcon className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">

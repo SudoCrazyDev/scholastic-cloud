@@ -263,7 +263,7 @@ const CollectionReportView: React.FC = () => {
             value={startDate}
             max={endDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
           />
         </div>
         <div>
@@ -273,7 +273,7 @@ const CollectionReportView: React.FC = () => {
             value={endDate}
             min={startDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -301,7 +301,7 @@ const CollectionReportView: React.FC = () => {
 
         {reportQuery.isFetching ? (
           <div className="py-8 text-center">
-            <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600 mb-2" />
+            <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-primary-600 mb-2" />
             <p className="text-gray-500">Generating report…</p>
           </div>
         ) : !report ? (
@@ -319,13 +319,13 @@ const CollectionReportView: React.FC = () => {
                 <div
                   key={c.label}
                   className={`rounded-lg border p-3 ${
-                    c.accent ? 'border-indigo-200 bg-indigo-50' : 'border-gray-200 bg-white'
+                    c.accent ? 'border-primary-200 bg-primary-50' : 'border-gray-200 bg-white'
                   }`}
                 >
                   <p className="text-xs text-gray-500 uppercase">{c.label}</p>
                   <p
                     className={`text-lg font-semibold tabular-nums ${
-                      c.accent ? 'text-indigo-700' : 'text-gray-900'
+                      c.accent ? 'text-primary-700' : 'text-gray-900'
                     }`}
                   >
                     {c.value}

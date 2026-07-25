@@ -272,7 +272,7 @@ const FinanceAnnouncementsView: React.FC = () => {
             />
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700 w-fit">
+          <div className="flex items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 text-sm text-primary-700 w-fit">
             <Megaphone className="w-4 h-4 shrink-0" />
             Sent to all students in your institution.
           </div>
@@ -318,7 +318,7 @@ const FinanceAnnouncementsView: React.FC = () => {
           <label className="flex items-center gap-2 cursor-pointer w-fit">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               checked={form.is_pinned}
               onChange={(e) => setForm((prev) => ({ ...prev, is_pinned: e.target.checked }))}
               disabled={isSaving}
@@ -409,7 +409,7 @@ const FinanceAnnouncementsView: React.FC = () => {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" loading={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button type="submit" loading={isSaving} className="bg-primary-600 hover:bg-primary-700 text-white">
               {editing ? (isSaving ? 'Updating…' : 'Update announcement') : isSaving ? 'Posting…' : 'Post announcement'}
             </Button>
             {editing && (
@@ -453,7 +453,7 @@ const FinanceAnnouncementsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
-                className="text-sm text-indigo-600 hover:text-indigo-700 mt-1"
+                className="text-sm text-primary-600 hover:text-primary-700 mt-1"
               >
                 Show all
               </button>

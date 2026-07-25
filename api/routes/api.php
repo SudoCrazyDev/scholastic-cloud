@@ -120,6 +120,9 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('institutions', InstitutionController::class);
     Route::post('institutions/{id}', [InstitutionController::class, 'update']); // POST route for file uploads
     Route::put('institutions/{id}/academic-year', [InstitutionController::class, 'updateAcademicYear']);
+    // Per-institution color theme (self-serve for institution admins)
+    Route::get('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'show']);
+    Route::put('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'update']);
     Route::get('institutions/{id}/academic-years', [InstitutionController::class, 'getAcademicYears']);
     Route::get('grade-levels', [GradeLevelController::class, 'index']);
     Route::post('grade-levels', [GradeLevelController::class, 'store']);

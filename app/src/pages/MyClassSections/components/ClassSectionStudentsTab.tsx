@@ -7,6 +7,8 @@ import { Select } from '../../../components/select';
 import { Search, User, Plus, Edit, Trash2, ArrowRightLeft, Printer } from 'lucide-react';
 import type { Student, Subject, Institution, ClassSection } from '../../../types';
 import { ClassSectionMasterListPDF } from './ClassSectionMasterListPDF';
+import { useAuth } from '../../../hooks/useAuth';
+import { brandPrimaryHex } from '../../../theme/institutionTheme';
 
 // Student Card Component with image error handling
 const StudentCard: React.FC<{
@@ -38,7 +40,7 @@ const StudentCard: React.FC<{
               <img
                 src={student.profile_picture}
                 alt={getFullName(student)}
-                className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 group-hover:border-indigo-300 transition-colors"
+                className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 group-hover:border-primary-300 transition-colors"
                 onError={() => {
                   setImageError(true);
                 }}
@@ -47,13 +49,13 @@ const StudentCard: React.FC<{
                 }}
               />
             ) : (
-              <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center border-2 border-gray-200 group-hover:border-indigo-300 transition-colors">
+              <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center border-2 border-gray-200 group-hover:border-primary-300 transition-colors">
                 <User className="w-6 h-6 text-gray-600" />
               </div>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors uppercase overflow-wrap max-w-[200px]">
+            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-primary-600 transition-colors uppercase overflow-wrap max-w-[200px]">
               {getFullName(student)}
             </p>
             <div className="flex items-center space-x-2 mt-1">
@@ -89,7 +91,7 @@ const StudentCard: React.FC<{
             }}
             variant="ghost"
             size="sm"
-            className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 opacity-0 group-hover:opacity-100 transition-all"
+            className="text-gray-600 hover:text-primary-600 hover:bg-primary-50 opacity-0 group-hover:opacity-100 transition-all"
             title="View student details"
           >
             <User className="w-4 h-4" />
@@ -175,6 +177,8 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   institution,
   schoolLogoUrl,
 }) => {
+  const { user } = useAuth();
+  const pdfBrandColor = brandPrimaryHex(user);
   const masterListFileName = section
     ? `master-list-grade-${section.grade_level}-${section.title}${section.academic_year ? `-${section.academic_year}` : ''}.pdf`
     : 'master-list.pdf';
@@ -196,10 +200,10 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
       transition={{ duration: 0.3 }}
     >
       {/* Class Summary */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 mb-6">
+      <div className="bg-gradient-to-r from-primary-50 to-purple-50 rounded-lg p-4 mb-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-indigo-600">
+            <div className="text-2xl font-bold text-primary-600">
               {studentSearchTerm ? `${students.length}` : students.length}
             </div>
             <div className="text-sm text-gray-600">
@@ -246,6 +250,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
                   institution={institution}
                   schoolLogoUrl={schoolLogoUrl}
                   generatedOn={new Date().toLocaleDateString()}
+                  brandColor={pdfBrandColor}
                 />
               }
               fileName={masterListFileName}
@@ -277,7 +282,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
             placeholder="Search students..."
             value={studentSearchTerm}
             onChange={(e) => setStudentSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
           />
         </div>
         <div className="sm:w-48">
@@ -292,7 +297,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
 
       {studentsLoading ? (
         <div className="flex items-center justify-center py-8">
-          <span className="text-indigo-600">Loading...</span>
+          <span className="text-primary-600">Loading...</span>
         </div>
       ) : studentsError ? (
         <div className="text-red-600">Failed to load students</div>

@@ -66,7 +66,7 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({
               onClick={() => setViewMode('monthly')}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 viewMode === 'monthly'
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-primary-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -77,7 +77,7 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({
               onClick={() => setViewMode('quarterly')}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 viewMode === 'quarterly'
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-primary-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -108,13 +108,13 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-sm text-gray-500">View Mode</p>
-          <p className="text-2xl font-semibold text-indigo-600">{viewMode === 'monthly' ? '10 Months' : '4 Quarters'}</p>
+          <p className="text-2xl font-semibold text-primary-600">{viewMode === 'monthly' ? '10 Months' : '4 Quarters'}</p>
         </div>
       </div>
 
       {collectionsQuery.isLoading ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-          <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600 mb-2" />
+          <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-primary-600 mb-2" />
           <p className="text-gray-500">Loading collections...</p>
         </div>
       ) : (
@@ -131,7 +131,7 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({
                   </div>
                   <div className="flex-1 bg-gray-100 rounded-full h-8 relative overflow-hidden">
                     <div
-                      className="bg-indigo-500 h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                      className="bg-primary-500 h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
                       style={{ width: `${Math.max((item.total / maxTotal) * 100, item.total > 0 ? 2 : 0)}%` }}
                     >
                       {item.total > 0 && (

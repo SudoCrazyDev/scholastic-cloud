@@ -58,6 +58,7 @@ class AuthController extends Controller
                     'institution' => $inst ? [
                         'id' => $inst->id,
                         'name' => $inst->title ?? $inst->name ?? null,
+                        'theme' => $inst->theme,
                     ] : null,
                 ];
             })->filter(fn ($i) => $i['institution'] !== null)->values()->all();
@@ -190,6 +191,7 @@ class AuthController extends Controller
                     'institution' => $inst ? [
                         'id' => $inst->id,
                         'name' => $inst->title ?? ($inst->name ?? null),
+                        'theme' => $inst->theme,
                     ] : null,
                 ];
             })->filter(fn ($i) => $i['institution'] !== null)->values()->all();
@@ -251,6 +253,7 @@ class AuthController extends Controller
                         'id' => $userInstitution->institution->id,
                         'title' => $userInstitution->institution->title,
                         'current_academic_year' => $userInstitution->institution->current_academic_year,
+                        'theme' => $userInstitution->institution->theme,
                     ] : null,
                 ];
             }),
@@ -336,6 +339,7 @@ class AuthController extends Controller
                         'id' => $userInstitution->institution->id,
                         'title' => $userInstitution->institution->title,
                         'current_academic_year' => $userInstitution->institution->current_academic_year,
+                        'theme' => $userInstitution->institution->theme,
                     ] : null,
                 ];
             }),

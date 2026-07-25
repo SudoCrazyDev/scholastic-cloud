@@ -55,7 +55,7 @@ const AnnouncementCard: React.FC<{
     <div
       onClick={handleClick}
       className={`rounded-xl border bg-white p-5 shadow-sm transition-colors ${
-        unread ? 'border-indigo-200 ring-1 ring-indigo-100 cursor-pointer hover:bg-indigo-50/30' : 'border-gray-200'
+        unread ? 'border-primary-200 ring-1 ring-primary-100 cursor-pointer hover:bg-primary-50/30' : 'border-gray-200'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -66,7 +66,7 @@ const AnnouncementCard: React.FC<{
             )}
             <h3 className="text-base font-semibold text-gray-900">{announcement.title}</h3>
             {unread && (
-              <span className="inline-flex rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="inline-flex rounded-full bg-primary-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                 New
               </span>
             )}
@@ -80,7 +80,7 @@ const AnnouncementCard: React.FC<{
 
       {announcement.body && (
         <div
-          className="announcement-body mt-3 text-sm text-gray-700 [&_a]:text-indigo-600 [&_a]:underline [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5"
+          className="announcement-body mt-3 text-sm text-gray-700 [&_a]:text-primary-600 [&_a]:underline [&_ol]:list-decimal [&_ul]:list-disc [&_ol]:pl-5 [&_ul]:pl-5"
           // Bodies are authored by trusted staff (teachers/admins) via the Quill editor.
           dangerouslySetInnerHTML={{ __html: announcement.body }}
         />
@@ -168,7 +168,7 @@ const AnnouncementBoard: React.FC = () => {
       className="space-y-6"
     >
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
           <Megaphone className="w-5 h-5" />
         </span>
         <div>

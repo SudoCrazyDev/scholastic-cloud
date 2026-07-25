@@ -320,7 +320,7 @@ export function AddScheduleModal({ isOpen, onClose, defaultStartTime, defaultEnd
                               value={type}
                               checked={formik.values.subject_type === type}
                               onChange={formik.handleChange}
-                              className="accent-indigo-600"
+                              className="accent-primary-600"
                             />
                             <span className="text-sm text-gray-700">
                               {type === 'parent' ? 'Parent Subject (e.g., MAPEH)' : 'Child Subject (e.g., PE, Arts)'}
@@ -485,7 +485,7 @@ export function AddScheduleModal({ isOpen, onClose, defaultStartTime, defaultEnd
                           name="is_limited_student"
                           checked={formik.values.is_limited_student}
                           onChange={formik.handleChange}
-                          className="accent-indigo-600"
+                          className="accent-primary-600"
                         />
                         <span className="text-sm text-gray-700">Limited student capacity</span>
                       </label>
@@ -499,7 +499,7 @@ export function AddScheduleModal({ isOpen, onClose, defaultStartTime, defaultEnd
                               value={studentSearch}
                               onChange={(e) => setStudentSearch(e.target.value)}
                               placeholder="Search students in this section..."
-                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                             />
                             <p className="mt-1 text-xs text-gray-400">Only students in the selected section can be assigned.</p>
                           </div>
@@ -528,7 +528,7 @@ export function AddScheduleModal({ isOpen, onClose, defaultStartTime, defaultEnd
                                         else next.delete(s.id)
                                         setSelectedStudentIds(next)
                                       }}
-                                      className="accent-indigo-600"
+                                      className="accent-primary-600"
                                     />
                                     <span className="flex-1 text-gray-700">
                                       {[s.first_name, s.middle_name, s.last_name, s.ext_name].filter(Boolean).join(' ')}
@@ -569,7 +569,7 @@ export function AddScheduleModal({ isOpen, onClose, defaultStartTime, defaultEnd
                       <Button
                         type="submit"
                         disabled={mutation.isPending || formik.isSubmitting}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        className="bg-primary-600 hover:bg-primary-700 text-white"
                       >
                         {mutation.isPending ? 'Saving...' : 'Add Subject'}
                       </Button>

@@ -372,7 +372,7 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-100">
+      <div className="bg-gradient-to-r from-primary-50 to-purple-50 rounded-xl p-6 border border-primary-100">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">AI-Powered Quarter Planner</h2>
@@ -446,12 +446,12 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                 <div
                   className={[
                     'flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center',
-                    section.done ? 'bg-emerald-100' : 'bg-indigo-100',
+                    section.done ? 'bg-emerald-100' : 'bg-primary-100',
                   ].join(' ')}
                 >
                   <Icon className={[
                     'w-6 h-6',
-                    section.done ? 'text-emerald-600' : 'text-indigo-600',
+                    section.done ? 'text-emerald-600' : 'text-primary-600',
                   ].join(' ')} />
                 </div>
                 
@@ -516,7 +516,7 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                     <div className="text-sm font-medium text-gray-700 mb-2">Generated Suggestions:</div>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {topicSuggestions.map((t, idx) => (
-                        <div key={idx} className="bg-white rounded-lg border border-gray-300 p-3 hover:border-indigo-300 transition-colors">
+                        <div key={idx} className="bg-white rounded-lg border border-gray-300 p-3 hover:border-primary-300 transition-colors">
                           <div className="font-medium text-gray-900">{t.title}</div>
                           {t.description && <div className="mt-1 text-sm text-gray-600">{t.description}</div>}
                         </div>
@@ -632,18 +632,18 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                 </div>
 
                 {generatingLessonPlans && generationProgress > 0 && (
-                  <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-indigo-900">Generating lesson plans...</span>
-                      <span className="text-sm font-semibold text-indigo-700">{generationProgress}%</span>
+                      <span className="text-sm font-medium text-primary-900">Generating lesson plans...</span>
+                      <span className="text-sm font-semibold text-primary-700">{generationProgress}%</span>
                     </div>
-                    <div className="w-full bg-indigo-200 rounded-full h-2.5">
+                    <div className="w-full bg-primary-200 rounded-full h-2.5">
                       <div
-                        className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
+                        className="bg-primary-600 h-2.5 rounded-full transition-all duration-500"
                         style={{ width: `${generationProgress}%` }}
                       ></div>
                     </div>
-                    <p className="mt-2 text-xs text-indigo-700">
+                    <p className="mt-2 text-xs text-primary-700">
                       Please wait while AI generates your lesson plans. This process runs in the background.
                     </p>
                   </div>
@@ -679,8 +679,8 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                   />
                 ) : (
                   <>
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-indigo-900 mb-3">How many assessment items to generate?</h4>
+                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-primary-900 mb-3">How many assessment items to generate?</h4>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <Field>
                           <Label htmlFor="quizzesCount" className="text-gray-900 font-medium">Quizzes</Label>

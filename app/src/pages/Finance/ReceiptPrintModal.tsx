@@ -188,7 +188,7 @@ const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({
             <Button
               type="button"
               onClick={handlePrint}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="bg-primary-600 hover:bg-primary-700 text-white"
             >
               Print Receipt
             </Button>

@@ -244,7 +244,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     <tr
                       key={day.id}
                       className={`border-b border-gray-50 ${off ? 'bg-red-50/40' : ''} ${
-                        !readOnly ? 'cursor-pointer hover:bg-indigo-50/40' : ''
+                        !readOnly ? 'cursor-pointer hover:bg-primary-50/40' : ''
                       }`}
                       onClick={() => {
                         if (readOnly) return

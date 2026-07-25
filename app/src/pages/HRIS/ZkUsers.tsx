@@ -70,7 +70,7 @@ const AddToDeviceModal: React.FC<{
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <Upload className="w-4 h-4 text-indigo-600" /> Add Staff to Device
+          <Upload className="w-4 h-4 text-primary-600" /> Add Staff to Device
         </h2>
 
         {assignedId ? (
@@ -78,7 +78,7 @@ const AddToDeviceModal: React.FC<{
             <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-3" />
             <p className="text-sm text-gray-700 font-medium">Staff queued for enrollment</p>
             <p className="text-xs text-gray-500 mt-1">
-              Assigned ZK User ID: <span className="font-mono font-bold text-indigo-700">{assignedId}</span>
+              Assigned ZK User ID: <span className="font-mono font-bold text-primary-700">{assignedId}</span>
             </p>
             <p className="text-xs text-gray-400 mt-2">The bridge will push the user to the device within 30 seconds.</p>
             <Button onClick={onAdded} className="mt-4">Done</Button>
@@ -188,7 +188,7 @@ const ZkUsers: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Monitor className="w-7 h-7 text-indigo-600" />
+          <Monitor className="w-7 h-7 text-primary-600" />
           <div>
             <h1 className="text-xl font-semibold text-gray-900">ZK Users</h1>
             <p className="text-sm text-gray-500">Link and enroll staff on ZKTeco devices</p>
@@ -207,7 +207,7 @@ const ZkUsers: React.FC = () => {
         <div className="flex rounded-lg border border-gray-200 overflow-hidden">
           {filterTabs.map((tab) => (
             <button key={tab.key} onClick={() => { setFilter(tab.key); setPage(1) }}
-              className={`px-4 py-1.5 text-sm font-medium transition-colors ${filter === tab.key ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              className={`px-4 py-1.5 text-sm font-medium transition-colors ${filter === tab.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
               {tab.label}
             </button>
           ))}
@@ -340,7 +340,7 @@ const ZkUserRow: React.FC<ZkUserRowProps> = ({ mapping, staffOptions, onLink, on
           {mapping.user_id && (
             <button onClick={onEnroll} disabled={isBusy || isPending}
               title="Push to device with default password '0000'. Employee should then scan fingerprint on the device to replace it."
-              className="p-1.5 rounded hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors disabled:opacity-40">
+              className="p-1.5 rounded hover:bg-primary-50 text-gray-400 hover:text-primary-600 transition-colors disabled:opacity-40">
               <Upload className="w-4 h-4" />
             </button>
           )}

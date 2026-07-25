@@ -633,9 +633,9 @@ const StaffSchedules: React.FC = () => {
 
   const renderHoursEditor = () => (
     <>
-      <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
+      <div className="rounded-lg border border-primary-100 bg-primary-50/50 p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-sm font-medium text-indigo-900">Common hours</span>
+          <span className="text-sm font-medium text-primary-900">Common hours</span>
           <Button type="button" variant="outline" size="sm" onClick={applyCommonToAll} disabled={isSavingForm}>
             Apply to all working days
           </Button>
@@ -689,7 +689,7 @@ const StaffSchedules: React.FC = () => {
                       checked={row.enabled}
                       onChange={(e) => updateDay(key, 'enabled', e.target.checked)}
                       disabled={isSavingForm}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                     />
                     {label}
                   </span>
@@ -767,7 +767,7 @@ const StaffSchedules: React.FC = () => {
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
       <form className="space-y-5 p-5" onSubmit={handleSubmitForm}>
         <div className="flex items-center gap-2 border-b border-gray-100 pb-4">
-          <CalendarClock className="h-5 w-5 text-indigo-600" />
+          <CalendarClock className="h-5 w-5 text-primary-600" />
           <h3 className="text-lg font-semibold text-gray-900">
             {editing ? `Edit "${editing.name}"` : 'New schedule'}
           </h3>
@@ -813,7 +813,7 @@ const StaffSchedules: React.FC = () => {
         )}
 
         <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-4">
-          <Button type="submit" loading={isSavingForm} className="bg-indigo-600 text-white hover:bg-indigo-700">
+          <Button type="submit" loading={isSavingForm} className="bg-primary-600 text-white hover:bg-primary-700">
             {editing ? (isSavingForm ? 'Saving…' : 'Save changes') : isSavingForm ? 'Creating…' : 'Create schedule'}
           </Button>
           <Button type="button" variant="outline" disabled={isSavingForm} onClick={closeForm}>
@@ -836,7 +836,7 @@ const StaffSchedules: React.FC = () => {
             className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={newSchedule}>
+        <Button className="bg-primary-600 text-white hover:bg-primary-700" onClick={newSchedule}>
           <PlusIcon className="mr-1 h-4 w-4" /> New schedule
         </Button>
       </div>
@@ -865,7 +865,7 @@ const StaffSchedules: React.FC = () => {
                   >
                     {schedule.is_active ? 'Active' : 'Inactive'}
                   </span>
-                  <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                  <span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
                     {schedule.assigned_count} assigned
                   </span>
                 </div>
@@ -926,7 +926,7 @@ const StaffSchedules: React.FC = () => {
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
           <form className="space-y-5 p-5" onSubmit={handleAssign}>
             <div className="flex items-center gap-2 border-b border-gray-100 pb-4">
-              <UserPlusIcon className="h-5 w-5 text-indigo-600" />
+              <UserPlusIcon className="h-5 w-5 text-primary-600" />
               <h3 className="text-lg font-semibold text-gray-900">Assign a schedule to staff</h3>
             </div>
 
@@ -970,7 +970,7 @@ const StaffSchedules: React.FC = () => {
                         type="button"
                         onClick={toggleSelectAllMatching}
                         disabled={isAssigning}
-                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-40"
+                        className="text-xs font-medium text-primary-600 hover:text-primary-700 disabled:opacity-40"
                       >
                         {allMatchingSelected
                           ? 'Clear selection'
@@ -989,7 +989,7 @@ const StaffSchedules: React.FC = () => {
                         return (
                           <span
                             key={u.id}
-                            className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-indigo-700"
+                            className="inline-flex items-center gap-1 rounded-full bg-primary-50 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary-700"
                             title={willReplace ? `Currently on ${current?.schedule_name} — will be reassigned` : undefined}
                           >
                             {willReplace && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
@@ -999,7 +999,7 @@ const StaffSchedules: React.FC = () => {
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => removeStaff(u.id)}
                               disabled={isAssigning}
-                              className="rounded-full p-0.5 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-700"
+                              className="rounded-full p-0.5 text-primary-400 hover:bg-primary-100 hover:text-primary-700"
                             >
                               <XMarkIcon className="h-3.5 w-3.5" />
                             </button>
@@ -1046,12 +1046,12 @@ const StaffSchedules: React.FC = () => {
                                     onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => toggleStaff(u.id)}
                                     className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
-                                      checked ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                                      checked ? 'bg-primary-50' : 'hover:bg-gray-50'
                                     }`}
                                   >
                                     <span
                                       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                                        checked ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
+                                        checked ? 'border-primary-600 bg-primary-600' : 'border-gray-300'
                                       }`}
                                     >
                                       {checked && <CheckIcon className="h-3 w-3 text-white" />}
@@ -1092,7 +1092,7 @@ const StaffSchedules: React.FC = () => {
                 )}
 
                 <div className="border-t border-gray-100 pt-4">
-                  <Button type="submit" loading={isAssigning} className="bg-indigo-600 text-white hover:bg-indigo-700">
+                  <Button type="submit" loading={isAssigning} className="bg-primary-600 text-white hover:bg-primary-700">
                     {isAssigning
                       ? 'Assigning…'
                       : selectedUserIds.length
@@ -1138,7 +1138,7 @@ const StaffSchedules: React.FC = () => {
                     {a.staff_email && <p className="truncate text-xs text-gray-500">{a.staff_email}</p>}
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                    <span className="rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">
                       {a.schedule_name}
                     </span>
                     <button
@@ -1200,7 +1200,7 @@ const StaffSchedules: React.FC = () => {
               <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Holiday
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" /> Event
+              <span className="h-2.5 w-2.5 rounded-full bg-primary-500" /> Event
             </span>
           </div>
         </div>
@@ -1224,13 +1224,13 @@ const StaffSchedules: React.FC = () => {
                 type="button"
                 key={ds}
                 onClick={() => openDay(ds)}
-                className={`flex min-h-[6.5rem] flex-col gap-1 border-b border-r border-gray-100 p-1.5 text-left align-top transition-colors hover:bg-indigo-50/40 ${
+                className={`flex min-h-[6.5rem] flex-col gap-1 border-b border-r border-gray-100 p-1.5 text-left align-top transition-colors hover:bg-primary-50/40 ${
                   idx % 7 === 0 ? 'border-l' : ''
                 } ${inMonth ? 'bg-white' : 'bg-gray-50/60'}`}
               >
                 <span
                   className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
-                    isToday ? 'bg-indigo-600 text-white' : inMonth ? 'text-gray-700' : 'text-gray-400'
+                    isToday ? 'bg-primary-600 text-white' : inMonth ? 'text-gray-700' : 'text-gray-400'
                   }`}
                 >
                   {cell.getDate()}
@@ -1241,7 +1241,7 @@ const StaffSchedules: React.FC = () => {
                       key={ev.id}
                       title={ev.title}
                       className={`truncate rounded px-1 py-0.5 text-[11px] font-medium ${
-                        ev.type === 'holiday' ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'
+                        ev.type === 'holiday' ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'
                       }`}
                     >
                       {ev.title}
@@ -1310,7 +1310,7 @@ const StaffSchedules: React.FC = () => {
             </button>
             <div className="px-2 text-center">
               <div className="text-base font-semibold text-gray-900">{label}</div>
-              {isToday && <div className="text-xs font-medium text-indigo-600">Today</div>}
+              {isToday && <div className="text-xs font-medium text-primary-600">Today</div>}
             </div>
             <button
               type="button"
@@ -1393,7 +1393,7 @@ const StaffSchedules: React.FC = () => {
                         {a.staff_email && <div className="text-xs text-gray-400">{a.staff_email}</div>}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                        <span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
                           {a.schedule_name}
                         </span>
                       </td>
@@ -1463,7 +1463,7 @@ const StaffSchedules: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span
                           className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                            ev.type === 'holiday' ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700'
+                            ev.type === 'holiday' ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'
                           }`}
                         >
                           {ev.type === 'holiday' ? 'Holiday' : 'Event'}
@@ -1535,7 +1535,7 @@ const StaffSchedules: React.FC = () => {
                 </p>
               )}
               <div className="flex gap-2">
-                <Button type="submit" loading={saving} className="bg-indigo-600 text-white hover:bg-indigo-700">
+                <Button type="submit" loading={saving} className="bg-primary-600 text-white hover:bg-primary-700">
                   {editingEvent ? (saving ? 'Saving…' : 'Save changes') : saving ? 'Adding…' : 'Add entry'}
                 </Button>
                 {editingEvent && (
@@ -1568,7 +1568,7 @@ const StaffSchedules: React.FC = () => {
       className="space-y-6"
     >
       <div className="flex items-center gap-3">
-        <CalendarClock className="h-8 w-8 text-indigo-600" />
+        <CalendarClock className="h-8 w-8 text-primary-600" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Schedules</h1>
           <p className="mt-1 text-gray-600">
@@ -1584,7 +1584,7 @@ const StaffSchedules: React.FC = () => {
           onClick={() => setTab('schedules')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             tab === 'schedules'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary-600 text-primary-600'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
           }`}
         >
@@ -1601,7 +1601,7 @@ const StaffSchedules: React.FC = () => {
           onClick={() => setTab('assign')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             tab === 'assign'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary-600 text-primary-600'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
           }`}
         >
@@ -1613,7 +1613,7 @@ const StaffSchedules: React.FC = () => {
           onClick={() => setTab('calendar')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             tab === 'calendar'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary-600 text-primary-600'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
           }`}
         >
@@ -1625,7 +1625,7 @@ const StaffSchedules: React.FC = () => {
           onClick={() => setTab('table')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
             tab === 'table'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-primary-600 text-primary-600'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
           }`}
         >

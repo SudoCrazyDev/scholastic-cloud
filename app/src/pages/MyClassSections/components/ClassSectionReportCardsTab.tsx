@@ -296,7 +296,7 @@ function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYe
                               {getSubjectTitle(grade.subject_id)}
                             </td>
                             <td className="px-5 py-3">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700">
                                 Q{grade.quarter}
                               </span>
                             </td>
@@ -508,7 +508,7 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
           placeholder="Search students..."
           value={studentSearchTerm}
           onChange={(e) => setStudentSearchTerm(e.target.value)}
-          className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm w-full"
+          className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm w-full"
         />
       </div>
       {/* Students List */}

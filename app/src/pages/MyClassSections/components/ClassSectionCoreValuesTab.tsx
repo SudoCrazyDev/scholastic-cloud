@@ -242,7 +242,7 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
                   <th
                     key={cv.key}
                     colSpan={cv.behaviors.length}
-                    className="border-b border-gray-200 px-3 py-3 text-center text-xs font-semibold text-indigo-700"
+                    className="border-b border-gray-200 px-3 py-3 text-center text-xs font-semibold text-primary-700"
                   >
                     {cv.label}
                   </th>
@@ -280,7 +280,7 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
                 const stickyBg = rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
 
                 return (
-                  <tr key={student.id} className={`${rowBg} hover:bg-indigo-50/50 transition-colors`}>
+                  <tr key={student.id} className={`${rowBg} hover:bg-primary-50/50 transition-colors`}>
                     <td
                       className={`sticky left-0 z-10 ${stickyBg} border-b border-gray-200 px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap`}
                       title={fullName}
@@ -338,7 +338,7 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
         </div>
         {studentsLoading || markingsLoading ? (
           <div className="flex justify-center items-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
           </div>
         ) : studentsError ? (
           <div className="text-red-500 text-center py-8">Failed to load students.</div>

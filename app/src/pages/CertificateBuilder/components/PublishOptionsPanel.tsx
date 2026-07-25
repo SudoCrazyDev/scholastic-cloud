@@ -93,7 +93,7 @@ const PublishOptionsPanel: React.FC<PublishOptionsPanelProps> = ({ options, onCh
 												checked={isChecked}
 												onChange={() => toggleGradeLevel(grade)}
 												disabled={isDisabled || isForced}
-												className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-0 transition-all duration-200 ease-out cursor-pointer disabled:cursor-not-allowed"
+												className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-0 transition-all duration-200 ease-out cursor-pointer disabled:cursor-not-allowed"
 											/>
 											<span>Grade {grade}</span>
 										</label>

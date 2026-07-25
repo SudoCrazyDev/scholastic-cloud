@@ -421,7 +421,7 @@ export default function CertificateBuilder() {
 					<button
 						type="button"
 						onClick={() => setElementsPanelOpen(true)}
-						className="flex flex-col items-center justify-center w-full flex-1 min-h-[120px] py-4 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors"
+						className="flex flex-col items-center justify-center w-full flex-1 min-h-[120px] py-4 text-gray-500 hover:text-primary-600 hover:bg-primary-50/50 transition-colors"
 						title="Show Elements panel"
 					>
 						<PanelLeft className="w-6 h-6" />
@@ -631,10 +631,10 @@ export default function CertificateBuilder() {
 																style={{ left: pos, top: 0 }}
 															>
 																<div
-																	className={`w-px ${isCenter ? 'h-3 bg-indigo-500' : 'h-2 bg-gray-400'}`}
+																	className={`w-px ${isCenter ? 'h-3 bg-primary-500' : 'h-2 bg-gray-400'}`}
 																	style={{ marginTop: 2 }}
 																/>
-																<span className={`text-[10px] mt-0.5 select-none ${isCenter ? 'text-indigo-600 font-semibold' : ''}`}>
+																<span className={`text-[10px] mt-0.5 select-none ${isCenter ? 'text-primary-600 font-semibold' : ''}`}>
 																	{isCenter ? 'Center' : pos}
 																</span>
 															</div>
@@ -661,10 +661,10 @@ export default function CertificateBuilder() {
 																style={{ left: 0, top: pos }}
 															>
 																<div
-																	className={`h-px flex-shrink-0 ${isCenter ? 'w-3 bg-indigo-500' : 'w-2 bg-gray-400'}`}
+																	className={`h-px flex-shrink-0 ${isCenter ? 'w-3 bg-primary-500' : 'w-2 bg-gray-400'}`}
 																	style={{ marginLeft: 2 }}
 																/>
-																<span className={`text-[10px] select-none whitespace-nowrap origin-left ${isCenter ? 'text-indigo-600 font-semibold' : ''}`} style={{ transform: 'rotate(-90deg)', marginLeft: 4 }}>
+																<span className={`text-[10px] select-none whitespace-nowrap origin-left ${isCenter ? 'text-primary-600 font-semibold' : ''}`} style={{ transform: 'rotate(-90deg)', marginLeft: 4 }}>
 																	{isCenter ? 'Center' : pos}
 																</span>
 															</div>
@@ -689,11 +689,11 @@ export default function CertificateBuilder() {
 										{showRuler && (
 											<div className="absolute inset-0 pointer-events-none z-10">
 												<div
-													className="absolute top-0 bottom-0 w-0 border-l border-dashed border-indigo-400/70"
+													className="absolute top-0 bottom-0 w-0 border-l border-dashed border-primary-400/70"
 													style={{ left: '50%' }}
 												/>
 												<div
-													className="absolute left-0 right-0 h-0 border-t border-dashed border-indigo-400/70"
+													className="absolute left-0 right-0 h-0 border-t border-dashed border-primary-400/70"
 													style={{ top: '50%' }}
 												/>
 											</div>

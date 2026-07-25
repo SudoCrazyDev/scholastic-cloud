@@ -109,7 +109,7 @@ export const TopicItem: React.FC<TopicItemProps> = ({
           className={`transition-colors ${
             topic.is_completed 
               ? 'text-green-600 hover:text-green-700' 
-              : 'text-gray-400 hover:text-indigo-600'
+              : 'text-gray-400 hover:text-primary-600'
           }`}
           title={topic.is_completed ? 'Mark as incomplete' : 'Mark as complete'}
         >
@@ -130,7 +130,7 @@ export const TopicItem: React.FC<TopicItemProps> = ({
           </h4>
           <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-              topic.is_published ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'
+              topic.is_published ? 'bg-primary-100 text-primary-800' : 'bg-amber-100 text-amber-800'
             }`}
             title={topic.is_published ? 'Visible to students' : 'Draft — hidden from students until published'}
           >

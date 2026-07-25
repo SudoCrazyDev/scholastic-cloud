@@ -539,7 +539,7 @@ export function ClassSectionModal({
                   <Button
                     type="submit"
                     disabled={loading || formik.isSubmitting}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="bg-primary-600 hover:bg-primary-700 text-white"
                   >
                     {loading || formik.isSubmitting ? 'Saving...' : (isEditing ? 'Update Section' : 'Create Section')}
                   </Button>

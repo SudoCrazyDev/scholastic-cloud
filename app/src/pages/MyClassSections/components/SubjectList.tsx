@@ -89,7 +89,7 @@ const SubjectItem = ({
         hasNoAdviser 
           ? 'border-red-200 bg-red-50'
           : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md'
-      } ${isChild ? 'ml-6 border-l-4 border-l-indigo-200' : ''}`}
+      } ${isChild ? 'ml-6 border-l-4 border-l-primary-200' : ''}`}
     >
       {/* Main Content */}
       <div className="flex items-start justify-between">
@@ -104,7 +104,7 @@ const SubjectItem = ({
               tabIndex={0}
             >
               <ChevronDown
-                className={`w-5 h-5 text-gray-500 transition-transform duration-200 group-hover/chevron:text-indigo-600 ${expanded ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-gray-500 transition-transform duration-200 group-hover/chevron:text-primary-600 ${expanded ? 'rotate-180' : ''}`}
               />
             </button>
           )}
@@ -139,7 +139,7 @@ const SubjectItem = ({
             </div>
           )}
           
-          <BookOpen className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-indigo-600' : 'text-green-600'} mr-2`} />
+          <BookOpen className={`w-5 h-5 flex-shrink-0 ${isChild ? 'text-primary-600' : 'text-green-600'} mr-2`} />
           <div className="flex-1 min-w-0">
             <h3 className={`font-semibold truncate ${hasNoAdviser ? 'text-red-700' : 'text-gray-900'}`}
               // Make the title clickable to also toggle expand/collapse
@@ -356,7 +356,7 @@ export const SubjectList: React.FC<SubjectListProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
       </div>
     )
   }

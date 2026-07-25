@@ -136,7 +136,7 @@ export default function Proficiency() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
       </div>
     );
   }
@@ -153,7 +153,7 @@ export default function Proficiency() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <TrendingUp className="w-8 h-8 text-indigo-600" />
+            <TrendingUp className="w-8 h-8 text-primary-600" />
             Proficiency
           </h1>
           <p className="mt-2 text-gray-600">
@@ -169,7 +169,7 @@ export default function Proficiency() {
                 onClick={() => setViewMode('by-grade')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'by-grade'
-                    ? 'bg-white text-indigo-700 shadow-sm'
+                    ? 'bg-white text-primary-700 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -181,7 +181,7 @@ export default function Proficiency() {
                 onClick={() => setViewMode('by-section')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'by-section'
-                    ? 'bg-white text-indigo-700 shadow-sm'
+                    ? 'bg-white text-primary-700 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -244,7 +244,7 @@ export default function Proficiency() {
             )}
             <div className="flex items-center gap-2 text-sm text-gray-600 ml-2">
               <span className="font-medium">Showing:</span>
-              <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-md">
+              <span className="bg-primary-100 text-primary-800 px-2 py-1 rounded-md">
                 {selectedAcademicYear}
                 {selectedGradeLevel ? ` • Grade ${selectedGradeLevel}` : ''}
                 {viewMode === 'by-section' && selectedSectionId
@@ -257,7 +257,7 @@ export default function Proficiency() {
 
         {isLoading ? (
           <div className="bg-white shadow-sm border border-gray-200 rounded-lg p-12 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto" />
             <p className="mt-2 text-sm text-gray-600">Loading proficiency data...</p>
           </div>
         ) : error ? (

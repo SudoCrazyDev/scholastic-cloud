@@ -133,7 +133,7 @@ const ReceiptApprovalsView: React.FC = () => {
               onClick={() => setStatusFilter(status)}
               className={`px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                 statusFilter === status
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-primary-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
@@ -213,7 +213,7 @@ const ReceiptApprovalsView: React.FC = () => {
                       onClick={() => openReviewModal(submission)}
                       className={
                         submission.status === 'pending'
-                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                          ? 'bg-primary-600 hover:bg-primary-700 text-white'
                           : undefined
                       }
                     >
@@ -277,7 +277,7 @@ const ReceiptApprovalsView: React.FC = () => {
                         href={reviewTarget.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                        className="text-sm font-medium text-primary-600 hover:text-primary-800 hover:underline"
                       >
                         Open file in a new tab
                       </a>
@@ -340,7 +340,7 @@ const ReceiptApprovalsView: React.FC = () => {
                     value={rejectNote}
                     onChange={(event) => setRejectNote(event.target.value)}
                     rows={3}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
                     placeholder="e.g. Image is unreadable, reference number does not match, wrong account"
                   />
                   <p className="mt-1 text-xs text-gray-500">

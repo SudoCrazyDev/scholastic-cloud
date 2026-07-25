@@ -167,7 +167,7 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
     return (
       <div className="min-h-[300px] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-indigo-600" />
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-600" />
           <p className="mt-2 text-sm text-gray-600">Loading attendance records...</p>
         </div>
       </div>
@@ -180,7 +180,7 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
       <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Calendar className="w-5 h-5 text-indigo-600" />
+            <Calendar className="w-5 h-5 text-primary-600" />
             <h3 className="text-lg font-semibold text-gray-900">Student Attendance</h3>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -263,7 +263,7 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
               animate={{ opacity: 1, y: 0 }}
               className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden"
             >
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-3 border-b border-gray-200">
+              <div className="bg-gradient-to-r from-primary-50 to-purple-50 px-6 py-3 border-b border-gray-200">
                 <h4 className="text-lg font-semibold text-gray-900">
                   {genderLabels[gender]} Students ({studentsList.length})
                 </h4>
@@ -296,8 +296,8 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
                         >
                           <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap bg-white border-r border-gray-200">
                             <div className="flex items-center">
-                              <div className="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                                <User className="w-4 h-4 text-indigo-600" />
+                              <div className="flex-shrink-0 h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center">
+                                <User className="w-4 h-4 text-primary-600" />
                               </div>
                               <div className="ml-3">
                                 <div className="text-sm font-medium text-gray-900 uppercase">

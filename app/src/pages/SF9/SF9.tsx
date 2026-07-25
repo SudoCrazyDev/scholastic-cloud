@@ -80,7 +80,7 @@ const SF9: React.FC = () => {
   if (studentsLoading || institutionsLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </div>
     );
   }
@@ -96,7 +96,7 @@ const SF9: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-600" />
+            <FileText className="w-5 h-5 text-primary-600" />
             <Badge color="blue">DepEd SF9</Badge>
           </div>
         </div>
@@ -134,7 +134,7 @@ const SF9: React.FC = () => {
                       key={student.id}
                       onClick={() => setSelectedStudent(student.id)}
                       className={`w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                        selectedStudent === student.id ? 'bg-indigo-50 border-indigo-200' : ''
+                        selectedStudent === student.id ? 'bg-primary-50 border-primary-200' : ''
                       }`}
                     >
                       <div className="font-medium text-gray-900 uppercase">
@@ -246,7 +246,7 @@ const SF9: React.FC = () => {
                       <div key={quarter} className="text-center">
                         <div className="font-medium text-gray-900">Quarter {quarter}</div>
                         <div className="text-gray-600">{grades.length} subjects</div>
-                        <div className="text-indigo-600 font-medium">
+                        <div className="text-primary-600 font-medium">
                           {grades.filter(g => g.final_grade !== null).length > 0
                             ? Math.round(grades.reduce((sum, g) => sum + (g.final_grade || 0), 0) / grades.filter(g => g.final_grade !== null).length)
                             : 'N/A'}

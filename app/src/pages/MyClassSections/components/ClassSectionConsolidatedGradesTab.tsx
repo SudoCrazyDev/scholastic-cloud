@@ -345,9 +345,9 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
           <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                <thead className="bg-gradient-to-r from-blue-50 to-primary-50">
                   <tr>
-                    <th className="sticky left-0 z-10 px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-indigo-50 border-r border-gray-200">
+                    <th className="sticky left-0 z-10 px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-primary-50 border-r border-gray-200">
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4" />
                         Student
@@ -441,9 +441,9 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
           <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                <thead className="bg-gradient-to-r from-blue-50 to-primary-50">
                   <tr>
-                    <th className="sticky left-0 z-10 px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-indigo-50 border-r border-gray-200">
+                    <th className="sticky left-0 z-10 px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-primary-50 border-r border-gray-200">
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4" />
                         Student
@@ -540,9 +540,9 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
               <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <thead className="bg-gradient-to-r from-blue-50 to-primary-50">
                       <tr>
-                        <th className="sticky left-0 z-10 px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-indigo-50 border-r border-gray-200">
+                        <th className="sticky left-0 z-10 px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-primary-50 border-r border-gray-200">
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4" />
                             Student

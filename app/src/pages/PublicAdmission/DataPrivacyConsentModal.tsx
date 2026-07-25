@@ -134,7 +134,7 @@ export function DataPrivacyConsentModal({
               type="button"
               disabled={!canSubmit || mutation.isPending}
               onClick={handleFinalSubmit}
-              className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-xl bg-primary-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {mutation.isPending ? 'Submitting…' : 'Submit application'}
             </button>
@@ -162,7 +162,7 @@ function PrivacyConsentCheckboxRow({
         'group flex cursor-pointer items-start gap-4 rounded-2xl border p-4 transition-all duration-200',
         disabled && 'pointer-events-none cursor-not-allowed opacity-60',
         checked && !disabled
-          ? 'border-indigo-300 bg-indigo-50/60 shadow-md shadow-indigo-900/10 ring-2 ring-indigo-400/30'
+          ? 'border-primary-300 bg-primary-50/60 shadow-md shadow-primary-900/10 ring-2 ring-primary-400/30'
           : 'border-slate-200/90 bg-white shadow-sm hover:border-slate-300 hover:shadow-md',
       )}
     >
@@ -178,8 +178,8 @@ function PrivacyConsentCheckboxRow({
           className={clsx(
             'flex h-6 w-6 items-center justify-center rounded-lg border-2 transition-all duration-200',
             checked && !disabled
-              ? 'scale-100 border-indigo-600 bg-indigo-600 shadow-inner'
-              : 'border-slate-300 bg-white shadow-sm group-focus-within:ring-2 group-focus-within:ring-indigo-500',
+              ? 'scale-100 border-primary-600 bg-primary-600 shadow-inner'
+              : 'border-slate-300 bg-white shadow-sm group-focus-within:ring-2 group-focus-within:ring-primary-500',
             disabled && 'opacity-50',
           )}
         >

@@ -67,12 +67,12 @@ export function StudentMedicalTab({ student, onUpdated }: StudentMedicalTabProps
             <Button variant="outline" onClick={() => setEditing(false)} disabled={saving}>
               <XMarkIcon className="w-4 h-4 mr-1" /> Cancel
             </Button>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleSave} disabled={saving}>
+            <Button className="bg-primary-600 hover:bg-primary-700 text-white" onClick={handleSave} disabled={saving}>
               <CheckIcon className="w-4 h-4 mr-1" /> {saving ? 'Saving...' : 'Save'}
             </Button>
           </div>
         ) : (
-          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={startEdit}>
+          <Button className="bg-primary-600 hover:bg-primary-700 text-white" onClick={startEdit}>
             <PencilIcon className="w-4 h-4 mr-1" /> Edit
           </Button>
         )}
@@ -99,7 +99,7 @@ export function StudentMedicalTab({ student, onUpdated }: StudentMedicalTabProps
                     <label className="inline-flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         checked={answer}
                         onChange={e => setHealth({ ...health, [answerKey]: e.target.checked })}
                       />

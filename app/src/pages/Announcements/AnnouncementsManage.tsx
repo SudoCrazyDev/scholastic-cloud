@@ -455,7 +455,7 @@ const AnnouncementsManage: React.FC = () => {
                     >
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         checked={form.section_ids.includes(section.id)}
                         onChange={() => toggleSection(section.id)}
                         disabled={isSaving}
@@ -490,7 +490,7 @@ const AnnouncementsManage: React.FC = () => {
                         disabled={isSaving}
                         className={`rounded-full border px-3 py-1 text-sm transition-colors ${
                           active
-                            ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                            ? 'border-primary-600 bg-primary-50 text-primary-700'
                             : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                         }`}
                       >
@@ -544,7 +544,7 @@ const AnnouncementsManage: React.FC = () => {
           <label className="flex items-center gap-2 cursor-pointer w-fit">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               checked={form.is_pinned}
               onChange={(e) => setForm((prev) => ({ ...prev, is_pinned: e.target.checked }))}
               disabled={isSaving}
@@ -635,7 +635,7 @@ const AnnouncementsManage: React.FC = () => {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" loading={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button type="submit" loading={isSaving} className="bg-primary-600 hover:bg-primary-700 text-white">
               {editing ? (isSaving ? 'Updating…' : 'Update announcement') : isSaving ? 'Posting…' : 'Post announcement'}
             </Button>
             {editing && (
@@ -747,7 +747,7 @@ const AnnouncementsManage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setFilters(EMPTY_FILTERS)}
-                className="text-sm text-indigo-600 hover:text-indigo-700 mt-1"
+                className="text-sm text-primary-600 hover:text-primary-700 mt-1"
               >
                 Clear filters
               </button>
@@ -772,7 +772,7 @@ const AnnouncementsManage: React.FC = () => {
                         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.className}`}>
                           {badge.label}
                         </span>
-                        <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                        <span className="inline-flex rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">
                           {audienceLabel(a.audience)}
                         </span>
                       </div>

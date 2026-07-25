@@ -239,15 +239,15 @@ export const AttendanceStatsCard: React.FC<AttendanceStatsCardProps> = React.mem
   return (
     <div className="space-y-4">
       {/* Current Time Display */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 text-white">
+      <div className="bg-gradient-to-r from-primary-600 to-purple-600 rounded-xl p-4 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h2 className={`font-semibold ${isFullscreen ? 'text-2xl' : 'text-lg'}`}>Current Time</h2>
-            <p className={`text-indigo-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>Last updated</p>
+            <p className={`text-primary-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>Last updated</p>
           </div>
           <div className="text-right">
             <div className={`font-mono font-bold ${isFullscreen ? 'text-4xl' : 'text-2xl'}`}>{formattedTime}</div>
-            <div className={`text-indigo-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>
+            <div className={`text-primary-100 ${isFullscreen ? 'text-lg' : 'text-sm'}`}>
               {formattedDate}
             </div>
           </div>

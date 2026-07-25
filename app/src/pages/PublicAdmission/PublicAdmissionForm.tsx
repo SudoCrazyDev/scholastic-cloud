@@ -103,7 +103,7 @@ function buildInitialValues(): AdmissionFormPayload {
 }
 
 const inputClass =
-  'w-full rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600'
+  'w-full rounded-lg border border-slate-200/90 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/25 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600'
 
 const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5'
 
@@ -166,7 +166,7 @@ function InstitutionLogo({
 
 function AdmissionThankYou({ institution }: { institution: PublicInstitution }) {
   return (
-    <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-indigo-950/5 ring-1 ring-slate-200/80 p-8 md:p-10 text-center">
+    <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-primary-950/5 ring-1 ring-slate-200/80 p-8 md:p-10 text-center">
       <InstitutionLogo title={institution.title} logoUrl={institution.logo_url} className="mb-6" />
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-6">
         <CheckCircle2 className="h-9 w-9" strokeWidth={2} aria-hidden />
@@ -186,7 +186,7 @@ function AdmissionThankYou({ institution }: { institution: PublicInstitution }) 
 
 function AdmissionClosed({ institution }: { institution: PublicInstitution }) {
   return (
-    <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-indigo-950/5 ring-1 ring-slate-200/80 p-8 md:p-10 text-center">
+    <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-primary-950/5 ring-1 ring-slate-200/80 p-8 md:p-10 text-center">
       <InstitutionLogo title={institution.title} logoUrl={institution.logo_url} className="mb-6" />
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-500 mb-6">
         <Lock className="h-8 w-8" strokeWidth={2} aria-hidden />
@@ -257,7 +257,7 @@ function PublicAdmissionForm() {
 
   if (!institutionId) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-slate-50 via-indigo-50/40 to-violet-100/50">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-slate-50 via-primary-50/40 to-violet-100/50">
         <p className="text-slate-600">
           Missing institution in URL. Use{' '}
           <code className="bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 text-sm">/admission/&lt;institution-id&gt;</code>
@@ -268,7 +268,7 @@ function PublicAdmissionForm() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 via-indigo-50/40 to-violet-100/50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 via-primary-50/40 to-violet-100/50">
         <p className="text-slate-600">Loading…</p>
       </div>
     )
@@ -276,11 +276,11 @@ function PublicAdmissionForm() {
 
   if (isError || !instRes?.success || !instRes.data) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-slate-50 via-indigo-50/40 to-violet-100/50">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-slate-50 via-primary-50/40 to-violet-100/50">
         <div className="text-center max-w-md">
           <h1 className="text-xl font-semibold text-slate-900 mb-2">Institution not found</h1>
           <p className="text-slate-600 mb-4">Check that the link includes a valid institution ID.</p>
-          <Link to="/login" className="text-indigo-600 text-sm font-medium hover:underline">
+          <Link to="/login" className="text-primary-600 text-sm font-medium hover:underline">
             Go to login
           </Link>
         </div>
@@ -293,7 +293,7 @@ function PublicAdmissionForm() {
   if (institution.admission_form_open === false && !submitted) {
     return (
       <div
-        className="min-h-screen py-8 px-4 bg-gradient-to-b from-slate-50 via-indigo-50/35 to-violet-100/45 flex flex-col items-center justify-center"
+        className="min-h-screen py-8 px-4 bg-gradient-to-b from-slate-50 via-primary-50/35 to-violet-100/45 flex flex-col items-center justify-center"
         style={{
           backgroundImage: `
           radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent),
@@ -312,7 +312,7 @@ function PublicAdmissionForm() {
   if (submitted) {
     return (
       <div
-        className="min-h-screen py-8 px-4 bg-gradient-to-b from-slate-50 via-indigo-50/35 to-violet-100/45 flex flex-col items-center justify-center"
+        className="min-h-screen py-8 px-4 bg-gradient-to-b from-slate-50 via-primary-50/35 to-violet-100/45 flex flex-col items-center justify-center"
         style={{
           backgroundImage: `
           radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent),
@@ -330,7 +330,7 @@ function PublicAdmissionForm() {
 
   return (
     <div
-      className="min-h-screen py-8 px-4 bg-gradient-to-b from-slate-50 via-indigo-50/35 to-violet-100/45"
+      className="min-h-screen py-8 px-4 bg-gradient-to-b from-slate-50 via-primary-50/35 to-violet-100/45"
       style={{
         backgroundImage: `
           radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent),
@@ -340,7 +340,7 @@ function PublicAdmissionForm() {
       }}
     >
       <div className="max-w-3xl mx-auto">
-        <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-indigo-950/5 ring-1 ring-slate-200/80 p-6 md:p-8 mb-6">
+        <div className="rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg shadow-primary-950/5 ring-1 ring-slate-200/80 p-6 md:p-8 mb-6">
           <InstitutionLogo title={institution.title} logoUrl={institution.logo_url} className="mb-5" />
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Admission Form</h1>
           <p className="mt-1 text-slate-600">
@@ -483,7 +483,7 @@ function AdmissionFormInner({
               type="button"
               onClick={goNext}
               disabled={mutationPending}
-              className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/25 transition hover:bg-indigo-500 disabled:opacity-50"
+              className="rounded-xl bg-primary-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary-600/25 transition hover:bg-primary-500 disabled:opacity-50"
             >
               Next
             </button>
@@ -499,7 +499,7 @@ function AdmissionFormInner({
                 onOpenPrivacyModal()
               }}
               disabled={mutationPending}
-              className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/25 transition hover:bg-indigo-500 disabled:opacity-50"
+              className="rounded-xl bg-primary-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary-600/25 transition hover:bg-primary-500 disabled:opacity-50"
             >
               Submit application
             </button>
@@ -514,7 +514,7 @@ function StepperHeader({ step }: { step: number }) {
   return (
     <div className="rounded-2xl bg-white/80 backdrop-blur-sm ring-1 ring-slate-200/80 p-4 md:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+        <span className="text-xs font-semibold uppercase tracking-wider text-primary-600">
           Step {step + 1} of {STEPS.length}
         </span>
         <span className="text-sm font-medium text-slate-700">{STEPS[step]?.title}</span>
@@ -525,7 +525,7 @@ function StepperHeader({ step }: { step: number }) {
             key={s.title}
             className={clsx(
               'h-1.5 flex-1 rounded-full transition-all duration-300',
-              i < step ? 'bg-indigo-500' : i === step ? 'bg-indigo-400' : 'bg-slate-200',
+              i < step ? 'bg-primary-500' : i === step ? 'bg-primary-400' : 'bg-slate-200',
             )}
             title={s.title}
           />
@@ -772,7 +772,7 @@ function StepAgreement() {
         conference with the school to further help my child. I will also fulfill my obligations to this school.
       </p>
 
-      <SwitchField className="mt-8 flex flex-col gap-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <SwitchField className="mt-8 flex flex-col gap-3 rounded-xl border border-primary-100 bg-primary-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
         <span data-slot="label" className="text-sm font-medium text-slate-900">
           I accept the agreement above *
         </span>
@@ -792,7 +792,7 @@ function HealthWhenRow({ title, basePath }: { title: string; basePath: string })
         className={clsx(
           'group flex cursor-pointer items-start gap-4 rounded-2xl border p-4 transition-all duration-200',
           checked
-            ? 'border-indigo-300 bg-indigo-50/60 shadow-md shadow-indigo-900/10 ring-2 ring-indigo-400/30'
+            ? 'border-primary-300 bg-primary-50/60 shadow-md shadow-primary-900/10 ring-2 ring-primary-400/30'
             : 'border-slate-200/90 bg-white shadow-sm hover:border-slate-300 hover:shadow-md',
         )}
       >
@@ -809,8 +809,8 @@ function HealthWhenRow({ title, basePath }: { title: string; basePath: string })
             className={clsx(
               'flex h-6 w-6 items-center justify-center rounded-lg border-2 transition-all duration-200',
               checked
-                ? 'scale-100 border-indigo-600 bg-indigo-600 shadow-inner'
-                : 'border-slate-300 bg-white shadow-sm group-focus-within:ring-2 group-focus-within:ring-indigo-500',
+                ? 'scale-100 border-primary-600 bg-primary-600 shadow-inner'
+                : 'border-slate-300 bg-white shadow-sm group-focus-within:ring-2 group-focus-within:ring-primary-500',
             )}
           >
             <Check
@@ -849,7 +849,7 @@ function HealthDetailsRow({ title, basePath }: { title: string; basePath: string
         className={clsx(
           'group flex cursor-pointer items-start gap-4 rounded-2xl border p-4 transition-all duration-200',
           checked
-            ? 'border-indigo-300 bg-indigo-50/60 shadow-md shadow-indigo-900/10 ring-2 ring-indigo-400/30'
+            ? 'border-primary-300 bg-primary-50/60 shadow-md shadow-primary-900/10 ring-2 ring-primary-400/30'
             : 'border-slate-200/90 bg-white shadow-sm hover:border-slate-300 hover:shadow-md',
         )}
       >
@@ -866,8 +866,8 @@ function HealthDetailsRow({ title, basePath }: { title: string; basePath: string
             className={clsx(
               'flex h-6 w-6 items-center justify-center rounded-lg border-2 transition-all duration-200',
               checked
-                ? 'scale-100 border-indigo-600 bg-indigo-600 shadow-inner'
-                : 'border-slate-300 bg-white shadow-sm group-focus-within:ring-2 group-focus-within:ring-indigo-500',
+                ? 'scale-100 border-primary-600 bg-primary-600 shadow-inner'
+                : 'border-slate-300 bg-white shadow-sm group-focus-within:ring-2 group-focus-within:ring-primary-500',
             )}
           >
             <Check

@@ -45,7 +45,7 @@ const STUDENT_PALETTE_ITEMS: PaletteItem[] = [
   { kind: 'student', field: 'middle_name', label: STUDENT_FIELD_LABELS.middle_name, accentClass: 'text-blue-700 bg-blue-100 border-blue-200', Icon: UserIcon },
   { kind: 'student', field: 'last_name', label: STUDENT_FIELD_LABELS.last_name, accentClass: 'text-blue-700 bg-blue-100 border-blue-200', Icon: UserIcon },
   { kind: 'student', field: 'ext_name', label: STUDENT_FIELD_LABELS.ext_name, accentClass: 'text-blue-700 bg-blue-100 border-blue-200', Icon: UserIcon },
-  { kind: 'student', field: 'lrn', label: STUDENT_FIELD_LABELS.lrn, accentClass: 'text-indigo-700 bg-indigo-100 border-indigo-200', Icon: DocumentTextIcon },
+  { kind: 'student', field: 'lrn', label: STUDENT_FIELD_LABELS.lrn, accentClass: 'text-primary-700 bg-primary-100 border-primary-200', Icon: DocumentTextIcon },
   { kind: 'student', field: 'gender', label: STUDENT_FIELD_LABELS.gender, accentClass: 'text-violet-700 bg-violet-100 border-violet-200', Icon: UserIcon },
   { kind: 'student', field: 'religion', label: STUDENT_FIELD_LABELS.religion, accentClass: 'text-violet-700 bg-violet-100 border-violet-200', Icon: UserIcon },
   { kind: 'student', field: 'birthdate', label: STUDENT_FIELD_LABELS.birthdate, accentClass: 'text-amber-700 bg-amber-100 border-amber-200', Icon: CalendarIcon },

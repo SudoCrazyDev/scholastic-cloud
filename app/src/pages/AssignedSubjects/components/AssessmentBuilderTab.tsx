@@ -106,7 +106,7 @@ const TYPE_OPTIONS: Array<{
     id: 'quiz',
     label: 'Quiz',
     icon: AcademicCapIcon,
-    accentClass: 'text-indigo-700 bg-indigo-100 border-indigo-200',
+    accentClass: 'text-primary-700 bg-primary-100 border-primary-200',
   },
   {
     id: 'activity',
@@ -140,7 +140,7 @@ const QUESTION_TYPE_OPTIONS: Array<{
     label: 'Multiple Choice',
     hint: 'One correct option',
     icon: ListBulletIcon,
-    accentClass: 'text-indigo-700 bg-indigo-100 border-indigo-200',
+    accentClass: 'text-primary-700 bg-primary-100 border-primary-200',
   },
   {
     type: 'multiple_choice',
@@ -376,7 +376,7 @@ const PaletteCard: React.FC<{
       ref={setNodeRef}
       type="button"
       className={clsx(
-        'w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-left transition hover:border-indigo-300 hover:bg-indigo-50',
+        'w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-left transition hover:border-primary-300 hover:bg-primary-50',
         isDragging && 'opacity-50'
       )}
       style={{ transform: CSS.Translate.toString(transform) }}
@@ -570,7 +570,7 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
                   className={clsx(
                     'mt-1.5 h-6 w-6 shrink-0 rounded-full border text-xs font-semibold',
                     checked
-                      ? 'border-indigo-500 bg-indigo-600 text-white'
+                      ? 'border-primary-500 bg-primary-600 text-white'
                       : 'border-gray-300 bg-white text-gray-700'
                   )}
                   onClick={() => onToggleCorrectChoice(question.id, letter, question.type === 'multiple_choice')}
@@ -595,7 +595,7 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
                         'inline-flex cursor-pointer items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition',
                         uploading
                           ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-                          : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                          : 'border-primary-300 bg-white text-primary-700 hover:bg-primary-50'
                       )}
                     >
                       <ArrowUpTrayIcon className="h-3.5 w-3.5" />
@@ -660,7 +660,7 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
                 className={clsx(
                   'rounded-lg border px-3 py-2 text-sm font-medium',
                   question.correctAnswers[0] === value
-                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
                     : 'border-gray-300 bg-white text-gray-700'
                 )}
               >
@@ -711,7 +711,7 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
             {question.type === 'essay' ? 'Suggested rubric answer (optional)' : 'Expected answer (optional)'}
           </label>
           <textarea
-            className="min-h-20 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="min-h-20 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             value={question.sampleAnswer}
             onChange={(event) => onSampleAnswerChange(question.id, event.target.value)}
             placeholder="Optional answer key for auto-checking"
@@ -734,7 +734,7 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
           </div>
           <label className="mb-1 block text-xs font-medium text-gray-600">Instructions for students (optional)</label>
           <textarea
-            className="min-h-16 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="min-h-16 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             value={question.sampleAnswer}
             onChange={(event) => onSampleAnswerChange(question.id, event.target.value)}
             placeholder={
@@ -933,7 +933,7 @@ const DragPictureEditor: React.FC<{
                         'inline-flex w-full cursor-pointer items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium transition',
                         uploadingCardId === card.id
                           ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-                          : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                          : 'border-primary-300 bg-white text-primary-700 hover:bg-primary-50'
                       )}
                     >
                       <ArrowUpTrayIcon className="h-3.5 w-3.5" />
@@ -1290,7 +1290,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
               className={clsx(
                 'inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition',
                 activeType === option.id
-                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  ? 'border-primary-600 bg-primary-600 text-white'
                   : 'border-transparent bg-gray-100 text-gray-700 hover:bg-gray-200'
               )}
             >
@@ -1329,7 +1329,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
             return (
               <li
                 key={method.id}
-                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200"
+                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-primary-200"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
@@ -1390,7 +1390,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     <button
                       type="button"
                       onClick={() => openEditBuilder(method)}
-                      className="rounded-md p-2 text-gray-500 transition hover:bg-indigo-50 hover:text-indigo-600"
+                      className="rounded-md p-2 text-gray-500 transition hover:bg-primary-50 hover:text-primary-600"
                       title="Edit"
                     >
                       <PencilIcon className="h-4 w-4" />
@@ -1419,7 +1419,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
       {builderOpen && draft && (
         <div className="fixed inset-0 z-50 bg-black/50">
           <div className="absolute inset-0 flex flex-col bg-white">
-            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-indigo-50 via-white to-white px-6 py-4">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-primary-50 via-white to-white px-6 py-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className={clsx('rounded-lg border p-1.5', getTypeOption(draft.type).accentClass)}>
@@ -1441,7 +1441,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                   Drag question types into the canvas, then configure scoring and assessment rules.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">
                     <DocumentTextIcon className="h-3.5 w-3.5" />
                     {draft.questions.length} question(s)
                   </span>
@@ -1481,7 +1481,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
               <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 bg-gray-50 p-4 lg:grid-cols-[18rem_minmax(0,1fr)_22rem]">
                 <aside className="min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
                   <div className="flex items-center gap-2">
-                    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-1.5 text-indigo-700">
+                    <div className="rounded-lg border border-primary-200 bg-primary-50 p-1.5 text-primary-700">
                       <LightBulbIcon className="h-4 w-4" />
                     </div>
                     <h4 className="text-sm font-semibold text-gray-900">Question Types</h4>
@@ -1632,7 +1632,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     <div>
                       <label className="mb-1 block text-xs font-medium text-gray-600">Description</label>
                       <textarea
-                        className="min-h-20 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="min-h-20 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                         value={draft.description}
                         onChange={(event) =>
                           updateDraft((current) => ({ ...current, description: event.target.value }))
@@ -1811,13 +1811,13 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
-                      <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                    <div className="rounded-lg border border-primary-100 bg-primary-50 p-3">
+                      <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-primary-700">
                         <DocumentTextIcon className="h-3.5 w-3.5" />
                         Summary
                       </p>
-                      <p className="mt-1 text-sm text-indigo-800">{draft.questions.length} question(s)</p>
-                      <p className="text-sm text-indigo-800">{totalPoints} total point(s)</p>
+                      <p className="mt-1 text-sm text-primary-800">{draft.questions.length} question(s)</p>
+                      <p className="text-sm text-primary-800">{totalPoints} total point(s)</p>
                     </div>
                   </div>
                 </aside>
@@ -1825,7 +1825,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
 
               <DragOverlay>
                 {currentDragType ? (
-                  <div className="inline-flex items-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 shadow">
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-primary-300 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700 shadow">
                     {React.createElement(getQuestionTypeOption(currentDragType).icon, { className: 'h-4 w-4' })}
                     {QUESTION_TYPE_LABELS[currentDragType]}
                   </div>
@@ -1906,7 +1906,7 @@ const CanvasPanel: React.FC<{
       ref={setNodeRef}
       className={clsx(
         'min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-4',
-        isOver && 'border-indigo-400 ring-2 ring-indigo-100'
+        isOver && 'border-primary-400 ring-2 ring-primary-100'
       )}
     >
       <div className="mb-4 flex items-center justify-between">

@@ -101,7 +101,7 @@ function SortableItem({
             value={element.content || ''}
             onChange={(e) => onUpdateContent(e.target.value)}
             placeholder="Enter custom text..."
-            className="w-full text-xs border-0 border-b border-dashed border-gray-300 focus:border-indigo-500 focus:ring-0 bg-transparent px-0 py-0.5"
+            className="w-full text-xs border-0 border-b border-dashed border-gray-300 focus:border-primary-500 focus:ring-0 bg-transparent px-0 py-0.5"
           />
         )
       case 'signature_line':
@@ -119,7 +119,7 @@ function SortableItem({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="group flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-2 hover:border-indigo-200 hover:shadow-sm transition-all">
+    <div ref={setNodeRef} style={style} className="group flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-2 hover:border-primary-200 hover:shadow-sm transition-all">
       <div
         {...attributes}
         {...listeners}
@@ -271,7 +271,7 @@ const ReceiptBuilderView: React.FC = () => {
                 type="button"
                 onClick={resetForm}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                  !selectedTemplateId ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                  !selectedTemplateId ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 + New Template
@@ -283,13 +283,13 @@ const ReceiptBuilderView: React.FC = () => {
                   onClick={() => loadTemplate(tpl)}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                     selectedTemplateId === tpl.id
-                      ? 'bg-indigo-50 text-indigo-700 font-medium'
+                      ? 'bg-primary-50 text-primary-700 font-medium'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   {tpl.name}
                   {tpl.is_default && (
-                    <span className="ml-1 text-xs text-indigo-500">(default)</span>
+                    <span className="ml-1 text-xs text-primary-500">(default)</span>
                   )}
                 </button>
               ))}
@@ -305,7 +305,7 @@ const ReceiptBuilderView: React.FC = () => {
                   key={item.type}
                   type="button"
                   onClick={() => addElement(item.type, item.label)}
-                  className="w-full text-left px-3 py-1.5 rounded text-xs text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                  className="w-full text-left px-3 py-1.5 rounded text-xs text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
                 >
                   {item.label}
                 </button>
@@ -375,7 +375,7 @@ const ReceiptBuilderView: React.FC = () => {
                 type="checkbox"
                 checked={isDefault}
                 onChange={(e) => setIsDefault(e.target.checked)}
-                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
               />
               Set as default template
             </label>
@@ -384,7 +384,7 @@ const ReceiptBuilderView: React.FC = () => {
                 type="button"
                 onClick={() => saveMutation.mutate()}
                 loading={saveMutation.isPending}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="bg-primary-600 hover:bg-primary-700 text-white"
               >
                 {saveMutation.isPending ? 'Saving...' : selectedTemplateId ? 'Update Template' : 'Save Template'}
               </Button>

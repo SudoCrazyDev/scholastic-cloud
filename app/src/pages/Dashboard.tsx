@@ -32,9 +32,9 @@ const RecentAnnouncements: React.FC = () => {
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
         <h3 className="inline-flex items-center gap-2 text-base font-semibold text-gray-900">
-          <Megaphone className="w-5 h-5 text-indigo-600" /> Announcements
+          <Megaphone className="w-5 h-5 text-primary-600" /> Announcements
         </h3>
-        <Link to="/announcements" className="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700">
+        <Link to="/announcements" className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700">
           View all <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
@@ -54,7 +54,7 @@ const RecentAnnouncements: React.FC = () => {
               to="/announcements"
               className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
             >
-              {!a.is_read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-600" aria-label="Unread" />}
+              {!a.is_read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary-600" aria-label="Unread" />}
               <div className={`min-w-0 ${a.is_read ? 'pl-5' : ''}`}>
                 <div className="flex items-center gap-1.5">
                   {a.is_pinned && <Pin className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
@@ -108,13 +108,13 @@ const Dashboard: React.FC = () => {
       className="space-y-6"
     >
       {/* Welcome Section */}
-      <motion.div variants={itemVariants} className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 text-white">
+      <motion.div variants={itemVariants} className="bg-gradient-to-r from-primary-600 to-purple-600 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold mb-2">
               Welcome back, {user?.first_name} {user?.last_name}! 👋
             </h1>
-            <p className="text-indigo-100">
+            <p className="text-primary-100">
               Here's what's happening with your ScholasticCloud platform today.
             </p>
           </div>

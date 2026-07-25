@@ -14,6 +14,7 @@ import { Select } from '../../components/select'
 import { Alert } from '../../components/alert'
 import { Building2, CalendarDays } from 'lucide-react'
 import { TrashIcon } from '@heroicons/react/24/outline'
+import AppearanceSettings from './components/AppearanceSettings'
 import type { UpdateInstitutionData } from '../../types'
 
 const Settings: React.FC = () => {
@@ -232,7 +233,7 @@ const Settings: React.FC = () => {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           <span className="ml-3 text-gray-600">Loading institution settings...</span>
         </div>
       </div>
@@ -265,8 +266,8 @@ const Settings: React.FC = () => {
       {/* Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-indigo-600" />
+          <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+            <Building2 className="w-6 h-6 text-primary-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Institution Settings</h1>
@@ -281,8 +282,8 @@ const Settings: React.FC = () => {
       {institution && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <CalendarDays className="w-6 h-6 text-indigo-600" />
+            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+              <CalendarDays className="w-6 h-6 text-primary-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Academic Year</h2>
@@ -352,13 +353,13 @@ const Settings: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {academicYears.map((ay) => (
-                      <tr key={ay.id} className={ay.is_current ? 'bg-indigo-50' : ''}>
+                      <tr key={ay.id} className={ay.is_current ? 'bg-primary-50' : ''}>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
                           {ay.year}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {ay.is_current ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
                               Current
                             </span>
                           ) : (
@@ -371,7 +372,7 @@ const Settings: React.FC = () => {
                               type="button"
                               disabled={academicYearMutation.isPending}
                               onClick={() => academicYearMutation.mutate(ay.year)}
-                              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+                              className="text-xs text-primary-600 hover:text-primary-800 font-medium disabled:opacity-50"
                             >
                               Set as current
                             </button>
@@ -386,6 +387,9 @@ const Settings: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Appearance & Branding (institution admins) */}
+      {institution && <AppearanceSettings />}
 
       {/* Form */}
       {institution && (
@@ -510,7 +514,7 @@ const Settings: React.FC = () => {
                       accept="image/*"
                       onChange={handleLogoChange}
                       disabled={updateMutation.isPending}
-                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 file:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     {errors.logo && (
                       <p className="mt-2 text-sm text-red-600 flex items-center gap-1">

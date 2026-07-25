@@ -53,9 +53,9 @@ export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, o
   return (
     <div className="fixed inset-0 z-50 bg-black/50">
       <div className="absolute inset-0 flex flex-col bg-gray-50">
-        <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-indigo-50 via-white to-white px-6 py-4">
+        <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-primary-50 via-white to-white px-6 py-4">
           <div className="flex items-center gap-2">
-            <EyeIcon className="h-5 w-5 text-indigo-600" />
+            <EyeIcon className="h-5 w-5 text-primary-600" />
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Student Preview</h3>
               <p className="text-sm text-gray-500">This is what students see when viewing this lesson.</p>
@@ -102,12 +102,12 @@ export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, o
 
             {/* Learning objectives */}
             {topic.learning_objectives && topic.learning_objectives.length > 0 && (
-              <div className="rounded-xl border-l-4 border-indigo-500 bg-indigo-50 p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-indigo-900">
+              <div className="rounded-xl border-l-4 border-primary-500 bg-primary-50 p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary-900">
                   <AcademicCapIcon className="h-4 w-4" />
                   Learning objectives
                 </div>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-indigo-900">
+                <ul className="list-disc space-y-1 pl-5 text-sm text-primary-900">
                   {topic.learning_objectives.map((obj, i) => (
                     <li key={i}>{obj}</li>
                   ))}
@@ -147,7 +147,7 @@ export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, o
       {assessmentId && loadingAssessment && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
           <div className="flex items-center gap-3 rounded-xl bg-white px-6 py-4 shadow-lg">
-            <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-indigo-600" />
+            <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary-600" />
             <span className="text-sm text-gray-600">Loading assessment preview...</span>
           </div>
         </div>

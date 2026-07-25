@@ -278,7 +278,7 @@ export function SubjectTemplateModal({
                         onBlur={formik.handleBlur}
                         rows={3}
                         placeholder="Describe what this template is for..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
                       />
                       {formik.touched.description && formik.errors.description && (
                         <p className="mt-1 text-sm text-red-600">{formik.errors.description}</p>
@@ -482,7 +482,7 @@ export function SubjectTemplateModal({
                 <Button
                   onClick={() => formik.handleSubmit()}
                   disabled={loading || formik.isSubmitting}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-primary-600 hover:bg-primary-700 text-white"
                 >
                   {loading || formik.isSubmitting ? 'Saving...' : (isEditing ? 'Update Template' : 'Create Template')}
                 </Button>

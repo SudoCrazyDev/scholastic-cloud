@@ -86,7 +86,7 @@ export function ReportCardModal({
                     placeholder="Set age on card"
                     value={overrideAge}
                     onChange={(e) => setOverrideAge(e.target.value)}
-                    className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                   />
                   <Button type="button" variant="outline" size="sm" onClick={handleApplyAge}>
                     Apply
@@ -95,7 +95,7 @@ export function ReportCardModal({
                 {loading || !institution || !classSection || !student ? (
                   <div className="flex items-center justify-center h-[600px]">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
                       <p className="text-gray-600">
                         {loading ? 'Loading report card data...' : 'Preparing report card...'}
                       </p>

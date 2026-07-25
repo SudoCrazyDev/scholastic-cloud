@@ -113,7 +113,7 @@ const Departments: React.FC = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEdit(d)}
-                          className="text-gray-600 hover:text-indigo-600"
+                          className="text-gray-600 hover:text-primary-600"
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>

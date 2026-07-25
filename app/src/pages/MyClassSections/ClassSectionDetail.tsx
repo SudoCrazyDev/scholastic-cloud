@@ -476,7 +476,7 @@ const ClassSectionDetail: React.FC = () => {
         animate={{ opacity: 1 }}
         className="flex items-center justify-center py-12"
       >
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </motion.div>
     )
   }
@@ -509,7 +509,7 @@ const ClassSectionDetail: React.FC = () => {
       {/* Back Button */}
       <button
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-primary-50 hover:text-primary-700 shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
       >
         <ArrowLeft className="w-5 h-5" />
         <span className="font-medium">Back to Sections</span>
@@ -542,10 +542,10 @@ const ClassSectionDetail: React.FC = () => {
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`whitespace-nowrap flex-shrink-0 py-3 px-3 sm:py-4 sm:px-3 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+                className={`whitespace-nowrap flex-shrink-0 py-3 px-3 sm:py-4 sm:px-3 border-b-2 font-medium text-sm transition-all duration-200 rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
                   activeTab === key
-                    ? 'border-indigo-500 text-indigo-700 bg-indigo-50 shadow-sm'
-                    : 'border-transparent text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 hover:border-indigo-200'
+                    ? 'border-primary-500 text-primary-700 bg-primary-50 shadow-sm'
+                    : 'border-transparent text-gray-500 hover:text-primary-600 hover:bg-primary-50/60 hover:border-primary-200'
                 }`}
               >
                 <div className="flex items-center gap-1.5">

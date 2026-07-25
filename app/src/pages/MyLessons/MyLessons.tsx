@@ -173,7 +173,7 @@ export const MyLessons: React.FC = () => {
     return (
       <div className="max-w-5xl mx-auto p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
           <span className="ml-3 text-gray-600">Loading lessons...</span>
         </div>
       </div>
@@ -240,7 +240,7 @@ export const MyLessons: React.FC = () => {
                 <button
                   type="button"
                   onClick={toggleAll}
-                  className="shrink-0 text-sm font-medium text-indigo-700 hover:text-indigo-900 whitespace-nowrap"
+                  className="shrink-0 text-sm font-medium text-primary-700 hover:text-primary-900 whitespace-nowrap"
                 >
                   {allExpanded ? 'Collapse all' : 'Expand all'}
                 </button>
@@ -259,7 +259,7 @@ export const MyLessons: React.FC = () => {
                   setQuarterFilter('');
                   setStatusFilter('');
                 }}
-                className="mt-3 text-sm font-medium text-indigo-700 hover:text-indigo-900"
+                className="mt-3 text-sm font-medium text-primary-700 hover:text-primary-900"
               >
                 Clear filters
               </button>
@@ -283,7 +283,7 @@ export const MyLessons: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center shrink-0">
                           <BookOpenIcon className="w-4 h-4" />
                         </div>
                         <h2 className="text-sm sm:text-base font-semibold text-gray-900 truncate">
@@ -329,7 +329,7 @@ export const MyLessons: React.FC = () => {
                                   <ClockIcon className="w-4 h-4" /> In progress
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-700">
                                   <PlayIcon className="w-4 h-4" /> Not started
                                 </span>
                               );
@@ -337,7 +337,7 @@ export const MyLessons: React.FC = () => {
                             return (
                               <li key={lesson.id}>
                                 <Link to={`/my-lessons/${lesson.id}/view`}>
-                                  <div className="p-4 flex items-start justify-between gap-4 transition-colors hover:bg-indigo-50/40">
+                                  <div className="p-4 flex items-start justify-between gap-4 transition-colors hover:bg-primary-50/40">
                                     <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2">
                                         <p className="font-semibold text-gray-900 truncate">{lesson.title}</p>
@@ -362,7 +362,7 @@ export const MyLessons: React.FC = () => {
                                         ) : null}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-1 text-indigo-700 text-sm font-medium shrink-0">
+                                    <div className="flex items-center gap-1 text-primary-700 text-sm font-medium shrink-0">
                                       <span>{lesson.progress_status === 'completed' ? 'Review' : 'Open'}</span>
                                       <ChevronRightIcon className="w-4 h-4" />
                                     </div>

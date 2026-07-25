@@ -253,7 +253,7 @@ const TracksStrands: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => { setEditingTrack(t); setTrackModalOpen(true) }}
-                            className="text-gray-600 hover:text-indigo-600"
+                            className="text-gray-600 hover:text-primary-600"
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -347,7 +347,7 @@ const TracksStrands: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => { setEditingStrand(s); setStrandModalOpen(true) }}
-                            className="text-gray-600 hover:text-indigo-600"
+                            className="text-gray-600 hover:text-primary-600"
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>

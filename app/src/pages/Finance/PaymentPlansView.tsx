@@ -382,7 +382,7 @@ const PaymentPlansView: React.FC = () => {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" loading={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button type="submit" loading={isSaving} className="bg-primary-600 hover:bg-primary-700 text-white">
               {editingPlan
                 ? isSaving
                   ? 'Updating…'
@@ -427,7 +427,7 @@ const PaymentPlansView: React.FC = () => {
                       >
                         {plan.is_active ? 'Active' : 'Inactive'}
                       </span>
-                      <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                      <span className="inline-flex rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">
                         {plan.installment_count} installment{plan.installment_count === 1 ? '' : 's'}
                       </span>
                     </div>

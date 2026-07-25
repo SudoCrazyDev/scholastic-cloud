@@ -98,7 +98,7 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           <span className="ml-3 text-gray-600">Loading assigned subjects...</span>
         </div>
       </div>
@@ -172,8 +172,8 @@ export const AssignedSubjectsGrid: React.FC<AssignedSubjectsGridProps> = ({
                     className="block border rounded-lg p-4 transition-all duration-200 hover:shadow-md border-gray-200 bg-white hover:border-gray-300"
                   >
                     {/* Subject Icon */}
-                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-3">
-                      <BookOpenIcon className="w-6 h-6 text-indigo-600" />
+                    <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-3">
+                      <BookOpenIcon className="w-6 h-6 text-primary-600" />
                     </div>
 
                     {/* Subject Info */}

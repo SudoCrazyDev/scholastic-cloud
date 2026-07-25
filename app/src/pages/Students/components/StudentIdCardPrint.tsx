@@ -115,7 +115,7 @@ export function StudentIdCardPrint({ student }: StudentIdCardPrintProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center gap-2 mb-4">
-        <IdentificationIcon className="w-5 h-5 text-indigo-600" />
+        <IdentificationIcon className="w-5 h-5 text-primary-600" />
         <h3 className="text-base font-semibold text-gray-900">Print ID Card</h3>
       </div>
 
@@ -163,7 +163,7 @@ export function StudentIdCardPrint({ student }: StudentIdCardPrintProps) {
                 <Button
                   onClick={handleExport}
                   disabled={exporting}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-primary-600 hover:bg-primary-700 text-white"
                 >
                   {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ArrowDownTrayIcon className="w-4 h-4 mr-2" />}
                   {exporting ? 'Preparing...' : 'Download / Print PDF'}

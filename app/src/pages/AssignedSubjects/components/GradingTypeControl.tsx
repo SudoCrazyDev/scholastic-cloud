@@ -82,7 +82,7 @@ export const GradingTypeControl: React.FC<GradingTypeControlProps> = ({
           disabled={saving}
           onClick={() => handleSelectType('numerical')}
           className={`${segmentBase} ${
-            type === 'numerical' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            type === 'numerical' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           <CalculatorIcon className="w-4 h-4" />
@@ -93,7 +93,7 @@ export const GradingTypeControl: React.FC<GradingTypeControlProps> = ({
           disabled={saving}
           onClick={() => handleSelectType('non_numerical')}
           className={`${segmentBase} ${
-            type === 'non_numerical' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            type === 'non_numerical' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           <TagIcon className="w-4 h-4" />

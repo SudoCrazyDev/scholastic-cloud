@@ -47,9 +47,9 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
   return (
     <div className="fixed inset-0 z-50 bg-black/50">
       <div className="absolute inset-0 flex flex-col bg-gray-50">
-        <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-indigo-50 via-white to-white px-6 py-4">
+        <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-primary-50 via-white to-white px-6 py-4">
           <div className="flex items-center gap-2">
-            <EyeIcon className="h-5 w-5 text-indigo-600" />
+            <EyeIcon className="h-5 w-5 text-primary-600" />
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Student Preview</h3>
               <p className="text-sm text-gray-500">This is what students see when taking this assessment.</p>
@@ -76,7 +76,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
           <div className="mx-auto max-w-2xl space-y-6 p-6">
             <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
               <div className="mb-2 flex items-center gap-2">
-                <DocumentTextIcon className="h-6 w-6 text-indigo-600" />
+                <DocumentTextIcon className="h-6 w-6 text-primary-600" />
                 <h1 className="text-xl font-bold text-gray-900">{method.title || 'Assessment'}</h1>
               </div>
               {method.description && <p className="mb-4 text-sm text-gray-600">{method.description}</p>}
@@ -97,7 +97,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                   return (
                     <div key={q.id} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                       <div className="mb-3 flex items-start gap-2 font-medium text-gray-900">
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary-700">
                           {idx + 1}
                         </span>
                         <QuestionPromptView prompt={q.prompt} className="min-w-0 flex-1 pt-1.5" />
@@ -109,7 +109,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                               key={opt}
                               className="flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 p-3"
                             >
-                              <input type="radio" disabled className="text-indigo-600" />
+                              <input type="radio" disabled className="text-primary-600" />
                               <span className="text-gray-800">{opt}</span>
                             </label>
                           ))}
@@ -119,7 +119,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                               key={cIdx}
                               className="flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 p-3"
                             >
-                              <input type="radio" disabled className="text-indigo-600" />
+                              <input type="radio" disabled className="text-primary-600" />
                               <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                             </label>
                           ))}
@@ -129,7 +129,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
                               key={cIdx}
                               className="flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 p-3"
                             >
-                              <input type="checkbox" disabled className="rounded border-gray-300 text-indigo-600" />
+                              <input type="checkbox" disabled className="rounded border-gray-300 text-primary-600" />
                               <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                             </label>
                           ))}

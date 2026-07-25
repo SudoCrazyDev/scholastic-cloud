@@ -177,7 +177,7 @@ const IdCardToolbar: React.FC<IdCardToolbarProps> = ({
 									type="button"
 									onClick={() => onSideChange(side)}
 									className={`px-4 h-full text-xs font-semibold capitalize transition-colors ${
-										activeSide === side ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+										activeSide === side ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
 									}`}
 								>
 									{side}
@@ -191,19 +191,19 @@ const IdCardToolbar: React.FC<IdCardToolbarProps> = ({
 						<span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider px-1">View</span>
 						<div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200 h-10">
 							<label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
-								<input type="checkbox" checked={snapping} onChange={onToggleSnapping} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+								<input type="checkbox" checked={snapping} onChange={onToggleSnapping} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5" />
 								<Magnet className="w-3.5 h-3.5" />
 								<span>Snap</span>
 							</label>
 							<div className="w-px h-4 bg-gray-300" />
 							<label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
-								<input type="checkbox" checked={showGrid} onChange={onToggleGrid} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+								<input type="checkbox" checked={showGrid} onChange={onToggleGrid} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5" />
 								<Grid className="w-3.5 h-3.5" />
 								<span>Grid</span>
 							</label>
 							<div className="w-px h-4 bg-gray-300" />
 							<label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
-								<input type="checkbox" checked={showRuler} onChange={onToggleRuler} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />
+								<input type="checkbox" checked={showRuler} onChange={onToggleRuler} className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5" />
 								<Ruler className="w-3.5 h-3.5" />
 								<span>Ruler</span>
 							</label>
@@ -255,7 +255,7 @@ const IdCardToolbar: React.FC<IdCardToolbarProps> = ({
 							<div className="w-px h-5 bg-gray-300" />
 							<div className="flex items-center gap-2">
 								<label className="flex items-center gap-1.5 px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-50 cursor-pointer text-xs text-gray-600 h-6">
-									{uploadingBg ? <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" /> : <ImageIcon className="w-3.5 h-3.5 text-gray-500" />}
+									{uploadingBg ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary-500" /> : <ImageIcon className="w-3.5 h-3.5 text-gray-500" />}
 									<span className="truncate">{uploadingBg ? 'Uploading' : bgImage ? 'Change' : 'Upload template'}</span>
 									<input type="file" accept="image/*" onChange={handleBgImageChange} disabled={uploadingBg} className="hidden" />
 								</label>

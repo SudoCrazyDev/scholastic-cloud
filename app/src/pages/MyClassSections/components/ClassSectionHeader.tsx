@@ -11,14 +11,14 @@ interface ClassSectionHeaderProps {
 const ClassSectionHeader: React.FC<ClassSectionHeaderProps> = ({ classSectionData }) => {
   return (
     <div className="w-full max-w-5xl mx-auto">
-      <div className="bg-gradient-to-br from-indigo-100 via-white to-purple-100 rounded-2xl shadow-xl border border-gray-200 p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 transition-all duration-300">
+      <div className="bg-gradient-to-br from-primary-100 via-white to-purple-100 rounded-2xl shadow-xl border border-gray-200 p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 transition-all duration-300">
         <div className="flex-1 min-w-0">
           <h1 className="text-3xl font-extrabold text-gray-900 mb-2 tracking-tight">
             {classSectionData.title}
           </h1>
           <div className="flex flex-wrap items-center gap-4 mb-2">
             <span className="inline-flex items-center text-sm text-gray-700 font-medium">
-              <Calendar className="w-4 h-4 mr-1 text-indigo-500" />
+              <Calendar className="w-4 h-4 mr-1 text-primary-500" />
               SY {classSectionData.academic_year}
             </span>
           </div>

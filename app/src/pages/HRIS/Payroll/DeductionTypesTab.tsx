@@ -254,7 +254,7 @@ const DeductionTypesTab: React.FC = () => {
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, has_employer_share: e.target.checked }))
                   }
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
                 Shared by employer (adds an employer counterpart, shown under Other Benefits)
               </label>
@@ -280,7 +280,7 @@ const DeductionTypesTab: React.FC = () => {
                   type="checkbox"
                   checked={form.is_active}
                   onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
                 Active (available on rates and payslips)
               </label>

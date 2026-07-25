@@ -161,7 +161,7 @@ export default function FormBuilderPage() {
         <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
           <aside className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-1.5 text-indigo-700">
+              <div className="rounded-lg border border-primary-200 bg-primary-50 p-1.5 text-primary-700">
                 <FileText className="h-4 w-4" />
               </div>
               <h2 className="text-sm font-semibold text-gray-900">Components</h2>
@@ -183,7 +183,7 @@ export default function FormBuilderPage() {
 
         <DragOverlay>
           {activeDragParsed ? (
-            <div className="inline-flex items-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-lg">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-primary-300 bg-primary-50 px-4 py-2.5 text-sm font-semibold text-primary-800 shadow-lg">
               {activeDragParsed.kind === 'student'
                 ? STUDENT_FIELD_LABELS[activeDragParsed.field]
                 : GENERAL_COMPONENT_LABELS[activeDragParsed.type]}

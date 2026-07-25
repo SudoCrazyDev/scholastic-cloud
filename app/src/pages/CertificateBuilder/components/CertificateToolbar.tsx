@@ -220,7 +220,7 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 									type="checkbox"
 									checked={snapping}
 									onChange={onToggleSnapping}
-									className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+									className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
 								/>
 								<Magnet className="w-3.5 h-3.5" />
 								<span>Snap</span>
@@ -233,7 +233,7 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 									type="checkbox"
 									checked={showGrid}
 									onChange={onToggleGrid}
-									className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+									className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
 								/>
 								<Grid className="w-3.5 h-3.5" />
 								<span>Grid</span>
@@ -246,7 +246,7 @@ const CertificateToolbar: React.FC<CertificateToolbarProps> = ({
 									type="checkbox"
 									checked={showRuler}
 									onChange={onToggleRuler}
-									className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+									className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
 								/>
 								<Ruler className="w-3.5 h-3.5" />
 								<span>Ruler</span>

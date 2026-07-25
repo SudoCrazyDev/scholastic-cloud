@@ -108,7 +108,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
               {/* Days */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-                  <Calendar className="w-4 h-4 text-indigo-500" />
+                  <Calendar className="w-4 h-4 text-primary-500" />
                   Meeting Days
                 </label>
                 <div className="flex gap-2 flex-wrap">
@@ -119,8 +119,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       onClick={() => toggleDay(day.key)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
                         selectedDays.includes(day.key)
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-600'
                       }`}
                     >
                       {day.label}
@@ -133,26 +133,26 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                    <Clock className="w-4 h-4 text-indigo-500" />
+                    <Clock className="w-4 h-4 text-primary-500" />
                     Start Time
                   </label>
                   <input
                     type="time"
                     value={startTime}
                     onChange={e => setStartTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5">
-                    <Clock className="w-4 h-4 text-indigo-500" />
+                    <Clock className="w-4 h-4 text-primary-500" />
                     End Time
                   </label>
                   <input
                     type="time"
                     value={endTime}
                     onChange={e => setEndTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -183,7 +183,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {loading && (
                       <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">

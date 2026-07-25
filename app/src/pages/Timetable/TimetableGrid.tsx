@@ -23,7 +23,7 @@ TIME_SLOTS.push('19:00')
 const SLOT_HEIGHT_PX = 40 // px per 30-min slot
 
 const SUBJECT_COLORS = [
-  'bg-indigo-100 border-indigo-300 text-indigo-800',
+  'bg-primary-100 border-primary-300 text-primary-800',
   'bg-emerald-100 border-emerald-300 text-emerald-800',
   'bg-amber-100 border-amber-300 text-amber-800',
   'bg-rose-100 border-rose-300 text-rose-800',

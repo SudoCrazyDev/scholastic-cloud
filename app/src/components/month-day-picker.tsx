@@ -57,7 +57,7 @@ export function MonthDayPicker({ month, day, onChange, disabled, className }: Mo
                     className={clsx(
                       'rounded-md px-1 py-1.5 text-xs font-medium transition-colors',
                       i + 1 === month
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-primary-600 text-white'
                         : 'text-gray-700 hover:bg-gray-100'
                     )}
                   >
@@ -79,7 +79,7 @@ export function MonthDayPicker({ month, day, onChange, disabled, className }: Mo
                     }}
                     className={clsx(
                       'rounded-md py-1 text-xs font-medium transition-colors',
-                      d === day ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'
+                      d === day ? 'bg-primary-600 text-white' : 'text-gray-700 hover:bg-gray-100'
                     )}
                   >
                     {d}

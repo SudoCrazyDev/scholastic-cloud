@@ -272,7 +272,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div 
-            className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+            className="bg-primary-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${progressPercentage}%` }}
           />
         </div>
@@ -295,7 +295,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
           <div key={quarter} className="space-y-3">
             {/* Quarter Header */}
             <div className="flex items-center justify-between">
-              <h4 className="text-md font-medium text-gray-800 border-b-2 border-indigo-200 pb-1">
+              <h4 className="text-md font-medium text-gray-800 border-b-2 border-primary-200 pb-1">
                 {quarterLabels[quarter as keyof typeof quarterLabels]}
               </h4>
               <span className="text-sm text-gray-500">

@@ -78,18 +78,18 @@ export const LessonPlanViewer: React.FC<LessonPlanViewerProps> = ({
 
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="text-center border-b-2 border-indigo-600 pb-4 mb-6">
+        <div className="text-center border-b-2 border-primary-600 pb-4 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 uppercase tracking-wide">
             {title || 'Detailed Lesson Plan'}
           </h1>
           {subjectTitle && (
-            <p className="text-lg font-semibold text-indigo-700 mt-2">
+            <p className="text-lg font-semibold text-primary-700 mt-2">
               {subjectTitle}
             </p>
           )}
           <div className="flex flex-wrap justify-center gap-6 mt-4 text-sm">
             {quarter && (
-              <span className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full">
+              <span className="flex items-center gap-1.5 px-3 py-1 bg-primary-50 text-primary-700 rounded-full">
                 <strong>Quarter:</strong> {quarter}
               </span>
             )}
@@ -113,9 +113,9 @@ export const LessonPlanViewer: React.FC<LessonPlanViewerProps> = ({
 
         {/* I. LEARNING OBJECTIVES */}
         {objectives.length > 0 && (
-          <div className="bg-indigo-50 rounded-lg p-5 border-l-4 border-indigo-600">
-            <h2 className="text-lg font-bold text-indigo-900 mb-3 flex items-center gap-2">
-              <span className="flex items-center justify-center w-8 h-8 bg-indigo-600 text-white rounded-full text-sm font-bold">
+          <div className="bg-primary-50 rounded-lg p-5 border-l-4 border-primary-600">
+            <h2 className="text-lg font-bold text-primary-900 mb-3 flex items-center gap-2">
+              <span className="flex items-center justify-center w-8 h-8 bg-primary-600 text-white rounded-full text-sm font-bold">
                 I
               </span>
               LEARNING OBJECTIVES

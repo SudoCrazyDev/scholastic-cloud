@@ -95,12 +95,12 @@ export function StudentFamilyTab({ student, onUpdated }: StudentFamilyTabProps) 
             <Button variant="outline" onClick={() => setEditing(false)} disabled={saving}>
               <XMarkIcon className="w-4 h-4 mr-1" /> Cancel
             </Button>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleSave} disabled={saving}>
+            <Button className="bg-primary-600 hover:bg-primary-700 text-white" onClick={handleSave} disabled={saving}>
               <CheckIcon className="w-4 h-4 mr-1" /> {saving ? 'Saving...' : 'Save'}
             </Button>
           </div>
         ) : (
-          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={startEdit}>
+          <Button className="bg-primary-600 hover:bg-primary-700 text-white" onClick={startEdit}>
             <PencilIcon className="w-4 h-4 mr-1" /> Edit
           </Button>
         )}

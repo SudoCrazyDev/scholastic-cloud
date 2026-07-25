@@ -208,7 +208,7 @@ const DefaultDiscountsView: React.FC = () => {
         </div>
         {formError && <p className="text-sm text-red-600">{formError}</p>}
         <div className="flex flex-wrap gap-3">
-          <Button type="submit" loading={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Button type="submit" loading={isSaving} className="bg-primary-600 hover:bg-primary-700 text-white">
             {editing
               ? isSaving
                 ? 'Updating Discount...'
@@ -243,7 +243,7 @@ const DefaultDiscountsView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {discounts.map((discount) => (
-                  <tr key={discount.id} className={editing?.id === discount.id ? 'bg-indigo-50/50' : ''}>
+                  <tr key={discount.id} className={editing?.id === discount.id ? 'bg-primary-50/50' : ''}>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{discount.name}</div>
                       {discount.description && (

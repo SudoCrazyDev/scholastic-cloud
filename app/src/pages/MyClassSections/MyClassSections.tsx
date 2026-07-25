@@ -94,7 +94,7 @@ const MyClassSections: React.FC = () => {
           animate={{ opacity: 1 }}
           className="flex items-center justify-center py-12"
         >
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
         </motion.div>
       )}
 
@@ -112,7 +112,7 @@ const MyClassSections: React.FC = () => {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
                     {classSection.title}
                   </h3>
                   <Badge color="indigo" className="mt-2">
@@ -120,7 +120,7 @@ const MyClassSections: React.FC = () => {
                   </Badge>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
                 </div>
               </div>
 

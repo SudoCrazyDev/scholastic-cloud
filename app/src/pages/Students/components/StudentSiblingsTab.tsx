@@ -139,7 +139,7 @@ export const StudentSiblingsTab: React.FC<StudentSiblingsTabProps> = ({ studentI
               <button
                 key={result.id}
                 type="button"
-                className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50"
+                className="w-full px-4 py-2 text-left text-sm hover:bg-primary-50"
                 onClick={() => {
                   if (group) {
                     addMemberMutation.mutate(result.id)
@@ -189,7 +189,7 @@ export const StudentSiblingsTab: React.FC<StudentSiblingsTabProps> = ({ studentI
                     ) : (
                       <Link
                         to={`/students/${member.student_id}`}
-                        className="font-medium text-indigo-600 hover:text-indigo-800"
+                        className="font-medium text-primary-600 hover:text-primary-800"
                       >
                         {studentFullName(member.student)}
                       </Link>
@@ -240,7 +240,7 @@ export const StudentSiblingsTab: React.FC<StudentSiblingsTabProps> = ({ studentI
                   {pickedStudents.map((picked) => (
                     <span
                       key={picked.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-sm text-indigo-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-sm text-primary-700"
                     >
                       {studentFullName(picked)}
                       <button
@@ -257,7 +257,7 @@ export const StudentSiblingsTab: React.FC<StudentSiblingsTabProps> = ({ studentI
                 loading={createGroupMutation.isPending}
                 disabled={pickedStudents.length < 1 || createGroupMutation.isPending}
                 onClick={() => createGroupMutation.mutate()}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-gray-300"
+                className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-gray-300"
               >
                 Link {pickedStudents.length || ''} Sibling{pickedStudents.length === 1 ? '' : 's'}
               </Button>

@@ -87,7 +87,7 @@ const Attendance: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Clock className="w-7 h-7 text-indigo-600" />
+          <Clock className="w-7 h-7 text-primary-600" />
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Attendance Logs</h1>
             <p className="text-sm text-gray-500">Biometric punch records from ZKTeco devices</p>
@@ -97,7 +97,7 @@ const Attendance: React.FC = () => {
           <button
             onClick={() => fetchMutation.mutate()}
             disabled={fetchMutation.isPending || devices.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-sm font-medium text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-40"
             title="Pull stored punches from the device for the selected date range"
           >
             <DownloadCloud className={`w-4 h-4 ${fetchMutation.isPending ? 'animate-pulse' : ''}`} />
@@ -129,7 +129,7 @@ const Attendance: React.FC = () => {
             value={fromDate}
             max={toDate || undefined}
             onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400"
           />
           <label className="text-xs font-medium text-gray-500">To</label>
           <input
@@ -137,12 +137,12 @@ const Attendance: React.FC = () => {
             value={toDate}
             min={fromDate || undefined}
             onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400"
           />
         </div>
         <button
           onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
-          className="text-xs text-indigo-600 hover:underline"
+          className="text-xs text-primary-600 hover:underline"
         >
           Clear dates
         </button>
@@ -234,11 +234,11 @@ const Attendance: React.FC = () => {
       )}
 
       {/* ADMS setup hint */}
-      <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-700">
+      <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 text-sm text-primary-700">
         <strong>Device setup (ADMS mode):</strong> On your ZKTeco device go to
         <strong> Menu → Comm → Cloud Server Setting</strong>, set Server Mode to
         <strong> ADMS</strong>, and set the Server Address to your API host
-        (e.g. <code className="bg-indigo-100 px-1 rounded">192.168.1.x:8000</code>).
+        (e.g. <code className="bg-primary-100 px-1 rounded">192.168.1.x:8000</code>).
         Punches will appear here automatically.
       </div>
     </motion.div>

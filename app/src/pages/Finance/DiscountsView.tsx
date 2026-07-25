@@ -196,7 +196,7 @@ const DiscountsView: React.FC<DiscountsViewProps> = ({
           <Button
             type="submit"
             loading={createMutation.isPending}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            className="bg-primary-600 hover:bg-primary-700 text-white"
           >
             {createMutation.isPending ? 'Saving...' : 'Add Discount'}
           </Button>

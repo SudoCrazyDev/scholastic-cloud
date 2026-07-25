@@ -46,10 +46,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       // Variant and color combinations
       variant === 'solid' && {
         'primary': [
-          'bg-blue-600 text-white border border-blue-600',
-          'hover:bg-blue-700 hover:border-blue-700',
-          'focus:ring-blue-500',
-          'active:bg-blue-800'
+          'bg-primary-600 text-white border border-primary-600',
+          'hover:bg-primary-700 hover:border-primary-700',
+          'focus:ring-primary-500',
+          'active:bg-primary-800'
         ],
         'secondary': [
           'bg-gray-600 text-white border border-gray-600',
@@ -58,37 +58,37 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           'active:bg-gray-800'
         ],
         'success': [
-          'bg-green-600 text-white border border-green-600',
-          'hover:bg-green-700 hover:border-green-700',
-          'focus:ring-green-500',
-          'active:bg-green-800'
+          'bg-success-600 text-white border border-success-600',
+          'hover:bg-success-700 hover:border-success-700',
+          'focus:ring-success-500',
+          'active:bg-success-800'
         ],
         'warning': [
-          'bg-yellow-500 text-white border border-yellow-500',
-          'hover:bg-yellow-600 hover:border-yellow-600',
-          'focus:ring-yellow-500',
-          'active:bg-yellow-700'
+          'bg-warning-500 text-white border border-warning-500',
+          'hover:bg-warning-600 hover:border-warning-600',
+          'focus:ring-warning-500',
+          'active:bg-warning-700'
         ],
         'danger': [
-          'bg-red-600 text-white border border-red-600',
-          'hover:bg-red-700 hover:border-red-700',
-          'focus:ring-red-500',
-          'active:bg-red-800'
+          'bg-danger-600 text-white border border-danger-600',
+          'hover:bg-danger-700 hover:border-danger-700',
+          'focus:ring-danger-500',
+          'active:bg-danger-800'
         ],
         'info': [
-          'bg-cyan-600 text-white border border-cyan-600',
-          'hover:bg-cyan-700 hover:border-cyan-700',
-          'focus:ring-cyan-500',
-          'active:bg-cyan-800'
+          'bg-info-600 text-white border border-info-600',
+          'hover:bg-info-700 hover:border-info-700',
+          'focus:ring-info-500',
+          'active:bg-info-800'
         ]
       }[color],
       
       variant === 'outline' && {
         'primary': [
-          'bg-transparent text-blue-600 border border-blue-600',
-          'hover:bg-blue-50 hover:border-blue-700',
-          'focus:ring-blue-500',
-          'active:bg-blue-100'
+          'bg-transparent text-primary-600 border border-primary-600',
+          'hover:bg-primary-50 hover:border-primary-700',
+          'focus:ring-primary-500',
+          'active:bg-primary-100'
         ],
         'secondary': [
           'bg-transparent text-gray-600 border border-gray-600',
@@ -97,37 +97,37 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           'active:bg-gray-100'
         ],
         'success': [
-          'bg-transparent text-green-600 border border-green-600',
-          'hover:bg-green-50 hover:border-green-700',
-          'focus:ring-green-500',
-          'active:bg-green-100'
+          'bg-transparent text-success-600 border border-success-600',
+          'hover:bg-success-50 hover:border-success-700',
+          'focus:ring-success-500',
+          'active:bg-success-100'
         ],
         'warning': [
-          'bg-transparent text-yellow-600 border border-yellow-600',
-          'hover:bg-yellow-50 hover:border-yellow-700',
-          'focus:ring-yellow-500',
-          'active:bg-yellow-100'
+          'bg-transparent text-warning-600 border border-warning-600',
+          'hover:bg-warning-50 hover:border-warning-700',
+          'focus:ring-warning-500',
+          'active:bg-warning-100'
         ],
         'danger': [
-          'bg-transparent text-red-600 border border-red-600',
-          'hover:bg-red-50 hover:border-red-700',
-          'focus:ring-red-500',
-          'active:bg-red-100'
+          'bg-transparent text-danger-600 border border-danger-600',
+          'hover:bg-danger-50 hover:border-danger-700',
+          'focus:ring-danger-500',
+          'active:bg-danger-100'
         ],
         'info': [
-          'bg-transparent text-cyan-600 border border-cyan-600',
-          'hover:bg-cyan-50 hover:border-cyan-700',
-          'focus:ring-cyan-500',
-          'active:bg-cyan-100'
+          'bg-transparent text-info-600 border border-info-600',
+          'hover:bg-info-50 hover:border-info-700',
+          'focus:ring-info-500',
+          'active:bg-info-100'
         ]
       }[color],
       
       variant === 'ghost' && {
         'primary': [
-          'bg-transparent text-blue-600 border border-transparent',
-          'hover:bg-blue-50 hover:border-blue-200',
-          'focus:ring-blue-500',
-          'active:bg-blue-100'
+          'bg-transparent text-primary-600 border border-transparent',
+          'hover:bg-primary-50 hover:border-primary-200',
+          'focus:ring-primary-500',
+          'active:bg-primary-100'
         ],
         'secondary': [
           'bg-transparent text-gray-600 border border-transparent',
@@ -136,37 +136,37 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           'active:bg-gray-100'
         ],
         'success': [
-          'bg-transparent text-green-600 border border-transparent',
-          'hover:bg-green-50 hover:border-green-200',
-          'focus:ring-green-500',
-          'active:bg-green-100'
+          'bg-transparent text-success-600 border border-transparent',
+          'hover:bg-success-50 hover:border-success-200',
+          'focus:ring-success-500',
+          'active:bg-success-100'
         ],
         'warning': [
-          'bg-transparent text-yellow-600 border border-transparent',
-          'hover:bg-yellow-50 hover:border-yellow-200',
-          'focus:ring-yellow-500',
-          'active:bg-yellow-100'
+          'bg-transparent text-warning-600 border border-transparent',
+          'hover:bg-warning-50 hover:border-warning-200',
+          'focus:ring-warning-500',
+          'active:bg-warning-100'
         ],
         'danger': [
-          'bg-transparent text-red-600 border border-transparent',
-          'hover:bg-red-50 hover:border-red-200',
-          'focus:ring-red-500',
-          'active:bg-red-100'
+          'bg-transparent text-danger-600 border border-transparent',
+          'hover:bg-danger-50 hover:border-danger-200',
+          'focus:ring-danger-500',
+          'active:bg-danger-100'
         ],
         'info': [
-          'bg-transparent text-cyan-600 border border-transparent',
-          'hover:bg-cyan-50 hover:border-cyan-200',
-          'focus:ring-cyan-500',
-          'active:bg-cyan-100'
+          'bg-transparent text-info-600 border border-transparent',
+          'hover:bg-info-50 hover:border-info-200',
+          'focus:ring-info-500',
+          'active:bg-info-100'
         ]
       }[color],
       
       variant === 'link' && {
         'primary': [
-          'bg-transparent text-blue-600 border border-transparent',
-          'hover:text-blue-700 hover:underline',
-          'focus:ring-blue-500',
-          'active:text-blue-800'
+          'bg-transparent text-primary-600 border border-transparent',
+          'hover:text-primary-700 hover:underline',
+          'focus:ring-primary-500',
+          'active:text-primary-800'
         ],
         'secondary': [
           'bg-transparent text-gray-600 border border-transparent',
@@ -175,28 +175,28 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           'active:text-gray-800'
         ],
         'success': [
-          'bg-transparent text-green-600 border border-transparent',
-          'hover:text-green-700 hover:underline',
-          'focus:ring-green-500',
-          'active:text-green-800'
+          'bg-transparent text-success-600 border border-transparent',
+          'hover:text-success-700 hover:underline',
+          'focus:ring-success-500',
+          'active:text-success-800'
         ],
         'warning': [
-          'bg-transparent text-yellow-600 border border-transparent',
-          'hover:text-yellow-700 hover:underline',
-          'focus:ring-yellow-500',
-          'active:text-yellow-800'
+          'bg-transparent text-warning-600 border border-transparent',
+          'hover:text-warning-700 hover:underline',
+          'focus:ring-warning-500',
+          'active:text-warning-800'
         ],
         'danger': [
-          'bg-transparent text-red-600 border border-transparent',
-          'hover:text-red-700 hover:underline',
-          'focus:ring-red-500',
-          'active:text-red-800'
+          'bg-transparent text-danger-600 border border-transparent',
+          'hover:text-danger-700 hover:underline',
+          'focus:ring-danger-500',
+          'active:text-danger-800'
         ],
         'info': [
-          'bg-transparent text-cyan-600 border border-transparent',
-          'hover:text-cyan-700 hover:underline',
-          'focus:ring-cyan-500',
-          'active:text-cyan-800'
+          'bg-transparent text-info-600 border border-transparent',
+          'hover:text-info-700 hover:underline',
+          'focus:ring-info-500',
+          'active:text-info-800'
         ]
       }[color],
       

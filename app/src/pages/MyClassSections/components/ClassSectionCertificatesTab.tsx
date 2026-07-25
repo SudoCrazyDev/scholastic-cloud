@@ -216,7 +216,7 @@ export default function ClassSectionCertificatesTab({
   if (certsLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
+        <Loader2 className="w-7 h-7 animate-spin text-primary-500" />
         <span className="ml-3 text-sm text-gray-500">Loading certificates...</span>
       </div>
     )
@@ -245,7 +245,7 @@ export default function ClassSectionCertificatesTab({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by name or LRN..."
-            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
           />
         </div>
         <span className="text-xs text-gray-500">
@@ -314,7 +314,7 @@ export default function ClassSectionCertificatesTab({
                                 key={cert.id}
                                 onClick={() => setPreviewState({ certificate: cert, student: enrichStudentForCert(student, cert) })}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all
-                                  bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 hover:shadow-sm"
+                                  bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100 hover:border-primary-300 hover:shadow-sm"
                                 title={`View ${cert.title} for ${getFullName(student)}`}
                               >
                                 <FileText className="w-3.5 h-3.5" />

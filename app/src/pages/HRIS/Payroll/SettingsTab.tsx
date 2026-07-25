@@ -122,7 +122,7 @@ const SettingsTab: React.FC = () => {
               Both rates are 0 — penalties are disabled and days are paid by hours worked.
             </p>
           ) : (
-            <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-700">
+            <p className="rounded-lg bg-primary-50 px-3 py-2 text-xs text-primary-700">
               Example: arriving 10 minutes past the grace period costs{' '}
               {peso(numberOrZero(form.late) * 10)}; punching out 10 minutes early costs{' '}
               {peso(numberOrZero(form.undertime) * 10)}.

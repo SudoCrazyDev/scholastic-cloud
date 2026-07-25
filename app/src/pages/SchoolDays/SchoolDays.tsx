@@ -149,7 +149,7 @@ const SchoolDays: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                  <Calendar className="w-8 h-8 text-indigo-600" />
+                  <Calendar className="w-8 h-8 text-primary-600" />
                   School Days
                 </h1>
                 <p className="mt-2 text-gray-600">
@@ -225,13 +225,13 @@ const SchoolDays: React.FC = () => {
           {isLoading ? (
             <div className="bg-white rounded-lg border border-gray-200 p-12 shadow-sm">
               <div className="flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
                 <p className="ml-3 text-sm text-gray-600">Loading school days...</p>
               </div>
             </div>
           ) : (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
+              <div className="bg-gradient-to-r from-primary-50 to-purple-50 px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">
                   School Days by Month
                 </h2>
@@ -264,7 +264,7 @@ const SchoolDays: React.FC = () => {
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <Calendar className="w-4 h-4 text-indigo-600 mr-2" />
+                              <Calendar className="w-4 h-4 text-primary-600 mr-2" />
                               <span className="text-sm font-medium text-gray-900">
                                 {month.label}
                               </span>

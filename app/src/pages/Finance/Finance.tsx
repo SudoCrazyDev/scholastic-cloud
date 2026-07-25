@@ -1032,7 +1032,7 @@ const Finance: React.FC = () => {
                 end={item.end}
                 aria-current={isActive ? 'page' : undefined}
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  isActive ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+                  isActive ? 'bg-primary-600 text-white' : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
@@ -1055,7 +1055,7 @@ const Finance: React.FC = () => {
                   aria-current={isActive ? 'page' : undefined}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                     isActive
-                      ? 'bg-white text-indigo-700 border border-gray-200 shadow-sm'
+                      ? 'bg-white text-primary-700 border border-gray-200 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/70'
                   }`}
                 >
@@ -1249,7 +1249,7 @@ const Finance: React.FC = () => {
             </div>
             {feeError && <p className="text-sm text-red-600">{feeError}</p>}
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" loading={isSavingFee} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              <Button type="submit" loading={isSavingFee} className="bg-primary-600 hover:bg-primary-700 text-white">
                 {editingFee ? (isSavingFee ? 'Updating Fee...' : 'Update Fee') : (isSavingFee ? 'Adding Fee...' : 'Add Fee')}
               </Button>
               {editingFee && (
@@ -1372,7 +1372,7 @@ const Finance: React.FC = () => {
                     <label className="mt-2 flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                         checked={defaultForm.apply_to_all}
                         onChange={(e) => setDefaultForm(prev => ({ ...prev, apply_to_all: e.target.checked }))}
                         disabled={isSavingDefault}
@@ -1413,7 +1413,7 @@ const Finance: React.FC = () => {
                 <Button
                   type="submit"
                   loading={isSavingDefault}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-primary-600 hover:bg-primary-700 text-white"
                 >
                   {editingDefault
                     ? isSavingDefault
@@ -1479,7 +1479,7 @@ const Finance: React.FC = () => {
             </div>
             {defaultsQuery.isLoading ? (
               <div className="p-8 text-center text-gray-500">
-                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600 mb-2" />
+                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-primary-600 mb-2" />
                 <p>Loading defaults…</p>
               </div>
             ) : !defaults.length ? (
@@ -1515,7 +1515,7 @@ const Finance: React.FC = () => {
                     {defaults.map((row) => (
                       <tr
                         key={row.id}
-                        className={editingDefault?.id === row.id ? 'bg-indigo-50/50' : 'hover:bg-gray-50/50'}
+                        className={editingDefault?.id === row.id ? 'bg-primary-50/50' : 'hover:bg-gray-50/50'}
                       >
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
                           {row.school_fee?.name || '—'}
@@ -1603,27 +1603,27 @@ const Finance: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
                   {selectedStudent ? (
-                    <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2.5">
+                    <div className="flex items-center justify-between rounded-lg border border-primary-100 bg-primary-50 px-3 py-2.5">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
                           {`${selectedStudent.first_name?.[0] ?? ''}${selectedStudent.last_name?.[0] ?? ''}`.toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-indigo-900">
+                          <p className="truncate text-sm font-semibold text-primary-900">
                             {getStudentFullName(selectedStudent)}
                           </p>
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-indigo-700/80">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-primary-700/80">
                             {selectedStudent.lrn && <span>LRN: {selectedStudent.lrn}</span>}
                             {(cashierGradeLevel || cashierSection) && (
                               <>
-                                {selectedStudent.lrn && <span className="text-indigo-300">•</span>}
+                                {selectedStudent.lrn && <span className="text-primary-300">•</span>}
                                 <span>
                                   {[cashierGradeLevel, cashierSection].filter(Boolean).join(' — ')}
                                 </span>
                               </>
                             )}
                             {cashierLedgerQuery.isFetching && !cashierGradeLevel && (
-                              <span className="text-indigo-400">Loading…</span>
+                              <span className="text-primary-400">Loading…</span>
                             )}
                           </div>
                         </div>
@@ -1670,7 +1670,7 @@ const Finance: React.FC = () => {
                                   setStudentSearchTerm(getStudentFullName(s))
                                   setDebouncedStudentSearch('')
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 flex flex-col"
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-primary-50 flex flex-col"
                               >
                                 <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
                                 {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
@@ -1802,7 +1802,7 @@ const Finance: React.FC = () => {
                                   }))
                                 }
                                 placeholder="0.00"
-                                className={`w-32 pl-6 text-right ${entered > 0 ? 'border-indigo-300 ring-1 ring-indigo-100' : ''}`}
+                                className={`w-32 pl-6 text-right ${entered > 0 ? 'border-primary-300 ring-1 ring-primary-100' : ''}`}
                                 disabled={createTransactionMutation.isPending}
                               />
                             </div>
@@ -1974,7 +1974,7 @@ const Finance: React.FC = () => {
                     type="submit"
                     loading={createTransactionMutation.isPending}
                     disabled={!selectedStudent || cashierLineItems.length === 0}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="w-full bg-primary-600 hover:bg-primary-700 text-white"
                   >
                     {createTransactionMutation.isPending
                       ? 'Recording...'
@@ -2052,7 +2052,7 @@ const Finance: React.FC = () => {
                             setLedgerSearchTerm(getStudentFullName(s))
                             setDebouncedLedgerSearch('')
                           }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 flex flex-col"
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-primary-50 flex flex-col"
                         >
                           <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
                           {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
@@ -2065,16 +2065,16 @@ const Finance: React.FC = () => {
                 )}
               </div>
               {selectedLedgerStudent && (
-                <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
-                  <span className="flex items-center gap-2 text-sm font-medium text-indigo-900">
+                <div className="flex items-center justify-between rounded-lg border border-primary-100 bg-primary-50 px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm font-medium text-primary-900">
                     <span>
                       {getStudentFullName(selectedLedgerStudent)}
                       {selectedLedgerStudent.lrn && ` (LRN: ${selectedLedgerStudent.lrn})`}
                     </span>
                     {(ledgerQuery.data?.data?.grade_level || ledgerQuery.data?.data?.section) && (
                       <>
-                        <span className="text-indigo-300">•</span>
-                        <span className="font-normal text-indigo-700">
+                        <span className="text-primary-300">•</span>
+                        <span className="font-normal text-primary-700">
                           {[ledgerQuery.data?.data?.grade_level, ledgerQuery.data?.data?.section]
                             .filter(Boolean)
                             .join(' - ')}
@@ -2151,9 +2151,9 @@ const Finance: React.FC = () => {
                       })}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-gray-200 bg-indigo-50 p-4">
+                  <div className="rounded-lg border border-gray-200 bg-primary-50 p-4">
                     <p className="text-sm text-gray-600 font-medium">Current Balance</p>
-                    <p className="text-xl font-semibold text-indigo-900 tabular-nums">
+                    <p className="text-xl font-semibold text-primary-900 tabular-nums">
                       ₱ {Number(ledgerQuery.data?.data?.totals?.balance ?? 0).toLocaleString('en-PH', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -2357,7 +2357,7 @@ const Finance: React.FC = () => {
                                   },
                                 ])
                               }
-                              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                              className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
                             >
                               <PlusIcon className="w-4 h-4" />
                               Add another fee
@@ -2389,7 +2389,7 @@ const Finance: React.FC = () => {
                         <Button
                           type="submit"
                           loading={createLedgerDiscountMutation.isPending}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                          className="bg-primary-600 hover:bg-primary-700 text-white"
                         >
                           Save Discount
                         </Button>
@@ -2402,7 +2402,7 @@ const Finance: React.FC = () => {
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                        <PlusIcon className="w-4 h-4 text-indigo-600" />
+                        <PlusIcon className="w-4 h-4 text-primary-600" />
                         Additional Fees
                       </h3>
                       <p className="text-xs text-gray-500">
@@ -2459,7 +2459,7 @@ const Finance: React.FC = () => {
                         <Button
                           type="submit"
                           loading={createLedgerAdditionalFeeMutation.isPending}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                          className="bg-primary-600 hover:bg-primary-700 text-white"
                         >
                           Add Additional Fee
                         </Button>
@@ -2519,7 +2519,7 @@ const Finance: React.FC = () => {
                         onClick={() => setLedgerViewMode('entries')}
                         className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                           ledgerViewMode === 'entries'
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-primary-600 text-white'
                             : 'bg-white text-gray-700 hover:bg-gray-50'
                         }`}
                       >
@@ -2530,7 +2530,7 @@ const Finance: React.FC = () => {
                         onClick={() => setLedgerViewMode('monthly')}
                         className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                           ledgerViewMode === 'monthly'
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-primary-600 text-white'
                             : 'bg-white text-gray-700 hover:bg-gray-50'
                         }`}
                       >
@@ -2541,7 +2541,7 @@ const Finance: React.FC = () => {
                         onClick={() => setLedgerViewMode('quarterly')}
                         className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                           ledgerViewMode === 'quarterly'
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-primary-600 text-white'
                             : 'bg-white text-gray-700 hover:bg-gray-50'
                         }`}
                       >
@@ -2949,7 +2949,7 @@ const Finance: React.FC = () => {
                   onClick={() => setVoidStatusFilter(status)}
                   className={`px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                     voidStatusFilter === status
-                      ? 'bg-indigo-600 text-white'
+                      ? 'bg-primary-600 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-50'
                   }`}
                 >
@@ -3105,7 +3105,7 @@ const Finance: React.FC = () => {
                     value={voidNote}
                     onChange={(e) => setVoidNote(e.target.value)}
                     rows={3}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
                     placeholder="e.g. Duplicate entry, wrong amount, payment reversed"
                   />
                 </div>
@@ -3176,7 +3176,7 @@ const Finance: React.FC = () => {
                     value={voidDiscountNote}
                     onChange={(e) => setVoidDiscountNote(e.target.value)}
                     rows={3}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
                     placeholder="e.g. Applied in error, wrong amount, not eligible"
                   />
                 </div>
@@ -3233,7 +3233,7 @@ const Finance: React.FC = () => {
                   value={disapproveNote}
                   onChange={(e) => setDisapproveNote(e.target.value)}
                   rows={3}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:ring-primary-500"
                   placeholder="e.g. Payment is valid, please verify with the receipt"
                 />
               </div>

@@ -172,8 +172,8 @@ const StudentGroup: React.FC<StudentGroupProps> = ({
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 sm:w-8 sm:h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs sm:text-xs font-medium text-indigo-600">
+                  <div className="w-10 h-10 sm:w-8 sm:h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs sm:text-xs font-medium text-primary-600">
                       {student.first_name.charAt(0)}{student.last_name.charAt(0)}
                     </span>
                   </div>
@@ -321,7 +321,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
                 e.stopPropagation()
                 onEditItem(item)
               }}
-              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+              className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
               title="Edit grade item"
             >
               <PencilIcon className="w-4 h-4" />
@@ -356,7 +356,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
                 <div className="flex items-center justify-end p-4 sm:p-6 border-b border-gray-200">
                   <button
                     onClick={() => setIsModalOpen(false)}
-                    className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 p-2"
+                    className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 p-2"
                     aria-label="Close"
                   >
                     <XMarkIcon className="w-6 h-6" />
@@ -495,7 +495,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   if (studentsLoading || gradeItemsLoading || subjectEcrsLoading || scoresLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
       </div>
     )
   }
@@ -519,7 +519,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
             Add Grade Item
@@ -618,7 +618,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
                   onClick={() => setActiveQuarter(quarter)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeQuarter === quarter
-                      ? 'border-indigo-500 text-indigo-600'
+                      ? 'border-primary-500 text-primary-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >

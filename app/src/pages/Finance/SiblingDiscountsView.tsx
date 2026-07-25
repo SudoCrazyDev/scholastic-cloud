@@ -74,7 +74,7 @@ const StudentSearchPicker: React.FC<StudentSearchPickerProps> = ({ placeholder, 
               <button
                 key={student.id}
                 type="button"
-                className="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50"
+                className="w-full px-4 py-2 text-left text-sm hover:bg-primary-50"
                 onClick={() => {
                   onPick(student)
                   setTerm('')
@@ -179,7 +179,7 @@ const MemberRow: React.FC<MemberRowProps> = ({ group, member, academicYear, canM
   return (
     <tr>
       <td className="px-4 py-3">
-        <Link to={`/students/${member.student_id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+        <Link to={`/students/${member.student_id}`} className="font-medium text-primary-600 hover:text-primary-800">
           {studentFullName(member.student)}
         </Link>
         {member.student?.lrn && <div className="text-sm text-gray-500">LRN {member.student.lrn}</div>}
@@ -221,7 +221,7 @@ const MemberRow: React.FC<MemberRowProps> = ({ group, member, academicYear, canM
             {canManage && (
               <button
                 type="button"
-                className="text-sm text-indigo-600 hover:text-indigo-800"
+                className="text-sm text-primary-600 hover:text-primary-800"
                 onClick={() => {
                   setDraftType(member.discount_type || 'fixed')
                   setDraftValue(
@@ -256,7 +256,7 @@ const MemberRow: React.FC<MemberRowProps> = ({ group, member, academicYear, canM
               disabled={Boolean(appliedDiscount) || !intendedLabel || applyMutation.isPending}
               loading={applyMutation.isPending}
               onClick={() => applyMutation.mutate()}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-gray-300"
+              className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-gray-300"
             >
               Apply
             </Button>
@@ -396,7 +396,7 @@ const SiblingDiscountsView: React.FC = () => {
                   {pickedStudents.map((student) => (
                     <span
                       key={student.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-sm text-indigo-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-sm text-primary-700"
                     >
                       {studentFullName(student)}
                       <button
@@ -416,7 +416,7 @@ const SiblingDiscountsView: React.FC = () => {
               loading={createMutation.isPending}
               disabled={pickedStudents.length < 2 || createMutation.isPending}
               onClick={() => createMutation.mutate()}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-gray-300"
+              className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-gray-300"
             >
               Create Group ({pickedStudents.length} selected, minimum 2)
             </Button>

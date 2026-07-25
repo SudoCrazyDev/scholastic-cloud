@@ -205,7 +205,7 @@ export function StudentReportCardModal({
                     placeholder="Set age on card"
                     value={overrideAge}
                     onChange={(e) => setOverrideAge(e.target.value)}
-                    className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="w-24 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                   />
                   <Button type="button" variant="outline" size="sm" onClick={() => setOverrideAge((prev) => prev.trim())}>
                     Apply

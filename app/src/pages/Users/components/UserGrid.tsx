@@ -81,7 +81,7 @@ export const UserGrid: React.FC<UserGridProps> = ({
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           <span className="ml-3 text-gray-600">Loading users...</span>
         </div>
       </div>
@@ -147,7 +147,7 @@ export const UserGrid: React.FC<UserGridProps> = ({
             transition={{ duration: 0.3 }}
             className={`relative group border rounded-lg p-4 transition-all duration-200 hover:shadow-md ${
               isSelected(user) 
-                ? 'border-indigo-500 bg-indigo-50' 
+                ? 'border-primary-500 bg-primary-50' 
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
@@ -160,8 +160,8 @@ export const UserGrid: React.FC<UserGridProps> = ({
             </div>
 
             {/* Avatar placeholder */}
-            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-3">
-              <UserIcon className="w-6 h-6 text-indigo-600" />
+            <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-3">
+              <UserIcon className="w-6 h-6 text-primary-600" />
             </div>
 
             {/* User info */}
@@ -222,7 +222,7 @@ export const UserGrid: React.FC<UserGridProps> = ({
               )}
               <button
                 onClick={() => onEdit(user)}
-                className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
                 title="Edit user"
               >
                 <PencilIcon className="w-4 h-4" />

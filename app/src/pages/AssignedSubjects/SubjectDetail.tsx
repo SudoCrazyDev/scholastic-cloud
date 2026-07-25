@@ -59,7 +59,7 @@ const SubjectDetail: React.FC = () => {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           <span className="ml-3 text-gray-600">Loading subject info...</span>
         </div>
       </div>
@@ -77,7 +77,7 @@ const SubjectDetail: React.FC = () => {
           <p className="text-gray-500 mb-6">{error ? (error as any).message : "The subject you're looking for doesn't exist."}</p>
           <Link
             to="/assigned-subjects"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
           >
             Back to Assigned Subjects
           </Link>
@@ -146,8 +146,8 @@ const SubjectDetail: React.FC = () => {
             >
               <ArrowLeftIcon className="w-5 h-5" />
             </Link>
-            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <BookOpenIcon className="w-6 h-6 text-indigo-600" />
+            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+              <BookOpenIcon className="w-6 h-6 text-primary-600" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{subject.title}</h1>
@@ -206,7 +206,7 @@ const SubjectDetail: React.FC = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors ${
                     activeTab === tab.id
-                      ? 'border-indigo-500 text-indigo-600'
+                      ? 'border-primary-500 text-primary-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >

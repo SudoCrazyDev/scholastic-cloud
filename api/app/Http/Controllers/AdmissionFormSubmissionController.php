@@ -48,7 +48,7 @@ class AdmissionFormSubmissionController extends Controller
      */
     public function publicInstitution(string $id): JsonResponse
     {
-        $institution = Institution::query()->select(['id', 'title', 'abbr', 'address', 'logo', 'admission_form_open'])->find($id);
+        $institution = Institution::query()->select(['id', 'title', 'abbr', 'address', 'logo', 'theme', 'admission_form_open'])->find($id);
 
         if (! $institution) {
             return response()->json([
@@ -65,6 +65,7 @@ class AdmissionFormSubmissionController extends Controller
                 'abbr' => $institution->abbr,
                 'address' => $institution->address,
                 'logo_url' => $institution->logo,
+                'theme' => $institution->theme,
                 'admission_form_open' => (bool) $institution->admission_form_open,
             ],
         ]);

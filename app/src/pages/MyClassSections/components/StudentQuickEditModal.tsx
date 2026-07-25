@@ -300,7 +300,7 @@ export function StudentQuickEditModal({
                               className="hidden"
                               disabled={isUploading}
                             />
-                            <div className="flex items-center space-x-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 transition-colors">
+                            <div className="flex items-center space-x-2 px-3 py-2 bg-primary-50 text-primary-700 rounded-md hover:bg-primary-100 transition-colors">
                               <CameraIcon className="w-4 h-4" />
                               <span className="text-sm font-medium">
                                 {isUploading ? 'Uploading...' : 'Upload Photo'}

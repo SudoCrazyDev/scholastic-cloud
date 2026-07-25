@@ -205,7 +205,7 @@ export const TeacherAttendanceGrid: React.FC<TeacherAttendanceGridProps> = ({
           >
             {/* Teacher Info */}
             <div className={`flex items-center space-x-3 ${compact ? 'mb-2' : 'mb-4'}`}>
-              <div className={`bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold ${compact ? 'w-8 h-8 text-xs' : 'w-12 h-12'}`}>
+              <div className={`bg-gradient-to-br from-primary-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold ${compact ? 'w-8 h-8 text-xs' : 'w-12 h-12'}`}>
                 {teacher.user.first_name.charAt(0)}{teacher.user.last_name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">

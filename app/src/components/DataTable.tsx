@@ -252,7 +252,7 @@ export function DataTable<T = any>({
             placeholder={search.placeholder || "Search..."}
             value={search.value}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => search.onSearch(e.target.value)}
-            className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+            className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary-500"
           />
         </div>
       )}
@@ -271,7 +271,7 @@ export function DataTable<T = any>({
                       if (input) input.indeterminate = someSelected
                     }}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                 </TableHeader>
               )}
@@ -308,7 +308,7 @@ export function DataTable<T = any>({
               <TableRow>
                 <TableCell colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)} className="text-center py-8">
                   <div className="flex items-center justify-center space-x-2">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
                     <span className="text-gray-500">Loading...</span>
                   </div>
                 </TableCell>
@@ -337,7 +337,7 @@ export function DataTable<T = any>({
                         )}
                         onChange={() => handleRowSelect(row)}
                         onClick={(e) => e.stopPropagation()}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                       />
                     </TableCell>
                   )}
@@ -370,12 +370,12 @@ export function DataTable<T = any>({
 
                           const getVariantClasses = (variant?: string) => {
                             switch (variant) {
-                              case 'primary': return 'text-blue-400 hover:text-blue-600'
+                              case 'primary': return 'text-primary-400 hover:text-primary-600'
                               case 'secondary': return 'text-gray-400 hover:text-gray-600'
-                              case 'danger': return 'text-red-400 hover:text-red-600'
-                              case 'warning': return 'text-yellow-400 hover:text-yellow-600'
-                              case 'success': return 'text-green-400 hover:text-green-600'
-                              case 'info': return 'text-cyan-400 hover:text-cyan-600'
+                              case 'danger': return 'text-danger-400 hover:text-danger-600'
+                              case 'warning': return 'text-warning-400 hover:text-warning-600'
+                              case 'success': return 'text-success-400 hover:text-success-600'
+                              case 'info': return 'text-info-400 hover:text-info-600'
                               default: return 'text-gray-400 hover:text-gray-600'
                             }
                           }
@@ -422,7 +422,7 @@ export function DataTable<T = any>({
             <button
               onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
               disabled={pagination.currentPage === 1}
-              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               Previous
             </button>
@@ -438,9 +438,9 @@ export function DataTable<T = any>({
                     onClick={() => pagination.onPageChange(page)}
                     className={`w-8 h-8 p-0 text-sm font-medium rounded-md transition-all duration-200 ${
                       isActive 
-                        ? 'bg-blue-600 text-white scale-105' 
+                        ? 'bg-primary-600 text-white scale-105' 
                         : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:scale-105'
-                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    } focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500`}
                   >
                     {page}
                   </button>
@@ -451,7 +451,7 @@ export function DataTable<T = any>({
             <button
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
               disabled={pagination.currentPage === pagination.totalPages}
-              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               Next
             </button>

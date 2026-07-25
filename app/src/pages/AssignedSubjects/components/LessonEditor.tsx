@@ -335,7 +335,7 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
             {/* Header */}
             <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
               <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-indigo-100 p-2 text-indigo-700">
+                <div className="rounded-lg bg-primary-100 p-2 text-primary-700">
                   <DocumentTextIcon className="h-5 w-5" />
                 </div>
                 <div>
@@ -346,7 +346,7 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <span className="flex flex-col items-end leading-tight">
-                    <span className={draft.is_published ? 'font-medium text-indigo-700' : 'font-medium text-amber-700'}>
+                    <span className={draft.is_published ? 'font-medium text-primary-700' : 'font-medium text-amber-700'}>
                       {draft.is_published ? 'Published' : 'Draft'}
                     </span>
                     <span className="text-[11px] text-gray-400">
@@ -503,7 +503,7 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
                         {draft.content.map((block) => {
                           if (block.type === 'rich_text') {
                             return (
-                              <SortableBlock key={block.id} id={block.id} onRemove={() => removeBlock(block.id)} label="Text" icon={<DocumentTextIcon className="h-4 w-4 text-indigo-600" />}>
+                              <SortableBlock key={block.id} id={block.id} onRemove={() => removeBlock(block.id)} label="Text" icon={<DocumentTextIcon className="h-4 w-4 text-primary-600" />}>
                                 <RichTextEditor value={block.html} onChange={(html) => updateBlock(block.id, { html })} />
                               </SortableBlock>
                             )
@@ -532,14 +532,14 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
                                 {block.path ? (
                                   <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                                     <span className="truncate text-sm text-gray-700">{block.name}</span>
-                                    <a href={block.url} target="_blank" rel="noreferrer" className="text-xs font-medium text-indigo-600 underline">
+                                    <a href={block.url} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary-600 underline">
                                       View
                                     </a>
                                   </div>
                                 ) : (
                                   <label
                                     className={clsx(
-                                      'flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 transition hover:border-indigo-300 hover:bg-indigo-50',
+                                      'flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 transition hover:border-primary-300 hover:bg-primary-50',
                                       uploadingBlockId === block.id && 'cursor-not-allowed opacity-60'
                                     )}
                                   >

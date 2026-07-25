@@ -217,7 +217,7 @@ export const TakeAssessment: React.FC = () => {
   if (showLoading || (needStart && startMutation.isPending)) {
     return (
       <div className="max-w-2xl mx-auto p-6 flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
         <span className="ml-3 text-gray-600">Loading...</span>
       </div>
     );
@@ -245,7 +245,7 @@ export const TakeAssessment: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
           <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Submitted</h2>
-          <p className="text-3xl font-bold text-indigo-600 mb-2">
+          <p className="text-3xl font-bold text-primary-600 mb-2">
             {result.score} / {result.max_score}
           </p>
           <p className="text-gray-600 mb-6">Your score has been recorded.</p>
@@ -270,7 +270,7 @@ export const TakeAssessment: React.FC = () => {
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
         <div className="flex items-center gap-2 mb-2">
-          <DocumentTextIcon className="w-6 h-6 text-indigo-600" />
+          <DocumentTextIcon className="w-6 h-6 text-primary-600" />
           <h1 className="text-xl font-bold text-gray-900">{currentPayload?.title ?? 'Assessment'}</h1>
         </div>
         {currentPayload?.description && (
@@ -292,7 +292,7 @@ export const TakeAssessment: React.FC = () => {
           return (
             <div key={q.index} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
               <div className="flex items-start gap-2 font-medium text-gray-900 mb-3">
-                <span className="inline-flex shrink-0 items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full text-sm font-bold">
+                <span className="inline-flex shrink-0 items-center justify-center w-8 h-8 bg-primary-100 text-primary-700 rounded-full text-sm font-bold">
                   {idx + 1}
                 </span>
                 <QuestionPromptView prompt={q.question} className="min-w-0 flex-1 pt-1.5" />
@@ -306,7 +306,7 @@ export const TakeAssessment: React.FC = () => {
                         <label
                           key={opt}
                           className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                            isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'
+                            isSelected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'
                           }`}
                         >
                           <input
@@ -315,7 +315,7 @@ export const TakeAssessment: React.FC = () => {
                             value={opt}
                             checked={isSelected}
                             onChange={() => handleAnswer(key, opt)}
-                            className="text-indigo-600"
+                            className="text-primary-600"
                           />
                           <span className="text-gray-800">{opt}</span>
                         </label>
@@ -331,7 +331,7 @@ export const TakeAssessment: React.FC = () => {
                       <label
                         key={cIdx}
                         className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'
+                          isSelected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'
                         }`}
                       >
                         <input
@@ -340,7 +340,7 @@ export const TakeAssessment: React.FC = () => {
                           value={letter}
                           checked={isSelected}
                           onChange={() => handleAnswer(key, letter)}
-                          className="text-indigo-600"
+                          className="text-primary-600"
                         />
                         <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                       </label>
@@ -355,14 +355,14 @@ export const TakeAssessment: React.FC = () => {
                       <label
                         key={cIdx}
                         className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'
+                          isSelected ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleMultipleChoice(key, letter)}
-                          className="rounded border-gray-300 text-indigo-600"
+                          className="rounded border-gray-300 text-primary-600"
                         />
                         <ChoiceContent text={choice} imageUrl={q.choiceImages?.[cIdx]} />
                       </label>
@@ -448,7 +448,7 @@ export const TakeAssessment: React.FC = () => {
                         className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                           isUploading
                             ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-                            : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                            : 'border-primary-300 bg-white text-primary-700 hover:bg-primary-50'
                         }`}
                       >
                         <PhotoIcon className="h-4 w-4" />
@@ -499,7 +499,7 @@ export const TakeAssessment: React.FC = () => {
                         className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                           isUploading
                             ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'
-                            : 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                            : 'border-primary-300 bg-white text-primary-700 hover:bg-primary-50'
                         }`}
                       >
                         <VideoCameraIcon className="h-4 w-4" />

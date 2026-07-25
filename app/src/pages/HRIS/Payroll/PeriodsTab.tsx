@@ -291,10 +291,10 @@ const PeriodsTab: React.FC = () => {
                 payslips.map((payslip) => (
                   <tr
                     key={payslip.id}
-                    className="cursor-pointer border-b border-gray-50 hover:bg-indigo-50/40"
+                    className="cursor-pointer border-b border-gray-50 hover:bg-primary-50/40"
                     onClick={() => setOpenPayslipId(payslip.id)}
                   >
-                    <td className="px-4 py-3 font-medium text-indigo-700">{payslip.staff_name}</td>
+                    <td className="px-4 py-3 font-medium text-primary-700">{payslip.staff_name}</td>
                     <td className="px-4 py-3 text-gray-600">{payslip.designation || '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{peso(payslip.daily_rate)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{payslip.days_worked}</td>
@@ -378,10 +378,10 @@ const PeriodsTab: React.FC = () => {
               periods.map((period) => (
                 <tr
                   key={period.id}
-                  className="cursor-pointer border-b border-gray-50 hover:bg-indigo-50/40"
+                  className="cursor-pointer border-b border-gray-50 hover:bg-primary-50/40"
                   onClick={() => setOpenPeriod(period)}
                 >
-                  <td className="px-4 py-3 font-medium text-indigo-700">{period.name}</td>
+                  <td className="px-4 py-3 font-medium text-primary-700">{period.name}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {shortDate(period.date_from)} – {shortDate(period.date_to)}
                   </td>

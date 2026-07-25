@@ -237,8 +237,8 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
   // Step 1: Select target section
   const renderStep1 = () => (
     <div className="space-y-4">
-      <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-        <p className="text-sm text-indigo-700">
+      <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
+        <p className="text-sm text-primary-700">
           Transferring <span className="font-semibold">{getStudentName(student)}</span>
           {sectionTitle ? <> from <span className="font-semibold">{sectionTitle}</span></> : null}. Choose the section to
           move this student to.
@@ -271,7 +271,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
     if (gradesLoading) {
       return (
         <div className="p-8 text-center bg-gray-50 rounded-lg">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-3" />
           <p className="text-gray-500">Loading the student's grades...</p>
         </div>
       )
@@ -307,7 +307,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
 
         {targetSubjectsLoading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto mb-3" />
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto mb-3" />
             <p className="text-sm text-gray-500">Loading subjects for {targetSection?.title}...</p>
           </div>
         ) : (
@@ -455,10 +455,10 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
             <p className="text-sm text-gray-500">From</p>
             <p className="text-base font-semibold text-gray-900">{sectionTitle || 'Current Section'}</p>
           </div>
-          <ArrowRightIcon className="w-6 h-6 text-indigo-500 flex-shrink-0" />
-          <div className="flex-1 border border-indigo-200 bg-indigo-50 rounded-lg p-4">
-            <p className="text-sm text-indigo-500">To</p>
-            <p className="text-base font-semibold text-indigo-900">{targetSection?.title || 'Target Section'}</p>
+          <ArrowRightIcon className="w-6 h-6 text-primary-500 flex-shrink-0" />
+          <div className="flex-1 border border-primary-200 bg-primary-50 rounded-lg p-4">
+            <p className="text-sm text-primary-500">To</p>
+            <p className="text-base font-semibold text-primary-900">{targetSection?.title || 'Target Section'}</p>
           </div>
         </div>
 
@@ -535,7 +535,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
                               isCompleted
                                 ? 'bg-green-500 text-white'
                                 : isActive
-                                ? 'bg-indigo-600 text-white'
+                                ? 'bg-primary-600 text-white'
                                 : 'bg-gray-300 text-gray-600'
                             }`}
                           >
@@ -543,7 +543,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
                           </div>
                           <span
                             className={`text-xs font-medium ${
-                              isActive ? 'text-indigo-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
+                              isActive ? 'text-primary-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
                             }`}
                           >
                             {step.title}
@@ -586,7 +586,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
                       type="button"
                       onClick={handleNext}
                       disabled={currentStep === 1 && !canProceedToStep2}
-                      className="bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500"
+                      className="bg-primary-600 hover:bg-primary-700 focus:ring-primary-500"
                     >
                       Next
                     </Button>

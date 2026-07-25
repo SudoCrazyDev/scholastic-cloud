@@ -27,6 +27,7 @@ class Institution extends Model
         'region',
         'gov_id',
         'logo',
+        'theme',
         'subscription_id',
         'default_department_id',
         'current_academic_year',
@@ -43,6 +44,7 @@ class Institution extends Model
      */
     protected $casts = [
         'subscription_id' => 'string',
+        'theme' => 'array',
         'admission_form_open' => 'boolean',
         'late_penalty_per_minute' => 'decimal:2',
         'undertime_penalty_per_minute' => 'decimal:2',

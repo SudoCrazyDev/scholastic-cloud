@@ -181,8 +181,8 @@ export function StudentAssignmentModal({
               <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
-                      <UsersIcon className="h-6 w-6 text-indigo-600" />
+                    <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <UsersIcon className="h-6 w-6 text-primary-600" />
                     </div>
                     <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
                       <h3 className="text-base font-semibold leading-6 text-gray-900">
@@ -195,7 +195,7 @@ export function StudentAssignmentModal({
                   </div>
                   <button
                     onClick={handleClose}
-                    className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                   >
                     <XMarkIcon className="h-6 w-6" />
                   </button>
@@ -256,7 +256,7 @@ export function StudentAssignmentModal({
 
                     {searchLoading ? (
                       <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                       </div>
                     ) : searchError ? (
                       <Alert
@@ -284,7 +284,7 @@ export function StudentAssignmentModal({
                             animate={{ opacity: 1, y: 0 }}
                             className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
                               selectedStudents.has(student.id)
-                                ? 'border-indigo-500 bg-indigo-50'
+                                ? 'border-primary-500 bg-primary-50'
                                 : 'border-gray-200 hover:border-gray-300'
                             }`}
                             onClick={() => handleStudentToggle(student.id)}
@@ -292,7 +292,7 @@ export function StudentAssignmentModal({
                             <div className="flex items-center space-x-3">
                               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                                 selectedStudents.has(student.id)
-                                  ? 'border-indigo-500 bg-indigo-500'
+                                  ? 'border-primary-500 bg-primary-500'
                                   : 'border-gray-300'
                               }`}>
                                 {selectedStudents.has(student.id) && (
@@ -318,9 +318,9 @@ export function StudentAssignmentModal({
 
                 {/* Selected Students Summary */}
                 {selectedStudents.size > 0 && (
-                  <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
+                  <div className="mb-6 p-4 bg-primary-50 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium text-indigo-900">
+                      <h4 className="text-sm font-medium text-primary-900">
                         Selected Students ({selectedStudents.size})
                       </h4>
                       <Button
@@ -337,8 +337,8 @@ export function StudentAssignmentModal({
                         if (!student) return null
                         return (
                           <div key={studentId} className="flex items-center space-x-2 text-sm">
-                            <CheckIcon className="w-4 h-4 text-indigo-600" />
-                            <span className="text-indigo-900">{getFullName(student)}</span>
+                            <CheckIcon className="w-4 h-4 text-primary-600" />
+                            <span className="text-primary-900">{getFullName(student)}</span>
                           </div>
                         )
                       })}
@@ -362,7 +362,7 @@ export function StudentAssignmentModal({
                           <Field
                             as="select"
                             name="academic_year"
-                            className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
+                            className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${
                               touched.academic_year && errors.academic_year
                                 ? 'border-red-300'
                                 : 'border-gray-300'

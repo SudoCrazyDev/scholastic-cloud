@@ -237,7 +237,7 @@ export default function IdElementsPanel({ institution, onAddElement, onCollapse 
 			<div className="mb-4 pb-3 border-b border-gray-200 flex items-start justify-between gap-2">
 				<div>
 					<h3 className="text-base font-semibold text-gray-900 mb-0.5 flex items-center gap-2">
-						<IdCard className="w-4 h-4 text-indigo-600" />
+						<IdCard className="w-4 h-4 text-primary-600" />
 						Elements
 					</h3>
 					<p className="text-xs text-gray-500 ml-6">Add to card</p>
@@ -268,11 +268,11 @@ export default function IdElementsPanel({ institution, onAddElement, onCollapse 
 											whileHover={{ scale: 1.05, y: -2 }}
 											whileTap={{ scale: 0.95 }}
 											onClick={() => createElement(element.id)}
-											className="flex flex-col items-center gap-2 p-2.5 bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-lg transition-all group shadow-sm hover:shadow-md"
+											className="flex flex-col items-center gap-2 p-2.5 bg-white hover:bg-primary-50 border border-gray-200 hover:border-primary-300 rounded-lg transition-all group shadow-sm hover:shadow-md"
 											title={`Add ${element.name}`}
 										>
-											<element.icon className="w-5 h-5 text-gray-700 group-hover:text-indigo-600 transition-colors" />
-											<span className="text-[10px] font-medium text-gray-600 group-hover:text-indigo-700">{element.name}</span>
+											<element.icon className="w-5 h-5 text-gray-700 group-hover:text-primary-600 transition-colors" />
+											<span className="text-[10px] font-medium text-gray-600 group-hover:text-primary-700">{element.name}</span>
 										</motion.button>
 									))}
 								</div>
@@ -296,11 +296,11 @@ export default function IdElementsPanel({ institution, onAddElement, onCollapse 
 												whileHover={{ scale: 1.02, x: 2 }}
 												whileTap={{ scale: 0.98 }}
 												onClick={() => addInstitutionVariable(variable)}
-												className="w-full flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200/50 hover:border-indigo-300 rounded-lg transition-all text-left shadow-sm hover:shadow"
+												className="w-full flex items-center gap-2.5 p-2.5 bg-gradient-to-r from-primary-50 to-purple-50 hover:from-primary-100 hover:to-purple-100 border border-primary-200/50 hover:border-primary-300 rounded-lg transition-all text-left shadow-sm hover:shadow"
 												title={`Add ${variable.label}`}
 											>
 												<div className="w-6 h-6 bg-white rounded-md flex items-center justify-center shadow-sm">
-													<Icon className="w-3.5 h-3.5 text-indigo-600" />
+													<Icon className="w-3.5 h-3.5 text-primary-600" />
 												</div>
 												<span className="text-xs font-medium text-gray-700 truncate">{variable.label}</span>
 											</motion.button>

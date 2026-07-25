@@ -68,7 +68,7 @@ function SortableElement({
     <div
       ref={setNodeRef}
       style={style}
-      className="group flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 transition-all hover:border-indigo-200 hover:shadow-sm"
+      className="group flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 transition-all hover:border-primary-200 hover:shadow-sm"
     >
       <div
         {...attributes}
@@ -88,7 +88,7 @@ function SortableElement({
             value={element.content || ''}
             onChange={(e) => onUpdateContent(e.target.value)}
             placeholder={contentPlaceholder}
-            className="mt-0.5 w-full border-0 border-b border-dashed border-gray-300 bg-transparent px-0 py-0.5 text-xs focus:border-indigo-500 focus:ring-0"
+            className="mt-0.5 w-full border-0 border-b border-dashed border-gray-300 bg-transparent px-0 py-0.5 text-xs focus:border-primary-500 focus:ring-0"
           />
         )}
       </div>
@@ -224,7 +224,7 @@ const PayslipDesignerTab: React.FC = () => {
                 onClick={resetForm}
                 className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                   !selectedTemplateId
-                    ? 'bg-indigo-50 font-medium text-indigo-700'
+                    ? 'bg-primary-50 font-medium text-primary-700'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -237,12 +237,12 @@ const PayslipDesignerTab: React.FC = () => {
                   onClick={() => loadTemplate(template)}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                     selectedTemplateId === template.id
-                      ? 'bg-indigo-50 font-medium text-indigo-700'
+                      ? 'bg-primary-50 font-medium text-primary-700'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   {template.name}
-                  {template.is_default && <span className="ml-1 text-xs text-indigo-500">(default)</span>}
+                  {template.is_default && <span className="ml-1 text-xs text-primary-500">(default)</span>}
                 </button>
               ))}
             </div>
@@ -257,7 +257,7 @@ const PayslipDesignerTab: React.FC = () => {
                   key={item.type}
                   type="button"
                   onClick={() => addElement(item.type)}
-                  className="w-full rounded px-3 py-1.5 text-left text-xs text-gray-700 transition-colors hover:bg-indigo-50 hover:text-indigo-700"
+                  className="w-full rounded px-3 py-1.5 text-left text-xs text-gray-700 transition-colors hover:bg-primary-50 hover:text-primary-700"
                 >
                   {item.label}
                 </button>
@@ -332,7 +332,7 @@ const PayslipDesignerTab: React.FC = () => {
                   type="checkbox"
                   checked={isDefault}
                   onChange={(e) => setIsDefault(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
                 Set as default template
               </label>

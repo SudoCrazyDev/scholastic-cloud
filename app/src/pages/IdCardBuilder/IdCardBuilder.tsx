@@ -339,7 +339,7 @@ export default function IdCardBuilder() {
 		return (
 			<div className="flex items-center justify-center h-full">
 				<div className="text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4" />
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4" />
 					<p className="text-gray-600">Loading template...</p>
 				</div>
 			</div>
@@ -390,7 +390,7 @@ export default function IdCardBuilder() {
 				{elementsPanelOpen ? (
 					<IdElementsPanel institution={fullInstitution} onAddElement={handleAddElement} onCollapse={() => setElementsPanelOpen(false)} />
 				) : (
-					<button type="button" onClick={() => setElementsPanelOpen(true)} className="flex flex-col items-center justify-center w-full flex-1 min-h-[120px] py-4 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors" title="Show Elements panel">
+					<button type="button" onClick={() => setElementsPanelOpen(true)} className="flex flex-col items-center justify-center w-full flex-1 min-h-[120px] py-4 text-gray-500 hover:text-primary-600 hover:bg-primary-50/50 transition-colors" title="Show Elements panel">
 						<PanelLeft className="w-6 h-6" />
 						<span className="mt-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Elements</span>
 					</button>
@@ -516,8 +516,8 @@ export default function IdCardBuilder() {
 																const isCenter = Math.abs(pos - centerX) < 2;
 																return (
 																	<div key={`h-${pos}`} className="absolute flex flex-col items-center text-gray-500" style={{ left: pos, top: 0 }}>
-																		<div className={`w-px ${isCenter ? 'h-3 bg-indigo-500' : 'h-2 bg-gray-400'}`} style={{ marginTop: 2 }} />
-																		<span className={`text-[8px] mt-0.5 select-none ${isCenter ? 'text-indigo-600 font-semibold' : ''}`}>{isCenter ? '½' : pos}</span>
+																		<div className={`w-px ${isCenter ? 'h-3 bg-primary-500' : 'h-2 bg-gray-400'}`} style={{ marginTop: 2 }} />
+																		<span className={`text-[8px] mt-0.5 select-none ${isCenter ? 'text-primary-600 font-semibold' : ''}`}>{isCenter ? '½' : pos}</span>
 																	</div>
 																);
 															});
@@ -534,8 +534,8 @@ export default function IdCardBuilder() {
 																const isCenter = Math.abs(pos - centerY) < 2;
 																return (
 																	<div key={`v-${pos}`} className="absolute flex items-center gap-0.5 text-gray-500" style={{ left: 0, top: pos }}>
-																		<div className={`h-px flex-shrink-0 ${isCenter ? 'w-3 bg-indigo-500' : 'w-2 bg-gray-400'}`} style={{ marginLeft: 2 }} />
-																		<span className={`text-[8px] select-none whitespace-nowrap origin-left ${isCenter ? 'text-indigo-600 font-semibold' : ''}`} style={{ transform: 'rotate(-90deg)', marginLeft: 2 }}>{isCenter ? '½' : pos}</span>
+																		<div className={`h-px flex-shrink-0 ${isCenter ? 'w-3 bg-primary-500' : 'w-2 bg-gray-400'}`} style={{ marginLeft: 2 }} />
+																		<span className={`text-[8px] select-none whitespace-nowrap origin-left ${isCenter ? 'text-primary-600 font-semibold' : ''}`} style={{ transform: 'rotate(-90deg)', marginLeft: 2 }}>{isCenter ? '½' : pos}</span>
 																	</div>
 																);
 															});
@@ -547,8 +547,8 @@ export default function IdCardBuilder() {
 											<div className="shadow-2xl relative rounded-xl overflow-hidden ring-1 ring-gray-200" style={{ position: 'absolute', top: offset, left: offset, width: preset.w, height: preset.h }}>
 												{showRuler && (
 													<div className="absolute inset-0 pointer-events-none z-20">
-														<div className="absolute top-0 bottom-0 w-0 border-l border-dashed border-indigo-400/60" style={{ left: '50%' }} />
-														<div className="absolute left-0 right-0 h-0 border-t border-dashed border-indigo-400/60" style={{ top: '50%' }} />
+														<div className="absolute top-0 bottom-0 w-0 border-l border-dashed border-primary-400/60" style={{ left: '50%' }} />
+														<div className="absolute left-0 right-0 h-0 border-t border-dashed border-primary-400/60" style={{ top: '50%' }} />
 													</div>
 												)}
 												<div ref={canvasRef} style={{ width: preset.w, height: preset.h, position: 'relative', zIndex: 3 }}>

@@ -98,8 +98,8 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                    <DocumentTextIcon className="w-6 h-6 text-indigo-600" />
+                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                    <DocumentTextIcon className="w-6 h-6 text-primary-600" />
                   </div>
                   <div>
                     <h3 className="text-lg font-medium text-gray-900">Add Grade Item</h3>
@@ -108,7 +108,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                 </div>
                 <button
                   onClick={onClose}
-                  className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                 >
                   <XMarkIcon className="w-6 h-6" />
                 </button>
@@ -125,7 +125,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                     type="text"
                     id="title"
                     {...formik.getFieldProps('title')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="e.g., Quiz 1: Basic Operations"
                   />
                   {formik.touched.title && formik.errors.title && (
@@ -142,7 +142,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                     id="description"
                     {...formik.getFieldProps('description')}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     placeholder="Brief description of the assessment or activity"
                   />
                   {formik.touched.description && formik.errors.description && (
@@ -163,7 +163,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                         type="date"
                         id="date"
                         {...formik.getFieldProps('date')}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       />
                       {formik.touched.date && formik.errors.date && (
                         <div className="text-xs text-red-600 mt-1">{formik.errors.date}</div>
@@ -180,7 +180,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                       id="total_score"
                       {...formik.getFieldProps('total_score')}
                       min="1"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                     {formik.touched.total_score && formik.errors.total_score && (
                       <div className="text-xs text-red-600 mt-1">{formik.errors.total_score}</div>
@@ -206,7 +206,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                       <select
                         id="subject_ecr_id"
                         {...formik.getFieldProps('subject_ecr_id')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       >
                         <option value="">Select a component</option>
                         {subjectEcrs.map((ecr: any) => (
@@ -225,7 +225,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                     <select
                       id="quarter"
                       {...formik.getFieldProps('quarter')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="1">First Quarter</option>
                       <option value="2">Second Quarter</option>
@@ -246,7 +246,7 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                   <select
                     id="type"
                     {...formik.getFieldProps('type')}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">Select Type...</option>
                     <option value="quiz">📝 Quiz</option>
@@ -275,14 +275,14 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={formik.isSubmitting || createMutation.status === 'pending' || !hasComponents}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {formik.isSubmitting || createMutation.status === 'pending' ? (
                       <>

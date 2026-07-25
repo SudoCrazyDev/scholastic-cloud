@@ -114,18 +114,18 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
         <h3 className="text-base font-semibold text-gray-900 mb-6">Quick ID Card</h3>
 
         <div className="flex flex-col items-center gap-4">
-          <div className="w-80 rounded-2xl overflow-hidden shadow-lg border border-indigo-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white">
+          <div className="w-80 rounded-2xl overflow-hidden shadow-lg border border-primary-100 bg-gradient-to-br from-primary-600 to-primary-800 text-white">
             {/* Header */}
-            <div className="px-6 pt-6 pb-4 border-b border-indigo-500/40">
-              <p className="text-xs font-semibold uppercase tracking-widest text-indigo-200">
+            <div className="px-6 pt-6 pb-4 border-b border-primary-500/40">
+              <p className="text-xs font-semibold uppercase tracking-widest text-primary-200">
                 ScholasticCloud
               </p>
-              <p className="text-sm text-indigo-200 mt-0.5">Student Identification Card</p>
+              <p className="text-sm text-primary-200 mt-0.5">Student Identification Card</p>
             </div>
 
             {/* Body */}
             <div className="px-6 py-5 flex items-center gap-5">
-              <div className="w-16 h-16 rounded-full overflow-hidden bg-indigo-500/40 flex-shrink-0 border-2 border-white/30">
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-primary-500/40 flex-shrink-0 border-2 border-white/30">
                 {student.profile_picture ? (
                   <img src={student.profile_picture} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -137,10 +137,10 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-base leading-tight truncate uppercase">{fullName}</p>
                 {student.lrn && (
-                  <p className="text-xs text-indigo-200 mt-1">LRN: {student.lrn}</p>
+                  <p className="text-xs text-primary-200 mt-1">LRN: {student.lrn}</p>
                 )}
                 {student.gender && (
-                  <p className="text-xs text-indigo-200 capitalize mt-0.5">{student.gender}</p>
+                  <p className="text-xs text-primary-200 capitalize mt-0.5">{student.gender}</p>
                 )}
               </div>
             </div>
@@ -168,10 +168,10 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <CpuChipIcon className="w-5 h-5 text-indigo-600" />
+            <CpuChipIcon className="w-5 h-5 text-primary-600" />
             <h3 className="text-base font-semibold text-gray-900">RFID Tag</h3>
           </div>
-          <Button size="sm" onClick={openModal} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Button size="sm" onClick={openModal} className="bg-primary-600 hover:bg-primary-700 text-white">
             <PlusIcon className="w-4 h-4 mr-1.5" />
             {rfidTag ? 'Update Tag' : 'Assign Tag'}
           </Button>
@@ -179,14 +179,14 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
 
         {loadingRfid ? (
           <div className="flex items-center gap-2 text-sm text-gray-400">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-500" />
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-500" />
             Loading...
           </div>
         ) : rfidTag ? (
-          <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3">
+          <div className="flex items-center justify-between bg-primary-50 border border-primary-100 rounded-lg px-4 py-3">
             <div>
-              <p className="text-xs text-indigo-500 font-medium uppercase tracking-wide">UID</p>
-              <p className="text-sm font-mono font-semibold text-indigo-900 mt-0.5">{rfidTag.rfid_uid}</p>
+              <p className="text-xs text-primary-500 font-medium uppercase tracking-wide">UID</p>
+              <p className="text-sm font-mono font-semibold text-primary-900 mt-0.5">{rfidTag.rfid_uid}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${rfidTag.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -194,7 +194,7 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
               </span>
               <button
                 onClick={openModal}
-                className="p-1.5 text-indigo-400 hover:text-indigo-600 transition-colors"
+                className="p-1.5 text-primary-400 hover:text-primary-600 transition-colors"
                 title="Edit RFID tag"
               >
                 <PencilIcon className="w-4 h-4" />
@@ -222,7 +222,7 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6 z-10">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
-                  <CpuChipIcon className="w-5 h-5 text-indigo-600" />
+                  <CpuChipIcon className="w-5 h-5 text-primary-600" />
                   <h3 className="text-base font-semibold text-gray-900">
                     {rfidTag ? 'Update RFID Tag' : 'Assign RFID Tag'}
                   </h3>
@@ -253,7 +253,7 @@ export function StudentIdTab({ student }: StudentIdTabProps) {
                   onClick={handleSave}
                   loading={saving}
                   disabled={saving || !rfidValue.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-primary-600 hover:bg-primary-700 text-white"
                 >
                   {rfidTag ? 'Update' : 'Assign'}
                 </Button>

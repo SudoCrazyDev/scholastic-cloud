@@ -90,7 +90,7 @@ const assessmentMeta = (type?: AssessmentBlock['assessmentType']) => {
     case 'exam':
       return { label: 'Exam', icon: BookOpenIcon, accent: 'text-violet-700 bg-violet-100' }
     default:
-      return { label: 'Quiz', icon: AcademicCapIcon, accent: 'text-indigo-700 bg-indigo-100' }
+      return { label: 'Quiz', icon: AcademicCapIcon, accent: 'text-primary-700 bg-primary-100' }
   }
 }
 
@@ -232,7 +232,7 @@ const LessonBlockView: React.FC<{
             />
           </div>
         ) : (
-          <a href={block.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-indigo-600 underline">
+          <a href={block.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-primary-600 underline">
             <PlayCircleIcon className="h-5 w-5" /> {block.url}
           </a>
         )}
@@ -252,7 +252,7 @@ const LessonBlockView: React.FC<{
           href={block.url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex shrink-0 items-center gap-1 font-medium text-indigo-600 hover:text-indigo-700"
+          className="inline-flex shrink-0 items-center gap-1 font-medium text-primary-600 hover:text-primary-700"
         >
           <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" /> Open
         </a>
@@ -333,9 +333,9 @@ const LessonBlockView: React.FC<{
         href={block.url}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:border-indigo-300 hover:bg-indigo-50"
+        className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:border-primary-300 hover:bg-primary-50"
       >
-        <div className="rounded-lg bg-indigo-100 p-2 text-indigo-700">
+        <div className="rounded-lg bg-primary-100 p-2 text-primary-700">
           <DocumentArrowDownIcon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -364,7 +364,7 @@ const LessonBlockView: React.FC<{
             type="button"
             disabled={unavailable}
             onClick={() => onOpenAssessment(block.subject_ecr_item_id)}
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {unavailable ? 'Unavailable' : 'Start'}
           </button>
@@ -423,7 +423,7 @@ const StepperViewer: React.FC<{
           <span className="shrink-0 text-xs text-gray-500">{pct}% viewed</span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
-          <div className="h-full rounded-full bg-indigo-600 transition-all duration-300" style={{ width: `${pct}%` }} />
+          <div className="h-full rounded-full bg-primary-600 transition-all duration-300" style={{ width: `${pct}%` }} />
         </div>
         <div className="flex flex-wrap gap-1.5">
           {blocks.map((b, i) => {
@@ -439,9 +439,9 @@ const StepperViewer: React.FC<{
                 className={clsx(
                   'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition',
                   isCurrent
-                    ? 'border-indigo-600 bg-indigo-600 text-white'
+                    ? 'border-primary-600 bg-primary-600 text-white'
                     : isVisited
-                      ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                      ? 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
                       : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
                 )}
               >
@@ -472,7 +472,7 @@ const StepperViewer: React.FC<{
           type="button"
           disabled={isLast}
           onClick={() => setIndex((i) => clamp(i + 1))}
-          className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Next <ChevronRightIcon className="h-4 w-4" />
         </button>

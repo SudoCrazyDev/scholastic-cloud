@@ -66,7 +66,7 @@ const AnswerView: React.FC<{ question: GradingQuestionMeta; answer: SubmittedAns
               href={upload.url ?? '#'}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800"
             >
               <ArrowDownTrayIcon className="h-4 w-4" />
               {upload.name}
@@ -192,7 +192,7 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
   return (
     <div className="fixed inset-0 z-50 bg-black/50">
       <div className="absolute inset-0 flex flex-col bg-white">
-        <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-indigo-50 via-white to-white px-6 py-4">
+        <header className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gradient-to-r from-primary-50 via-white to-white px-6 py-4">
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold text-gray-900">Submissions &amp; Grading</h3>
@@ -228,7 +228,7 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
 
         {isLoading ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-indigo-600" />
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600" />
           </div>
         ) : submissions.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center text-gray-500">
@@ -292,7 +292,7 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-indigo-600">
+                      <p className="text-2xl font-bold text-primary-600">
                         {selected.total_score}
                         <span className="text-base font-medium text-gray-400"> / {selected.max_score}</span>
                       </p>
@@ -345,7 +345,7 @@ export const GradeSubmissionsModal: React.FC<GradeSubmissionsModalProps> = ({ it
                               onChange={(e) =>
                                 setScoreDraft((prev) => ({ ...prev, [gradeKey(pq)]: e.target.value }))
                               }
-                              className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                               placeholder="0"
                             />
                             <span className="text-sm text-gray-500">/ {question.points} pts</span>

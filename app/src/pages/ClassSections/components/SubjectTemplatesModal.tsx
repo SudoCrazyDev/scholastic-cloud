@@ -134,7 +134,7 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
                 <div className="flex justify-end mb-6">
                   <Button
                     onClick={handleCreate}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="bg-primary-600 hover:bg-primary-700 text-white"
                   >
                     <PlusIcon className="w-5 h-5 mr-2" />
                     Create Template
@@ -144,7 +144,7 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
                 {/* Templates Grid */}
                 {loading ? (
                   <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
                   </div>
                 ) : templates.length === 0 ? (
                   <div className="bg-gray-50 rounded-lg p-12 text-center">
@@ -155,7 +155,7 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
                     </p>
                     <Button
                       onClick={handleCreate}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="bg-primary-600 hover:bg-primary-700 text-white"
                     >
                       <PlusIcon className="w-5 h-5 mr-2" />
                       Create Your First Template
@@ -182,7 +182,7 @@ export function SubjectTemplatesModal({ isOpen, onClose }: SubjectTemplatesModal
                             <div className="flex gap-1">
                               <button
                                 onClick={() => handleEdit(template)}
-                                className="p-1 text-gray-600 hover:text-indigo-600 transition-colors"
+                                className="p-1 text-gray-600 hover:text-primary-600 transition-colors"
                                 title="Edit template"
                               >
                                 <PencilIcon className="w-4 h-4" />

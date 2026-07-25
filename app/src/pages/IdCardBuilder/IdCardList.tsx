@@ -88,12 +88,12 @@ export default function IdCardList() {
 
 	const EmptyState = () => (
 		<motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-16">
-			<div className="w-24 h-24 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-				<IdentificationIcon className="w-12 h-12 text-indigo-600" />
+			<div className="w-24 h-24 bg-gradient-to-br from-primary-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+				<IdentificationIcon className="w-12 h-12 text-primary-600" />
 			</div>
 			<h3 className="text-xl font-semibold text-gray-900 mb-2">No ID templates yet</h3>
 			<p className="text-gray-600 mb-8 max-w-md mx-auto">Design your first student ID card (front & back) for {currentInstitution?.name ?? currentInstitution?.title ?? 'your institution'}.</p>
-			<Button variant="primary" onClick={() => navigate('/id-card-builder/new')} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg">
+			<Button variant="primary" onClick={() => navigate('/id-card-builder/new')} className="bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white shadow-lg">
 				<PlusIcon className="w-5 h-5 mr-2" />
 				Create New ID Template
 			</Button>
@@ -116,7 +116,7 @@ export default function IdCardList() {
 						<h1 className="text-3xl font-bold text-gray-900 mb-2">Student ID Builder</h1>
 						<p className="text-gray-600 text-lg">Design and print student ID cards for {currentInstitution?.name ?? currentInstitution?.title ?? 'your institution'}</p>
 					</div>
-					<Button variant="primary" onClick={() => navigate('/id-card-builder/new')} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg px-6 py-3">
+					<Button variant="primary" onClick={() => navigate('/id-card-builder/new')} className="bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 text-white shadow-lg px-6 py-3">
 						<PlusIcon className="w-5 h-5 mr-2" />
 						Create New ID Template
 					</Button>
@@ -134,13 +134,13 @@ export default function IdCardList() {
 					<motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 						<AnimatePresence>
 							{items.map((item) => (
-								<motion.div key={item.id} variants={itemVariants} layout className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-200 transition-all duration-300 transform hover:-translate-y-1">
+								<motion.div key={item.id} variants={itemVariants} layout className="group bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg hover:border-primary-200 transition-all duration-300 transform hover:-translate-y-1">
 									<div className="flex items-start space-x-4 mb-4">
-										<div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center">
-											<IdentificationIcon className="w-6 h-6 text-indigo-600" />
+										<div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-purple-100 rounded-xl flex items-center justify-center">
+											<IdentificationIcon className="w-6 h-6 text-primary-600" />
 										</div>
 										<div className="flex-1 min-w-0">
-											<h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors truncate">{item.title}</h3>
+											<h3 className="text-lg font-semibold text-gray-900 group-hover:text-primary-700 transition-colors truncate">{item.title}</h3>
 											<p className="text-sm text-gray-500 mt-1">ID: {String(item.id).slice(0, 8)}...</p>
 										</div>
 									</div>
@@ -157,7 +157,7 @@ export default function IdCardList() {
 									</div>
 
 									<div className="flex gap-2">
-										<Button variant="secondary" onClick={() => navigate(`/id-card-builder?id=${item.id}`)} className="flex-1 bg-gray-50 hover:bg-indigo-50 border-gray-200 hover:border-indigo-200 text-gray-700 hover:text-indigo-700">
+										<Button variant="secondary" onClick={() => navigate(`/id-card-builder?id=${item.id}`)} className="flex-1 bg-gray-50 hover:bg-primary-50 border-gray-200 hover:border-primary-200 text-gray-700 hover:text-primary-700">
 											<ArrowTopRightOnSquareIcon className="w-4 h-4 mr-2" />
 											Open
 										</Button>

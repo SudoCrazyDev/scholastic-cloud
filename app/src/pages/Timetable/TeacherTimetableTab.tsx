@@ -28,7 +28,7 @@ const GRID_HEIGHT = (END_HOUR - START_HOUR) * PX_PER_HOUR
 
 // One color per teacher column (cycles if > 5 selected)
 const COLUMN_COLORS = [
-  'bg-indigo-100 border-indigo-300 text-indigo-800',
+  'bg-primary-100 border-primary-300 text-primary-800',
   'bg-emerald-100 border-emerald-300 text-emerald-800',
   'bg-amber-100 border-amber-300 text-amber-800',
   'bg-rose-100 border-rose-300 text-rose-800',
@@ -38,7 +38,7 @@ const COLUMN_COLORS = [
 ]
 
 const CHIP_COLORS = [
-  'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
+  'bg-primary-100 text-primary-800 hover:bg-primary-200',
   'bg-emerald-100 text-emerald-800 hover:bg-emerald-200',
   'bg-amber-100 text-amber-800 hover:bg-amber-200',
   'bg-rose-100 text-rose-800 hover:bg-rose-200',
@@ -201,7 +201,7 @@ const TeacherTimetableTab: React.FC = () => {
                 onClick={() => setSelectedDay(day)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors whitespace-nowrap ${
                   selectedDay === day
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-primary-600 text-white'
                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -213,7 +213,7 @@ const TeacherTimetableTab: React.FC = () => {
           {/* Loading */}
           {timetableLoading ? (
             <div className="py-16 flex items-center justify-center">
-              <svg className="animate-spin w-8 h-8 text-indigo-500" viewBox="0 0 24 24" fill="none">
+              <svg className="animate-spin w-8 h-8 text-primary-500" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
@@ -260,7 +260,7 @@ const TeacherTimetableTab: React.FC = () => {
                         {HOURS.slice(0, -1).map(hour => (
                           <div
                             key={`slot-${hour}`}
-                            className="absolute left-0 right-0 border-t border-gray-100 cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                            className="absolute left-0 right-0 border-t border-gray-100 cursor-pointer hover:bg-primary-50/50 transition-colors"
                             style={{ top: (hour - START_HOUR) * PX_PER_HOUR, height: PX_PER_HOUR }}
                             onClick={() => openAtSlot(hour)}
                           >

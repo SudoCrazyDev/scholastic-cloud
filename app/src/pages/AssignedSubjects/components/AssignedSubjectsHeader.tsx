@@ -38,8 +38,8 @@ export const AssignedSubjectsHeader: React.FC<AssignedSubjectsHeaderProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
         {/* Title and Stats */}
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <BookOpenIcon className="w-6 h-6 text-indigo-600" />
+          <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+            <BookOpenIcon className="w-6 h-6 text-primary-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -61,7 +61,7 @@ export const AssignedSubjectsHeader: React.FC<AssignedSubjectsHeaderProps> = ({
             <select
               value={sectionFilter}
               onChange={(e) => onSectionFilter(e.target.value)}
-              className="w-full sm:w-56 pl-9 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full sm:w-56 pl-9 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               aria-label="Filter by section"
             >
               <option value="all">All Sections</option>

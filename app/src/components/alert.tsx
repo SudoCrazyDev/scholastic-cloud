@@ -12,32 +12,32 @@ export interface AlertProps {
 
 const alertStyles = {
   success: {
-    bg: 'bg-green-50',
-    border: 'border-green-200',
-    text: 'text-green-800',
-    icon: 'text-green-400',
-    iconBg: 'bg-green-100',
+    bg: 'bg-success-50',
+    border: 'border-success-200',
+    text: 'text-success-800',
+    icon: 'text-success-400',
+    iconBg: 'bg-success-100',
   },
   error: {
-    bg: 'bg-red-50',
-    border: 'border-red-200',
-    text: 'text-red-800',
-    icon: 'text-red-400',
-    iconBg: 'bg-red-100',
+    bg: 'bg-danger-50',
+    border: 'border-danger-200',
+    text: 'text-danger-800',
+    icon: 'text-danger-400',
+    iconBg: 'bg-danger-100',
   },
   warning: {
-    bg: 'bg-yellow-50',
-    border: 'border-yellow-200',
-    text: 'text-yellow-800',
-    icon: 'text-yellow-400',
-    iconBg: 'bg-yellow-100',
+    bg: 'bg-warning-50',
+    border: 'border-warning-200',
+    text: 'text-warning-800',
+    icon: 'text-warning-400',
+    iconBg: 'bg-warning-100',
   },
   info: {
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
-    text: 'text-blue-800',
-    icon: 'text-blue-400',
-    iconBg: 'bg-blue-100',
+    bg: 'bg-info-50',
+    border: 'border-info-200',
+    text: 'text-info-800',
+    icon: 'text-info-400',
+    iconBg: 'bg-info-100',
   },
 };
 
@@ -108,7 +108,7 @@ export const Alert: React.FC<AlertProps> = ({
                 <div className="-mx-1.5 -my-1.5">
                   <button
                     onClick={onClose}
-                    className={`inline-flex rounded-md p-1.5 ${styles.bg} ${styles.text} hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-green-50 focus:ring-green-600`}
+                    className={`inline-flex rounded-md p-1.5 ${styles.bg} ${styles.text} hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-success-50 focus:ring-success-600`}
                   >
                     <span className="sr-only">Dismiss</span>
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

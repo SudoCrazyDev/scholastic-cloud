@@ -1,4 +1,6 @@
 // Common types used across the application
+import type { InstitutionTheme } from '../theme/palette';
+
 export interface User {
   id: string;
   first_name: string;
@@ -893,6 +895,7 @@ export interface Institution {
   region?: string;
   gov_id?: string;
   logo?: string;
+  theme?: InstitutionTheme | null;
   default_department_id?: string | null;
   default_department?: Department | null;
   current_academic_year?: string | null;

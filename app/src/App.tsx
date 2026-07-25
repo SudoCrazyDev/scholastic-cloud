@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { QueryProvider } from './providers/QueryProvider';
 import { AuthProvider } from './providers/AuthProvider';
+import { ThemeProvider } from './providers/ThemeProvider';
 import PublicLayout from './components/layouts/PublicLayout';
 import PrivateLayout from './components/layouts/PrivateLayout';
 import StudentOnlyRoute from './components/StudentOnlyRoute';
@@ -67,6 +68,7 @@ function App() {
   return (
     <QueryProvider>
       <AuthProvider>
+        <ThemeProvider>
         <Router>
           <Routes>
             {/* Public Routes */}
@@ -201,19 +203,20 @@ function App() {
             success: {
               duration: 4000,
               iconTheme: {
-                primary: '#10b981',
+                primary: 'var(--color-success-500)',
                 secondary: '#fff',
               },
             },
             error: {
               duration: 5000,
               iconTheme: {
-                primary: '#ef4444',
+                primary: 'var(--color-danger-500)',
                 secondary: '#fff',
               },
             },
           }}
         />
+        </ThemeProvider>
       </AuthProvider>
     </QueryProvider>
   );

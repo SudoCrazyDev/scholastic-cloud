@@ -216,8 +216,8 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <div className="p-3 bg-indigo-100 rounded-lg">
-            <Trophy className="w-8 h-8 text-indigo-600" />
+          <div className="p-3 bg-primary-100 rounded-lg">
+            <Trophy className="w-8 h-8 text-primary-600" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Student Ranking</h2>

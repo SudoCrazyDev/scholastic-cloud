@@ -63,7 +63,7 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick }) => {
             <input
               type="text"
               placeholder="Search..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
             />
           </div>
         </div>
@@ -72,7 +72,7 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick }) => {
         <div className="flex items-center space-x-4">
           {/* Current Academic Year Badge */}
           {currentAcademicYear && (
-            <div className="hidden sm:flex items-center space-x-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-medium">
+            <div className="hidden sm:flex items-center space-x-1.5 bg-primary-50 border border-primary-200 text-primary-700 px-3 py-1.5 rounded-lg text-sm font-medium">
               <CalendarDays className="w-4 h-4" />
               <span>S.Y. {currentAcademicYear}</span>
             </div>
@@ -122,7 +122,7 @@ const Topbar: React.FC<TopbarProps> = ({ onMobileMenuClick }) => {
               onClick={() => setIsProfileOpen(!isProfileOpen)}
               className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
             >
-              <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
                 <span className="text-sm font-medium text-white">
                   {user?.first_name?.[0]}{user?.last_name?.[0]}
                 </span>
