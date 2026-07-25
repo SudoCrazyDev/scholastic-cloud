@@ -885,6 +885,44 @@ export interface UpdateDepartmentData {
   slug?: string;
 }
 
+// Disbursement types
+export interface DisbursementType {
+  id: string;
+  institution_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Disbursement {
+  id: string;
+  institution_id: string;
+  disbursement_type_id: string | null;
+  type_name: string | null;
+  title: string;
+  description: string | null;
+  amount: string;
+  date_issued: string;
+  in_charge_user_id: string | null;
+  in_charge_name: string | null;
+  receipt_url: string | null;
+  receipt_name: string | null;
+  receipt_mime: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DisbursementFormData {
+  title: string;
+  description?: string;
+  amount: number;
+  date_issued: string;
+  disbursement_type_id?: string | null;
+  in_charge_user_id?: string | null;
+  receipt?: File | null;
+  remove_receipt?: boolean;
+}
+
 // Institution types
 export interface Institution {
   id: string;

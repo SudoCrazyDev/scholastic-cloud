@@ -9,6 +9,8 @@ use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\CoreValueMarkingController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\DisbursementController;
+use App\Http\Controllers\DisbursementTypeController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\DefaultDiscountController;
@@ -367,6 +369,20 @@ Route::middleware('auth.token')->group(function () {
 
     // Receipt templates
     Route::apiResource('receipt-templates', ReceiptTemplateController::class);
+
+    // Disbursement types (dynamic expense categories)
+    Route::get('disbursement-types', [DisbursementTypeController::class, 'index']);
+    Route::post('disbursement-types', [DisbursementTypeController::class, 'store']);
+    Route::put('disbursement-types/{id}', [DisbursementTypeController::class, 'update']);
+    Route::patch('disbursement-types/{id}', [DisbursementTypeController::class, 'update']);
+    Route::delete('disbursement-types/{id}', [DisbursementTypeController::class, 'destroy']);
+
+    // Disbursements / expenses (update is POST-based for multipart receipt uploads)
+    Route::get('disbursements', [DisbursementController::class, 'index']);
+    Route::post('disbursements', [DisbursementController::class, 'store']);
+    Route::get('disbursements/{id}', [DisbursementController::class, 'show']);
+    Route::post('disbursements/{id}', [DisbursementController::class, 'update']);
+    Route::delete('disbursements/{id}', [DisbursementController::class, 'destroy']);
 
     // Finance collections (monthly/quarterly breakdown)
     Route::get('finance/collections', [FinanceDashboardController::class, 'collections']);
