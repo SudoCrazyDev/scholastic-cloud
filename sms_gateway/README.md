@@ -60,13 +60,23 @@ npm run dev
 
 ### Linux / Raspberry Pi OS Lite
 ```bash
-sudo ./deploy/install.sh
-# then edit /opt/sms_gateway/.env, pair, and:
+sudo ./deploy/install.sh      # installs build tools + usb-modeswitch, builds, adds the service
+# pair, then:
+sudo -u smsgw node /opt/sms_gateway/dist/index.js --pair <CODE>
 sudo systemctl enable --now sms-gateway
 journalctl -u sms-gateway -f
 ```
-Use `deploy/99-gsm-modem.rules` to pin a stable `/dev/gsm-modem` symlink so the
-port survives reboots.
+The modem is **auto-detected**, so `SERIAL_PORT` can stay blank and no udev
+symlink is required. If you'd still like a stable `/dev/gsm-modem` path, see
+`deploy/99-gsm-modem.rules`.
+
+### Modem auto-detection
+Leave `SERIAL_PORT` blank and the agent finds the modem on startup: it ranks
+serial ports by known cellular-modem USB vendor (Huawei, SIMCom, Quectel, ZTE,
+…) and confirms each really is a modem by checking it answers `AT` and
+`AT+CGMM`. At boot it retries for ~30s so a slow-to-enumerate USB modem is still
+found. Run `npm run list-ports` to see what's detected (likely modems are
+flagged). Set `SERIAL_PORT` explicitly only to override.
 
 ### Windows
 ```powershell

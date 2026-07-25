@@ -263,28 +263,68 @@ export class Modem {
   }
 }
 
-/** Probe candidate serial ports with `AT` and return the first that answers `OK`. */
+// USB vendor IDs of common cellular/GSM modem makers — probed first.
+const MODEM_VENDOR_IDS = new Set([
+  '12d1', // Huawei
+  '1e0e', // SIMCom
+  '2c7c', // Quectel
+  '19d2', // ZTE
+  '1bc7', // Telit
+  '1546', // u-blox
+  '1199', // Sierra Wireless
+  '05c6', // Qualcomm (generic)
+  '2cb7', // Fibocom
+  '0403', // FTDI (many SIM800/900 breakout boards)
+])
+
+const PORT_PATH_RE = /ttyUSB|ttyACM|ttyAMA|ttyS|rfcomm|COM\d|wwan|modem|serial|UART/i
+
+/**
+ * Find a connected GSM modem automatically. Ranks candidate serial ports by
+ * known cellular-modem USB vendor, then confirms each really is a modem by
+ * checking it answers `AT` (→ OK) and `AT+CGMM` (→ a model string) — so it
+ * won't latch onto an unrelated serial device.
+ */
 export async function autoDetectPort(baud: number): Promise<string | null> {
   const ports = await SerialPort.list()
   const candidates = ports
-    .map((p) => p.path)
-    .filter((p) => /ttyUSB|ttyACM|COM|wwan|modem|serial/i.test(p))
-  for (const path of candidates) {
-    const ok = await probe(path, baud)
-    if (ok) {
-      log.info(`Modem responds on ${path}`)
-      return path
+    .filter((p) => PORT_PATH_RE.test(p.path))
+    .map((p) => ({
+      path: p.path,
+      known: !!p.vendorId && MODEM_VENDOR_IDS.has(p.vendorId.toLowerCase()),
+      manufacturer: p.manufacturer,
+    }))
+    // Known modem vendors first; the AT interface is often the higher-numbered port.
+    .sort((a, b) => Number(b.known) - Number(a.known))
+
+  let fallback: string | null = null
+  for (const c of candidates) {
+    const score = await probeModem(c.path, baud)
+    if (score >= 2) {
+      log.info(`GSM modem found on ${c.path}${c.manufacturer ? ` (${c.manufacturer})` : ''}`)
+      return c.path
     }
+    if (score === 1 && !fallback) fallback = c.path // AT-responsive but no CGMM confirmation
+  }
+
+  if (fallback) {
+    log.info(`Using AT-responsive port ${fallback} (no model confirmation)`)
+    return fallback
   }
   return null
 }
 
-function probe(path: string, baud: number): Promise<boolean> {
+/** 0 = not a modem, 1 = answers AT, 2 = answers AT and AT+CGMM (confirmed modem). */
+function probeModem(path: string, baud: number): Promise<number> {
   return new Promise((resolve) => {
     let done = false
-    const finish = (v: boolean) => {
+    let buf = ''
+    let sawOk = false
+
+    const finish = (v: number) => {
       if (done) return
       done = true
+      clearTimeout(timer)
       try {
         port.close()
       } catch {
@@ -292,23 +332,41 @@ function probe(path: string, baud: number): Promise<boolean> {
       }
       resolve(v)
     }
+
     const port = new SerialPort({ path, baudRate: baud }, (err) => {
-      if (err) return finish(false)
-      port.write('AT\r')
+      if (err) return finish(0)
+      port.write('ATE0\r') // echo off so replies are clean
+      setTimeout(() => port.write('AT\r'), 150)
+      setTimeout(() => port.write('AT+CGMM\r'), 400)
     })
-    let buf = ''
+
     port.on('data', (c: Buffer) => {
       buf += c.toString('latin1')
-      if (buf.includes('OK')) finish(true)
+      if (!sawOk && /\bOK\b/.test(buf)) sawOk = true
+      // A CGMM reply is a non-empty line that isn't an echo/status token.
+      const modelLine = buf
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .find((l) => l.length >= 2 && !/^(AT|OK|ERROR|\+CME|\+CMS)/i.test(l))
+      if (sawOk && modelLine) finish(2)
     })
-    port.on('error', () => finish(false))
-    setTimeout(() => finish(false), 1500)
+    port.on('error', () => finish(0))
+
+    const timer = setTimeout(() => finish(sawOk ? 1 : 0), 2500)
   })
 }
 
 export async function listPorts(): Promise<void> {
   const ports = await SerialPort.list()
+  if (ports.length === 0) {
+    log.info('No serial ports found.')
+    return
+  }
   for (const p of ports) {
-    log.info(`${p.path}  ${p.manufacturer ?? ''} ${p.productId ? `(pid ${p.productId})` : ''}`)
+    const known = p.vendorId && MODEM_VENDOR_IDS.has(p.vendorId.toLowerCase()) ? '  <- likely GSM modem' : ''
+    log.info(
+      `${p.path}  ${p.manufacturer ?? ''}` +
+        `${p.vendorId ? ` [${p.vendorId}:${p.productId ?? '????'}]` : ''}${known}`,
+    )
   }
 }

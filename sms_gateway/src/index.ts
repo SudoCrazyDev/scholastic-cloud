@@ -4,6 +4,26 @@ import { Modem, autoDetectPort, listPorts } from './modem.js'
 import { Portal } from './portal.js'
 import { Agent } from './agent.js'
 
+/**
+ * Resolve the modem serial port. An explicit SERIAL_PORT wins; otherwise auto-detect,
+ * retrying a few times so a modem that enumerates slowly at boot (common on a Pi) is
+ * still found instead of failing immediately.
+ */
+async function resolveSerialPort(configured: string | null, baud: number): Promise<string | null> {
+  if (configured) return configured
+
+  const attempts = 10
+  for (let i = 0; i < attempts; i++) {
+    const found = await autoDetectPort(baud)
+    if (found) return found
+    if (i < attempts - 1) {
+      log.warn(`No GSM modem detected yet (attempt ${i + 1}/${attempts}); retrying in 3s…`)
+      await new Promise((r) => setTimeout(r, 3000))
+    }
+  }
+  return null
+}
+
 async function main(): Promise<void> {
   const config = loadConfig()
   setLogLevel(config.logLevel)
@@ -56,9 +76,10 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const path = config.serialPort ?? (await autoDetectPort(config.serialBaud))
+  const path = await resolveSerialPort(config.serialPort, config.serialBaud)
   if (!path) {
-    log.error('No GSM modem found. Set SERIAL_PORT in .env or check the USB connection.')
+    log.error('No GSM modem found. Plug in the USB modem, or set SERIAL_PORT in .env.')
+    log.error('Tip: run `npm run list-ports` to see detected serial devices.')
     process.exit(1)
   }
 
