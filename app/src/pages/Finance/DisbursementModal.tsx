@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Textarea } from '../../components/textarea'
-import { Listbox, ListboxOption, ListboxLabel } from '../../components/listbox'
 import { Autocomplete } from '../../components/autocomplete'
 import { FileText, X } from 'lucide-react'
 import type { Disbursement, DisbursementType, DisbursementFormData, User } from '../../types'
@@ -83,6 +82,8 @@ export function DisbursementModal({
   const existingReceipt = disbursement?.receipt_url && !removeReceipt && !receipt
   const userOptions = users.map((u) => ({ id: u.id, label: userLabel(u) }))
   const selectedUser = userOptions.find((o) => o.id === inChargeId) ?? null
+  const typeOptions = types.map((t) => ({ id: t.id, label: t.name }))
+  const selectedType = typeOptions.find((o) => o.id === typeId) ?? null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -138,24 +139,13 @@ export function DisbursementModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <Listbox
-              value={typeId}
-              onChange={(v: string) => setTypeId(v)}
-              placeholder="Select a type"
-              aria-label="Type"
-            >
-              <ListboxOption value="">
-                <ListboxLabel>
-                  <span className="text-zinc-500">No type</span>
-                </ListboxLabel>
-              </ListboxOption>
-              {types.map((t) => (
-                <ListboxOption key={t.id} value={t.id}>
-                  <ListboxLabel>{t.name}</ListboxLabel>
-                </ListboxOption>
-              ))}
-            </Listbox>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type (optional)</label>
+            <Autocomplete
+              value={selectedType}
+              onChange={(opt) => setTypeId(opt?.id ?? '')}
+              options={typeOptions}
+              placeholder="Select or search a type..."
+            />
           </div>
 
           <div>
