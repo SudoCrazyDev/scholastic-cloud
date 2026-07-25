@@ -2300,3 +2300,70 @@ export interface SavePayslipTemplateData {
   paper_size?: string;
   layout: PayslipTemplateElement[];
 }
+
+// ── SMS Gateway ────────────────────────────────────────────────────────────
+export interface SmsGateway {
+  id: string;
+  institution_id: string;
+  name: string;
+  location: string | null;
+  platform: 'linux' | 'windows' | 'unknown';
+  status: 'online' | 'offline' | 'unknown';
+  is_paired: boolean;
+  signal_strength: number | null;
+  network_operator: string | null;
+  sim_msisdn: string | null;
+  sim_balance: string | null;
+  imei: string | null;
+  modem_model: string | null;
+  agent_version: string | null;
+  last_seen_at: string | null;
+  pairing_code?: string;
+  pairing_code_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SmsMessageStatus =
+  | 'queued'
+  | 'sending'
+  | 'sent'
+  | 'delivered'
+  | 'failed'
+  | 'received'
+  | 'canceled';
+
+export interface SmsMessage {
+  id: string;
+  institution_id: string;
+  gateway_id: string | null;
+  direction: 'outbound' | 'inbound';
+  to_number: string | null;
+  from_number: string | null;
+  body: string;
+  status: SmsMessageStatus;
+  segments: number;
+  error: string | null;
+  provider_ref: string | null;
+  source: string | null;
+  queued_by: string | null;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  received_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SmsSettings {
+  id: string;
+  institution_id: string;
+  default_gateway_id: string | null;
+  rate_limit_per_minute: number;
+  send_window_start: string | null;
+  send_window_end: string | null;
+  opt_out_keywords: string;
+  sender_name: string | null;
+  created_at: string;
+  updated_at: string;
+}

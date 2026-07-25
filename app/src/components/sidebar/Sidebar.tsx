@@ -39,6 +39,8 @@ import {
   Megaphone,
   Send,
   Banknote,
+  Smartphone,
+  MessageSquare,
 } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 
@@ -308,6 +310,32 @@ const menuGroups: MenuGroup[] = [
         label: 'Staffs',
         icon: <UserCheck className="w-5 h-5" />,
         path: '/staffs',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+      },
+    ],
+  },
+  {
+    label: 'SMS Gateway',
+    items: [
+      {
+        id: 'sms-gateways',
+        label: 'Gateways',
+        icon: <Smartphone className="w-5 h-5" />,
+        path: '/sms/gateways',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+      },
+      {
+        id: 'sms-messages',
+        label: 'Messages',
+        icon: <MessageSquare className="w-5 h-5" />,
+        path: '/sms/messages',
+        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+      },
+      {
+        id: 'sms-settings',
+        label: 'SMS Settings',
+        icon: <Settings className="w-5 h-5" />,
+        path: '/sms/settings',
         allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
       },
     ],

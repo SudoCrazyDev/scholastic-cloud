@@ -1,0 +1,19 @@
+[Unit]
+Description=ScholasticCloud SMS Gateway agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust WorkingDirectory/User to your install location.
+WorkingDirectory=/opt/sms_gateway
+ExecStart=/usr/bin/node /opt/sms_gateway/dist/index.js
+Restart=always
+RestartSec=5
+User=smsgw
+# The modem device must be readable/writable by this user (dialout group).
+SupplementaryGroups=dialout
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -8,6 +8,10 @@ use App\Http\Controllers\BridgeController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\CoreValueMarkingController;
+use App\Http\Controllers\SmsBridgeController;
+use App\Http\Controllers\SmsGatewayController;
+use App\Http\Controllers\SmsMessageController;
+use App\Http\Controllers\SmsSettingsController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DisbursementController;
 use App\Http\Controllers\DisbursementTypeController;
@@ -76,6 +80,18 @@ Route::middleware('auth.bridge.token')->group(function () {
     Route::post('/bridge/zk-users/sync', [BridgeController::class, 'syncUsers']);
     Route::get('/bridge/pending-enrollments', [BridgeController::class, 'pendingEnrollments']);
     Route::post('/bridge/enrollment-done', [BridgeController::class, 'enrollmentDone']);
+});
+
+// SMS gateway pairing (public — one-time code)
+Route::post('/sms-gateway/pair', [SmsBridgeController::class, 'pair']);
+
+// SMS gateway kiosk endpoints (authenticated with per-gateway token)
+Route::middleware('auth.sms.token')->group(function () {
+    Route::post('/sms-gateway/heartbeat', [SmsBridgeController::class, 'heartbeat']);
+    Route::get('/sms-gateway/outbox', [SmsBridgeController::class, 'outbox']);
+    Route::post('/sms-gateway/outbox/status', [SmsBridgeController::class, 'outboxStatus']);
+    Route::post('/sms-gateway/delivery-reports', [SmsBridgeController::class, 'deliveryReports']);
+    Route::post('/sms-gateway/inbox', [SmsBridgeController::class, 'inbox']);
 });
 
 // Public routes (no authentication required)
@@ -461,6 +477,25 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('biometric/zk-users/{id}', [ZkUserMappingController::class, 'destroy']);
     Route::post('biometric/zk-users/{id}/enroll', [ZkUserMappingController::class, 'enroll']);
     Route::post('biometric/zk-users/{id}/trigger-fingerprint', [ZkUserMappingController::class, 'triggerFingerprint']);
+
+    // SMS Gateway — kiosk devices
+    Route::get('sms/gateways', [SmsGatewayController::class, 'index']);
+    Route::post('sms/gateways', [SmsGatewayController::class, 'store']);
+    Route::get('sms/gateways/{id}', [SmsGatewayController::class, 'show']);
+    Route::patch('sms/gateways/{id}', [SmsGatewayController::class, 'update']);
+    Route::delete('sms/gateways/{id}', [SmsGatewayController::class, 'destroy']);
+    Route::post('sms/gateways/{id}/refresh-pairing-code', [SmsGatewayController::class, 'refreshPairingCode']);
+
+    // SMS Gateway — messages
+    Route::get('sms/messages', [SmsMessageController::class, 'index']);
+    Route::post('sms/messages', [SmsMessageController::class, 'store']);
+    Route::get('sms/messages/{id}', [SmsMessageController::class, 'show']);
+    Route::post('sms/messages/{id}/retry', [SmsMessageController::class, 'retry']);
+    Route::post('sms/messages/{id}/cancel', [SmsMessageController::class, 'cancel']);
+
+    // SMS Gateway — settings
+    Route::get('sms/settings', [SmsSettingsController::class, 'show']);
+    Route::put('sms/settings', [SmsSettingsController::class, 'update']);
 
     // Announcements
     // Viewer feed (students + staff) — declared before the apiResource so the

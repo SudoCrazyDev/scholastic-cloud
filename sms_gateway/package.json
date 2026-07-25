@@ -1,0 +1,31 @@
+{
+  "name": "scholasticcloud-sms-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Headless on-prem SMS kiosk agent for ScholasticCloud. Sends and receives SMS through a USB GSM modem via AT commands, driven entirely by the ScholasticCloud portal.",
+  "type": "module",
+  "bin": {
+    "sms-gateway": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "pair": "tsx src/index.ts --pair",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx pdu.selftest.ts",
+    "list-ports": "tsx src/index.ts --list-ports"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

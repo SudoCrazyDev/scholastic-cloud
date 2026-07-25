@@ -61,6 +61,9 @@ import HrisZkUsers from './pages/HRIS/ZkUsers';
 import HrisAttendance from './pages/HRIS/Attendance';
 import HrisStaffSchedules from './pages/HRIS/StaffSchedules';
 import HrisPayroll from './pages/HRIS/Payroll';
+import SmsGateways from './pages/SMS/Gateways';
+import SmsMessages from './pages/SMS/Messages';
+import SmsSettings from './pages/SMS/Settings';
 import AnnouncementBoard from './pages/Announcements/AnnouncementBoard';
 import AnnouncementsManage from './pages/Announcements/AnnouncementsManage';
 
@@ -185,6 +188,9 @@ function App() {
               <Route path="hris/attendance" element={<HrisAttendance />} />
               <Route path="hris/staff-schedules" element={<HrisStaffSchedules />} />
               <Route path="hris/payroll" element={<HrisPayroll />} />
+              <Route path="sms/gateways" element={<SmsGateways />} />
+              <Route path="sms/messages" element={<SmsMessages />} />
+              <Route path="sms/settings" element={<SmsSettings />} />
               <Route path="announcements" element={<AnnouncementBoard />} />
               <Route path="announcements/manage" element={<AnnouncementsManage />} />
 
