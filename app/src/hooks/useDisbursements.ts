@@ -9,7 +9,6 @@ export function useDisbursements() {
   const queryClient = useQueryClient()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editing, setEditing] = useState<Disbursement | null>(null)
-  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false)
 
   const disbursementsQuery = useQuery({
     queryKey: ['disbursements'],
@@ -122,8 +121,6 @@ export function useDisbursements() {
     isModalOpen,
     editing,
     modalLoading: createMutation.isPending || updateMutation.isPending,
-    isTypeModalOpen,
-    setIsTypeModalOpen,
     handleCreate,
     handleEdit,
     handleModalClose,

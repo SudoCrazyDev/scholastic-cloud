@@ -3,7 +3,7 @@ import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Textarea } from '../../components/textarea'
 import { Select } from '../../components/select'
-import { Settings2, FileText, X } from 'lucide-react'
+import { FileText, X } from 'lucide-react'
 import type { Disbursement, DisbursementType, DisbursementFormData, User } from '../../types'
 
 interface DisbursementModalProps {
@@ -14,7 +14,6 @@ interface DisbursementModalProps {
   types: DisbursementType[]
   users: User[]
   loading?: boolean
-  onManageTypes: () => void
 }
 
 function userLabel(u: User): string {
@@ -32,7 +31,6 @@ export function DisbursementModal({
   types,
   users,
   loading = false,
-  onManageTypes,
 }: DisbursementModalProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -137,17 +135,7 @@ export function DisbursementModal({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-medium text-gray-700">Type</label>
-              <button
-                type="button"
-                onClick={onManageTypes}
-                className="text-xs text-primary-600 hover:text-primary-700 inline-flex items-center gap-1"
-              >
-                <Settings2 className="w-3.5 h-3.5" />
-                Manage types
-              </button>
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <Select
               value={typeId}
               onChange={(e) => setTypeId(e.target.value)}

@@ -167,7 +167,7 @@ function App() {
               <Route path="finance" element={<Finance />} />
               <Route path="finance/school-fees" element={<Finance />} />
               <Route path="payment-plans" element={<PaymentPlansView />} />
-              <Route path="finance/disbursements" element={<Disbursements />} />
+              <Route path="disbursements" element={<Disbursements />} />
               <Route path="finance-announcements" element={<FinanceAnnouncementsView />} />
               <Route path="finance/default-amounts" element={<Finance />} />
               <Route path="finance/cashiering" element={<Finance />} />

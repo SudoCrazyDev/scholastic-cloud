@@ -260,7 +260,7 @@ const menuGroups: MenuGroup[] = [
         id: 'disbursements',
         label: 'Disbursements',
         icon: <Banknote className="w-5 h-5" />,
-        path: '/finance/disbursements',
+        path: '/disbursements',
         allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
       },
     ],
