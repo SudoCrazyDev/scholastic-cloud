@@ -231,8 +231,24 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                   <th className="px-4 py-2.5">In</th>
                   <th className="px-4 py-2.5">Out</th>
                   <th className="px-4 py-2.5 text-right">Hours</th>
-                  <th className="px-4 py-2.5 text-right">Penalty</th>
-                  <th className="px-4 py-2.5 text-right">OT</th>
+                  <th
+                    className="px-4 py-2.5 text-right"
+                    title="Peso deducted from the daily rate for late arrival + undertime"
+                  >
+                    Penalty
+                  </th>
+                  <th
+                    className="px-4 py-2.5 text-right"
+                    title="Undertime — minutes punched out before the scheduled end"
+                  >
+                    UT
+                  </th>
+                  <th
+                    className="px-4 py-2.5 text-right"
+                    title="Overtime — only manager-approved minutes are paid"
+                  >
+                    OT
+                  </th>
                   <th className="px-4 py-2.5 text-right">Earned</th>
                   <th className="px-4 py-2.5" />
                 </tr>
@@ -240,6 +256,10 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
               <tbody>
                 {payslip.days.map((day) => {
                   const off = day.is_rest_day || day.is_holiday
+                  // The stored penalty bundles late + undertime; split out the
+                  // undertime share so the UT column can show what it cost.
+                  const undertimePenalty =
+                    day.undertime_minutes * payslip.undertime_penalty_per_minute
                   return (
                     <tr
                       key={day.id}
@@ -315,6 +335,29 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                         )}
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums">
+                        {day.undertime_minutes > 0 ? (
+                          <span
+                            className="text-red-600"
+                            title={
+                              undertimePenalty > 0
+                                ? `${day.undertime_minutes} min undertime · −${peso(undertimePenalty)}`
+                                : `${day.undertime_minutes} min undertime`
+                            }
+                          >
+                            {day.undertime_minutes}m
+                          </span>
+                        ) : day.waive_undertime ? (
+                          <span
+                            className="text-xs italic text-gray-400"
+                            title="Undertime waived by an approved exception"
+                          >
+                            waived
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
                         {day.overtime_minutes > 0 ? (
                           <span className="text-green-700" title={`${day.overtime_minutes} min approved`}>
                             +{peso(day.overtime_amount)}
@@ -349,7 +392,16 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                   <td className="px-4 py-2.5 text-right tabular-nums text-red-600">
                     {payslip.penalty_total > 0 ? `−${peso(payslip.penalty_total)}` : '—'}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-green-700">
+                  <td
+                    className="px-4 py-2.5 text-right tabular-nums text-red-600"
+                    title={`${payslip.undertime_minutes} min undertime this period`}
+                  >
+                    {payslip.undertime_minutes > 0 ? `${payslip.undertime_minutes}m` : '—'}
+                  </td>
+                  <td
+                    className="px-4 py-2.5 text-right tabular-nums text-green-700"
+                    title={`${payslip.overtime_minutes} min approved overtime this period`}
+                  >
                     {payslip.overtime_total > 0 ? `+${peso(payslip.overtime_total)}` : '—'}
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{peso(payslip.gross_pay)}</td>
