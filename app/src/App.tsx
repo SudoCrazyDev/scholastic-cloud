@@ -60,6 +60,7 @@ import HrisDevices from './pages/HRIS/Devices';
 import HrisZkUsers from './pages/HRIS/ZkUsers';
 import HrisAttendance from './pages/HRIS/Attendance';
 import HrisStaffSchedules from './pages/HRIS/StaffSchedules';
+import HrisAttendanceRequests from './pages/HRIS/AttendanceRequests';
 import HrisPayroll from './pages/HRIS/Payroll';
 import SmsGateways from './pages/SMS/Gateways';
 import SmsMessages from './pages/SMS/Messages';
@@ -187,6 +188,7 @@ function App() {
               <Route path="hris/zk-users" element={<HrisZkUsers />} />
               <Route path="hris/attendance" element={<HrisAttendance />} />
               <Route path="hris/staff-schedules" element={<HrisStaffSchedules />} />
+              <Route path="hris/attendance-requests" element={<HrisAttendanceRequests />} />
               <Route path="hris/payroll" element={<HrisPayroll />} />
               <Route path="sms/gateways" element={<SmsGateways />} />
               <Route path="sms/messages" element={<SmsMessages />} />

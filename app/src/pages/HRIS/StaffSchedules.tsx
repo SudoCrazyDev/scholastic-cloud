@@ -24,6 +24,7 @@ import { staffCalendarService } from '../../services/staffCalendarService'
 import { staffService } from '../../services/staffService'
 import type {
   CalendarEventType,
+  CalendarPayTreatment,
   CreateStaffCalendarEventData,
   CreateStaffScheduleData,
   DayOfWeek,
@@ -57,6 +58,34 @@ interface DayRow {
 
 type DayState = Record<DayOfWeek, DayRow>
 type Tab = 'schedules' | 'assign' | 'calendar' | 'table'
+
+interface EventForm {
+  title: string
+  type: CalendarEventType
+  description: string
+  pay_treatment: CalendarPayTreatment
+  dismissal_time: string // "HH:MM", blank = full day
+}
+
+const emptyEventForm = (): EventForm => ({
+  title: '',
+  type: 'holiday',
+  description: '',
+  pay_treatment: 'normal',
+  dismissal_time: '',
+})
+
+const CALENDAR_TYPE_LABELS: Record<CalendarEventType, string> = {
+  holiday: 'Holiday',
+  suspension: 'Work / class suspension',
+  event: 'Event (no effect on pay)',
+}
+
+const PAY_TREATMENT_LABELS: Record<CalendarPayTreatment, string> = {
+  normal: 'Pay by the usual rules',
+  full_day_paid: 'Pay everyone a full day',
+  no_pay: 'Nobody earns for this day',
+}
 
 // JS Date.getDay() (0=Sun) → our day_of_week keys
 const JS_DAY_TO_KEY: DayOfWeek[] = [
@@ -311,11 +340,7 @@ const StaffSchedules: React.FC = () => {
   })
   const [dayModalDate, setDayModalDate] = useState<string | null>(null)
   const [editingEvent, setEditingEvent] = useState<StaffCalendarEvent | null>(null)
-  const [eventForm, setEventForm] = useState<{ title: string; type: CalendarEventType; description: string }>({
-    title: '',
-    type: 'holiday',
-    description: '',
-  })
+  const [eventForm, setEventForm] = useState<EventForm>(emptyEventForm())
   const [eventError, setEventError] = useState<string | null>(null)
 
   const calendarCells = useMemo(() => {
@@ -353,7 +378,7 @@ const StaffSchedules: React.FC = () => {
     onSuccess: () => {
       invalidateCalendar()
       setEditingEvent(null)
-      setEventForm({ title: '', type: 'holiday', description: '' })
+      setEventForm(emptyEventForm())
       setEventError(null)
       toast.success('Calendar entry saved.')
     },
@@ -376,7 +401,7 @@ const StaffSchedules: React.FC = () => {
   const openDay = (dateStr: string) => {
     setDayModalDate(dateStr)
     setEditingEvent(null)
-    setEventForm({ title: '', type: 'holiday', description: '' })
+    setEventForm(emptyEventForm())
     setEventError(null)
   }
 
@@ -388,7 +413,13 @@ const StaffSchedules: React.FC = () => {
 
   const startEditEvent = (ev: StaffCalendarEvent) => {
     setEditingEvent(ev)
-    setEventForm({ title: ev.title, type: ev.type, description: ev.description || '' })
+    setEventForm({
+      title: ev.title,
+      type: ev.type,
+      description: ev.description || '',
+      pay_treatment: ev.pay_treatment || 'normal',
+      dismissal_time: ev.dismissal_time || '',
+    })
     setEventError(null)
   }
 
@@ -400,12 +431,16 @@ const StaffSchedules: React.FC = () => {
       return
     }
     if (!dayModalDate) return
+    // A plain event never touches pay; the API enforces the same thing.
+    const affectsPay = eventForm.type !== 'event'
     saveEventMutation.mutate({
       id: editingEvent?.id ?? null,
       data: {
         title: eventForm.title.trim(),
         description: eventForm.description.trim() || null,
         type: eventForm.type,
+        pay_treatment: affectsPay ? eventForm.pay_treatment : 'normal',
+        dismissal_time: affectsPay ? eventForm.dismissal_time || null : null,
         event_date: dayModalDate,
       },
     })
@@ -1463,13 +1498,33 @@ const StaffSchedules: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span
                           className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                            ev.type === 'holiday' ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'
+                            ev.type === 'holiday'
+                              ? 'bg-red-100 text-red-700'
+                              : ev.type === 'suspension'
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-primary-100 text-primary-700'
                           }`}
                         >
-                          {ev.type === 'holiday' ? 'Holiday' : 'Event'}
+                          {ev.type === 'holiday'
+                            ? 'Holiday'
+                            : ev.type === 'suspension'
+                              ? 'Suspension'
+                              : 'Event'}
                         </span>
                         <span className="truncate text-sm font-medium text-gray-900">{ev.title}</span>
                       </div>
+                      {(ev.dismissal_time || ev.pay_treatment !== 'normal') && (
+                        <p className="mt-0.5 text-xs font-medium text-amber-700">
+                          {[
+                            ev.dismissal_time ? `Dismissal ${ev.dismissal_time}` : null,
+                            ev.pay_treatment !== 'normal'
+                              ? PAY_TREATMENT_LABELS[ev.pay_treatment]
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      )}
                       {ev.description && <p className="mt-0.5 text-xs text-gray-500">{ev.description}</p>}
                     </div>
                     <div className="flex shrink-0 gap-1">
@@ -1498,7 +1553,7 @@ const StaffSchedules: React.FC = () => {
 
             <form onSubmit={submitEvent} className="space-y-3 border-t border-gray-100 pt-4">
               <p className="text-sm font-medium text-gray-700">
-                {editingEvent ? 'Edit entry' : 'Add holiday or event'}
+                {editingEvent ? 'Edit entry' : 'Add holiday, suspension or event'}
               </p>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-500">Type</label>
@@ -1507,10 +1562,10 @@ const StaffSchedules: React.FC = () => {
                   onChange={(e) =>
                     setEventForm((f) => ({ ...f, type: e.target.value as CalendarEventType }))
                   }
-                  options={[
-                    { value: 'holiday', label: 'Holiday' },
-                    { value: 'event', label: 'Event' },
-                  ]}
+                  options={(Object.keys(CALENDAR_TYPE_LABELS) as CalendarEventType[]).map((type) => ({
+                    value: type,
+                    label: CALENDAR_TYPE_LABELS[type],
+                  }))}
                   className="w-full"
                   disabled={saving}
                 />
@@ -1519,7 +1574,13 @@ const StaffSchedules: React.FC = () => {
                 label="Title"
                 value={eventForm.title}
                 onChange={(e) => setEventForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder={eventForm.type === 'holiday' ? 'e.g. Independence Day' : 'e.g. Staff meeting'}
+                placeholder={
+                  eventForm.type === 'holiday'
+                    ? 'e.g. Independence Day'
+                    : eventForm.type === 'suspension'
+                      ? 'e.g. Typhoon — half day per mayor’s order'
+                      : 'e.g. Staff meeting'
+                }
                 disabled={saving}
               />
               <Input
@@ -1529,6 +1590,50 @@ const StaffSchedules: React.FC = () => {
                 placeholder="Optional"
                 disabled={saving}
               />
+
+              {eventForm.type !== 'event' && (
+                <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                    Effect on payroll
+                  </p>
+                  <Input
+                    label="Early dismissal (optional)"
+                    type="time"
+                    value={eventForm.dismissal_time}
+                    onChange={(e) => setEventForm((f) => ({ ...f, dismissal_time: e.target.value }))}
+                    disabled={saving}
+                  />
+                  <p className="-mt-1 text-xs text-gray-600">
+                    For a half day, set the dismissal time. The day is measured against it instead of
+                    the scheduled end, so staff who stayed until dismissal earn a{' '}
+                    <strong>full daily rate</strong> — and anyone who left earlier is still docked.
+                  </p>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-500">Pay treatment</label>
+                    <Select
+                      value={eventForm.pay_treatment}
+                      onChange={(e) =>
+                        setEventForm((f) => ({
+                          ...f,
+                          pay_treatment: e.target.value as CalendarPayTreatment,
+                        }))
+                      }
+                      options={(Object.keys(PAY_TREATMENT_LABELS) as CalendarPayTreatment[]).map(
+                        (value) => ({ value, label: PAY_TREATMENT_LABELS[value] })
+                      )}
+                      className="w-full"
+                      disabled={saving}
+                    />
+                    <p className="mt-1 text-xs text-gray-600">
+                      {eventForm.pay_treatment === 'full_day_paid'
+                        ? 'Everyone is paid a full day and no late/undertime is charged, even with no punches. Use when nobody is expected to report.'
+                        : eventForm.pay_treatment === 'no_pay'
+                          ? 'Nobody earns for this date.'
+                          : 'Leave as-is when staff still report — pay follows the schedule, penalties and any dismissal time above.'}
+                    </p>
+                  </div>
+                </div>
+              )}
               {eventError && (
                 <p className="text-sm text-red-600" role="alert">
                   {eventError}
@@ -1545,7 +1650,7 @@ const StaffSchedules: React.FC = () => {
                     disabled={saving}
                     onClick={() => {
                       setEditingEvent(null)
-                      setEventForm({ title: '', type: 'holiday', description: '' })
+                      setEventForm(emptyEventForm())
                       setEventError(null)
                     }}
                   >

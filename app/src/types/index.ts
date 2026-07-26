@@ -579,7 +579,15 @@ export interface AssignStaffScheduleResult {
 }
 
 // Calendar — holidays & events
-export type CalendarEventType = 'holiday' | 'event';
+export type CalendarEventType = 'holiday' | 'event' | 'suspension';
+
+// What payroll does with the day.
+//  'normal'        — price by the usual hours / penalty rules
+//  'full_day_paid' — every staff member earns the full daily rate, punches or not
+//  'no_pay'        — the day earns nothing
+// Independent of `dismissal_time`, which instead shortens the working day so
+// staff who stayed until dismissal earn a full day through the normal rules.
+export type CalendarPayTreatment = 'normal' | 'full_day_paid' | 'no_pay';
 
 export interface StaffCalendarEvent {
   id: string;
@@ -587,6 +595,8 @@ export interface StaffCalendarEvent {
   title: string;
   description?: string | null;
   type: CalendarEventType;
+  pay_treatment: CalendarPayTreatment;
+  dismissal_time?: string | null; // "HH:MM" — early dismissal for a half-day
   event_date: string; // YYYY-MM-DD
   created_at?: string | null;
   updated_at?: string | null;
@@ -596,7 +606,64 @@ export interface CreateStaffCalendarEventData {
   title: string;
   description?: string | null;
   type: CalendarEventType;
+  pay_treatment?: CalendarPayTreatment;
+  dismissal_time?: string | null;
   event_date: string;
+}
+
+// --- Attendance exception requests (HRIS) ---
+
+export type AttendanceRequestKind =
+  | 'late_arrival'
+  | 'early_out'
+  | 'official_business'
+  | 'forgot_punch';
+
+export type AttendanceRequestStatus = 'pending' | 'approved' | 'disapproved' | 'cancelled';
+
+export interface StaffAttendanceRequest {
+  id: string;
+  user_id: string;
+  staff_name: string | null;
+  date_from: string; // YYYY-MM-DD
+  date_to: string;
+  kind: AttendanceRequestKind;
+  waive_late: boolean;
+  waive_undertime: boolean;
+  pay_full_day: boolean;
+  credited_time_in: string | null; // "HH:MM"
+  credited_time_out: string | null;
+  reason: string;
+  status: AttendanceRequestStatus;
+  review_note: string | null;
+  requested_by: string | null;
+  requested_by_name: string | null;
+  reviewed_by_name: string | null;
+  reviewed_at: string | null;
+  created_at: string | null;
+}
+
+export interface CreateAttendanceRequestData {
+  user_id?: string | null; // approvers only — file on behalf of a staff member
+  date_from: string;
+  date_to: string;
+  kind: AttendanceRequestKind;
+  reason: string;
+  credited_time_in?: string | null;
+  credited_time_out?: string | null;
+  // Approver-only overrides of the defaults derived from `kind`.
+  waive_late?: boolean;
+  waive_undertime?: boolean;
+  pay_full_day?: boolean;
+}
+
+export interface ApproveAttendanceRequestData {
+  waive_late?: boolean;
+  waive_undertime?: boolean;
+  pay_full_day?: boolean;
+  credited_time_in?: string | null;
+  credited_time_out?: string | null;
+  review_note?: string | null;
 }
 
 export interface StudentInstallment {
@@ -2163,6 +2230,10 @@ export interface PayslipSummary {
   net_pay: number;
 }
 
+// How a payslip day is priced once any exception is taken into account.
+// 'full_day' guarantees the daily rate regardless of hours worked.
+export type PayslipDayPayPolicy = 'normal' | 'full_day' | 'no_pay';
+
 export interface PayslipDay {
   id: string;
   work_date: string;
@@ -2177,6 +2248,12 @@ export interface PayslipDay {
   overtime_minutes: number; // approved by the payroll manager — these are paid
   overtime_amount: number;
   amount_earned: number;
+  schedule_start: string | null; // "HH:MM" — reflects an announced dismissal time when the day was shortened
+  schedule_end: string | null;
+  waive_late: boolean;
+  waive_undertime: boolean;
+  pay_policy: PayslipDayPayPolicy;
+  exception_label: string | null; // e.g. "Typhoon suspension · Approved early out"
   is_holiday: boolean;
   is_rest_day: boolean;
 }

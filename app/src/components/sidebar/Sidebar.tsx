@@ -36,6 +36,7 @@ import {
   Monitor,
   Clock,
   CalendarClock,
+  CalendarCheck,
   Megaphone,
   Send,
   Banknote,
@@ -297,6 +298,24 @@ const menuGroups: MenuGroup[] = [
         icon: <CalendarClock className="w-5 h-5" />,
         path: '/hris/staff-schedules',
         allowedRoles: ['principal', 'institution-administrator'],
+      },
+      {
+        // Every staff member files their own; approvers also get a review queue.
+        id: 'hris-attendance-requests',
+        label: 'Attendance Requests',
+        icon: <CalendarCheck className="w-5 h-5" />,
+        path: '/hris/attendance-requests',
+        allowedRoles: [
+          'principal',
+          'institution-administrator',
+          'subject-teacher',
+          'department-head',
+          'hr-admin',
+          'hr',
+          'staff',
+          'registrar',
+          'finance',
+        ],
       },
       {
         id: 'hris-payroll',

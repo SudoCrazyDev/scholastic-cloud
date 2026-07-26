@@ -439,9 +439,16 @@ Route::middleware('auth.token')->group(function () {
     Route::post('staff-schedules/{id}/assign', [\App\Http\Controllers\StaffScheduleController::class, 'assign']);
     Route::apiResource('staff-schedules', \App\Http\Controllers\StaffScheduleController::class);
 
-    // HRIS — Staff calendar (holidays & events)
+    // HRIS — Staff calendar (holidays, events & suspensions)
     Route::apiResource('staff-calendar-events', \App\Http\Controllers\StaffCalendarEventController::class)
         ->only(['index', 'store', 'update', 'destroy']);
+
+    // HRIS — Attendance exception requests (early out, official business, …)
+    Route::get('staff-attendance-requests', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'index']);
+    Route::post('staff-attendance-requests', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'store']);
+    Route::post('staff-attendance-requests/{id}/approve', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'approve']);
+    Route::post('staff-attendance-requests/{id}/disapprove', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'disapprove']);
+    Route::post('staff-attendance-requests/{id}/cancel', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'cancel']);
 
     // HRIS — Payroll (compensation settings, deduction types, periods, payslips)
     Route::apiResource('payroll-deduction-types', \App\Http\Controllers\PayrollDeductionTypeController::class)

@@ -8,6 +8,7 @@ use App\Models\PayrollCompensation;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipDay;
+use App\Models\StaffAttendanceRequest;
 use App\Models\StaffCalendarEvent;
 use App\Models\StaffScheduleAssignment;
 use Carbon\Carbon;
@@ -41,12 +42,21 @@ class PayrollService
             ->get();
         $userIds = $compensations->pluck('user_id')->all();
 
-        $holidayDates = StaffCalendarEvent::where('institution_id', $institutionId)
-            ->where('type', 'holiday')
+        $calendarEntries = StaffCalendarEvent::where('institution_id', $institutionId)
             ->whereBetween('event_date', [$from->toDateString(), $to->toDateString()])
+            ->get();
+
+        $holidayDates = $calendarEntries
+            ->where('type', 'holiday')
             ->pluck('event_date')
             ->map(fn ($date) => Carbon::parse($date)->toDateString())
             ->flip();
+
+        // Institution-wide pay policy per date (suspensions, paid holidays).
+        $dayPolicies = $this->buildDayPolicies($calendarEntries);
+
+        // Approved per-staff exceptions, expanded per date: [user_id][Y-m-d].
+        $staffExceptions = $this->buildStaffExceptions($institutionId, $userIds, $from, $to);
 
         $assignments = StaffScheduleAssignment::with('staffSchedule.days')
             ->where('institution_id', $institutionId)
@@ -67,13 +77,24 @@ class PayrollService
 
         $generated = 0;
 
-        DB::transaction(function () use ($period, $compensations, $assignments, $punches, $holidayDates, $lateRate, $undertimeRate, $defaultOvertimeRate, &$generated) {
+        DB::transaction(function () use ($period, $compensations, $assignments, $punches, $holidayDates, $dayPolicies, $staffExceptions, $lateRate, $undertimeRate, $defaultOvertimeRate, &$generated) {
             $period->payslips()->delete();
 
             foreach ($compensations as $compensation) {
                 // Per-staff overtime rate, falling back to the institution default.
                 $overtimeRate = $compensation->effectiveOvertimeRate($defaultOvertimeRate);
-                $this->buildPayslip($period, $compensation, $assignments->get($compensation->user_id), $punches[$compensation->user_id] ?? [], $holidayDates, $lateRate, $undertimeRate, $overtimeRate);
+                $this->buildPayslip(
+                    $period,
+                    $compensation,
+                    $assignments->get($compensation->user_id),
+                    $punches[$compensation->user_id] ?? [],
+                    $holidayDates,
+                    $dayPolicies,
+                    $staffExceptions[$compensation->user_id] ?? [],
+                    $lateRate,
+                    $undertimeRate,
+                    $overtimeRate
+                );
                 $generated++;
             }
         });
@@ -81,12 +102,18 @@ class PayrollService
         return ['generated' => $generated];
     }
 
+    /**
+     * @param  array<string, array>  $dayPolicies  institution-wide policy keyed by Y-m-d
+     * @param  array<string, array>  $userExceptions  this staff member's approved exceptions keyed by Y-m-d
+     */
     private function buildPayslip(
         PayrollPeriod $period,
         PayrollCompensation $compensation,
         ?StaffScheduleAssignment $assignment,
         array $userPunches,
         \Illuminate\Support\Collection $holidayDates,
+        array $dayPolicies,
+        array $userExceptions,
         float $lateRate,
         float $undertimeRate,
         float $overtimeRate
@@ -119,6 +146,14 @@ class PayrollService
                 ? $scheduleDay === null
                 : $date->isWeekend();
 
+            // Institution-wide policy for the date merged with this staff
+            // member's own approved requests.
+            $exception = $this->mergeException(
+                $dayPolicies[$dateKey] ?? null,
+                $userExceptions[$dateKey] ?? null,
+                $isRestDay
+            );
+
             $dayPunches = $userPunches[$dateKey] ?? [];
             $timeIn = null;
             $timeOut = null;
@@ -129,11 +164,23 @@ class PayrollService
                 $timeOut = end($dayPunches)->format('H:i:s');
             }
 
+            // An approved request may supply the times a missing punch would
+            // have recorded. It never overwrites a real punch.
+            $timeIn ??= $exception['credited_time_in'];
+            $timeOut ??= $exception['credited_time_out'];
+
             $lunchStart = $scheduleDay?->lunch_start;
             $lunchEnd = $scheduleDay?->lunch_end;
 
+            $scheduleStart = $scheduleDay?->start_time;
+            // A dismissal time (LGU half-day) shortens the day: payroll stores
+            // it as the effective schedule end, so undertime is measured
+            // against dismissal and a staff member who stayed until then earns
+            // the full daily rate through the ordinary penalty model.
+            $scheduleEnd = $this->effectiveScheduleEnd($scheduleStart, $scheduleDay?->end_time, $exception['dismissal_time']);
+
             $requiredHours = $scheduleDay
-                ? $this->netScheduleHours($scheduleDay->start_time, $scheduleDay->end_time, $lunchStart, $lunchEnd)
+                ? $this->netScheduleHours($scheduleStart, $scheduleEnd, $lunchStart, $lunchEnd)
                 : (float) $compensation->hours_per_day;
 
             $isHoliday = $holidayDates->has($dateKey);
@@ -141,8 +188,8 @@ class PayrollService
             $priced = $this->priceDay(
                 $timeIn,
                 $timeOut,
-                $scheduleDay?->start_time,
-                $scheduleDay?->end_time,
+                $scheduleStart,
+                $scheduleEnd,
                 (int) ($scheduleDay->grace_minutes ?? 0),
                 $isHoliday,
                 $hours,
@@ -152,7 +199,10 @@ class PayrollService
                 $lateRate,
                 $undertimeRate,
                 0, // approved overtime starts at zero — a payroll manager grants it per day
-                $overtimeRate
+                $overtimeRate,
+                $exception['waive_late'],
+                $exception['waive_undertime'],
+                $exception['pay_policy']
             );
 
             $rows[] = new PayslipDay([
@@ -161,9 +211,13 @@ class PayrollService
                 'time_out' => $timeOut,
                 'lunch_start' => $lunchStart,
                 'lunch_end' => $lunchEnd,
-                'schedule_start' => $scheduleDay?->start_time,
-                'schedule_end' => $scheduleDay?->end_time,
+                'schedule_start' => $scheduleStart,
+                'schedule_end' => $scheduleEnd,
                 'grace_minutes' => (int) ($scheduleDay->grace_minutes ?? 0),
+                'waive_late' => $exception['waive_late'],
+                'waive_undertime' => $exception['waive_undertime'],
+                'pay_policy' => $exception['pay_policy'],
+                'exception_label' => $exception['label'],
                 'required_hours' => round($requiredHours, 2),
                 'hours_worked' => $hours,
                 'late_minutes' => $priced['late_minutes'],
@@ -254,7 +308,10 @@ class PayrollService
         $totalDeductions = round((float) $payslip->deductions()->sum('amount'), 2);
 
         $payslip->update([
-            'days_worked' => $days->filter(fn ($day) => (float) $day->hours_worked > 0)->count(),
+            // A fully-paid exception day counts as worked even with no punches
+            // (approved official business, a paid suspension).
+            'days_worked' => $days->filter(fn ($day) => (float) $day->hours_worked > 0
+                || $day->pay_policy === PayslipDay::PAY_FULL_DAY)->count(),
             'hours_worked' => round((float) $days->sum('hours_worked'), 2),
             'late_minutes' => (int) $days->sum('late_minutes'),
             'undertime_minutes' => (int) $days->sum('undertime_minutes'),
@@ -305,6 +362,19 @@ class PayrollService
      * (informational) — pay comes solely from the approved $overtimeMinutes
      * a payroll manager granted on the day, at ₱/minute, on top of the base.
      *
+     * Day exceptions (a calendar suspension or an approved staff request)
+     * layer on top:
+     *
+     * - $waiveLate / $waiveUndertime zero out the corresponding penalty. This
+     *   is the only thing that forgives a penalty.
+     * - $payPolicy `full_day` replaces the *hours-based fallback* with the
+     *   daily rate, so a staff member out on approved official business with
+     *   no punch at all is still paid. It deliberately does NOT apply on the
+     *   penalty branch, which already starts from the full daily rate — the
+     *   surviving penalty there is one no waiver covered, and an approved
+     *   early-out must not silently forgive an unrelated late arrival.
+     * - $payPolicy `no_pay` zeroes the day outright, overtime included.
+     *
      * @return array{late_minutes: int, undertime_minutes: int, penalty_amount: float, detected_overtime_minutes: int, overtime_amount: float, amount_earned: float}
      */
     private function priceDay(
@@ -321,13 +391,28 @@ class PayrollService
         float $lateRate,
         float $undertimeRate,
         int $overtimeMinutes,
-        float $overtimeRate
+        float $overtimeRate,
+        bool $waiveLate = false,
+        bool $waiveUndertime = false,
+        string $payPolicy = PayslipDay::PAY_NORMAL
     ): array {
         $detectedOvertime = 0;
         if (! $isHoliday && $scheduleEnd && $timeOut) {
             $detectedOvertime = intdiv(max(0, $this->toSeconds($timeOut) - $this->toSeconds($scheduleEnd)), 60);
         }
 
+        if ($payPolicy === PayslipDay::PAY_NO_PAY) {
+            return [
+                'late_minutes' => 0,
+                'undertime_minutes' => 0,
+                'penalty_amount' => 0.0,
+                'detected_overtime_minutes' => $detectedOvertime,
+                'overtime_amount' => 0.0,
+                'amount_earned' => 0.0,
+            ];
+        }
+
+        $payFullDay = $payPolicy === PayslipDay::PAY_FULL_DAY;
         $overtimeAmount = round($overtimeMinutes * $overtimeRate, 2);
 
         $usePenalties = ! $isHoliday
@@ -336,20 +421,29 @@ class PayrollService
             && ($lateRate > 0 || $undertimeRate > 0);
 
         if (! $usePenalties) {
+            $base = $payFullDay
+                ? round($dailyRate, 2)
+                : $this->earnedAmount($hours, $requiredHours, $dailyRate, $hourlyRate);
+
             return [
                 'late_minutes' => 0,
                 'undertime_minutes' => 0,
                 'penalty_amount' => 0.0,
                 'detected_overtime_minutes' => $detectedOvertime,
                 'overtime_amount' => $overtimeAmount,
-                'amount_earned' => round($this->earnedAmount($hours, $requiredHours, $dailyRate, $hourlyRate) + $overtimeAmount, 2),
+                'amount_earned' => round($base + $overtimeAmount, 2),
             ];
         }
 
         $graceEnd = $this->toSeconds($scheduleStart) + $graceMinutes * 60;
-        $lateMinutes = intdiv(max(0, $this->toSeconds($timeIn) - $graceEnd), 60);
-        $undertimeMinutes = intdiv(max(0, $this->toSeconds($scheduleEnd) - $this->toSeconds($timeOut)), 60);
+        $lateMinutes = $waiveLate ? 0 : intdiv(max(0, $this->toSeconds($timeIn) - $graceEnd), 60);
+        $undertimeMinutes = $waiveUndertime ? 0 : intdiv(max(0, $this->toSeconds($scheduleEnd) - $this->toSeconds($timeOut)), 60);
         $penalty = round($lateMinutes * $lateRate + $undertimeMinutes * $undertimeRate, 2);
+
+        // No $payFullDay here on purpose: this branch already starts from the
+        // full daily rate, and the surviving penalty is one the exception did
+        // not waive. An approved early-out must not also forgive lateness.
+        $base = max(0, $dailyRate - $penalty);
 
         return [
             'late_minutes' => $lateMinutes,
@@ -357,7 +451,7 @@ class PayrollService
             'penalty_amount' => $penalty,
             'detected_overtime_minutes' => $detectedOvertime,
             'overtime_amount' => $overtimeAmount,
-            'amount_earned' => round(max(0, $dailyRate - $penalty) + $overtimeAmount, 2),
+            'amount_earned' => round($base + $overtimeAmount, 2),
         ];
     }
 
@@ -381,7 +475,10 @@ class PayrollService
             (float) $payslip->late_penalty_per_minute,
             (float) $payslip->undertime_penalty_per_minute,
             (int) $day->overtime_minutes,
-            (float) $payslip->overtime_rate_per_minute
+            (float) $payslip->overtime_rate_per_minute,
+            (bool) $day->waive_late,
+            (bool) $day->waive_undertime,
+            (string) ($day->pay_policy ?: PayslipDay::PAY_NORMAL)
         );
     }
 
@@ -402,12 +499,214 @@ class PayrollService
         return round(min($hours * $hourlyRate, $dailyRate), 2);
     }
 
+    /**
+     * Institution-wide pay policy per date, from the staff calendar.
+     *
+     * Multiple entries may share a date. They are merged conservatively:
+     * the earliest dismissal wins (the shortest day is the one that was
+     * actually announced), and a paid treatment outranks an unpaid one.
+     *
+     * @param  \Illuminate\Support\Collection<int, StaffCalendarEvent>  $entries
+     * @return array<string, array{pay_treatment: string, dismissal_time: ?string, label: string}>
+     */
+    private function buildDayPolicies(\Illuminate\Support\Collection $entries): array
+    {
+        $policies = [];
+
+        foreach ($entries as $entry) {
+            if (! $entry->affectsPay()) {
+                continue;
+            }
+
+            $dateKey = Carbon::parse($entry->event_date)->toDateString();
+            $dismissal = $entry->dismissal_time ? substr((string) $entry->dismissal_time, 0, 8) : null;
+            $existing = $policies[$dateKey] ?? null;
+
+            if ($existing === null) {
+                $policies[$dateKey] = [
+                    'pay_treatment' => $entry->pay_treatment,
+                    'dismissal_time' => $dismissal,
+                    'label' => $entry->title,
+                ];
+
+                continue;
+            }
+
+            if ($dismissal !== null && ($existing['dismissal_time'] === null || $dismissal < $existing['dismissal_time'])) {
+                $policies[$dateKey]['dismissal_time'] = $dismissal;
+            }
+
+            if ($entry->pay_treatment === StaffCalendarEvent::PAY_FULL_DAY
+                || ($entry->pay_treatment === StaffCalendarEvent::PAY_NO_PAY && $existing['pay_treatment'] === StaffCalendarEvent::PAY_NORMAL)) {
+                $policies[$dateKey]['pay_treatment'] = $entry->pay_treatment;
+            }
+
+            $policies[$dateKey]['label'] = $existing['label'].' · '.$entry->title;
+        }
+
+        return $policies;
+    }
+
+    /**
+     * Approved staff attendance requests, expanded to one entry per covered
+     * date: [user_id][Y-m-d]. Only approved rows reach payroll — pending or
+     * disapproved requests have no effect on pay.
+     *
+     * Overlapping approvals for the same day are unioned (any waiver granted
+     * stays granted) since each was approved on its own merits.
+     *
+     * @param  array<int, string>  $userIds
+     * @return array<string, array<string, array>>
+     */
+    private function buildStaffExceptions(string $institutionId, array $userIds, Carbon $from, Carbon $to): array
+    {
+        $requests = StaffAttendanceRequest::where('institution_id', $institutionId)
+            ->where('status', StaffAttendanceRequest::STATUS_APPROVED)
+            ->whereIn('user_id', $userIds ?: ['-'])
+            ->whereDate('date_from', '<=', $to->toDateString())
+            ->whereDate('date_to', '>=', $from->toDateString())
+            ->orderBy('created_at')
+            ->get();
+
+        $exceptions = [];
+
+        foreach ($requests as $requestRow) {
+            $start = $requestRow->date_from->copy()->max($from->copy()->startOfDay());
+            $end = $requestRow->date_to->copy()->min($to->copy()->startOfDay());
+            $label = $this->kindLabel($requestRow->kind);
+
+            foreach (CarbonPeriod::create($start, $end) as $date) {
+                $dateKey = $date->toDateString();
+                $existing = $exceptions[$requestRow->user_id][$dateKey] ?? null;
+
+                $exceptions[$requestRow->user_id][$dateKey] = [
+                    'waive_late' => ($existing['waive_late'] ?? false) || $requestRow->waive_late,
+                    'waive_undertime' => ($existing['waive_undertime'] ?? false) || $requestRow->waive_undertime,
+                    'pay_full_day' => ($existing['pay_full_day'] ?? false) || $requestRow->pay_full_day,
+                    'credited_time_in' => $existing['credited_time_in'] ?? $requestRow->credited_time_in,
+                    'credited_time_out' => $existing['credited_time_out'] ?? $requestRow->credited_time_out,
+                    'label' => $existing ? $existing['label'].' · '.$label : $label,
+                ];
+            }
+        }
+
+        return $exceptions;
+    }
+
+    /**
+     * Collapse the institution-wide policy and the staff member's own
+     * approved request into the single set of knobs priceDay understands.
+     *
+     * Precedence: an individually approved `pay_full_day` beats a blanket
+     * `no_pay`, because it was granted for that specific person and date.
+     *
+     * A rest day is never turned into a paid day by an institution-wide
+     * policy — otherwise a paid holiday landing on a Sunday would hand every
+     * staff member an extra day's pay for a day they never work. An
+     * individually approved request still counts, since somebody reviewed it.
+     *
+     * @return array{waive_late: bool, waive_undertime: bool, pay_policy: string, dismissal_time: ?string, credited_time_in: ?string, credited_time_out: ?string, label: ?string}
+     */
+    private function mergeException(?array $policy, ?array $staffException, bool $isRestDay = false): array
+    {
+        $waiveLate = (bool) ($staffException['waive_late'] ?? false);
+        $waiveUndertime = (bool) ($staffException['waive_undertime'] ?? false);
+        $payFullDay = (bool) ($staffException['pay_full_day'] ?? false);
+        $noPay = false;
+        $labels = [];
+
+        $dismissalTime = null;
+
+        if ($policy !== null) {
+            // The entry is still named on the printed record; only its pay
+            // effect is suppressed on a rest day.
+            $labels[] = $policy['label'];
+
+            if (! $isRestDay) {
+                $dismissalTime = $policy['dismissal_time'];
+
+                if ($policy['pay_treatment'] === StaffCalendarEvent::PAY_FULL_DAY) {
+                    // Nobody is expected to report on a fully-paid suspension,
+                    // so any punch that does land must not be penalised.
+                    $payFullDay = true;
+                    $waiveLate = true;
+                    $waiveUndertime = true;
+                } elseif ($policy['pay_treatment'] === StaffCalendarEvent::PAY_NO_PAY) {
+                    $noPay = true;
+                }
+            }
+        }
+
+        if (($staffException['label'] ?? null) !== null) {
+            $labels[] = $staffException['label'];
+        }
+
+        $payPolicy = PayslipDay::PAY_NORMAL;
+        if ($payFullDay) {
+            $payPolicy = PayslipDay::PAY_FULL_DAY;
+        } elseif ($noPay) {
+            $payPolicy = PayslipDay::PAY_NO_PAY;
+        }
+
+        return [
+            'waive_late' => $waiveLate,
+            'waive_undertime' => $waiveUndertime,
+            'pay_policy' => $payPolicy,
+            'dismissal_time' => $dismissalTime,
+            'credited_time_in' => $staffException['credited_time_in'] ?? null,
+            'credited_time_out' => $staffException['credited_time_out'] ?? null,
+            'label' => $labels === [] ? null : implode(' · ', $labels),
+        ];
+    }
+
+    /**
+     * The day's effective end time: normally the scheduled end, but pulled
+     * back to an announced dismissal time when that lands earlier. Clamped to
+     * the start so a dismissal before a staff member's shift even begins
+     * yields a zero-length day rather than a negative one.
+     */
+    private function effectiveScheduleEnd(?string $scheduleStart, ?string $scheduleEnd, ?string $dismissalTime): ?string
+    {
+        if ($scheduleEnd === null || $dismissalTime === null) {
+            return $scheduleEnd;
+        }
+
+        if ($this->toSeconds($dismissalTime) >= $this->toSeconds($scheduleEnd)) {
+            return $scheduleEnd;
+        }
+
+        if ($scheduleStart !== null && $this->toSeconds($dismissalTime) <= $this->toSeconds($scheduleStart)) {
+            return $scheduleStart;
+        }
+
+        return $dismissalTime;
+    }
+
+    private function kindLabel(string $kind): string
+    {
+        return match ($kind) {
+            StaffAttendanceRequest::KIND_LATE_ARRIVAL => 'Excused late arrival',
+            StaffAttendanceRequest::KIND_EARLY_OUT => 'Approved early out',
+            StaffAttendanceRequest::KIND_OFFICIAL_BUSINESS => 'Official business',
+            StaffAttendanceRequest::KIND_FORGOT_PUNCH => 'Missed punch',
+            default => 'Attendance exception',
+        };
+    }
+
+    /**
+     * Scheduled hours minus the lunch break. The break is clipped to the
+     * working window so a shortened day (dismissal at noon with a 12:00–13:00
+     * lunch) is not charged for a break that never happened.
+     */
     private function netScheduleHours(string $start, string $end, ?string $lunchStart, ?string $lunchEnd): float
     {
-        $seconds = $this->toSeconds($end) - $this->toSeconds($start);
+        $startSeconds = $this->toSeconds($start);
+        $endSeconds = $this->toSeconds($end);
+        $seconds = max(0, $endSeconds - $startSeconds);
 
         if ($lunchStart && $lunchEnd && $lunchEnd > $lunchStart) {
-            $seconds -= $this->toSeconds($lunchEnd) - $this->toSeconds($lunchStart);
+            $overlap = min($endSeconds, $this->toSeconds($lunchEnd)) - max($startSeconds, $this->toSeconds($lunchStart));
+            $seconds -= max(0, $overlap);
         }
 
         return round(max(0, $seconds) / 3600, 2);

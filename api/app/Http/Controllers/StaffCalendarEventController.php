@@ -62,6 +62,8 @@ class StaffCalendarEventController extends Controller
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'type' => $validated['type'],
+            'pay_treatment' => $validated['pay_treatment'],
+            'dismissal_time' => $validated['dismissal_time'],
             'event_date' => $validated['event_date'],
             'created_by' => $request->user()?->id,
         ]);
@@ -95,6 +97,8 @@ class StaffCalendarEventController extends Controller
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'type' => $validated['type'],
+            'pay_treatment' => $validated['pay_treatment'],
+            'dismissal_time' => $validated['dismissal_time'],
             'event_date' => $validated['event_date'],
         ]);
 
@@ -129,14 +133,32 @@ class StaffCalendarEventController extends Controller
         ]);
     }
 
+    /**
+     * A plain `event` is informational only, so its pay fields are forced back
+     * to the neutral values — a dismissal time on a staff meeting would
+     * otherwise silently shorten everyone's paid day.
+     */
     private function validatePayload(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'type' => ['required', Rule::in(StaffCalendarEvent::TYPES)],
+            'pay_treatment' => ['sometimes', 'nullable', Rule::in(StaffCalendarEvent::PAY_TREATMENTS)],
+            'dismissal_time' => 'sometimes|nullable|date_format:H:i',
             'event_date' => 'required|date',
         ]);
+
+        $affectsPay = $validated['type'] !== 'event';
+
+        $validated['pay_treatment'] = $affectsPay
+            ? ($validated['pay_treatment'] ?? StaffCalendarEvent::PAY_NORMAL)
+            : StaffCalendarEvent::PAY_NORMAL;
+
+        $dismissal = $affectsPay ? ($validated['dismissal_time'] ?? null) : null;
+        $validated['dismissal_time'] = $dismissal ? $dismissal.':00' : null;
+
+        return $validated;
     }
 
     private function serialize(StaffCalendarEvent $event): array
@@ -147,6 +169,8 @@ class StaffCalendarEventController extends Controller
             'title' => $event->title,
             'description' => $event->description,
             'type' => $event->type,
+            'pay_treatment' => $event->pay_treatment,
+            'dismissal_time' => $event->dismissal_time ? substr((string) $event->dismissal_time, 0, 5) : null,
             'event_date' => $event->event_date?->format('Y-m-d'),
             'created_at' => $event->created_at?->toIso8601String(),
             'updated_at' => $event->updated_at?->toIso8601String(),

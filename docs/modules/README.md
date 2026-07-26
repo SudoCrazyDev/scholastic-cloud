@@ -20,6 +20,11 @@ modules should consume its data.
 - [Staff Schedules](HRIS/StaffSchedules/STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates
   (weekly hours + lunch + per-day grace period), assigned to staff (one per staff), plus an
   institution calendar of holidays & events. Consumed by Payroll for lateness/undertime/overtime.
+- [Attendance Exceptions](HRIS/AttendanceExceptions/ATTENDANCE_EXCEPTIONS.md) — HRIS. How a day is
+  paid differently from what the punches say: institution-wide suspensions / half-days with an
+  early dismissal time and a pay treatment, plus per-staff requests (early out, excused late
+  arrival, official business, missed punch) that a principal approves. Waives late/undertime
+  penalties and can guarantee the full daily rate. Read before changing pay arithmetic.
 
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder

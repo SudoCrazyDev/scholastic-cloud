@@ -10,6 +10,15 @@ class PayslipDay extends Model
 {
     use HasUuids;
 
+    /** Price the day by the usual hours / penalty rules. */
+    public const PAY_NORMAL = 'normal';
+
+    /** Guarantee the daily rate regardless of hours worked. */
+    public const PAY_FULL_DAY = 'full_day';
+
+    /** The day earns nothing. */
+    public const PAY_NO_PAY = 'no_pay';
+
     protected $fillable = [
         'payslip_id',
         'work_date',
@@ -20,6 +29,10 @@ class PayslipDay extends Model
         'schedule_start',
         'schedule_end',
         'grace_minutes',
+        'waive_late',
+        'waive_undertime',
+        'pay_policy',
+        'exception_label',
         'required_hours',
         'hours_worked',
         'late_minutes',
@@ -36,6 +49,8 @@ class PayslipDay extends Model
     protected $casts = [
         'work_date' => 'date',
         'grace_minutes' => 'integer',
+        'waive_late' => 'boolean',
+        'waive_undertime' => 'boolean',
         'required_hours' => 'decimal:2',
         'hours_worked' => 'decimal:2',
         'late_minutes' => 'integer',

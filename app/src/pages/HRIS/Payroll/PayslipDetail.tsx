@@ -263,6 +263,34 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             Holiday
                           </span>
                         )}
+                        {day.pay_policy === 'full_day' && (
+                          <span
+                            className="ml-2 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700"
+                            title="Paid a full day regardless of hours worked"
+                          >
+                            Full-day pay
+                          </span>
+                        )}
+                        {day.pay_policy === 'no_pay' && (
+                          <span className="ml-2 rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                            Unpaid
+                          </span>
+                        )}
+                        {day.exception_label && (
+                          <div className="mt-0.5 text-[11px] font-normal text-amber-700">
+                            {day.exception_label}
+                            {(day.waive_late || day.waive_undertime) && (
+                              <span className="text-gray-400">
+                                {' '}
+                                ·{' '}
+                                {[day.waive_late ? 'late' : null, day.waive_undertime ? 'undertime' : null]
+                                  .filter(Boolean)
+                                  .join(' + ')}{' '}
+                                waived
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-2 tabular-nums">{time12(day.time_in) || '—'}</td>
                       <td className="px-4 py-2 tabular-nums">{time12(day.time_out) || '—'}</td>

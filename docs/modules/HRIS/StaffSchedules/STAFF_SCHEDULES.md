@@ -23,10 +23,12 @@ Staff are linked to a template through an **assignment**. Rules:
 - **One schedule → many staff** (a template can be assigned to any number of people).
 - A template's **days** define which weekdays are worked. **A weekday with no row = day off.**
 
-A separate **Calendar** records institution-wide **holidays** and **events** per date
-(multiple entries per day allowed). Holidays are currently **informational** — they are
-surfaced in the UI but do **not** automatically mutate schedules/attendance (see
-[Not yet wired](#not-yet-wired)).
+A separate **Calendar** records institution-wide **holidays**, **events** and **suspensions**
+per date (multiple entries per day allowed). Holidays do not mutate schedules/attendance, but
+a calendar entry now carries a **pay policy** (`pay_treatment` + `dismissal_time`) that payroll
+reads — see
+[Attendance Exceptions](../AttendanceExceptions/ATTENDANCE_EXCEPTIONS.md) for how an
+LGU-declared half-day or a paid suspension is priced.
 
 ---
 
@@ -104,7 +106,9 @@ repo-relative; line numbers drift — search the symbol if it has moved.
 | institution_id | uuid | FK → institutions, cascade |
 | title | string | |
 | description | text nullable | |
-| type | string | `holiday` \| `event` |
+| type | string | `holiday` \| `event` \| `suspension` |
+| pay_treatment | string | `normal` \| `full_day_paid` \| `no_pay`; forced to `normal` for `event` |
+| dismissal_time | time nullable | early dismissal — shortens the paid day for that date |
 | event_date | date | single day; **multiple entries per date allowed** (no unique constraint) |
 | created_by | uuid nullable | |
 | timestamps | | |
