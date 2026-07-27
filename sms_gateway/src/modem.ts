@@ -44,9 +44,11 @@ export class Modem {
 
   private onData(chunk: Buffer): void {
     this.buffer += chunk.toString('latin1')
-    // The CMGS prompt "> " has no CRLF — release prompt waiters when we see it.
-    if (this.buffer.includes('> ') && this.promptWaiters.length) {
-      this.buffer = this.buffer.replace('> ', '')
+    // The CMGS '>' prompt has no CRLF and some modems omit the trailing space,
+    // so match the '>' itself (only while a send is waiting for it).
+    if (this.promptWaiters.length && this.buffer.includes('>')) {
+      const i = this.buffer.indexOf('>')
+      this.buffer = this.buffer.slice(i + 1).replace(/^[ \t]+/, '')
       this.promptWaiters.shift()!()
     }
     let idx: number
@@ -63,6 +65,7 @@ export class Modem {
   }
 
   private dispatchLine(line: string): void {
+    log.debug('<<', line)
     if (this.lineWaiters.length) {
       this.lineWaiters.shift()!(line)
     } else if (this.unsolicited) {
@@ -200,9 +203,20 @@ export class Modem {
     const run = () =>
       new Promise<string | null>((resolve, reject) => {
         const lines: string[] = []
+        let promptFired = false
         const timer = setTimeout(() => {
           cleanup()
-          reject(new Error(`CMGS timeout: ${cmd}`))
+          // Abort a half-entered CMGS so the modem returns to command mode and
+          // the next message isn't wedged. ESC (0x1B) cancels PDU input.
+          try {
+            this.write('\x1b')
+          } catch {
+            /* ignore */
+          }
+          const detail = promptFired
+            ? 'sent message but no +CMGS/OK from modem (check SIM balance / network registration)'
+            : "modem never showed the '>' prompt"
+          reject(new Error(`CMGS timeout: ${cmd} — ${detail}`))
         }, 30000)
         const handler = (line: string) => {
           if (line === 'OK') {
@@ -223,6 +237,7 @@ export class Modem {
           if (i >= 0) this.lineWaiters.splice(i, 1)
         }
         this.promptWaiters.push(() => {
+          promptFired = true
           this.lineWaiters.push(handler)
           this.write(payload)
         })
