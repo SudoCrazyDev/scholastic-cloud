@@ -1,4 +1,4 @@
-import { AGENT_VERSION, loadConfig, reloadConfig, persistToken } from './config.js'
+import { AGENT_VERSION, ENV_PATH, loadConfig, reloadConfig, persistToken } from './config.js'
 import { log, setLogLevel } from './logger.js'
 import { Modem, autoDetectPort, listPorts } from './modem.js'
 import { Portal } from './portal.js'
@@ -65,8 +65,20 @@ async function main(): Promise<void> {
       log.warn('Could not read modem info during pairing (continuing):', String(e))
     }
     const result = await portal.pair(code, meta)
-    persistToken(result.token)
-    log.info(`Paired. gateway_id=${result.gateway_id}. Token saved to .env. Start the agent with: npm start`)
+    try {
+      persistToken(result.token)
+      log.info(`Paired. gateway_id=${result.gateway_id}. Token saved to ${ENV_PATH}. Start the agent with: npm start`)
+    } catch (e) {
+      // The server has already consumed the pairing code and minted this token,
+      // so it must NOT be lost. Print it so the operator can save it by hand and
+      // fix the permission problem, instead of ending up with an unpairable gateway.
+      log.error(`Paired (gateway_id=${result.gateway_id}) but could NOT write the token file: ${String(e)}`)
+      log.error(`Add this line to ${ENV_PATH} manually, then start the agent:`)
+      log.error(`SMS_GATEWAY_TOKEN=${result.token}`)
+      log.error('Tip: run pairing as the service user so it can write the file, e.g.:')
+      log.error('  sudo -u smsgw node dist/index.js --pair <PAIRING_CODE>')
+      process.exit(1)
+    }
     return
   }
 
