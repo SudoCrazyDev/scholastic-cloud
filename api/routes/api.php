@@ -12,6 +12,7 @@ use App\Http\Controllers\SmsBridgeController;
 use App\Http\Controllers\SmsGatewayController;
 use App\Http\Controllers\SmsMessageController;
 use App\Http\Controllers\SmsSettingsController;
+use App\Http\Controllers\GateSmsSettingController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DisbursementController;
 use App\Http\Controllers\DisbursementTypeController;
@@ -504,6 +505,10 @@ Route::middleware('auth.token')->group(function () {
     // SMS Gateway — settings
     Route::get('sms/settings', [SmsSettingsController::class, 'show']);
     Route::put('sms/settings', [SmsSettingsController::class, 'update']);
+
+    // SMS Gateway — per-gate (entrance/exit) notification config
+    Route::get('sms/gate-settings', [GateSmsSettingController::class, 'index']);
+    Route::put('sms/gate-settings/{gateType}', [GateSmsSettingController::class, 'update']);
 
     // Announcements
     // Viewer feed (students + staff) — declared before the apiResource so the

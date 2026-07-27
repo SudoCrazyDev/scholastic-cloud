@@ -6,6 +6,7 @@ use App\Models\RfidScanLog;
 use App\Models\Student;
 use App\Models\StudentRfidTag;
 use App\Models\StudentSection;
+use App\Services\GateSmsNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -117,6 +118,8 @@ class RfidScanLogController extends Controller
 
             $log->load(['student', 'studentRfidTag']);
 
+            app(GateSmsNotifier::class)->notify($log);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Scan recorded — ' . $type,
@@ -197,6 +200,10 @@ class RfidScanLogController extends Controller
             ]);
 
             $log->load(['student', 'studentRfidTag', 'institution']);
+
+            // Best-effort: queues the parent/guardian SMS if this gate has one configured.
+            // Never blocks or fails the scan — the kiosk must stay responsive.
+            app(GateSmsNotifier::class)->notify($log);
 
             $activeSection = StudentSection::with('classSection')
                 ->where('student_id', $studentId)

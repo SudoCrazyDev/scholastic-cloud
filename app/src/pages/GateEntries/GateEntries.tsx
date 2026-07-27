@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { ScanLine, Copy, ExternalLink, LogIn, LogOut } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { rfidScanLogService } from '../../services/rfidScanLogService'
+import GateSmsCard from './components/GateSmsCard'
 import type { RfidScanLog } from '../../types'
 
 type GateTab = 'enter' | 'exit'
@@ -143,6 +144,9 @@ export default function GateEntries() {
             No institution is linked to this account. Contact an administrator if you need access.
           </p>
         )}
+
+        {/* SMS notification config for this gate */}
+        {institutionId && <GateSmsCard key={activeTab} gateType={activeTab} />}
 
         {/* Logs table */}
         {!institutionId ? null : isLoading ? (

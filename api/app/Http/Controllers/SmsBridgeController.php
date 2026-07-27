@@ -6,6 +6,7 @@ use App\Models\SmsGateway;
 use App\Models\SmsMessage;
 use App\Models\SmsOptOut;
 use App\Models\SmsSetting;
+use App\Services\SmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -112,6 +113,11 @@ class SmsBridgeController extends Controller
         $requested = (int) $request->query('limit', 10);
         $requested = max(1, min($requested, 50));
 
+        // Resolve anything a previous run claimed but never reported on. Does not gate
+        // this poll — `sending` rows never blocked the claim, which only selects `queued`.
+        // Runs here so the module needs no cron to self-heal.
+        app(SmsService::class)->reapStuck($gateway->institution_id);
+
         $rateLimit = SmsSetting::where('institution_id', $gateway->institution_id)
             ->value('rate_limit_per_minute') ?? 20;
 
@@ -184,7 +190,14 @@ class SmsBridgeController extends Controller
         foreach ($validated['results'] as $result) {
             $message = SmsMessage::where('id', $result['id'])
                 ->where('gateway_id', $gateway->id)
-                ->whereIn('status', ['sending', 'queued'])
+                ->where(function ($q) {
+                    // A reaped row is terminal only because we gave up waiting. If the
+                    // agent finally reports, its result is authoritative — otherwise the
+                    // reaper would leave a genuinely-sent message showing as failed.
+                    $q->whereIn('status', ['sending', 'queued'])
+                        ->orWhere(fn ($r) => $r->where('status', 'failed')
+                            ->where('error', SmsMessage::REAPED_ERROR));
+                })
                 ->first();
 
             if (! $message) {

@@ -2432,6 +2432,20 @@ export interface SmsMessage {
   updated_at: string;
 }
 
+/** Per-gate (entrance/exit) SMS notification config for the Gate Entries module. */
+export interface GateSmsSetting {
+  id: string;
+  institution_id: string;
+  gate_type: 'enter' | 'exit';
+  is_enabled: boolean;
+  sms_gateway_id: string | null;
+  message_template: string;
+  cooldown_minutes: number;
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SmsSettings {
   id: string;
   institution_id: string;

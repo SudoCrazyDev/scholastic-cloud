@@ -11,6 +11,13 @@ class SmsMessage extends Model
 {
     use HasFactory, HasUuids;
 
+    /**
+     * Written by the reaper (SmsService::reapStuck) onto rows a gateway claimed but
+     * never reported on. Doubles as the marker that lets a late, genuine result from
+     * the agent still correct the row — see SmsBridgeController::outboxStatus.
+     */
+    public const REAPED_ERROR = 'No result reported by gateway';
+
     protected $fillable = [
         'institution_id',
         'gateway_id',

@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { ApiResponse, SmsGateway, SmsMessage, SmsSettings } from '../types'
+import type { ApiResponse, GateSmsSetting, SmsGateway, SmsMessage, SmsSettings } from '../types'
 
 export interface SmsMessageListMeta {
   current_page: number
@@ -23,6 +23,12 @@ export interface SmsMessageFilters {
   to?: string
   per_page?: number
   page?: number
+}
+
+export interface GateSmsSettingsResponse {
+  success: boolean
+  data: GateSmsSetting[]
+  meta: { variables: string[] }
 }
 
 class SmsService {
@@ -117,6 +123,22 @@ class SmsService {
 
   async updateSettings(payload: Partial<Omit<SmsSettings, 'id' | 'institution_id' | 'created_at' | 'updated_at'>>) {
     const response = await api.put<ApiResponse<SmsSettings>>('/sms/settings', payload)
+    return response.data
+  }
+
+  // --- Gate (entrance/exit) notification settings ---
+
+  /** Both gate rows, plus the template variables the server understands. */
+  async getGateSettings() {
+    const response = await api.get<GateSmsSettingsResponse>('/sms/gate-settings')
+    return response.data
+  }
+
+  async updateGateSetting(
+    gateType: 'enter' | 'exit',
+    payload: Partial<Pick<GateSmsSetting, 'is_enabled' | 'sms_gateway_id' | 'message_template' | 'cooldown_minutes' | 'timezone'>>,
+  ) {
+    const response = await api.put<ApiResponse<GateSmsSetting>>(`/sms/gate-settings/${gateType}`, payload)
     return response.data
   }
 }

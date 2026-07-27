@@ -5,10 +5,50 @@ namespace App\Services;
 use App\Models\SmsMessage;
 use App\Models\SmsOptOut;
 use App\Models\SmsSetting;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SmsService
 {
+    /**
+     * How long a row may sit in `sending` before the reaper gives up on it. Generous
+     * next to the agent's 30s CMGS timeout — this is for an agent that died mid-batch
+     * or could not report its results, not for a slow modem.
+     */
+    public const STUCK_AFTER_MINUTES = 10;
+
+    /**
+     * Resolve outbound rows a gateway claimed but never reported on. Without this they
+     * sit in `sending` forever: never sent, never failed, never re-claimed (the outbox
+     * only selects `queued`), and with no Retry available since that requires `failed`.
+     *
+     * They block nothing while stuck — the queue keeps flowing past them, and they stop
+     * counting against the trailing-minute budget 60s after being claimed. This is about
+     * not stranding a message, not about throughput.
+     *
+     * Marking them `failed` matches the module's no-auto-retry rule — the number is
+     * skipped and stays visible + manually retryable on the Messages screen.
+     *
+     * @return int rows reaped
+     */
+    public function reapStuck(?string $institutionId = null, ?int $minutes = null): int
+    {
+        $cutoff = now()->subMinutes($minutes ?? self::STUCK_AFTER_MINUTES);
+
+        return SmsMessage::where('direction', 'outbound')
+            ->where('status', 'sending')
+            ->where('updated_at', '<', $cutoff)
+            ->when($institutionId, fn ($q) => $q->where('institution_id', $institutionId))
+            ->update([
+                'status' => 'failed',
+                'error' => SmsMessage::REAPED_ERROR,
+                // Freeze updated_at deliberately. The outbox budget counts rows touched in
+                // the trailing minute, so bumping it would throttle the gateway at exactly
+                // the moment it is recovering — and the throughput really happened at claim time.
+                'updated_at' => DB::raw('updated_at'),
+            ]);
+    }
+
     /**
      * Queue one or more outbound SMS for an institution. One sms_messages row is
      * created per recipient. Numbers on the institution's opt-out list are skipped.
