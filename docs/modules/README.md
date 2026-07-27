@@ -25,6 +25,11 @@ modules should consume its data.
   early dismissal time and a pay treatment, plus per-staff requests (early out, excused late
   arrival, official business, missed punch) that a principal approves. Waives late/undertime
   penalties and can guarantee the full daily rate. Read before changing pay arithmetic.
+- [SMS Gateway](SMS_GATEWAY/SMS_GATEWAY.md) — Communication. Sends/receives SMS over local prepaid
+  SIMs via an on-prem **kiosk** (Raspberry Pi / Windows PC) with a USB GSM modem, managed entirely
+  from the portal. Clones the HRIS bridge pattern: per-device agent, pairing-code → hashed token,
+  heartbeat, pull-based outbox queue. Other modules send by calling `SmsService::queue()` — no
+  producers wired yet. Three admin pages: **Gateways**, **Messages**, **Settings**.
 
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder
