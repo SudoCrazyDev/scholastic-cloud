@@ -138,10 +138,11 @@ class CopyToSubjectsTest extends TestCase
     }
 
     /**
-     * A copied quiz must not share image objects with its original, or replacing
-     * an image in one section's copy would blank it out in the other's.
+     * Copying shares the image objects instead of duplicating them — storage
+     * should grow with real edits, not with copies — and replacing the picture
+     * in one section must leave the other section's copy showing it.
      */
-    public function test_a_copied_assessment_gets_its_own_images(): void
+    public function test_a_copied_assessment_shares_images_until_one_is_replaced(): void
     {
         $imagePath = $this->institution->id.'/assessments/images/diagram.png';
         Storage::disk('r2')->put($imagePath, 'png-bytes');
@@ -170,52 +171,47 @@ class CopyToSubjectsTest extends TestCase
         $copy = SubjectEcrItem::where('title', 'Quiz with pictures')->where('id', '!=', $item->id)->firstOrFail();
         $copiedQuestion = AssessmentQuestion::where('subject_ecr_item_id', $copy->id)->firstOrFail();
 
-        $copiedImageUrl = $copiedQuestion->config['choiceImages'][0];
-        $this->assertNotSame($imageUrl, $copiedImageUrl, 'the copy should not reuse the original object');
+        // Nothing new was written to storage: the copy points at the same object.
+        $this->assertSame($imageUrl, $copiedQuestion->config['choiceImages'][0]);
+        $this->assertCount(1, Storage::disk('r2')->allFiles($this->institution->id.'/assessments/images'));
 
-        $copiedImagePath = MediaUrl::pathFrom($copiedImageUrl);
-        Storage::disk('r2')->assertExists($copiedImagePath);
-
-        // The same image used twice in one assessment is duplicated only once.
-        $this->assertStringContainsString(e($copiedImageUrl), $copiedQuestion->question);
-
-        // Replacing the image on the original leaves the copy intact.
-        $this->auth()->post('/api/subjects-ecr-items/images', [
+        // Replacing the picture in one section writes a new object and must
+        // leave the other section's copy showing the original.
+        $replacement = $this->auth()->post('/api/subjects-ecr-items/images', [
             'file' => UploadedFile::fake()->create('new.png', 8, 'image/png'),
+            'previous_url' => $imageUrl,
+        ]);
+        $replacement->assertCreated();
+
+        Storage::disk('r2')->assertExists($imagePath);
+        Storage::disk('r2')->assertExists($replacement->json('data.path'));
+    }
+
+    /**
+     * Once the last assessment stops pointing at a shared image, the re-upload
+     * that drops it should take the object with it.
+     */
+    public function test_the_last_reference_to_an_image_is_cleaned_up(): void
+    {
+        $imagePath = $this->institution->id.'/assessments/images/only.png';
+        Storage::disk('r2')->put($imagePath, 'png-bytes');
+        $imageUrl = MediaUrl::for($imagePath);
+
+        $ecr = SubjectEcr::where('subject_id', $this->source->id)->first();
+        SubjectEcrItem::create([
+            'subject_ecr_id' => $ecr->id,
+            'type' => 'quiz',
+            'title' => 'Sole owner',
+            'content_version' => 1,
+            'content' => ['questions' => [['type' => 'single_choice', 'question' => 'q', 'choiceImages' => [$imageUrl]]]],
+        ]);
+
+        $this->auth()->post('/api/subjects-ecr-items/images', [
+            'file' => UploadedFile::fake()->create('replacement.png', 8, 'image/png'),
             'previous_url' => $imageUrl,
         ])->assertCreated();
 
         Storage::disk('r2')->assertMissing($imagePath);
-        Storage::disk('r2')->assertExists($copiedImagePath);
-    }
-
-    /**
-     * Copies made before per-copy duplication existed still share an object, so
-     * a re-upload must leave anything with a second referent alone.
-     */
-    public function test_an_image_shared_by_two_assessments_survives_a_re_upload(): void
-    {
-        $sharedPath = $this->institution->id.'/assessments/images/shared.png';
-        Storage::disk('r2')->put($sharedPath, 'png-bytes');
-        $sharedUrl = MediaUrl::for($sharedPath);
-
-        foreach ([$this->source, $this->target] as $subject) {
-            $ecr = SubjectEcr::where('subject_id', $subject->id)->first();
-            SubjectEcrItem::create([
-                'subject_ecr_id' => $ecr->id,
-                'type' => 'quiz',
-                'title' => 'Legacy shared quiz',
-                'content_version' => 1,
-                'content' => ['questions' => [['type' => 'single_choice', 'question' => 'q', 'choiceImages' => [$sharedUrl]]]],
-            ]);
-        }
-
-        $this->auth()->post('/api/subjects-ecr-items/images', [
-            'file' => UploadedFile::fake()->create('replacement.png', 8, 'image/png'),
-            'previous_url' => $sharedUrl,
-        ])->assertCreated();
-
-        Storage::disk('r2')->assertExists($sharedPath);
     }
 
     public function test_a_target_without_components_is_reported_not_silently_dropped(): void
@@ -238,7 +234,7 @@ class CopyToSubjectsTest extends TestCase
         $this->assertSame($this->targetWithoutComponents->id, $response->json('data.skipped.0.subject_id'));
     }
 
-    public function test_a_lesson_copies_with_its_own_copy_of_each_attachment(): void
+    public function test_a_lesson_copy_shares_its_attachments_until_the_last_one_is_gone(): void
     {
         $filePath = $this->institution->id.'/subjects/'.$this->source->id.'/lessons/original/notes.pdf';
         Storage::disk('r2')->put($filePath, 'pdf-bytes');
@@ -269,14 +265,19 @@ class CopyToSubjectsTest extends TestCase
         $blocks = $copy->content;
         $this->assertCount(2, $blocks, 'the assessment block should not carry over');
 
+        // The attachment is shared, not re-stored: a 100 MB video copied to five
+        // sections must stay one object in the bucket.
         $copiedFile = collect($blocks)->firstWhere('type', 'file');
-        $this->assertNotSame($filePath, $copiedFile['path']);
-        Storage::disk('r2')->assertExists($copiedFile['path']);
+        $this->assertSame($filePath, $copiedFile['path']);
+        $this->assertCount(1, Storage::disk('r2')->allFiles($this->institution->id.'/subjects'));
 
-        // Deleting the source lesson must not break the copy.
+        // Deleting the source lesson must leave the copy's attachment alone.
         $this->auth()->deleteJson("/api/topics/{$topic->id}")->assertOk();
+        Storage::disk('r2')->assertExists($filePath);
+
+        // Once the copy goes too, nothing references the file and it is cleaned up.
+        $this->auth()->deleteJson("/api/topics/{$copy->id}")->assertOk();
         Storage::disk('r2')->assertMissing($filePath);
-        Storage::disk('r2')->assertExists($copiedFile['path']);
     }
 
     public function test_re_uploading_an_assessment_image_removes_the_one_it_replaced(): void

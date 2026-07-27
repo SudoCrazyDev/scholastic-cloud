@@ -404,10 +404,7 @@ class TopicController extends Controller
             // Copies start hidden so the teacher can adjust before students see them.
             $copy->is_published = false;
             $copy->order = (int) (Topic::where('subject_id', $target->id)->max('order') ?? -1) + 1;
-            $copy->content = [];
-            $copy->save();
-
-            [$content, $dropped] = $this->duplicateContentFor($copy, $source->content);
+            [$content, $dropped] = $this->duplicateContentFor($source->content);
             $droppedAssessmentBlocks += $dropped;
             $copy->content = $content;
             $copy->save();
@@ -429,69 +426,35 @@ class TopicController extends Controller
     }
 
     /**
-     * Rebuild a lesson's content blocks for a copy: duplicate each attached file
-     * into the new lesson's folder and drop assessment links.
+     * Rebuild a lesson's content blocks for a copy.
+     *
+     * Attachments are shared with the original rather than duplicated in the
+     * bucket — a lesson can carry a 100 MB video, and copying it to five
+     * sections would store it six times for no benefit. Uploads are immutable,
+     * so a copy only diverges when someone actually replaces a file, and that
+     * replacement writes its own object. deleteOrphanedFiles() is what keeps
+     * the shared object alive until the last lesson using it lets go.
+     *
+     * Assessment links are dropped: those ids belong to the source subject.
      *
      * @return array{0: array<int, array<string, mixed>>, 1: int}
      */
-    private function duplicateContentFor(Topic $copy, mixed $blocks): array
+    private function duplicateContentFor(mixed $blocks): array
     {
         $dropped = 0;
         $result = [];
 
         foreach (is_array($blocks) ? $blocks : [] as $block) {
-            $type = $block['type'] ?? null;
-
-            if ($type === 'assessment') {
+            if (($block['type'] ?? null) === 'assessment') {
                 $dropped++;
 
                 continue;
-            }
-
-            if ($type === 'file' && ! empty($block['path'])) {
-                $newPath = $this->copyStoredFile(
-                    (string) $block['path'],
-                    $copy->subject?->institution_id ?? 'unknown',
-                    $copy->subject_id,
-                    $copy->id
-                );
-                if ($newPath === null) {
-                    // The original object is gone; keeping a dead reference
-                    // would just show a broken link in the copy.
-                    continue;
-                }
-                $block['path'] = $newPath;
-                $block['url'] = Topic::freshFileUrl($newPath);
             }
 
             $result[] = $block;
         }
 
         return [$result, $dropped];
-    }
-
-    /**
-     * Copy an R2 object into a lesson's own folder. Returns the new key, or null
-     * when the source object no longer exists.
-     */
-    private function copyStoredFile(string $sourcePath, string $institutionId, string $subjectId, string $topicId): ?string
-    {
-        try {
-            $disk = Storage::disk('r2');
-            if (! $disk->exists($sourcePath)) {
-                return null;
-            }
-
-            $extension = pathinfo($sourcePath, PATHINFO_EXTENSION) ?: 'bin';
-            $newPath = $institutionId.'/subjects/'.$subjectId.'/lessons/'.$topicId.'/'.Str::uuid().'.'.$extension;
-            $disk->copy($sourcePath, $newPath);
-
-            return $newPath;
-        } catch (\Throwable $e) {
-            Log::error('Failed to copy lesson attachment', ['path' => $sourcePath, 'error' => $e->getMessage()]);
-
-            return null;
-        }
     }
 
     /**
@@ -517,7 +480,10 @@ class TopicController extends Controller
     private function deleteOrphanedFiles(array $before, array $after): void
     {
         foreach (array_diff($before, $after) as $path) {
-            if (Topic::where('content', 'like', '%'.$path.'%')->exists()) {
+            // Match on the file name, not the full key: the JSON cast escapes
+            // slashes, so the raw key never appears verbatim in the column.
+            // Names are UUIDs, so this is unambiguous.
+            if (Topic::where('content', 'like', '%'.basename($path).'%')->exists()) {
                 continue;
             }
             MediaUrl::deleteByPath($path);
