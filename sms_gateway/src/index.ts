@@ -1,4 +1,4 @@
-import { AGENT_VERSION, loadConfig, persistToken } from './config.js'
+import { AGENT_VERSION, loadConfig, reloadConfig, persistToken } from './config.js'
 import { log, setLogLevel } from './logger.js'
 import { Modem, autoDetectPort, listPorts } from './modem.js'
 import { Portal } from './portal.js'
@@ -25,7 +25,7 @@ async function resolveSerialPort(configured: string | null, baud: number): Promi
 }
 
 async function main(): Promise<void> {
-  const config = loadConfig()
+  let config = loadConfig()
   setLogLevel(config.logLevel)
   const args = process.argv.slice(2)
 
@@ -71,9 +71,15 @@ async function main(): Promise<void> {
   }
 
   // ── Normal run ────────────────────────────────────────────────────────────
-  if (!config.token) {
-    log.error('Not paired yet. Run: npm run pair -- <PAIRING_CODE>')
-    process.exit(1)
+  // Not paired yet: wait instead of exiting. Under systemd a hard exit here
+  // crash-loops every RestartSec and can trip the start limit (permanent ban).
+  // Staying alive keeps the unit healthy and auto-continues the moment a token
+  // is written by a separate `npm run pair`, with no restart needed.
+  while (!config.token) {
+    log.warn('Not paired yet — waiting. In another shell run: npm run pair -- <PAIRING_CODE>')
+    await new Promise((r) => setTimeout(r, 15000))
+    config = reloadConfig()
+    setLogLevel(config.logLevel)
   }
 
   const path = await resolveSerialPort(config.serialPort, config.serialBaud)

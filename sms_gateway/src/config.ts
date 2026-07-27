@@ -38,6 +38,16 @@ export interface Config {
   platform: 'linux' | 'windows' | 'unknown'
 }
 
+/**
+ * Re-read the .env from disk and return a fresh Config. Used to pick up a token
+ * written by a separate `npm run pair` run without restarting the service.
+ * `override: true` makes dotenv replace the already-loaded process.env values.
+ */
+export function reloadConfig(): Config {
+  dotenv.config({ path: ENV_PATH, override: true })
+  return loadConfig()
+}
+
 export function loadConfig(): Config {
   const platform =
     process.platform === 'win32' ? 'windows' : process.platform === 'linux' ? 'linux' : 'unknown'

@@ -2,6 +2,10 @@
 Description=ScholasticCloud SMS Gateway agent
 After=network-online.target
 Wants=network-online.target
+# Never let a crash-loop permanently ban the unit ("start request repeated too
+# quickly"). With the interval at 0 the start-limit is disabled and Restart=always
+# always applies.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
