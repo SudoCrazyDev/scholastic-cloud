@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import type { GradingPeriodConfig } from '../types';
 
 interface Student {
   student_id: string;
@@ -17,6 +18,8 @@ interface ConsolidatedGradesData {
     title: string;
     academic_year: string;
   };
+  /** Quarters vs terms for the section's academic year, resolved server-side. */
+  grading_periods?: GradingPeriodConfig;
   students: Student[];
 }
 
@@ -69,15 +72,15 @@ export const exportConsolidatedGradesToExcel = (
 ) => {
   const workbook = XLSX.utils.book_new();
   
+  // Quarters vs terms comes from the grades payload so an export of a historical
+  // section keeps the labels its grades were entered under.
+  const gradingPeriods = data.grading_periods as GradingPeriodConfig | undefined;
+
   const getQuarterLabel = (quarter: number | string) => {
-    if (quarter === 'final') return 'Final Quarter';
-    const quarters: Record<number, string> = {
-      1: 'First Quarter',
-      2: 'Second Quarter',
-      3: 'Third Quarter',
-      4: 'Fourth Quarter',
-    };
-    return quarters[quarter as number] || `Quarter ${quarter}`;
+    const noun = gradingPeriods?.noun ?? 'Quarter';
+    if (quarter === 'final') return `Final ${noun}`;
+    const period = gradingPeriods?.periods?.find((p) => p.value === String(quarter));
+    return period?.label ?? `${noun} ${quarter}`;
   };
 
   // Group students by gender

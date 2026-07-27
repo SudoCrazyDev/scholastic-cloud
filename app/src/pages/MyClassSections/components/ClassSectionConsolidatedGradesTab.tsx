@@ -9,22 +9,21 @@ import { Button } from '../../../components/button';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { ConsolidatedGradesPDF } from '../../ConsolidatedGrades/components/ConsolidatedGradesPDF';
 import { exportConsolidatedGradesToExcel } from '../../../utils/excelExport';
-import type { Subject } from '../../../types';
+import type { GradingPeriodConfig, Subject } from '../../../types';
 
 interface ClassSectionConsolidatedGradesTabProps {
   sectionId: string;
   selectedQuarter: number | string;
 }
 
-const getQuarterLabel = (quarter: number | string) => {
-  if (quarter === 'final') return 'Final Quarter';
-  const quarters: Record<number, string> = {
-    1: 'First Quarter',
-    2: 'Second Quarter',
-    3: 'Third Quarter',
-    4: 'Fourth Quarter',
-  };
-  return quarters[quarter as number] || `Quarter ${quarter}`;
+const getQuarterLabel = (
+  quarter: number | string,
+  gradingPeriods?: GradingPeriodConfig
+) => {
+  const noun = gradingPeriods?.noun ?? 'Quarter';
+  if (quarter === 'final') return `Final ${noun}`;
+  const period = gradingPeriods?.periods?.find((p) => p.value === String(quarter));
+  return period?.label ?? `${noun} ${quarter}`;
 };
 
 const formatGrade = (grade: number | string | null) => {
@@ -288,7 +287,9 @@ const ClassSectionConsolidatedGradesTab: React.FC<ClassSectionConsolidatedGrades
                 <GraduationCap className="w-4 h-4" />
                 <span className="font-medium">{section.title}</span>
               </div>
-              <Badge color="blue">{getQuarterLabel(selectedQuarter)}</Badge>
+              <Badge color="blue">
+                {getQuarterLabel(selectedQuarter, data?.grading_periods)}
+              </Badge>
               <Badge color="green">{section.academic_year}</Badge>
             </div>
           </div>

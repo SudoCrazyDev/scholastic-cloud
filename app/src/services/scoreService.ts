@@ -13,8 +13,9 @@ interface GradeItem {
   date: string
   description: string
   total_score: number
-  category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment'
-  quarter: 'First Quarter' | 'Second Quarter' | 'Third Quarter' | 'Fourth Quarter'
+  category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment' | string
+  /** Stored grading period ordinal ('1'..'4'); labels come from useGradingPeriods. */
+  quarter: string
   subject_id: string
 }
 

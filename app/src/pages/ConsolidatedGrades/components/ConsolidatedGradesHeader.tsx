@@ -10,6 +10,8 @@ interface ConsolidatedGradesHeaderProps {
   selectedAcademicYear: string;
   quarters: Quarter[];
   academicYears: string[];
+  /** 'Quarter' or 'Term', per the selected year's structure. */
+  periodNoun?: string;
   onQuarterChange: (quarter: string) => void;
   onAcademicYearChange: (year: string) => void;
 }
@@ -19,6 +21,7 @@ export function ConsolidatedGradesHeader({
   selectedAcademicYear,
   quarters,
   academicYears,
+  periodNoun = 'Quarter',
   onQuarterChange,
   onAcademicYearChange,
 }: ConsolidatedGradesHeaderProps) {
@@ -28,7 +31,7 @@ export function ConsolidatedGradesHeader({
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
           <div className="flex flex-col gap-2">
             <label htmlFor="quarter-select" className="text-sm font-medium text-gray-700">
-              Quarter
+              {periodNoun}
             </label>
             <Select
               id="quarter-select"
@@ -36,7 +39,7 @@ export function ConsolidatedGradesHeader({
               onChange={(e) => onQuarterChange(e.target.value)}
               className="w-48"
               options={quarters}
-              placeholder="Select quarter"
+              placeholder={`Select ${periodNoun.toLowerCase()}`}
             />
           </div>
 

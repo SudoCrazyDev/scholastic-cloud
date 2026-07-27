@@ -5,6 +5,7 @@ import { roundGrade, getPassFailRemarks, calculateAgeAsOfOctober31 } from '@/uti
 import { fitPdfSingleLineFontSizePx, formatStudentNameReportCard } from '@/utils/reportCardPdfUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
 import { useInstitutionLogo } from '@/hooks/useInstitutionLogo';
+import { useGradingPeriodsForYear } from '@/hooks/useGradingPeriods';
 
 /** Local asset (public/deped-logo.png) to avoid CORS from external URLs */
 const DEPED_LOGO_URL = '/deped-logo.png';
@@ -12,15 +13,27 @@ const DEPED_LOGO_URL = '/deped-logo.png';
 /** Set to false to show empty Final Grade and Remarks for now. Set to true to show computed values. */
 const SHOW_FINAL_GRADE_AND_REMARKS_VALUES = false;
 
-/** Final grade = average of quarter grades (only quarters with valid grades). Rounded to whole number. */
-function computeFinalGradeFromQuarters(q1?: number | string, q2?: number | string, q3?: number | string, q4?: number | string): number {
-  const values = [q1, q2, q3, q4]
+/**
+ * Final grade = average of the grading period grades that have a value, so a
+ * 3-term year averages over 3 periods and a 4-quarter year over 4.
+ * Rounded to a whole number.
+ */
+function computeFinalGradeFromQuarters(periodGrades: Array<number | string | undefined>): number {
+  const values = periodGrades
     .map(v => (v != null && v !== '' ? Number(v) : NaN))
     .filter(n => !Number.isNaN(n) && n > 0);
   if (values.length === 0) return 0;
   const sum = values.reduce((a, b) => a + b, 0);
   return Math.round(sum / values.length);
 }
+
+/** Grade columns on StudentSubjectGrade are keyed quarter1..quarter4 by ordinal. */
+const PERIOD_GRADE_KEYS = [
+  'quarter1_grade',
+  'quarter2_grade',
+  'quarter3_grade',
+  'quarter4_grade',
+] as const;
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
   'Maka-Diyos': [
@@ -37,6 +50,18 @@ const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
     'Demonstrates appropriate behavior in carrying out activities in the school, community, and country',
   ],
 };
+
+/**
+ * Row layout for the observed-values table. Sub-row heights differ per core value
+ * in the DepEd form, so they are captured here — the table is generated from this
+ * config so the number of grading period columns follows the academic year.
+ */
+const CORE_VALUE_ROWS: Array<{ coreValue: string; heights: string[] }> = [
+  { coreValue: 'Maka-Diyos', heights: ['30px', '25px'] },
+  { coreValue: 'Maka-Tao', heights: ['30px', '25px'] },
+  { coreValue: 'Makakalikasan', heights: ['30px'] },
+  { coreValue: 'Makabansa', heights: ['30px', '25px'] },
+];
 
 interface PrintTempReportCardProps {
   sectionSubjects?: SectionSubject[]
@@ -71,6 +96,12 @@ export default function PrintTempReportCard({
 
     const { schoolLogoUrl } = useInstitutionLogo(institution?.id);
 
+    // 4 quarters or 3 terms, per the academic year this card covers.
+    const gradingPeriods = useGradingPeriodsForYear(academicYear);
+    /** Grade columns split the fixed-width period block evenly (25% for 4, 33.33% for 3). */
+    const periodColumnWidth = `${100 / gradingPeriods.count}%`;
+    const periodGradeKeys = PERIOD_GRADE_KEYS.slice(0, gradingPeriods.count);
+
     const coreValueMap = useMemo(() => {
       const map: Record<string, Record<string, Record<string, string>>> = {};
       (Array.isArray(coreValueMarkings) ? coreValueMarkings : []).forEach((m: any) => {
@@ -87,7 +118,7 @@ export default function PrintTempReportCard({
       return map;
     }, [coreValueMarkings]);
 
-    const mark = (coreValue: string, behaviorStatement: string, quarter: '1' | '2' | '3' | '4') => {
+    const mark = (coreValue: string, behaviorStatement: string, quarter: string) => {
       return coreValueMap?.[coreValue]?.[behaviorStatement]?.[quarter] || '';
     };
 
@@ -150,20 +181,19 @@ export default function PrintTempReportCard({
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Learning Areas</Text>
                             </View>
                             <View style={{width: '40%', display: 'flex', flexDirection: 'column', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Quarter</Text>
+                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{gradingPeriods.noun}</Text>
                                 <View style={{display: 'flex', flexDirection: 'row', borderTop: '1px solid black'}}>
-                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>1</Text>
-                                    </View>
-                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>2</Text>
-                                    </View>
-                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>3</Text>
-                                    </View>
-                                    <View style={{width: '25%'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>4</Text>
-                                    </View>
+                                    {gradingPeriods.periods.map((period, periodIndex) => (
+                                        <View
+                                            key={`period-header-${period.value}`}
+                                            style={{
+                                                width: periodColumnWidth,
+                                                borderRight: periodIndex === gradingPeriods.periods.length - 1 ? undefined : '1px solid black',
+                                            }}
+                                        >
+                                            <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>{period.value}</Text>
+                                        </View>
+                                    ))}
                                 </View>
                             </View>
                             <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
@@ -181,10 +211,7 @@ export default function PrintTempReportCard({
                               // If it's a variant subject, only include it if student has grades
                               if (subject.variant) {
                                 const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
-                                return studentGrade?.quarter1_grade ||
-                                       studentGrade?.quarter2_grade ||
-                                       studentGrade?.quarter3_grade ||
-                                       studentGrade?.quarter4_grade ||
+                                return periodGradeKeys.some(key => studentGrade?.[key]) ||
                                        studentGrade?.final_grade;
                               }
                               // Always include non-variant subjects
@@ -233,15 +260,9 @@ export default function PrintTempReportCard({
                             })
                             .map((subject, index) => {
                             const studentGrade = studentSubjectsGrade.find(grade => grade.subject_id === subject.id);
-                            const q1 = studentGrade?.quarter1_grade;
-                            const q2 = studentGrade?.quarter2_grade;
-                            const q3 = studentGrade?.quarter3_grade;
-                            const q4 = studentGrade?.quarter4_grade;
-                            const quarter1Grade = roundGrade(q1) || '';
-                            const quarter2Grade = roundGrade(q2) || '';
-                            const quarter3Grade = roundGrade(q3) || '';
-                            const quarter4Grade = roundGrade(q4) || '';
-                            const finalGradeNum = computeFinalGradeFromQuarters(q1, q2, q3, q4);
+                            const rawPeriodGrades = periodGradeKeys.map(key => studentGrade?.[key]);
+                            const periodGrades = rawPeriodGrades.map(value => roundGrade(value) || '');
+                            const finalGradeNum = computeFinalGradeFromQuarters(rawPeriodGrades);
                             const finalGrade = finalGradeNum > 0 ? String(finalGradeNum) : '';
                             const remarks = finalGradeNum > 0 ? getPassFailRemarks(finalGradeNum) : '';
                             const isChild = subject.subject_type === 'child';
@@ -253,18 +274,24 @@ export default function PrintTempReportCard({
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginLeft: `${subject.subject_type === 'parent' ? '0px' : '10px'}`}}>{subject.title ||  'Subject'}{subject.variant ? ` - ${subject.variant}` : ''}</Text>
                                 </View>
                                 <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black', alignItems: 'center', justifyContent: 'center'}}>
-                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>{quarter1Grade}</Text>
-                                  </View>
-                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>{quarter2Grade}</Text>
-                                  </View>
-                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>{quarter3Grade}</Text>
-                                  </View>
-                                  <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                    <Text>{quarter4Grade}</Text>
-                                  </View>
+                                  {periodGrades.map((periodGrade, periodIndex) => (
+                                    <View
+                                      key={`${subject.id}-period-${periodIndex}`}
+                                      style={{
+                                        height: '100%',
+                                        fontSize: '8px',
+                                        fontFamily: 'Helvetica',
+                                        width: periodColumnWidth,
+                                        borderRight: periodIndex === periodGrades.length - 1 ? undefined : '1px solid black',
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                      }}
+                                    >
+                                      <Text>{periodGrade}</Text>
+                                    </View>
+                                  ))}
                                 </View>
                                 <View style={{width: '10%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                   <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{showFinalAndRemarks ? finalGrade : ''}</Text>
@@ -399,6 +426,7 @@ export default function PrintTempReportCard({
                     
                     <View style={{width: '50%', paddingHorizontal: '20px', display: 'flex', flexDirection: 'column', marginTop: '5px'}}>
                         <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', marginBottom: '10px'}}>REPORT ON LEARNER'S OBSERVED VALUES</Text>
+                        {/* Header: one column per grading period (4 quarters or 3 terms). */}
                         <View style={{display: 'flex', flexDirection: 'row', border: '1px solid black'}}>
                             <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Core Values</Text>
@@ -407,270 +435,87 @@ export default function PrintTempReportCard({
                                 <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Behavior Statements</Text>
                             </View>
                             <View style={{width: '40%', display: 'flex', flexDirection: 'column'}}>
-                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>Quarter</Text>
+                                <Text style={{fontSize: '8px', fontFamily: 'Helvetica', textAlign: 'center'}}>{gradingPeriods.noun}</Text>
                                 <View style={{display: 'flex', flexDirection: 'row', borderTop: '1px solid black'}}>
-                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>1</Text>
-                                    </View>
-                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>2</Text>
-                                    </View>
-                                    <View style={{width: '25%', borderRight: '1px solid black'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>3</Text>
-                                    </View>
-                                    <View style={{width: '25%'}}>
-                                        <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>4</Text>
-                                    </View>
+                                    {gradingPeriods.periods.map((period, periodIndex) => (
+                                        <View
+                                            key={`core-value-header-${period.value}`}
+                                            style={{
+                                                width: periodColumnWidth,
+                                                borderRight: periodIndex === gradingPeriods.periods.length - 1 ? undefined : '1px solid black',
+                                            }}
+                                        >
+                                            <Text style={{fontSize: '8px', fontFamily: 'Helvetica-Bold', textAlign: 'center'}}>{period.value}</Text>
+                                        </View>
+                                    ))}
                                 </View>
                             </View>
                         </View>
-                        
-                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Maka-Diyos</Text>
-                            </View>
-                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <View style={{height: '30px', borderBottom: '1px solid black'}}>
-                                    <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        {CORE_VALUE_BEHAVIORS['Maka-Diyos'][0]}
-                                    </Text>
-                                </View>
-                                <View>
-                                    <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        {CORE_VALUE_BEHAVIORS['Maka-Diyos'][1]}
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '1')}
-                                        </Text>
+
+                        {CORE_VALUE_ROWS.map(({ coreValue, heights }) => {
+                            const behaviors = CORE_VALUE_BEHAVIORS[coreValue] ?? [];
+
+                            return (
+                                <View key={coreValue} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
+                                    <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>{coreValue}</Text>
                                     </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '1')}
-                                        </Text>
+
+                                    <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
+                                        {heights.map((height, behaviorIndex) => (
+                                            <View
+                                                key={`${coreValue}-statement-${behaviorIndex}`}
+                                                style={{
+                                                    height,
+                                                    borderBottom: behaviorIndex === heights.length - 1 ? undefined : '1px solid black',
+                                                }}
+                                            >
+                                                <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                                    {behaviors[behaviorIndex]}
+                                                </Text>
+                                            </View>
+                                        ))}
                                     </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '2')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '2')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '3')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '3')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][0], '4')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Diyos', CORE_VALUE_BEHAVIORS['Maka-Diyos'][1], '4')}
-                                        </Text>
+
+                                    <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                                        {gradingPeriods.periods.map((period, periodIndex) => (
+                                            <View
+                                                key={`${coreValue}-${period.value}`}
+                                                style={{
+                                                    height: '100%',
+                                                    fontSize: '8px',
+                                                    fontFamily: 'Helvetica',
+                                                    width: periodColumnWidth,
+                                                    borderRight: periodIndex === gradingPeriods.periods.length - 1 ? undefined : '1px solid black',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                }}
+                                            >
+                                                {heights.map((height, behaviorIndex) => (
+                                                    <View
+                                                        key={`${coreValue}-${period.value}-${behaviorIndex}`}
+                                                        style={{
+                                                            width: '100%',
+                                                            height,
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            justifyContent: 'center',
+                                                            borderBottom: behaviorIndex === heights.length - 1 ? undefined : '1px solid black',
+                                                        }}
+                                                    >
+                                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
+                                                            {mark(coreValue, behaviors[behaviorIndex], period.value)}
+                                                        </Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        ))}
                                     </View>
                                 </View>
-                            </View>
-                        </View>
-                        
-                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Maka-Tao</Text>
-                            </View>
-                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <View style={{height: '30px', borderBottom: '1px solid black'}}>
-                                    <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        {CORE_VALUE_BEHAVIORS['Maka-Tao'][0]}
-                                    </Text>
-                                </View>
-                                <View>
-                                    <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        {CORE_VALUE_BEHAVIORS['Maka-Tao'][1]}
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '1')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '1')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '2')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '2')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '3')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '3')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][0], '4')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Maka-Tao', CORE_VALUE_BEHAVIORS['Maka-Tao'][1], '4')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-                        
-                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Makakalikasan</Text>
-                            </View>
-                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <View style={{height: '30px'}}>
-                                    <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        {CORE_VALUE_BEHAVIORS['Makakalikasan'][0]}
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '1')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '2')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '3')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makakalikasan', CORE_VALUE_BEHAVIORS['Makakalikasan'][0], '4')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-                        
-                        <View style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
-                            <View style={{width: '18%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <Text style={{fontSize: '7px', fontFamily: 'Helvetica', textAlign: 'center'}}>Makabansa</Text>
-                            </View>
-                            <View style={{width: '42%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid black'}}>
-                                <View style={{height: '30px', borderBottom: '1px solid black'}}>
-                                    <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        {CORE_VALUE_BEHAVIORS['Makabansa'][0]}
-                                    </Text>
-                                </View>
-                                <View>
-                                    <Text style={{height: '25px', fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                        {CORE_VALUE_BEHAVIORS['Makabansa'][1]}
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={{width: '40%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '1')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '1')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '2')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '2')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', borderRight: '1px solid black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '3')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '3')}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={{height:'100%' ,fontSize: '8px', fontFamily: 'Helvetica', width: '25%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-                                    <View style={{width: '100%', height: '30px', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][0], '4')}
-                                        </Text>
-                                    </View>
-                                    <View style={{width: '100%', height: '25px', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                                        <Text style={{fontSize: '6px', fontFamily: 'Helvetica', textAlign: 'center', padding: '4px'}}>
-                                            {mark('Makabansa', CORE_VALUE_BEHAVIORS['Makabansa'][1], '4')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
+                            );
+                        })}
                         
                         <View style={{marginTop: '0', display: 'flex', flexDirection: 'column'}}>
                             <View style={{display: 'flex', flexDirection: 'row', paddingBottom: '5px'}}>

@@ -35,6 +35,9 @@ import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
 import { Switch } from '../../../components/switch'
 import { RichTextEditor } from './RichTextEditor'
+import { DraftRecoveryBanner, DraftStatus } from './DraftRecoveryBanner'
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
+import { useLocalDraft } from '../../../hooks/useLocalDraft'
 import { topicService } from '../../../services/topicService'
 import { assessmentMethodService, type AssessmentMethodType } from '../../../services/assessmentMethodService'
 import type { Topic, LessonBlock } from '../../../types'
@@ -63,13 +66,6 @@ interface LessonDraft {
   learning_objectives: string[]
   content: LessonBlock[]
 }
-
-const QUARTER_OPTIONS = [
-  { value: '1', label: '1st Quarter' },
-  { value: '2', label: '2nd Quarter' },
-  { value: '3', label: '3rd Quarter' },
-  { value: '4', label: '4th Quarter' },
-]
 
 const emptyDraft = (): LessonDraft => ({
   title: '',
@@ -158,19 +154,34 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
   isLoading = false,
 }) => {
   const isEditing = !!topic
+  // 4 quarters or 3 terms, per the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods()
   const [draft, setDraft] = useState<LessonDraft>(emptyDraft())
   const [savedTopicId, setSavedTopicId] = useState<string | null>(topic?.id ?? null)
   const [uploadingBlockId, setUploadingBlockId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // What the server last confirmed; autosave only keeps a local copy of work
+  // that differs from this.
+  const [savedDraft, setSavedDraft] = useState<LessonDraft | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   useEffect(() => {
     if (isOpen) {
-      setDraft(topic ? draftFromTopic(topic) : emptyDraft())
+      const initial = topic ? draftFromTopic(topic) : emptyDraft()
+      setDraft(initial)
+      setSavedDraft(initial)
       setSavedTopicId(topic?.id ?? null)
       setError(null)
     }
   }, [isOpen, topic])
+
+  // Mirror in-progress edits into this browser so a failed save on a bad
+  // connection doesn't mean rebuilding the lesson from scratch.
+  const localDraft = useLocalDraft<LessonDraft>({
+    key: isOpen ? `lesson:${subjectId}:${topic?.id ?? savedTopicId ?? 'new'}` : null,
+    value: draft,
+    baseline: savedDraft,
+  })
 
   // Assessments available to link (all types merged).
   const { data: linkableAssessments = [] } = useQuery({
@@ -261,7 +272,15 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
       )
       setDraft((d) => ({ ...d, content: nextContent }))
       const saved = await onSubmit(buildPayload(nextContent), topicId)
-      setDraft((d) => ({ ...d, content: (saved.content || nextContent).map((b) => ({ ...b })) }))
+      // This write reached the server, so it becomes the autosave baseline too —
+      // otherwise the editor would keep claiming it holds unsaved changes.
+      const persisted: LessonDraft = {
+        ...draft,
+        content: (saved.content || nextContent).map((b) => ({ ...b })),
+      }
+      setDraft(persisted)
+      setSavedDraft(persisted)
+      localDraft.markSaved(persisted)
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to upload file.')
     } finally {
@@ -306,13 +325,25 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
       const saved = await onSubmit(buildPayload(), savedTopicId)
       setSavedTopicId(saved.id)
       toast.success(wasNew ? 'Lesson saved. You can keep editing or close.' : 'Lesson updated.')
-      if (wasNew) {
-        // After first create, stay open in edit mode so file uploads work.
-        setDraft((d) => ({ ...d, content: (saved.content || d.content).map((b) => ({ ...b })) }))
+      // After first create, stay open in edit mode so file uploads work.
+      const persisted: LessonDraft = {
+        ...draft,
+        content: (saved.content || draft.content).map((b) => ({ ...b })),
       }
+      setDraft(persisted)
+      setSavedDraft(persisted)
+      localDraft.markSaved(persisted)
     } catch {
-      setError('Failed to save the lesson. Please try again.')
+      // Keep the local copy: this is exactly the case the autosave exists for.
+      setError('Failed to save the lesson. Your changes are still here — check your connection and try again.')
     }
+  }
+
+  const handleClose = () => {
+    if (localDraft.isDirty && !window.confirm('You have unsaved changes. Close the lesson editor anyway?')) {
+      return
+    }
+    onClose()
   }
 
   return (
@@ -324,7 +355,7 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-gray-900/50"
-            onClick={onClose}
+            onClick={handleClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.98, y: 10 }}
@@ -341,6 +372,9 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{isEditing ? 'Edit Lesson' : 'Create Lesson'}</h3>
                   <p className="text-xs text-gray-500">Build learning content students can read and watch.</p>
+                  <div className="mt-1">
+                    <DraftStatus isDirty={localDraft.isDirty} lastAutosavedAt={localDraft.lastAutosavedAt} />
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -359,13 +393,13 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
                     color="indigo"
                   />
                 </label>
-                <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+                <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
                   Close
                 </Button>
                 <Button type="button" onClick={handleSave} disabled={isLoading}>
                   {isLoading ? 'Saving…' : isEditing || savedTopicId ? 'Save Changes' : 'Save Lesson'}
                 </Button>
-                <button type="button" onClick={onClose} className="rounded-md p-2 text-gray-400 hover:bg-gray-100">
+                <button type="button" onClick={handleClose} className="rounded-md p-2 text-gray-400 hover:bg-gray-100">
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
@@ -375,6 +409,18 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
               {error && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+              )}
+
+              {localDraft.recovered && (
+                <DraftRecoveryBanner
+                  savedAt={localDraft.recovered.savedAt}
+                  itemLabel="lesson"
+                  onRestore={() => {
+                    setDraft(localDraft.recovered!.data)
+                    localDraft.dismissRecovered()
+                  }}
+                  onDiscard={localDraft.discard}
+                />
               )}
 
               {/* Meta */}
@@ -397,11 +443,13 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Quarter</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      {gradingPeriods.noun}
+                    </label>
                     <Select
                       value={draft.quarter}
                       onChange={(e) => setDraft((d) => ({ ...d, quarter: e.target.value }))}
-                      options={QUARTER_OPTIONS}
+                      options={gradingPeriods.options}
                       className="w-full"
                     />
                   </div>

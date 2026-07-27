@@ -1,6 +1,7 @@
 import React from 'react'
 import { PrinterIcon } from '@heroicons/react/24/outline'
 import { Button } from '@/components/button'
+import { useGradingPeriods } from '@/hooks/useGradingPeriods'
 
 interface LessonPlanContent {
   kind?: string
@@ -47,6 +48,9 @@ export const LessonPlanViewer: React.FC<LessonPlanViewerProps> = ({
   showPrintButton = false,
   onPrint,
 }) => {
+  // Called before the early return so the hook order stays stable.
+  const gradingPeriods = useGradingPeriods()
+
   if (!content) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -90,7 +94,7 @@ export const LessonPlanViewer: React.FC<LessonPlanViewerProps> = ({
           <div className="flex flex-wrap justify-center gap-6 mt-4 text-sm">
             {quarter && (
               <span className="flex items-center gap-1.5 px-3 py-1 bg-primary-50 text-primary-700 rounded-full">
-                <strong>Quarter:</strong> {quarter}
+                <strong>{gradingPeriods.noun}:</strong> {quarter}
               </span>
             )}
             {content.week && (

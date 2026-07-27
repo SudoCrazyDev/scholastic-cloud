@@ -23,6 +23,7 @@ import { Button } from '@/components/button';
 import { MatchingQuestion } from './MatchingQuestion';
 import { DragPictureQuestion } from './DragPictureQuestion';
 import { QuestionPromptView } from '../AssignedSubjects/components/QuestionPromptView';
+import { useGradingPeriods } from '@/hooks/useGradingPeriods';
 
 const isUploadAnswer = (value: unknown): value is UploadAnswer =>
   !!value && typeof value === 'object' && !Array.isArray(value) && 'path' in (value as Record<string, unknown>);
@@ -54,6 +55,7 @@ export const TakeAssessment: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const gradingPeriods = useGradingPeriods();
   const [answers, setAnswers] = useState<AssessmentAnswers>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -278,7 +280,9 @@ export const TakeAssessment: React.FC = () => {
         )}
         <p className="text-sm text-gray-500">
           {currentPayload?.subject_title && <span>{currentPayload.subject_title}</span>}
-          {currentPayload?.quarter && <span> · Quarter {currentPayload.quarter}</span>}
+          {currentPayload?.quarter && (
+            <span> · {gradingPeriods.numberedLabelFor(currentPayload.quarter)}</span>
+          )}
           {currentPayload?.max_score != null && <span> · Max score: {currentPayload.max_score}</span>}
         </p>
       </div>

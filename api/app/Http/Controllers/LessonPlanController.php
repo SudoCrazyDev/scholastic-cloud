@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LessonPlan;
 use App\Models\Subject;
+use App\Support\GradingPeriods;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,7 +18,7 @@ class LessonPlanController extends Controller
     {
         $validated = $request->validate([
             'subject_id' => ['required', 'uuid', 'exists:subjects,id'],
-            'quarter' => ['nullable', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['nullable', 'string', Rule::in(GradingPeriods::anyValues())],
         ]);
 
         $user = $request->user();

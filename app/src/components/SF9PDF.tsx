@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 import type { SF9Data } from '../services/sf9Service';
+import type { GradingPeriodConfig } from '../types';
 import { formatDateOnly } from '../utils/date';
 
 // Register fonts
@@ -178,18 +179,17 @@ const getRemarks = (grade: number | null): string => {
   return 'Did Not Meet Expectations';
 };
 
-const getQuarterLabel = (quarter: string): string => {
-  const quarters: Record<string, string> = {
-    '1': 'First Quarter',
-    '2': 'Second Quarter',
-    '3': 'Third Quarter',
-    '4': 'Fourth Quarter',
-  };
-  return quarters[quarter] || `Quarter ${quarter}`;
+const getQuarterLabel = (quarter: string, gradingPeriods?: GradingPeriodConfig): string => {
+  const noun = gradingPeriods?.noun ?? 'Quarter';
+  const period = gradingPeriods?.periods?.find((p) => p.value === String(quarter));
+  return period?.label ?? `${noun} ${quarter}`;
 };
 
 export const SF9PDF: React.FC<SF9PDFProps> = ({ data }) => {
   const { student, institution, academic_performance, core_values, attendance_summary, enrollment_history } = data;
+  // Quarters vs terms for the year this record covers, resolved server-side.
+  const gradingPeriods = data.grading_periods;
+  const periodNoun = gradingPeriods?.noun ?? 'Quarter';
 
   return (
     <Document>
@@ -248,7 +248,7 @@ export const SF9PDF: React.FC<SF9PDFProps> = ({ data }) => {
           {Object.entries(academic_performance).map(([quarter, grades]) => (
             <View key={quarter} style={{ marginBottom: 10 }}>
               <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 5 }}>
-                {getQuarterLabel(quarter)}
+                {getQuarterLabel(quarter, gradingPeriods)}
               </Text>
               
               <View style={styles.table}>
@@ -257,7 +257,7 @@ export const SF9PDF: React.FC<SF9PDFProps> = ({ data }) => {
                     <Text style={{ fontSize: 8, fontWeight: 'bold' }}>Subject</Text>
                   </View>
                   <View style={styles.tableColQuarter}>
-                    <Text style={{ fontSize: 8, fontWeight: 'bold' }}>Quarter Grade</Text>
+                    <Text style={{ fontSize: 8, fontWeight: 'bold' }}>{periodNoun} Grade</Text>
                   </View>
                   <View style={styles.tableColFinal}>
                     <Text style={{ fontSize: 8, fontWeight: 'bold' }}>Final Grade</Text>
@@ -301,7 +301,7 @@ export const SF9PDF: React.FC<SF9PDFProps> = ({ data }) => {
           {Object.entries(core_values).map(([quarter, values]) => (
             <View key={quarter} style={{ marginBottom: 10 }}>
               <Text style={{ fontSize: 10, fontWeight: 'bold', marginBottom: 5 }}>
-                {getQuarterLabel(quarter)}
+                {getQuarterLabel(quarter, gradingPeriods)}
               </Text>
               
               <View style={styles.table}>

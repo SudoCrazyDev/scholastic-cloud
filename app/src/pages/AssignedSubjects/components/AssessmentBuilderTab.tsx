@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -24,6 +24,7 @@ import {
   ArrowsRightLeftIcon,
   RectangleGroupIcon,
   ArrowUpTrayIcon,
+  DocumentDuplicateIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import {
@@ -64,9 +65,13 @@ import { Input } from '@/components/input'
 import { Badge } from '@/components/badge'
 import { Switch } from '@/components/switch'
 import { Select } from '@/components/select'
+import { useGradingPeriods } from '@/hooks/useGradingPeriods'
 import { GradeSubmissionsModal } from './GradeSubmissionsModal'
 import { PreviewAssessmentModal } from './PreviewAssessmentModal'
 import { RichTextEditor } from './RichTextEditor'
+import { CopyToSubjectsModal } from './CopyToSubjectsModal'
+import { DraftRecoveryBanner, DraftStatus } from './DraftRecoveryBanner'
+import { useLocalDraft } from '@/hooks/useLocalDraft'
 
 interface AssessmentBuilderTabProps {
   subjectId: string
@@ -228,11 +233,6 @@ const QUESTION_TYPE_SELECT_OPTIONS = QUESTION_TYPE_OPTIONS.map((option) => ({
 const ASSESSMENT_TYPE_SELECT_OPTIONS = TYPE_OPTIONS.map((option) => ({
   value: option.id,
   label: option.label,
-}))
-
-const QUARTER_SELECT_OPTIONS = ['1', '2', '3', '4'].map((quarter) => ({
-  value: quarter,
-  label: `Q${quarter}`,
 }))
 
 const STATUS_SELECT_OPTIONS: Array<{ value: AssessmentPublishStatus; label: string }> = [
@@ -473,7 +473,8 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
   const handleChoiceImageUpload = async (choiceIndex: number, file: File) => {
     setUploadingChoiceIndex(choiceIndex)
     try {
-      const res = await subjectEcrItemService.uploadImage(file)
+      // Hand the outgoing image to the server so the replaced file is deleted.
+      const res = await subjectEcrItemService.uploadImage(file, question.choiceImages[choiceIndex])
       setChoiceImage(choiceIndex, res.data.url)
     } catch (error) {
       toast.error(
@@ -618,7 +619,10 @@ const SortableQuestionCard: React.FC<SortableQuestionCardProps> = ({
                         variant="ghost"
                         color="danger"
                         size="sm"
-                        onClick={() => setChoiceImage(choiceIndex, '')}
+                        onClick={() => {
+                          setChoiceImage(choiceIndex, '')
+                          void subjectEcrItemService.deleteImage(imageUrl)
+                        }}
                       >
                         Remove image
                       </Button>
@@ -854,12 +858,17 @@ const DragPictureEditor: React.FC<{
       cards: current.cards.map((card) => (card.id === cardId ? { ...card, ...patch } : card)),
     }))
   const removeCard = (cardId: string) =>
-    onUpdate((current) => ({ ...current, cards: current.cards.filter((card) => card.id !== cardId) }))
+    onUpdate((current) => {
+      const removed = current.cards.find((card) => card.id === cardId)
+      if (removed?.imageUrl) void subjectEcrItemService.deleteImage(removed.imageUrl)
+      return { ...current, cards: current.cards.filter((card) => card.id !== cardId) }
+    })
 
   const handleUpload = async (cardId: string, file: File) => {
     setUploadingCardId(cardId)
     try {
-      const res = await subjectEcrItemService.uploadImage(file)
+      const previousUrl = question.cards.find((card) => card.id === cardId)?.imageUrl
+      const res = await subjectEcrItemService.uploadImage(file, previousUrl)
       setCard(cardId, { imageUrl: res.data.url })
     } catch (error) {
       toast.error(
@@ -984,12 +993,33 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
   const queryClient = useQueryClient()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
+  // 4 quarters or 3 terms, per the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods()
+  const quarterSelectOptions = useMemo(
+    () => gradingPeriods.periods.map((period) => ({ value: period.value, label: period.short })),
+    [gradingPeriods]
+  )
+
   const [activeType, setActiveType] = useState<AssessmentMethodType>('quiz')
   const [builderOpen, setBuilderOpen] = useState(false)
   const [draft, setDraft] = useState<BuilderDraft | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [gradingMethod, setGradingMethod] = useState<{ id: string; title: string } | null>(null)
   const [previewMethod, setPreviewMethod] = useState<AssessmentMethod | null>(null)
+  const [copyMethod, setCopyMethod] = useState<AssessmentMethod | null>(null)
+  // The last state the server acknowledged, so autosave can tell real unsaved
+  // work apart from a draft that merely mirrors what is already stored.
+  const [savedDraft, setSavedDraft] = useState<BuilderDraft | null>(null)
+
+  const draftKey = builderOpen && draft ? `assessment:${subjectId}:${draft.id ?? 'new-' + draft.type}` : null
+  const localDraft = useLocalDraft<BuilderDraft | null>({
+    key: draftKey,
+    value: draft,
+    baseline: savedDraft,
+  })
+  // Read inside mutation callbacks, which close over a stale `draft`.
+  const draftRef = useRef<BuilderDraft | null>(draft)
+  draftRef.current = draft
 
   const { data: ecrRes } = useQuery({
     queryKey: ['subjectEcrs', subjectId],
@@ -1016,21 +1046,23 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
   // After a save, adopt the server-assigned question ids (v2) into the draft so a subsequent
   // edit in the same session updates the existing rows instead of duplicating them. The
   // response's content.questions are in the same order the draft sent them.
+  // The result also becomes the autosave baseline: it is now what the server holds.
   const syncDraftFromResponse = (response: any, createdId?: string) => {
+    const current = draftRef.current
+    if (!current) return
     const item = response?.data ?? response
     const serverQs: Array<{ id?: string }> = item?.content?.questions ?? []
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            id: createdId ?? item?.id ?? current.id,
-            contentVersion: item?.content_version ?? current.contentVersion,
-            questions: current.questions.map((q, i) =>
-              serverQs[i]?.id ? { ...q, id: String(serverQs[i].id) } : q
-            ),
-          }
-        : current
-    )
+    const next: BuilderDraft = {
+      ...current,
+      id: createdId ?? item?.id ?? current.id,
+      contentVersion: item?.content_version ?? current.contentVersion,
+      questions: current.questions.map((q, i) =>
+        serverQs[i]?.id ? { ...q, id: String(serverQs[i].id) } : q
+      ),
+    }
+    setDraft(next)
+    setSavedDraft(next)
+    localDraft.markSaved(next)
   }
 
   const saveCreateMutation = useMutation({
@@ -1190,19 +1222,28 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
 
   const openCreateBuilder = () => {
     if (!firstEcrId) return
-    setDraft(newDraft(activeType, firstEcrId))
+    const fresh = newDraft(activeType, firstEcrId)
+    setDraft(fresh)
+    setSavedDraft(fresh)
     setBuilderOpen(true)
   }
 
   const openEditBuilder = (assessment: AssessmentMethod) => {
+    const fromServer = draftFromAssessment(assessment)
     setActiveType(assessment.type)
-    setDraft(draftFromAssessment(assessment))
+    setDraft(fromServer)
+    setSavedDraft(fromServer)
     setBuilderOpen(true)
   }
 
   const closeBuilder = () => {
+    // Anything unsaved stays in the browser draft, so reopening offers it back.
+    if (localDraft.isDirty && !window.confirm('You have unsaved changes. Close the builder anyway?')) {
+      return
+    }
     setBuilderOpen(false)
     setDraft(null)
+    setSavedDraft(null)
     setActiveDragId(null)
   }
 
@@ -1350,7 +1391,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                         <TypeIcon className="h-3.5 w-3.5" />
                         {typeMeta.label}
                       </Badge>
-                      <Badge color="zinc">Q{method.quarter}</Badge>
+                      <Badge color="zinc">{gradingPeriods.shortLabelFor(method.quarter)}</Badge>
                     </div>
                     {method.description && (
                       <p className="mt-1 line-clamp-2 text-sm text-gray-600">{method.description}</p>
@@ -1394,6 +1435,14 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                       title="Edit"
                     >
                       <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => method.id && setCopyMethod(method)}
+                      className="rounded-md p-2 text-gray-500 transition hover:bg-violet-50 hover:text-violet-600"
+                      title="Copy to another subject"
+                    >
+                      <DocumentDuplicateIcon className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
@@ -1453,6 +1502,7 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                     <CheckCircleIcon className="h-3.5 w-3.5" />
                     {validationErrors.length === 0 ? 'Ready to save' : `${validationErrors.length} issue(s)`}
                   </span>
+                  <DraftStatus isDirty={localDraft.isDirty} lastAutosavedAt={localDraft.lastAutosavedAt} />
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1471,6 +1521,20 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
                 </button>
               </div>
             </header>
+
+            {localDraft.recovered?.data && (
+              <div className="border-b border-amber-100 bg-white px-6 py-3">
+                <DraftRecoveryBanner
+                  savedAt={localDraft.recovered.savedAt}
+                  itemLabel={draft.type}
+                  onRestore={() => {
+                    setDraft(localDraft.recovered!.data as BuilderDraft)
+                    localDraft.dismissRecovered()
+                  }}
+                  onDiscard={localDraft.discard}
+                />
+              </div>
+            )}
 
             <DndContext
               sensors={sensors}
@@ -1643,13 +1707,15 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">Quarter</label>
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                          {gradingPeriods.noun}
+                        </label>
                         <Select
                           value={draft.quarter}
                           onChange={(event) =>
                             updateDraft((current) => ({ ...current, quarter: event.target.value }))
                           }
-                          options={QUARTER_SELECT_OPTIONS}
+                          options={quarterSelectOptions}
                           className="w-full"
                         />
                       </div>
@@ -1862,6 +1928,18 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
       {previewMethod && (
         <PreviewAssessmentModal method={previewMethod} onClose={() => setPreviewMethod(null)} />
       )}
+
+      <CopyToSubjectsModal
+        isOpen={!!copyMethod}
+        onClose={() => setCopyMethod(null)}
+        itemTitle={copyMethod?.title ?? ''}
+        itemLabel={copyMethod ? labelForType(copyMethod.type).toLowerCase() : 'assessment method'}
+        sourceSubjectId={subjectId}
+        onCopy={async (targetSubjectIds) => {
+          const response = await subjectEcrItemService.copyToSubjects(copyMethod!.id!, targetSubjectIds)
+          return response.data
+        }}
+      />
     </div>
   )
 }

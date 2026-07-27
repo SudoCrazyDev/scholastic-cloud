@@ -11,7 +11,8 @@ import {
   DocumentTextIcon,
   EyeIcon,
   EyeSlashIcon,
-  DocumentMagnifyingGlassIcon
+  DocumentMagnifyingGlassIcon,
+  DocumentDuplicateIcon
 } from '@heroicons/react/24/outline'
 import { Button } from '../../../components/button'
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../../../components/dropdown'
@@ -23,6 +24,7 @@ interface TopicItemProps {
   topic: Topic
   onEdit: (topic: Topic) => void
   onDelete: (topicId: string) => void
+  onCopy?: (topic: Topic) => void
   onToggleCompletion: (topicId: string) => void
   onTogglePublish?: (topicId: string) => void
   onMoveUp?: (topicId: string) => void
@@ -39,6 +41,7 @@ export const TopicItem: React.FC<TopicItemProps> = ({
   topic,
   onEdit,
   onDelete,
+  onCopy,
   onToggleCompletion,
   onTogglePublish,
   onMoveUp,
@@ -71,6 +74,16 @@ export const TopicItem: React.FC<TopicItemProps> = ({
       onClick: () => onEdit(topic),
       disabled: busy
     },
+    ...(onCopy
+      ? [
+          {
+            label: 'Copy to another subject',
+            icon: DocumentDuplicateIcon,
+            onClick: () => onCopy(topic),
+            disabled: busy
+          }
+        ]
+      : []),
     ...(onTogglePublish
       ? [
           {

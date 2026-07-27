@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Support\MediaUrl;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
-use App\Models\StudentInstitution;
+use Illuminate\Support\Facades\Storage;
 
 class Student extends Model
 {
@@ -156,7 +156,7 @@ class Student extends Model
      */
     public function getProfilePictureAttribute($value)
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -164,25 +164,19 @@ class Student extends Model
             return $value;
         }
 
-        // Try R2 first (institution/student profile pictures stored on R2)
+        // R2 (institution/student profile pictures), via a permanent URL.
+        $url = MediaUrl::for($value);
+        if ($url) {
+            return $url;
+        }
+
+        // Fall back to S3 for legacy paths.
         try {
-            $r2Url = config('filesystems.disks.r2.url');
-            if ($r2Url) {
-                return rtrim($r2Url, '/') . '/' . ltrim($value, '/');
-            }
-            return Storage::disk('r2')->temporaryUrl($value, now()->addHours(24));
+            return Storage::disk('s3')->url($value);
         } catch (\Throwable $e) {
-            // Fall back to S3 for legacy paths
-            try {
-                return Storage::disk('s3')->temporaryUrl($value, now()->addHours(1));
-            } catch (\Exception $e2) {
-                try {
-                    return Storage::disk('s3')->url($value);
-                } catch (\Exception $e3) {
-                    Log::warning('Failed to generate profile picture URL for student: ' . $this->id . ' - ' . $e3->getMessage());
-                    return null;
-                }
-            }
+            Log::warning('Failed to generate profile picture URL for student: '.$this->id.' - '.$e->getMessage());
+
+            return null;
         }
     }
-} 
+}

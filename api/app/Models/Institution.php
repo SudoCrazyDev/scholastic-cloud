@@ -2,13 +2,13 @@
 
 namespace App\Models;
 
+use App\Support\MediaUrl;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 
 class Institution extends Model
 {
@@ -62,17 +62,9 @@ class Institution extends Model
         }
         // R2 key stored in DB
         if (str_starts_with($value, 'institutions/')) {
-            try {
-                $url = config('filesystems.disks.r2.url');
-                if ($url) {
-                    return rtrim($url, '/') . '/' . ltrim($value, '/');
-                }
-                return Storage::disk('r2')->temporaryUrl($value, now()->addHours(24));
-            } catch (\Throwable $e) {
-                Log::warning('Institution logo URL failed for ' . $this->id . ': ' . $e->getMessage());
-                return null;
-            }
+            return MediaUrl::for($value);
         }
+
         // Legacy: full URL (e.g. /storage/...) or existing public URL
         return $value;
     }

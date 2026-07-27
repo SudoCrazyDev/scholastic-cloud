@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Support\MediaUrl;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Model;
 
 class StudentDocument extends Model
 {
@@ -27,19 +27,11 @@ class StudentDocument extends Model
 
     public function getUrlAttribute(): ?string
     {
-        if (!$this->file_path) {
+        if (! $this->file_path) {
             return null;
         }
 
-        try {
-            $r2Url = config('filesystems.disks.r2.url');
-            if ($r2Url) {
-                return rtrim($r2Url, '/') . '/' . ltrim($this->file_path, '/');
-            }
-            return Storage::disk('r2')->temporaryUrl($this->file_path, now()->addHours(24));
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return MediaUrl::for($this->file_path);
     }
 
     protected $appends = ['url'];

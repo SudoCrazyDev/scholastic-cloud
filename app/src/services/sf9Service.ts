@@ -1,5 +1,5 @@
 import { api } from '../lib/api';
-import type { ApiResponse } from '../types';
+import type { ApiResponse, GradingPeriodConfig } from '../types';
 
 export interface SF9Data {
   student: {
@@ -23,6 +23,8 @@ export interface SF9Data {
     gov_id?: string;
   };
   current_academic_year: string;
+  /** Quarters vs terms for the year this record covers, resolved server-side. */
+  grading_periods?: GradingPeriodConfig;
   current_sections: Array<{
     section_id: string;
     grade_level: string;

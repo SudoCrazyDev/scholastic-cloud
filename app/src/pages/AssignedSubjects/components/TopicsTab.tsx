@@ -9,7 +9,10 @@ import { Alert } from '../../../components/alert'
 import { ConfirmationModal } from '../../../components/ConfirmationModal'
 import { LessonEditor } from './LessonEditor'
 import { TopicItem } from './TopicItem'
+import { CopyToSubjectsModal } from './CopyToSubjectsModal'
+import { topicService } from '../../../services/topicService'
 import { useTopics } from '../../../hooks/useTopics'
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
 import type { Topic } from '../../../types'
 import type { CreateTopicData, UpdateTopicData } from '../../../services/topicService'
 
@@ -21,6 +24,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
   const [deletingTopicId, setDeletingTopicId] = useState<string | null>(null)
+  const [copyingTopic, setCopyingTopic] = useState<Topic | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const {
@@ -41,36 +45,41 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
     isTogglingCompletion
   } = useTopics(subjectId)
 
-  // Group topics by quarter
+  // 4 quarters or 3 terms, per the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods()
+
+  // Group topics by grading period
   const topicsByQuarter = useMemo(() => {
-    const grouped: Record<string, Topic[]> = {
-      '1': [],
-      '2': [],
-      '3': [],
-      '4': []
-    }
+    const grouped: Record<string, Topic[]> = Object.fromEntries(
+      gradingPeriods.values.map(value => [value, [] as Topic[]])
+    )
 
     topics.forEach(topic => {
       const quarter = topic.quarter || '1'
-      if (grouped[quarter]) {
-        grouped[quarter].push(topic)
+      // Keep a bucket for periods outside the configured structure (e.g. a
+      // leftover 4th-quarter lesson after a switch to terms) so nothing is
+      // silently hidden from the teacher.
+      if (!grouped[quarter]) {
+        grouped[quarter] = []
       }
+      grouped[quarter].push(topic)
     })
 
-    // Sort topics within each quarter by order
+    // Sort topics within each period by order
     Object.keys(grouped).forEach(quarter => {
       grouped[quarter].sort((a, b) => a.order - b.order)
     })
 
     return grouped
-  }, [topics])
+  }, [topics, gradingPeriods])
 
-  const quarterLabels = {
-    '1': '1st Quarter',
-    '2': 'Second Quarter', 
-    '3': 'Third Quarter',
-    '4': 'Fourth Quarter'
-  }
+  const quarterLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        gradingPeriods.periods.map(period => [period.value, period.label])
+      ) as Record<string, string>,
+    [gradingPeriods]
+  )
 
   const handleSubmitLesson = async (
     data: CreateTopicData | UpdateTopicData,
@@ -296,7 +305,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
             {/* Quarter Header */}
             <div className="flex items-center justify-between">
               <h4 className="text-md font-medium text-gray-800 border-b-2 border-primary-200 pb-1">
-                {quarterLabels[quarter as keyof typeof quarterLabels]}
+                {quarterLabels[quarter] ?? gradingPeriods.labelFor(quarter)}
               </h4>
               <span className="text-sm text-gray-500">
                 {quarterTopics.length} topic{quarterTopics.length !== 1 ? 's' : ''}
@@ -312,6 +321,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
                     topic={topic}
                     onEdit={handleEditTopic}
                     onDelete={(topicId) => setDeletingTopicId(topicId)}
+                    onCopy={(t) => setCopyingTopic(t)}
                     onToggleCompletion={handleToggleCompletion}
                     onTogglePublish={handleTogglePublish}
                     onMoveUp={handleMoveUp}
@@ -342,6 +352,16 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
         topic={editingTopic}
         subjectId={subjectId}
         isLoading={isCreating || isUpdating}
+      />
+
+      {/* Copy this lesson into the teacher's other subjects */}
+      <CopyToSubjectsModal
+        isOpen={!!copyingTopic}
+        onClose={() => setCopyingTopic(null)}
+        itemTitle={copyingTopic?.title ?? ''}
+        itemLabel="lesson"
+        sourceSubjectId={subjectId}
+        onCopy={(targetSubjectIds) => topicService.copyToSubjects(copyingTopic!.id, targetSubjectIds)}
       />
 
       {/* Delete Confirmation Modal */}

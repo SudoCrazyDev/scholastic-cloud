@@ -3,22 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\Subject;
+use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentV2Service;
-use Illuminate\Http\Request;
+use App\Support\GradingPeriods;
+use App\Support\MediaUrl;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class SubjectEcrItemController extends Controller
 {
-    public function __construct(protected AssessmentV2Service $v2)
-    {
-    }
+    public function __construct(protected AssessmentV2Service $v2) {}
 
     /**
      * Response shape for a single item. For v2, resolved question rows (with stable ids) are
@@ -32,8 +33,10 @@ class SubjectEcrItemController extends Controller
             $content['questions'] = $item->resolvedQuestions();
             $data['content'] = $content;
         }
+
         return $data;
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -45,23 +48,23 @@ class SubjectEcrItemController extends Controller
             'subject_ecr_id' => ['nullable'],
             'type' => ['nullable', 'string', Rule::in(['quiz', 'assignment', 'activity', 'project', 'exam', 'other'])],
             'status' => ['nullable', 'string', Rule::in(['draft', 'published'])],
-            'quarter' => ['nullable', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['nullable', 'string', Rule::in(GradingPeriods::anyValues())],
             'scheduled_date' => ['nullable', 'date_format:Y-m-d'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ])->validate();
 
         // If subject_id is used, enforce institution access similar to other controllers.
-        if (!empty($validated['subject_id'])) {
+        if (! empty($validated['subject_id'])) {
             $authenticatedUser = $request->user();
             $defaultInstitution = $authenticatedUser->userInstitutions()
                 ->where('is_default', true)
                 ->first();
 
-            if (!$defaultInstitution) {
+            if (! $defaultInstitution) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No default institution found for authenticated user'
+                    'message' => 'No default institution found for authenticated user',
                 ], 403);
             }
 
@@ -69,23 +72,23 @@ class SubjectEcrItemController extends Controller
                 ->where('institution_id', $defaultInstitution->institution_id)
                 ->first();
 
-            if (!$subject) {
+            if (! $subject) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Subject not found or access denied'
+                    'message' => 'Subject not found or access denied',
                 ], 404);
             }
         }
 
         $query = SubjectEcrItem::query()->with('subjectEcr');
 
-        if (!empty($validated['subject_id'])) {
+        if (! empty($validated['subject_id'])) {
             $query->whereHas('subjectEcr', function ($q) use ($validated) {
                 $q->where('subject_id', $validated['subject_id']);
             });
         }
 
-        if (!empty($validated['subject_ecr_id'])) {
+        if (! empty($validated['subject_ecr_id'])) {
             $subjectEcrIds = $request->query('subject_ecr_id');
             if (is_array($subjectEcrIds)) {
                 $query->whereIn('subject_ecr_id', $subjectEcrIds);
@@ -94,26 +97,26 @@ class SubjectEcrItemController extends Controller
             }
         }
 
-        if (!empty($validated['type'])) {
+        if (! empty($validated['type'])) {
             $query->where('type', $validated['type']);
         }
 
-        if (!empty($validated['status'])) {
+        if (! empty($validated['status'])) {
             $query->where('status', $validated['status']);
         }
 
-        if (!empty($validated['quarter'])) {
+        if (! empty($validated['quarter'])) {
             $query->where('quarter', $validated['quarter']);
         }
 
-        if (!empty($validated['scheduled_date'])) {
+        if (! empty($validated['scheduled_date'])) {
             $query->whereDate('scheduled_date', $validated['scheduled_date']);
         }
 
-        if (!empty($validated['date_from'])) {
+        if (! empty($validated['date_from'])) {
             $query->whereDate('scheduled_date', '>=', $validated['date_from']);
         }
-        if (!empty($validated['date_to'])) {
+        if (! empty($validated['date_to'])) {
             $query->whereDate('scheduled_date', '<=', $validated['date_to']);
         }
 
@@ -195,25 +198,26 @@ class SubjectEcrItemController extends Controller
                     $this->v2->syncQuestions($item, $questions ?? []);
                     $item->refresh()->load('questions');
                 }
+
                 return $item;
             });
 
             return response()->json([
                 'success' => true,
                 'data' => $this->present($item),
-                'message' => 'Subject ECR item created successfully'
+                'message' => 'Subject ECR item created successfully',
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create subject ECR item',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -231,12 +235,12 @@ class SubjectEcrItemController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $this->present($item)
+                'data' => $this->present($item),
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Subject ECR item not found'
+                'message' => 'Subject ECR item not found',
             ], 404);
         }
     }
@@ -248,7 +252,7 @@ class SubjectEcrItemController extends Controller
     {
         try {
             $item = SubjectEcrItem::findOrFail($id);
-            
+
             $validatedData = $request->validate([
                 'subject_ecr_id' => 'sometimes|required|uuid',
                 'type' => 'nullable|string|max:255',
@@ -321,19 +325,19 @@ class SubjectEcrItemController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $this->present($item),
-                'message' => 'Subject ECR item updated successfully'
+                'message' => 'Subject ECR item updated successfully',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update subject ECR item',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -360,20 +364,24 @@ class SubjectEcrItemController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Subject ECR item deleted successfully'
+                'message' => 'Subject ECR item deleted successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete subject ECR item',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Upload an image used inside an assessment question (e.g. Drag The Picture cards).
-     * Returns a stable public URL the builder stores in the question content.
+     * Upload an image used inside an assessment question (question prompts,
+     * multiple-choice options, Drag The Picture cards).
+     *
+     * Returns a permanent URL the builder stores in the question content. When
+     * the caller passes the image it is replacing (`previous_url`/`previous_path`),
+     * that object is removed from R2 so re-uploads don't accumulate orphans.
      */
     public function uploadImage(Request $request): JsonResponse
     {
@@ -382,7 +390,7 @@ class SubjectEcrItemController extends Controller
             ->where('is_default', true)
             ->first();
 
-        if (!$defaultInstitution) {
+        if (! $defaultInstitution) {
             return response()->json([
                 'success' => false,
                 'message' => 'No default institution found for authenticated user',
@@ -391,29 +399,187 @@ class SubjectEcrItemController extends Controller
 
         $request->validate([
             'file' => 'required|file|mimes:png,jpg,jpeg,webp,gif|max:10240',
+            'previous_url' => 'nullable|string',
+            'previous_path' => 'nullable|string',
         ]);
 
         $file = $request->file('file');
         $extension = $file->getClientOriginalExtension() ?: 'png';
-        $fileName = Str::uuid() . '.' . $extension;
-        $r2Path = $defaultInstitution->institution_id . '/assessments/images/' . $fileName;
+        $fileName = Str::uuid().'.'.$extension;
+        $prefix = $defaultInstitution->institution_id.'/assessments/images/';
+        $r2Path = $prefix.$fileName;
 
         Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
 
-        // Build a public URL the same way ID card assets / student profile pictures do.
-        $r2Url = config('filesystems.disks.r2.url');
-        if ($r2Url) {
-            $url = rtrim($r2Url, '/') . '/' . ltrim($r2Path, '/');
-        } else {
-            $url = Storage::disk('r2')->temporaryUrl($r2Path, now()->addDays(7));
-        }
+        $this->deleteReplacedUpload(
+            $request->input('previous_path') ?: $request->input('previous_url'),
+            $prefix
+        );
 
         return response()->json([
             'success' => true,
             'data' => [
-                'url' => $url,
+                'url' => MediaUrl::for($r2Path),
                 'path' => $r2Path,
             ],
         ], 201);
+    }
+
+    /**
+     * Duplicate this assessment method into one or more other subjects — the
+     * usual case being the same quiz across every section a teacher handles.
+     *
+     * Copies land as drafts so schedules and visibility are reviewed per
+     * section before students see them. Image URLs are shared rather than
+     * re-uploaded: they are permanent and never rewritten in place.
+     */
+    public function copyToSubjects(Request $request, string $id): JsonResponse
+    {
+        $defaultInstitution = $request->user()->userInstitutions()
+            ->where('is_default', true)
+            ->first();
+
+        if (! $defaultInstitution) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No default institution found for authenticated user',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'target_subject_ids' => 'required|array|min:1',
+            'target_subject_ids.*' => 'uuid|exists:subjects,id',
+        ]);
+
+        $source = SubjectEcrItem::with(['subjectEcr.subject', 'questions'])->find($id);
+        if (! $source || $source->subjectEcr?->subject?->institution_id !== $defaultInstitution->institution_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Assessment method not found or access denied',
+            ], 404);
+        }
+
+        $sourceEcrTitle = $source->subjectEcr?->title;
+        $copied = 0;
+        $skipped = [];
+
+        foreach (array_unique($validated['target_subject_ids']) as $targetSubjectId) {
+            $target = Subject::where('id', $targetSubjectId)
+                ->where('institution_id', $defaultInstitution->institution_id)
+                ->first();
+
+            if (! $target) {
+                $skipped[] = [
+                    'subject_id' => $targetSubjectId,
+                    'subject_title' => '',
+                    'reason' => 'Subject not found in your institution.',
+                ];
+
+                continue;
+            }
+
+            if ($target->id === $source->subjectEcr?->subject_id) {
+                $skipped[] = [
+                    'subject_id' => $target->id,
+                    'subject_title' => $target->title,
+                    'reason' => 'This is the subject the assessment already belongs to.',
+                ];
+
+                continue;
+            }
+
+            // Prefer the component with the same name (e.g. "Written Works"),
+            // so a copied quiz keeps weighting under the equivalent component.
+            $targetEcr = SubjectEcr::where('subject_id', $target->id)
+                ->when($sourceEcrTitle, fn ($q) => $q->orderByRaw('title = ? DESC', [$sourceEcrTitle]))
+                ->orderBy('created_at')
+                ->first();
+
+            if (! $targetEcr) {
+                $skipped[] = [
+                    'subject_id' => $target->id,
+                    'subject_title' => $target->title,
+                    'reason' => 'No Components of Summative Assessment set up yet.',
+                ];
+
+                continue;
+            }
+
+            DB::transaction(function () use ($source, $targetEcr) {
+                $copy = $source->replicate([
+                    'created_at',
+                    'updated_at',
+                ]);
+                $copy->subject_ecr_id = $targetEcr->id;
+                // Dates belong to the section the assessment was built for.
+                $copy->status = 'draft';
+                $copy->scheduled_date = null;
+                $copy->open_at = null;
+                $copy->close_at = null;
+                $copy->due_at = null;
+                $copy->save();
+
+                if ($source->isV2()) {
+                    foreach ($source->questions as $question) {
+                        $questionCopy = $question->replicate(['created_at', 'updated_at', 'deleted_at']);
+                        $questionCopy->subject_ecr_item_id = $copy->id;
+                        $questionCopy->save();
+                    }
+                }
+            });
+
+            $copied++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['copied' => $copied, 'skipped' => $skipped],
+            'message' => $copied === 1
+                ? 'Assessment method copied to 1 subject as a draft.'
+                : "Assessment method copied to {$copied} subjects as drafts.",
+        ]);
+    }
+
+    /**
+     * Delete an assessment image the teacher removed from a question.
+     */
+    public function deleteImage(Request $request): JsonResponse
+    {
+        $authenticatedUser = $request->user();
+        $defaultInstitution = $authenticatedUser->userInstitutions()
+            ->where('is_default', true)
+            ->first();
+
+        if (! $defaultInstitution) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No default institution found for authenticated user',
+            ], 403);
+        }
+
+        $request->validate([
+            'url' => 'required_without:path|nullable|string',
+            'path' => 'required_without:url|nullable|string',
+        ]);
+
+        $this->deleteReplacedUpload(
+            $request->input('path') ?: $request->input('url'),
+            $defaultInstitution->institution_id.'/assessments/images/'
+        );
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Drop the object a re-upload just replaced. Scoped to the caller's own
+     * institution/assessment prefix so a crafted `previous_url` can't be used
+     * to delete somebody else's file.
+     */
+    private function deleteReplacedUpload(?string $previous, string $allowedPrefix): void
+    {
+        $path = MediaUrl::pathFrom($previous);
+        if ($path && str_starts_with($path, $allowedPrefix)) {
+            MediaUrl::deleteByPath($path);
+        }
     }
 }

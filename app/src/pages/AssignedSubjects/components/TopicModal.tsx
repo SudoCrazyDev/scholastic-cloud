@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { XMarkIcon, DocumentTextIcon } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { Textarea } from '../../../components/textarea'
+import { Select } from '../../../components/select'
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
 import type { Topic } from '../../../types'
 import type { CreateTopicData, UpdateTopicData } from '../../../services/topicService'
 
@@ -31,6 +33,8 @@ export const TopicModal: React.FC<TopicModalProps> = ({
     quarter: '1'
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  // 4 quarters or 3 terms, per the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods()
 
   const isEditing = !!topic
 
@@ -181,23 +185,22 @@ export const TopicModal: React.FC<TopicModalProps> = ({
                   />
                 </div>
 
-                {/* Quarter Select */}
+                {/* Grading period select */}
                 <div>
                   <label htmlFor="quarter" className="block text-sm font-medium text-gray-700 mb-2">
-                    Quarter
+                    {gradingPeriods.noun}
                   </label>
-                  <select
+                  <Select
                     id="quarter"
                     value={formData.quarter}
                     onChange={(e) => handleInputChange('quarter', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    options={gradingPeriods.periods.map((period) => ({
+                      value: period.value,
+                      label: period.label,
+                    }))}
+                    className="w-full"
                     disabled={isLoading}
-                  >
-                    <option value="1">1st Quarter</option>
-                    <option value="2">Second Quarter</option>
-                    <option value="3">Third Quarter</option>
-                    <option value="4">Fourth Quarter</option>
-                  </select>
+                  />
                 </div>
 
                 {/* Actions */}

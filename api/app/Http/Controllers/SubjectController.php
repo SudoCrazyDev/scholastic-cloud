@@ -301,14 +301,17 @@ class SubjectController extends Controller
                 }
             }
 
-            // Handle adviser field - convert empty string to null or set to null if not provided
-            if (isset($validated['adviser'])) {
+            // Handle adviser field. Only touch it when the client actually sent the key:
+            // an empty string clears the teacher, an omitted key leaves it alone. Partial
+            // updates (e.g. the grading-type switch on the subject detail page) must never
+            // silently unassign the subject teacher — that drops the subject out of the
+            // teacher's "My Assigned Subjects" list.
+            if ($request->has('adviser')) {
                 if ($validated['adviser'] === '') {
                     $validated['adviser'] = null;
                 }
             } else {
-                // If adviser field is not provided in the request, set it to null to clear it
-                $validated['adviser'] = null;
+                unset($validated['adviser']);
             }
 
             // Ensure the institution_id is always set to the user's default institution

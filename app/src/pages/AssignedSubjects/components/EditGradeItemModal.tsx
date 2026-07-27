@@ -8,6 +8,8 @@ import { useFormik } from 'formik'
 import * as Yup from 'yup'
 import { useUpdateSubjectEcrItem } from '../../../hooks/useSubjectEcrItems'
 import { useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
+import { Select } from '../../../components/select'
 
 interface EditGradeItemModalProps {
   isOpen: boolean
@@ -33,6 +35,8 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
   gradeItem
 }) => {
   const updateMutation = useUpdateSubjectEcrItem()
+  // 4 quarters or 3 terms, per the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods()
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   const subjectEcrs = subjectEcrsData?.data || []
 
@@ -50,7 +54,7 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
       description: Yup.string().required('Description is required'),
       total_score: Yup.number().min(1).required('Total score is required'),
       subject_ecr_id: Yup.string().required('Component is required'),
-      quarter: Yup.string().required('Quarter is required'),
+      quarter: Yup.string().required('Grading period is required'),
       type: Yup.string(),
     }),
     onSubmit: async (values, { resetForm, setSubmitting, setErrors }) => {
@@ -189,7 +193,7 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
                   )}
                 </div>
 
-                {/* Category (Component) and Quarter */}
+                {/* Category (Component) and grading period */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="subject_ecr_id" className="block text-sm font-medium text-gray-700 mb-2">
@@ -217,18 +221,17 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
                   </div>
                   <div>
                     <label htmlFor="quarter" className="block text-sm font-medium text-gray-700 mb-2">
-                      Quarter
+                      {gradingPeriods.noun}
                     </label>
-                    <select
+                    <Select
                       id="quarter"
                       {...formik.getFieldProps('quarter')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="1">First Quarter</option>
-                      <option value="2">Second Quarter</option>
-                      <option value="3">Third Quarter</option>
-                      <option value="4">Fourth Quarter</option>
-                    </select>
+                      options={gradingPeriods.periods.map((period) => ({
+                        value: period.value,
+                        label: period.label,
+                      }))}
+                      className="w-full"
+                    />
                     {formik.touched.quarter && formik.errors.quarter && (
                       <div className="text-xs text-red-600 mt-1">{formik.errors.quarter}</div>
                     )}

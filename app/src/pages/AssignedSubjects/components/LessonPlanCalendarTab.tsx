@@ -6,6 +6,7 @@ import { Alert } from '@/components/alert'
 import type { LessonPlan } from '@/types'
 import { lessonPlanService } from '@/services/lessonPlanService'
 import { subjectEcrItemService, type SubjectEcrItem } from '@/services/subjectEcrItemService'
+import { useGradingPeriods } from '@/hooks/useGradingPeriods'
 import { LessonPlanViewer } from './LessonPlanViewer'
 import { QuizQuestionsViewer } from './QuizQuestionsViewer'
 
@@ -99,6 +100,8 @@ const TypeBadge: React.FC<{ type?: string }> = ({ type }) => {
 }
 
 export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ subjectId }) => {
+  // 4 quarters or 3 terms, per the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods()
   const [quarter, setQuarter] = useState<'1' | '2' | '3' | '4'>('1')
   const [cursorMonth, setCursorMonth] = useState<Date>(() => startOfMonth(new Date()))
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -428,16 +431,16 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
         </div>
 
         <div className="flex items-center gap-2">
-          {(['1', '2', '3', '4'] as const).map((q) => (
+          {gradingPeriods.periods.map((period) => (
             <Button
-              key={q}
+              key={period.value}
               type="button"
               size="sm"
-              variant={quarter === q ? 'solid' : 'outline'}
+              variant={quarter === period.value ? 'solid' : 'outline'}
               color="primary"
-              onClick={() => setQuarter(q)}
+              onClick={() => setQuarter(period.value as '1' | '2' | '3' | '4')}
             >
-              Q{q}
+              {period.short}
             </Button>
           ))}
         </div>

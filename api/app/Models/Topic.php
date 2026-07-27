@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\MediaUrl;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
 
 class Topic extends Model
 {
@@ -52,35 +52,42 @@ class Topic extends Model
     }
 
     /**
-     * Content blocks with file URLs re-signed at read time. The `url` stored in
-     * a file block is a presigned URL that expires (R2/S3 signatures last at
-     * most 7 days), so readers must always get a fresh URL derived from `path`.
+     * Content blocks with file URLs rebuilt from `path` at read time. URLs are
+     * permanent now, but old rows still hold expired presigned links, so the
+     * `url` in storage is never trusted — it is always re-derived.
      */
     public function contentWithFreshUrls(): array
     {
         $blocks = is_array($this->content) ? $this->content : [];
 
         return array_map(function ($block) {
-            if (($block['type'] ?? null) === 'file' && !empty($block['path'])) {
+            if (($block['type'] ?? null) === 'file' && ! empty($block['path'])) {
                 $block['url'] = self::freshFileUrl($block['path']) ?? ($block['url'] ?? null);
             }
+
             return $block;
         }, $blocks);
     }
 
     /**
-     * Best-effort viewable URL for an R2 object: presigned if supported, else public URL.
+     * Permanent viewable URL for an R2 object.
      */
     public static function freshFileUrl(string $path): ?string
     {
-        try {
-            return Storage::disk('r2')->temporaryUrl($path, now()->addDays(7));
-        } catch (\Throwable) {
-            try {
-                return Storage::disk('r2')->url($path);
-            } catch (\Throwable) {
-                return null;
-            }
-        }
+        return MediaUrl::for($path);
+    }
+
+    /**
+     * R2 object keys referenced by the given content blocks.
+     *
+     * @param  array<int, array<string, mixed>>|null  $blocks
+     * @return array<int, string>
+     */
+    public static function filePathsIn(?array $blocks): array
+    {
+        return array_values(array_filter(array_map(
+            fn ($block) => ($block['type'] ?? null) === 'file' ? MediaUrl::clean($block['path'] ?? null) : null,
+            is_array($blocks) ? $blocks : []
+        )));
     }
 }

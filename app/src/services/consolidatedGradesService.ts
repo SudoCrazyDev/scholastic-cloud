@@ -1,4 +1,5 @@
 import { api } from '../lib/api'
+import type { GradingPeriodConfig } from '../types'
 
 export interface ConsolidatedGradesResponse {
   success: boolean
@@ -10,6 +11,8 @@ export interface ConsolidatedGradesResponse {
       academic_year: string
     }
     quarter: number
+    /** Quarters vs terms for the section's academic year. */
+    grading_periods?: GradingPeriodConfig
     students: Array<{
       student_id: string
       student_name: string

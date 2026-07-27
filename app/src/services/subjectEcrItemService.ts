@@ -103,11 +103,40 @@ class SubjectEcrItemService {
   }
 
   // Uploads an image used inside a question (e.g. Drag The Picture cards); returns a public URL.
-  async uploadImage(file: File): Promise<{ success: boolean; data: { url: string; path: string } }> {
+  /**
+   * Upload an image used inside an assessment question. Pass `previousUrl` when
+   * replacing an existing image so the server can drop the old file from storage
+   * instead of leaving it orphaned.
+   */
+  async uploadImage(
+    file: File,
+    previousUrl?: string | null
+  ): Promise<{ success: boolean; data: { url: string; path: string } }> {
     const formData = new FormData();
     formData.append('file', file);
+    if (previousUrl) formData.append('previous_url', previousUrl);
     const response = await api.post(`${this.baseUrl}/images`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  /** Remove an uploaded assessment image from storage. Best effort — never blocks the UI. */
+  async deleteImage(url: string): Promise<void> {
+    try {
+      await api.delete(`${this.baseUrl}/images`, { data: { url } });
+    } catch {
+      // Orphaned files are a housekeeping concern, not something to surface.
+    }
+  }
+
+  /** Duplicate this assessment method into one or more other subjects. */
+  async copyToSubjects(
+    id: string,
+    targetSubjectIds: string[]
+  ): Promise<{ success: boolean; data: { copied: number; skipped: Array<{ subject_id: string; subject_title: string; reason: string }> } }> {
+    const response = await api.post(`${this.baseUrl}/${id}/copy`, {
+      target_subject_ids: targetSubjectIds,
     });
     return response.data;
   }

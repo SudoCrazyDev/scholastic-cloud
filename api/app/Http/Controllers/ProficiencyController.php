@@ -6,6 +6,7 @@ use App\Models\ClassSection;
 use App\Models\StudentSection;
 use App\Models\StudentRunningGrade;
 use App\Models\Subject;
+use App\Support\GradingPeriods;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,10 @@ class ProficiencyController extends Controller
             $institutionId = $userInstitutions->first();
         }
 
+        $gradingPeriods = GradingPeriods::config(
+            GradingPeriods::forInstitution($institutionId, $academicYear)
+        );
+
         $sectionsQuery = ClassSection::where('institution_id', $institutionId)
             ->where('academic_year', $academicYear);
 
@@ -59,6 +64,7 @@ class ProficiencyController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [],
+                'grading_periods' => $gradingPeriods,
             ]);
         }
 
@@ -104,6 +110,7 @@ class ProficiencyController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $this->buildResultRows($groupKeyToPairs, [], []),
+                'grading_periods' => $gradingPeriods,
             ]);
         }
 
@@ -135,6 +142,7 @@ class ProficiencyController extends Controller
         return response()->json([
             'success' => true,
             'data' => $result,
+            'grading_periods' => $gradingPeriods,
         ]);
     }
 
@@ -244,6 +252,10 @@ class ProficiencyController extends Controller
             $institutionId = $userInstitutions->first();
         }
 
+        $gradingPeriods = GradingPeriods::config(
+            GradingPeriods::forInstitution($institutionId, $academicYear)
+        );
+
         $sectionsQuery = ClassSection::where('institution_id', $institutionId)
             ->where('academic_year', $academicYear);
 
@@ -262,6 +274,7 @@ class ProficiencyController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [],
+                'grading_periods' => $gradingPeriods,
             ]);
         }
 
@@ -320,6 +333,7 @@ class ProficiencyController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $this->buildBySectionResultRows($groupKeyToData, [], []),
+                'grading_periods' => $gradingPeriods,
             ]);
         }
 
@@ -351,6 +365,7 @@ class ProficiencyController extends Controller
         return response()->json([
             'success' => true,
             'data' => $result,
+            'grading_periods' => $gradingPeriods,
         ]);
     }
 

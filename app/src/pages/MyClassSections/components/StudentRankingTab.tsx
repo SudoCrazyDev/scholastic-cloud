@@ -107,13 +107,18 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
     return parts.filter(Boolean).join(' ');
   };
 
-  // Quarter options
-  const quarterOptions = [
-    { value: '1', label: '1st Quarter' },
-    { value: '2', label: '2nd Quarter' },
-    { value: '3', label: '3rd Quarter' },
-    { value: '4', label: '4th Quarter' },
-  ];
+  // Grading period options — the API resolves quarters vs terms for the section's
+  // academic year and returns it alongside the grades.
+  const gradingPeriods = data?.grading_periods;
+  const periodNoun = gradingPeriods?.noun ?? 'Quarter';
+  const quarterOptions = (
+    gradingPeriods?.periods ?? [
+      { value: '1', label: '1st Quarter' },
+      { value: '2', label: '2nd Quarter' },
+      { value: '3', label: '3rd Quarter' },
+      { value: '4', label: '4th Quarter' },
+    ]
+  ).map((period) => ({ value: period.value, label: period.label }));
 
   // Map consolidated grades to student rankings (use same Final Grade logic as Consolidated Grades tab)
   const studentsWithGrouped = data ? buildStudentsWithGroupedSubjects(data) : [];
@@ -225,11 +230,11 @@ const StudentRankingTab: React.FC<StudentRankingTabProps> = ({ students, classSe
           </div>
         </div>
         
-        {/* Quarter Filter */}
+        {/* Grading period filter */}
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Quarter:</span>
+            <span className="text-sm font-medium text-gray-700">{periodNoun}:</span>
           </div>
           <Select
             value={selectedQuarter.toString()}

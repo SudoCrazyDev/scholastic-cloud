@@ -6,6 +6,7 @@ use App\Auth\StudentPortalUser;
 use App\Models\User;
 use App\Models\Student;
 use App\Models\StudentAuth;
+use App\Support\GradingPeriods;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -191,7 +192,11 @@ class AuthController extends Controller
                     'institution' => $inst ? [
                         'id' => $inst->id,
                         'name' => $inst->title ?? ($inst->name ?? null),
+                        'current_academic_year' => $inst->current_academic_year,
                         'theme' => $inst->theme,
+                        'grading_periods' => GradingPeriods::config(
+                            GradingPeriods::forInstitution($si->institution_id)
+                        ),
                     ] : null,
                 ];
             })->filter(fn ($i) => $i['institution'] !== null)->values()->all();
@@ -254,6 +259,12 @@ class AuthController extends Controller
                         'title' => $userInstitution->institution->title,
                         'current_academic_year' => $userInstitution->institution->current_academic_year,
                         'theme' => $userInstitution->institution->theme,
+                        // Quarters vs terms for the institution's current academic year,
+                        // so the client can label and count grading periods without an
+                        // extra request on every grade screen.
+                        'grading_periods' => GradingPeriods::config(
+                            GradingPeriods::forInstitution($userInstitution->institution_id)
+                        ),
                     ] : null,
                 ];
             }),
@@ -340,6 +351,12 @@ class AuthController extends Controller
                         'title' => $userInstitution->institution->title,
                         'current_academic_year' => $userInstitution->institution->current_academic_year,
                         'theme' => $userInstitution->institution->theme,
+                        // Quarters vs terms for the institution's current academic year,
+                        // so the client can label and count grading periods without an
+                        // extra request on every grade screen.
+                        'grading_periods' => GradingPeriods::config(
+                            GradingPeriods::forInstitution($userInstitution->institution_id)
+                        ),
                     ] : null,
                 ];
             }),

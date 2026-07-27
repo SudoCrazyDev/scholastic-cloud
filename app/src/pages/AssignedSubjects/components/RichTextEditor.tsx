@@ -97,6 +97,54 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     })
     quillRef.current = quill
 
+    // Insert an image file by uploading it to R2 and embedding the returned
+    // URL — never a base64 data URI, which would bloat the stored prompt HTML
+    // (and can push a multi-question save past the server's request-body limit,
+    // surfacing as a browser "Network Error").
+    const insertUploadedImage = async (file: File) => {
+      const upload = onImageUploadRef.current
+      if (!upload) return
+      const range = quill.getSelection(true) ?? { index: quill.getLength(), length: 0 }
+      const url = await upload(file)
+      if (!url || quillRef.current !== quill) return
+      quill.insertEmbed(range.index, 'image', url, 'user')
+      quill.setSelection(range.index + 1, 0)
+    }
+
+    // Intercept pasted/dropped image files before Quill's default clipboard
+    // handler embeds them as base64. Capture phase + stopPropagation keeps the
+    // event from reaching Quill's own bubble-phase listener.
+    const handlePaste = (event: ClipboardEvent) => {
+      if (!onImageUploadRef.current) return
+      const file = Array.from(event.clipboardData?.items ?? [])
+        .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        ?.getAsFile()
+      if (!file) return
+      event.preventDefault()
+      event.stopPropagation()
+      void insertUploadedImage(file)
+    }
+    const handleDrop = (event: DragEvent) => {
+      if (!onImageUploadRef.current) return
+      const file = Array.from(event.dataTransfer?.files ?? []).find((item) =>
+        item.type.startsWith('image/')
+      )
+      if (!file) return
+      event.preventDefault()
+      event.stopPropagation()
+      void insertUploadedImage(file)
+    }
+    quill.root.addEventListener('paste', handlePaste, true)
+    quill.root.addEventListener('drop', handleDrop, true)
+
+    // Pasted HTML (e.g. from a doc or web page) may carry base64 <img> tags;
+    // drop them so they never enter the prompt content.
+    const Delta = Quill.import('delta') as any
+    quill.clipboard.addMatcher('IMG', (node: Node, delta: any) => {
+      const src = (node as HTMLImageElement).getAttribute?.('src') ?? ''
+      return src.startsWith('data:') ? new Delta() : delta
+    })
+
     if (value) {
       settingRef.current = true
       quill.clipboard.dangerouslyPasteHTML(value)

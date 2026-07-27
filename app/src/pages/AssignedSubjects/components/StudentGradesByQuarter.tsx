@@ -1,5 +1,6 @@
 import React from 'react';
 import { FinalGradeInput } from './FinalGradeInput';
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods';
 import type { StudentRunningGrade } from '../../../services/studentRunningGradeService';
 import type { Student } from '../../../types';
 import type { GradeBandLike } from '../../../utils/gradeScale';
@@ -37,17 +38,19 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
   isDisabled = false,
   gradingBands = null,
 }) => {
-  // Group grades by quarter
+  const gradingPeriods = useGradingPeriods();
+
+  // Group grades by grading period
   const gradesByQuarter = runningGrades.reduce((acc, grade) => {
     acc[grade.quarter] = grade;
     return acc;
   }, {} as Record<string, StudentRunningGrade>);
 
-  // All quarters for desktop display
-  const allQuarters: ('1' | '2' | '3' | '4')[] = ['1', '2', '3', '4'];
-  
-  // Filtered quarters for mobile/tablet
-  const filteredQuarters = selectedQuarter 
+  // Every grading period the year has (4 for quarters, 3 for terms) — desktop
+  const allQuarters = gradingPeriods.values as ('1' | '2' | '3' | '4')[];
+
+  // Filtered periods for mobile/tablet
+  const filteredQuarters = selectedQuarter && gradingPeriods.hasPeriod(selectedQuarter)
     ? [selectedQuarter as '1' | '2' | '3' | '4']
     : allQuarters;
 
@@ -83,7 +86,9 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
           </div>
           {selectedQuarter && (
             <div className="lg:hidden flex items-center space-x-1 mt-1">
-              <span className="text-xs text-blue-600 font-medium">Showing: Quarter {selectedQuarter}</span>
+              <span className="text-xs text-blue-600 font-medium">
+                Showing: {gradingPeriods.numberedLabelFor(selectedQuarter)}
+              </span>
             </div>
           )}
         </div>

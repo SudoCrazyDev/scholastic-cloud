@@ -11,6 +11,7 @@ import { subjectQuarterPlanService } from '@/services/subjectQuarterPlanService'
 import { topicService } from '@/services/topicService'
 import { subjectEcrService } from '@/services/subjectEcrService'
 import { lessonPlanService } from '@/services/lessonPlanService'
+import { useGradingPeriods } from '@/hooks/useGradingPeriods'
 import { 
   LightBulbIcon, 
   CalendarIcon, 
@@ -35,6 +36,8 @@ const WEEKDAYS = [
 ] as const
 
 export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
+  // 4 quarters or 3 terms, per the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods()
   const [quarter, setQuarter] = useState<'1' | '2' | '3' | '4'>('1')
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     topics: true,
@@ -233,10 +236,10 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
         activities_count: activitiesCount,
         projects_count: projectsCount,
       })
-      setSuccess('Quarter plan saved.')
+      setSuccess(`${gradingPeriods.noun} plan saved.`)
       await quarterPlanQuery.refetch()
     } catch (e: unknown) {
-      setError(getApiErrorMessage(e) ?? 'Failed to save quarter plan.')
+      setError(getApiErrorMessage(e) ?? `Failed to save ${gradingPeriods.noun.toLowerCase()} plan.`)
     } finally {
       setBusy(false)
     }
@@ -337,14 +340,14 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
       {
         id: 'topics',
         title: 'Topics',
-        description: 'Generate and save lesson topics for the quarter',
+        description: `Generate and save lesson topics for the ${gradingPeriods.noun.toLowerCase()}`,
         icon: LightBulbIcon,
         done: hasSavedTopics,
         status: hasSavedTopics ? `${savedTopicsForQuarter.length} saved` : 'Not started',
       },
       {
         id: 'quarterPlan',
-        title: 'Quarter Schedule',
+        title: `${gradingPeriods.noun} Schedule`,
         description: 'Set meeting days, dates, and assessment counts',
         icon: CalendarIcon,
         done: hasQuarterPlan,
@@ -375,28 +378,31 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
       <div className="bg-gradient-to-r from-primary-50 to-purple-50 rounded-xl p-6 border border-primary-100">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">AI-Powered Quarter Planner</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              AI-Powered {gradingPeriods.noun} Planner
+            </h2>
             <p className="mt-2 text-sm text-gray-600">
-              Automatically generate topics, lesson plans, and assessments using AI. Complete each step to build your quarter curriculum.
+              Automatically generate topics, lesson plans, and assessments using AI. Complete each
+              step to build your {gradingPeriods.noun.toLowerCase()} curriculum.
             </p>
           </div>
         </div>
         
-        {/* Quarter Selector */}
+        {/* Grading period selector */}
         <div className="mt-6 flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-700">Select Quarter:</span>
+          <span className="text-sm font-medium text-gray-700">Select {gradingPeriods.noun}:</span>
           <div className="flex gap-2">
-            {(['1', '2', '3', '4'] as const).map((q) => (
+            {gradingPeriods.periods.map((period) => (
               <Button
-                key={q}
+                key={period.value}
                 type="button"
-                variant={quarter === q ? 'solid' : 'outline'}
+                variant={quarter === period.value ? 'solid' : 'outline'}
                 color="primary"
                 size="sm"
-                onClick={() => setQuarter(q)}
+                onClick={() => setQuarter(period.value as '1' | '2' | '3' | '4')}
                 disabled={busy}
               >
-                Q{q}
+                {period.short}
               </Button>
             ))}
           </div>
@@ -531,7 +537,9 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                       <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Field>
-                    <Label htmlFor="startDate" className="text-gray-900 font-medium">Quarter start date</Label>
+                    <Label htmlFor="startDate" className="text-gray-900 font-medium">
+                      {gradingPeriods.noun} start date
+                    </Label>
                     <Input
                       id="startDate"
                       type="date"
@@ -600,14 +608,14 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                   <Alert
                     type="warning"
                     show
-                    message="Quarter plan not found for this quarter. Please save the quarter schedule first (Step 2)."
+                    message={`${gradingPeriods.noun} plan not found for this ${gradingPeriods.noun.toLowerCase()}. Please save the ${gradingPeriods.noun.toLowerCase()} schedule first (Step 2).`}
                   />
                 )}
                 {hasQuarterPlan && !hasSavedTopics && (
                   <Alert
                     type="warning"
                     show
-                    message="No topics found for this quarter yet. Save topics first (Step 1) so lesson plans can be generated."
+                    message={`No topics found for this ${gradingPeriods.noun.toLowerCase()} yet. Save topics first (Step 1) so lesson plans can be generated.`}
                   />
                 )}
 
@@ -667,7 +675,7 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                   <Alert
                     type="warning"
                     show
-                    message="Quarter plan not found for this quarter. Please save the quarter schedule first (Step 2) so the generator knows how many items to create."
+                    message={`${gradingPeriods.noun} plan not found for this ${gradingPeriods.noun.toLowerCase()}. Please save the ${gradingPeriods.noun.toLowerCase()} schedule first (Step 2) so the generator knows how many items to create.`}
                   />
                 )}
 
@@ -767,7 +775,7 @@ export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
                         onClick={() => handleGenerateAssessments(true)}
                         disabled={busy || !hasQuarterPlan}
                       >
-                        Generate (overwrite quarter)
+                        Generate (overwrite {gradingPeriods.noun.toLowerCase()})
                       </Button>
                     </div>
                   </>

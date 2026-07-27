@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -43,14 +43,7 @@ import ClassSectionAttendanceTab from './components/ClassSectionAttendanceTab'
 import ClassSectionCertificatesTab from './components/ClassSectionCertificatesTab'
 import { Select } from '../../components/select'
 import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils'
-
-const QUARTER_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: '1', label: 'First Quarter' },
-  { value: '2', label: 'Second Quarter' },
-  { value: '3', label: 'Third Quarter' },
-  { value: '4', label: 'Fourth Quarter' },
-  { value: 'final', label: 'Final Quarter' },
-]
+import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods'
 
 const ERROR_TIMEOUT = 5000
 const SUCCESS_TIMEOUT = 3000
@@ -167,6 +160,25 @@ const ClassSectionDetail: React.FC = () => {
   
   const classSectionData = classSection?.data
 
+  // 4 quarters or 3 terms, per this section's academic year — a section from an
+  // earlier year keeps reporting on the structure its grades were entered under.
+  const gradingPeriods = useGradingPeriodsForYear(classSectionData?.academic_year)
+
+  const quarterOptions = useMemo(
+    () => [
+      ...gradingPeriods.periods.map(period => ({ value: period.value, label: period.label })),
+      { value: 'final', label: `Final ${gradingPeriods.noun}` },
+    ],
+    [gradingPeriods]
+  )
+
+  // A term-based year has no 4th period, so never leave the filter on one.
+  useEffect(() => {
+    if (selectedQuarter !== 'final' && !gradingPeriods.hasPeriod(selectedQuarter)) {
+      setSelectedQuarter('1')
+    }
+  }, [gradingPeriods, selectedQuarter])
+
   const selectedStudent = useMemo(() => {
     if (!selectedStudentForReport?.id || !students.length) return null
     return students.find(student => student.id === selectedStudentForReport.id) || null
@@ -200,7 +212,10 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!selectedStudentForReport?.id,
   })
 
-  /** Each subject should have at most 4 grades (one per quarter). Flag if any subject has more than 4. */
+  /**
+   * Each subject should have at most one grade per grading period (4 for a
+   * quarter-based year, 3 for a term-based one). Flag any subject with more.
+   */
   const gradeAnomaly = useMemo(() => {
     if (!studentGrades?.data || !Array.isArray(studentGrades.data)) return null
     const bySubject: Record<string, number> = {}
@@ -208,14 +223,16 @@ const ClassSectionDetail: React.FC = () => {
       const sid = g.subject_id
       if (sid) bySubject[sid] = (bySubject[sid] || 0) + 1
     })
-    const overFour = Object.entries(bySubject).filter(([, count]) => count > 4)
-    if (overFour.length === 0) return null
+    const overLimit = Object.entries(bySubject).filter(
+      ([, count]) => count > gradingPeriods.count
+    )
+    if (overLimit.length === 0) return null
     return {
       hasAnomaly: true,
-      subjectIds: overFour.map(([id]) => id),
-      countBySubject: Object.fromEntries(overFour),
+      subjectIds: overLimit.map(([id]) => id),
+      countBySubject: Object.fromEntries(overLimit),
     }
-  }, [studentGrades?.data])
+  }, [studentGrades?.data, gradingPeriods.count])
 
   const transformedGrades = useMemo((): StudentSubjectGrade[] => {
     if (!studentGrades?.data || !selectedStudentForReport?.id) return []
@@ -562,10 +579,10 @@ const ClassSectionDetail: React.FC = () => {
           {/* Quarter Filter for Consolidated Grades */}
           {activeTab === 'consolidated-grades' && (
             <div className="mb-4 flex items-center gap-2">
-              <span className="text-sm text-gray-700 font-medium">Quarter:</span>
+              <span className="text-sm text-gray-700 font-medium">{gradingPeriods.noun}:</span>
               <div className="min-w-[140px]">
                 <Select
-                  options={QUARTER_OPTIONS}
+                  options={quarterOptions}
                   value={selectedQuarter}
                   onChange={e => setSelectedQuarter(e.target.value)}
                 />
@@ -660,7 +677,7 @@ const ClassSectionDetail: React.FC = () => {
                     <Alert
                       type="warning"
                       title="Grade data issue"
-                      message={`${gradeAnomaly.subjectIds.length} subject(s) have more than 4 grade records (expected: one per quarter). Please review or fix in Consolidated Grades.`}
+                      message={`${gradeAnomaly.subjectIds.length} subject(s) have more than ${gradingPeriods.count} grade records (expected: one per ${gradingPeriods.noun.toLowerCase()}). Please review or fix in Consolidated Grades.`}
                       show={true}
                     />
                   )}

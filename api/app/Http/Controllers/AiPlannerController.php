@@ -12,6 +12,7 @@ use App\Models\SubjectQuarterPlan;
 use App\Models\Topic;
 use App\Services\Ai\AiManager;
 use Carbon\Carbon;
+use App\Support\GradingPeriods;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ class AiPlannerController extends Controller
         ]);
 
         $quarterValidated = validator(['quarter' => $quarter], [
-            'quarter' => ['required', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['required', 'string', Rule::in(GradingPeriods::anyValues())],
         ])->validate();
 
         $user = $request->user();
@@ -95,7 +96,7 @@ class AiPlannerController extends Controller
         ]);
 
         $quarterValidated = validator(['quarter' => $quarter], [
-            'quarter' => ['required', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['required', 'string', Rule::in(GradingPeriods::anyValues())],
         ])->validate();
 
         $user = $request->user();
@@ -206,7 +207,7 @@ class AiPlannerController extends Controller
         ]);
 
         $quarterValidated = validator(['quarter' => $quarter], [
-            'quarter' => ['required', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['required', 'string', Rule::in(GradingPeriods::anyValues())],
         ])->validate();
 
         $user = $request->user();

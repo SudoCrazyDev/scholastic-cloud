@@ -2,17 +2,19 @@
 
 namespace App\Models;
 
+use App\Support\MediaUrl;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class PaymentReceiptSubmission extends Model
 {
     use HasFactory, HasUuids;
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_REJECTED = 'rejected';
 
     protected $fillable = [
@@ -62,18 +64,10 @@ class PaymentReceiptSubmission extends Model
 
     public function getUrlAttribute(): ?string
     {
-        if (!$this->file_path) {
+        if (! $this->file_path) {
             return null;
         }
 
-        try {
-            $r2Url = config('filesystems.disks.r2.url');
-            if ($r2Url) {
-                return rtrim($r2Url, '/') . '/' . ltrim($this->file_path, '/');
-            }
-            return Storage::disk('r2')->temporaryUrl($this->file_path, now()->addHours(24));
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return MediaUrl::for($this->file_path);
     }
 }

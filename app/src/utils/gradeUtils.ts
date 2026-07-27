@@ -137,7 +137,11 @@ export const getGeneralAverageRemarks = (grade: number, failedCount = 0): string
   return 'Promoted'
 }
 
-export const getQuarterGrade = (grades: StudentRunningGrade[], quarter: '1' | '2' | '3' | '4'): number => {
+/**
+ * Grade for one grading period. The period is a plain ordinal ('1'..'4'); how many
+ * a year has (4 quarters or 3 terms) comes from useGradingPeriods, not from here.
+ */
+export const getQuarterGrade = (grades: StudentRunningGrade[], quarter: string | number): number => {
   const q = String(quarter)
   const quarterGrade = grades.find(
     grade => String(grade.quarter) === q || Number(grade.quarter) === Number(quarter)

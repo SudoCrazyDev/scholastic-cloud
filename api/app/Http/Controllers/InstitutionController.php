@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Institution;
 use App\Models\InstitutionAcademicYear;
 use App\Models\Subscription;
+use App\Support\GradingPeriods;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class InstitutionController extends Controller
@@ -300,11 +302,79 @@ class InstitutionController extends Controller
     public function getAcademicYears(string $id): JsonResponse
     {
         $institution = Institution::findOrFail($id);
-        $years = $institution->academicYears()->get();
+        $years = $institution->academicYears()->get()->map(function (InstitutionAcademicYear $year) {
+            $year->grading_periods = GradingPeriods::config($year->grading_period_type);
+
+            return $year;
+        });
 
         return response()->json([
             'success' => true,
             'data' => $years,
+        ]);
+    }
+
+    /**
+     * Resolved grading period structure for the signed-in user's institution.
+     * Optionally scoped to a specific academic year via ?academic_year=.
+     */
+    public function gradingPeriods(Request $request): JsonResponse
+    {
+        $academicYear = $request->query('academic_year');
+        $institutionId = $request->query('institution_id')
+            ?: GradingPeriods::institutionIdForUser($request->user());
+
+        $type = GradingPeriods::forInstitution($institutionId, $academicYear ?: null);
+
+        return response()->json([
+            'success' => true,
+            'data' => GradingPeriods::config($type),
+        ]);
+    }
+
+    /**
+     * Set whether an academic year is divided into 4 quarters or 3 terms.
+     *
+     * The structure is per academic year on purpose: institutions adopt DepEd's
+     * 3-term structure on a school-year boundary, and past years must keep
+     * reporting on the structure their grades were entered under.
+     */
+    public function updateAcademicYearGradingPeriods(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $role = $user->getRole();
+
+        if (! $role || ! in_array($role->slug, ['principal', 'institution-administrator'])) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+            'grading_period_type' => ['required', 'string', Rule::in(GradingPeriods::TYPES)],
+        ]);
+
+        $institution = Institution::findOrFail($id);
+
+        $academicYear = InstitutionAcademicYear::where('institution_id', $institution->id)
+            ->where('year', $validated['year'])
+            ->first();
+
+        if (! $academicYear) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Academic year not found for this institution.',
+            ], 404);
+        }
+
+        $academicYear->update(['grading_period_type' => $validated['grading_period_type']]);
+        GradingPeriods::flushCache();
+
+        $academicYear->grading_periods = GradingPeriods::config($academicYear->grading_period_type);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Grading period structure updated successfully',
+            'data' => $academicYear,
         ]);
     }
 
@@ -322,25 +392,34 @@ class InstitutionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'current_academic_year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+            'grading_period_type' => ['nullable', 'string', Rule::in(GradingPeriods::TYPES)],
         ]);
 
         $institution = Institution::findOrFail($id);
-        $year = $request->current_academic_year;
+        $year = $validated['current_academic_year'];
 
         // Mark all other years as not current
         InstitutionAcademicYear::where('institution_id', $institution->id)
             ->where('year', '!=', $year)
             ->update(['is_current' => false]);
 
-        // Upsert the selected year as current
+        // Upsert the selected year as current. Only overwrite the grading period
+        // structure when one was explicitly supplied, so re-selecting an existing
+        // year never silently re-labels the grades already entered under it.
+        $attributes = ['is_current' => true];
+        if (! empty($validated['grading_period_type'])) {
+            $attributes['grading_period_type'] = $validated['grading_period_type'];
+        }
+
         InstitutionAcademicYear::updateOrCreate(
             ['institution_id' => $institution->id, 'year' => $year],
-            ['is_current' => true]
+            $attributes
         );
 
         $institution->update(['current_academic_year' => $year]);
+        GradingPeriods::flushCache();
 
         return response()->json([
             'success' => true,

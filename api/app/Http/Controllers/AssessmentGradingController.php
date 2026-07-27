@@ -11,10 +11,10 @@ use App\Models\SubjectEcrItem;
 use App\Services\AssessmentScoringService;
 use App\Services\AssessmentV2Service;
 use App\Services\RunningGradeRecalcService;
+use App\Support\MediaUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Teacher-facing grading for student assessment submissions, with emphasis on
@@ -26,8 +26,7 @@ class AssessmentGradingController extends Controller
         protected AssessmentScoringService $scoringService,
         protected RunningGradeRecalcService $runningGradeRecalcService,
         protected AssessmentV2Service $v2
-    ) {
-    }
+    ) {}
 
     /**
      * The (answers, manualScores) maps for an attempt, keyed the same way its questions are:
@@ -38,6 +37,7 @@ class AssessmentGradingController extends Controller
         if ($item->isV2()) {
             return [$this->v2->answersMap($attempt), $this->v2->manualMap($attempt)];
         }
+
         return [$attempt->answers ?? [], $attempt->manual_scores ?? []];
     }
 
@@ -62,6 +62,7 @@ class AssessmentGradingController extends Controller
 
         $submissions = $attempts->map(function (StudentAssessmentAttempt $attempt) use ($questions, $item) {
             [$answers, $manual] = $this->attemptMaps($attempt, $item);
+
             return $this->buildSubmission($attempt, $questions, $answers, $manual);
         })->values();
 
@@ -103,7 +104,7 @@ class AssessmentGradingController extends Controller
         $attempt = StudentAssessmentAttempt::where('subject_ecr_item_id', $item->id)
             ->whereNotNull('submitted_at')
             ->find($attemptId);
-        if (!$attempt) {
+        if (! $attempt) {
             return response()->json(['success' => false, 'message' => 'Submission not found.'], 404);
         }
 
@@ -117,13 +118,13 @@ class AssessmentGradingController extends Controller
                 // manual_scores keyed by question id; award onto the normalized answer rows.
                 $byId = [];
                 foreach ($questions as $q) {
-                    if (!empty($q['id'])) {
+                    if (! empty($q['id'])) {
                         $byId[$q['id']] = $q;
                     }
                 }
                 foreach ($validated['manual_scores'] as $qid => $value) {
                     $question = $byId[$qid] ?? null;
-                    if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
+                    if (! $question || ! $this->scoringService->isManualQuestion($question) || $value === null) {
                         continue;
                     }
                     $points = (float) ($question['points'] ?? 1);
@@ -148,7 +149,7 @@ class AssessmentGradingController extends Controller
                 foreach ($validated['manual_scores'] as $index => $value) {
                     $i = (int) $index;
                     $question = $questions[$i] ?? null;
-                    if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
+                    if (! $question || ! $this->scoringService->isManualQuestion($question) || $value === null) {
                         continue;
                     }
                     $points = (float) ($question['points'] ?? 1);
@@ -174,6 +175,7 @@ class AssessmentGradingController extends Controller
 
         $attempt->load(['student', 'assessmentAnswers']);
         [$answers, $manual] = $this->attemptMaps($attempt, $item);
+
         return response()->json([
             'success' => true,
             'data' => $this->buildSubmission($attempt, $questions, $answers, $manual),
@@ -219,7 +221,7 @@ class AssessmentGradingController extends Controller
                 foreach ($attempt->manual_scores ?? [] as $index => $value) {
                     $i = (int) $index;
                     $question = $questions[$i] ?? null;
-                    if (!$question || !$this->scoringService->isManualQuestion($question) || $value === null) {
+                    if (! $question || ! $this->scoringService->isManualQuestion($question) || $value === null) {
                         continue;
                     }
                     $points = (float) ($question['points'] ?? 1);
@@ -231,7 +233,7 @@ class AssessmentGradingController extends Controller
             $changed = (float) $attempt->score !== $total || (float) $attempt->max_score !== $maxScore;
             if ($changed) {
                 $payload = ['score' => $total, 'max_score' => $maxScore];
-                if (!$isV2) {
+                if (! $isV2) {
                     $payload['manual_scores'] = $manualScores;
                 }
                 $attempt->update($payload);
@@ -239,7 +241,7 @@ class AssessmentGradingController extends Controller
             }
 
             // Attempts are ordered latest-first; only the latest per student drives the ECR score.
-            if (!isset($seenStudents[$attempt->student_id])) {
+            if (! isset($seenStudents[$attempt->student_id])) {
                 $seenStudents[$attempt->student_id] = true;
                 if ($changed) {
                     StudentEcrItemScore::updateOrCreate(
@@ -253,6 +255,7 @@ class AssessmentGradingController extends Controller
 
         $submissions = $attempts->map(function (StudentAssessmentAttempt $attempt) use ($questions, $item) {
             [$answers, $manual] = $this->attemptMaps($attempt, $item);
+
             return $this->buildSubmission($attempt, $questions, $answers, $manual);
         })->values();
 
@@ -274,7 +277,7 @@ class AssessmentGradingController extends Controller
     private function expectedStudentCount(SubjectEcrItem $item): int
     {
         $subject = $item->subjectEcr?->subject;
-        if (!$subject) {
+        if (! $subject) {
             return 0;
         }
 
@@ -282,7 +285,7 @@ class AssessmentGradingController extends Controller
             ->where('is_active', true)
             ->pluck('student_id');
 
-        if (!$subject->is_limited_student && $subject->class_section_id) {
+        if (! $subject->is_limited_student && $subject->class_section_id) {
             $studentIds = $studentIds->merge(
                 StudentSection::where('section_id', $subject->class_section_id)
                     ->where('is_active', true)
@@ -300,14 +303,14 @@ class AssessmentGradingController extends Controller
     private function authorizeItem(Request $request, string $itemId): SubjectEcrItem|JsonResponse
     {
         $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($itemId);
-        if (!$item || !in_array($item->type, ['quiz', 'activity', 'assignment', 'exam'], true)) {
+        if (! $item || ! in_array($item->type, ['quiz', 'activity', 'assignment', 'exam'], true)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
         $defaultInstitution = $request->user()->userInstitutions()
             ->where('is_default', true)
             ->first();
-        if (!$defaultInstitution) {
+        if (! $defaultInstitution) {
             return response()->json([
                 'success' => false,
                 'message' => 'No default institution found for authenticated user',
@@ -315,7 +318,7 @@ class AssessmentGradingController extends Controller
         }
 
         $subjectInstitutionId = $item->subjectEcr?->subject?->institution_id;
-        if (!$subjectInstitutionId || $subjectInstitutionId !== $defaultInstitution->institution_id) {
+        if (! $subjectInstitutionId || $subjectInstitutionId !== $defaultInstitution->institution_id) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -344,6 +347,7 @@ class AssessmentGradingController extends Controller
                 'manual' => $this->scoringService->isManualQuestion($q),
             ];
         }
+
         return $meta;
     }
 
@@ -423,31 +427,27 @@ class AssessmentGradingController extends Controller
     private function resolveAnswerForView(mixed $given): mixed
     {
         if (is_array($given) && isset($given['path']) && is_string($given['path'])) {
-            $given['url'] = $this->temporaryFileUrl($given['path']);
+            $given['url'] = $this->permanentFileUrl($given['path']);
+
             return $given;
         }
         // Multi-image answers: a list of upload references.
         if (is_array($given) && array_is_list($given)) {
             return array_map(function ($entry) {
                 if (is_array($entry) && isset($entry['path']) && is_string($entry['path'])) {
-                    $entry['url'] = $this->temporaryFileUrl($entry['path']);
+                    $entry['url'] = $this->permanentFileUrl($entry['path']);
                 }
+
                 return $entry;
             }, $given);
         }
+
         return $given;
     }
 
-    private function temporaryFileUrl(string $path): ?string
+    /** Non-expiring URL for a submitted file stored on R2. */
+    private function permanentFileUrl(string $path): ?string
     {
-        try {
-            return Storage::disk('r2')->temporaryUrl($path, now()->addDays(7));
-        } catch (\Throwable) {
-            try {
-                return Storage::disk('r2')->url($path);
-            } catch (\Throwable) {
-                return null;
-            }
-        }
+        return MediaUrl::for($path);
     }
 }

@@ -13,6 +13,7 @@ import type { Topic } from '../../../types'
 import { Button } from '../../../components/button'
 import { Badge } from '../../../components/badge'
 import { assessmentMethodService } from '../../../services/assessmentMethodService'
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
 import { LessonContentViewer, stripHtml } from './LessonContentViewer'
 import { RichTextEditor } from './RichTextEditor'
 import { PreviewAssessmentModal } from './PreviewAssessmentModal'
@@ -29,6 +30,7 @@ interface PreviewLessonModalProps {
  * student preview instead of a real attempt.
  */
 export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, onClose }) => {
+  const gradingPeriods = useGradingPeriods()
   const blocks = topic.content ?? []
   const [assessmentId, setAssessmentId] = React.useState<string | null>(null)
 
@@ -84,7 +86,9 @@ export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, o
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{topic.title}</h1>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                {topic.quarter && <Badge color="zinc">Q{topic.quarter}</Badge>}
+                {topic.quarter && (
+                  <Badge color="zinc">{gradingPeriods.shortLabelFor(topic.quarter)}</Badge>
+                )}
                 {topic.estimated_minutes ? (
                   <span className="inline-flex items-center gap-1">
                     <ClockIcon className="h-4 w-4" />

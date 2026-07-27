@@ -18,6 +18,7 @@ import {
 import { Badge } from '@/components/badge';
 import { Select } from '@/components/select';
 import { SearchInput } from '@/components/search-input';
+import { useGradingPeriods } from '@/hooks/useGradingPeriods';
 import { stripHtml } from '@/pages/AssignedSubjects/components/LessonContentViewer';
 
 interface SubjectLessonGroup {
@@ -31,14 +32,6 @@ const QUARTER_ORDER = (q?: string) => (q ? Number(q) || 99 : 99);
 
 /** Above this many total lessons the subject sections start collapsed. */
 const AUTO_EXPAND_LESSON_LIMIT = 12;
-
-const QUARTER_OPTIONS = [
-  { value: '', label: 'All quarters' },
-  { value: '1', label: 'Quarter 1' },
-  { value: '2', label: 'Quarter 2' },
-  { value: '3', label: 'Quarter 3' },
-  { value: '4', label: 'Quarter 4' },
-];
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -57,6 +50,16 @@ export const MyLessons: React.FC = () => {
   const items = (data?.data ?? []) as StudentLessonItem[];
   const subjects = (data?.subjects ?? []) as StudentLessonSubject[];
   const forbidden = error && (error as any)?.response?.status === 403;
+
+  // 4 quarters or 3 terms, per the institution's current academic year.
+  const gradingPeriods = useGradingPeriods();
+  const quarterOptions = useMemo(
+    () => [
+      { value: '', label: `All ${gradingPeriods.noun_plural.toLowerCase()}` },
+      ...gradingPeriods.options,
+    ],
+    [gradingPeriods]
+  );
 
   const [search, setSearch] = useState('');
   const [quarterFilter, setQuarterFilter] = useState('');
@@ -225,7 +228,7 @@ export const MyLessons: React.FC = () => {
               <Select
                 inputSize="sm"
                 className="w-36"
-                options={QUARTER_OPTIONS}
+                options={quarterOptions}
                 value={quarterFilter}
                 onChange={(e) => setQuarterFilter(e.target.value)}
               />
@@ -341,7 +344,7 @@ export const MyLessons: React.FC = () => {
                                     <div className="min-w-0 flex-1">
                                       <div className="flex flex-wrap items-center gap-2">
                                         <p className="font-semibold text-gray-900 truncate">{lesson.title}</p>
-                                        {lesson.quarter && <Badge color="zinc">Q{lesson.quarter}</Badge>}
+                                        {lesson.quarter && <Badge color="zinc">{gradingPeriods.shortLabelFor(lesson.quarter)}</Badge>}
                                         {statusPill}
                                       </div>
                                       {stripHtml(lesson.description) && (

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Subject;
 use App\Models\SubjectQuarterPlan;
+use App\Support\GradingPeriods;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,7 +18,7 @@ class SubjectQuarterPlanController extends Controller
     {
         $validated = $request->validate([
             'subject_id' => ['required', 'uuid', 'exists:subjects,id'],
-            'quarter' => ['required', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['required', 'string', Rule::in(GradingPeriods::anyValues())],
         ]);
 
         $user = $request->user();
@@ -47,7 +48,7 @@ class SubjectQuarterPlanController extends Controller
     {
         $validated = $request->validate([
             'subject_id' => ['required', 'uuid', 'exists:subjects,id'],
-            'quarter' => ['required', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['required', 'string', Rule::in(GradingPeriods::anyValues())],
             'start_date' => ['required', 'date_format:Y-m-d'],
             'exam_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'meeting_days' => ['nullable', 'array'],
@@ -72,6 +73,8 @@ class SubjectQuarterPlanController extends Controller
         if (!$subject) {
             return response()->json(['success' => false, 'message' => 'Subject not found or access denied'], 404);
         }
+
+        GradingPeriods::assertValidPeriod(GradingPeriods::forSubject($subject), $validated['quarter']);
 
         $plan = SubjectQuarterPlan::updateOrCreate(
             [

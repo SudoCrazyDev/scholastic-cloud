@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Subject;
 use App\Models\Topic;
+use App\Support\GradingPeriods;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ class TopicBulkController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'subject_id' => ['required', 'uuid', 'exists:subjects,id'],
-            'quarter' => ['nullable', 'string', Rule::in(['1', '2', '3', '4'])],
+            'quarter' => ['nullable', 'string', Rule::in(GradingPeriods::anyValues())],
             'topics' => ['required', 'array', 'min:1', 'max:100'],
             'topics.*.title' => ['required', 'string', 'max:255'],
             'topics.*.description' => ['nullable', 'string'],

@@ -13,6 +13,12 @@ export { useStudentScores } from './useStudentScores';
 export * from './useStudentRunningGrades';
 export { useStudentReportCard } from './useStudentReportCard';
 export { useInstitutionLogo } from './useInstitutionLogo';
+export {
+  useGradingPeriods,
+  useGradingPeriodsForYear,
+  buildGradingPeriodConfig,
+} from './useGradingPeriods';
+export type { UseGradingPeriodsResult } from './useGradingPeriods';
 
 // Generic data table hook
 export { useDataTable } from './useDataTable'

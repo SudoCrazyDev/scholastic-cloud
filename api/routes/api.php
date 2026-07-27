@@ -104,6 +104,13 @@ Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackControll
 // Public kiosk endpoint for RFID gate scanners
 Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan']);
 
+// Permanent (non-expiring) media links for uploaded files. Not behind auth
+// because browsers request these from <img>/<a> without the bearer token —
+// the signature on the URL is the access control.
+Route::get('/media', [\App\Http\Controllers\MediaController::class, 'show'])
+    ->middleware('signed')
+    ->name('media.show');
+
 // Public online admission form (no auth)
 Route::get('/public/institutions/{id}', [AdmissionFormSubmissionController::class, 'publicInstitution']);
 Route::get('/public/grade-levels', [GradeLevelController::class, 'publicIndex']);
@@ -143,6 +150,9 @@ Route::middleware('auth.token')->group(function () {
     Route::get('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'show']);
     Route::put('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'update']);
     Route::get('institutions/{id}/academic-years', [InstitutionController::class, 'getAcademicYears']);
+    Route::put('institutions/{id}/academic-years/grading-periods', [InstitutionController::class, 'updateAcademicYearGradingPeriods']);
+    // Resolved quarter-vs-term structure for the signed-in user's institution
+    Route::get('grading-periods', [InstitutionController::class, 'gradingPeriods']);
     Route::get('grade-levels', [GradeLevelController::class, 'index']);
     Route::post('grade-levels', [GradeLevelController::class, 'store']);
     Route::put('grade-levels/{id}', [GradeLevelController::class, 'update']);
@@ -262,6 +272,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('topics/reorder', [App\Http\Controllers\TopicController::class, 'reorder']);
     Route::patch('topics/{id}/toggle-completion', [App\Http\Controllers\TopicController::class, 'toggleCompletion']);
     Route::post('topics/{id}/upload', [App\Http\Controllers\TopicController::class, 'uploadAttachment']);
+    Route::post('topics/{id}/copy', [App\Http\Controllers\TopicController::class, 'copyToSubjects']);
 
     // Subject quarter plans (AI planner)
     Route::get('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'showBySubjectAndQuarter']);
@@ -281,6 +292,8 @@ Route::middleware('auth.token')->group(function () {
     // SubjectEcr routes
     Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class);
     Route::post('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'uploadImage']);
+    Route::delete('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'deleteImage']);
+    Route::post('subjects-ecr-items/{id}/copy', [App\Http\Controllers\SubjectEcrItemController::class, 'copyToSubjects']);
     Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class);
     // SubjectSummativeAssessment routes
     Route::apiResource('subject-summative-assessments', \App\Http\Controllers\SubjectSummativeAssessmentController::class);

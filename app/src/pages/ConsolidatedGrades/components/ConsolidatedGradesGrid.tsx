@@ -8,12 +8,15 @@ interface ConsolidatedGradesGridProps {
   sections: ClassSection[];
   selectedQuarter: string;
   selectedAcademicYear: string;
+  /** 'Quarter' or 'Term', per the selected year's structure. */
+  periodNoun?: string;
 }
 
 export function ConsolidatedGradesGrid({
   sections,
   selectedQuarter,
   selectedAcademicYear,
+  periodNoun = 'Quarter',
 }: ConsolidatedGradesGridProps) {
   const navigate = useNavigate();
   if (sections.length === 0) {
@@ -22,7 +25,7 @@ export function ConsolidatedGradesGrid({
         <GraduationCap className="mx-auto h-12 w-12 text-gray-400" />
         <h3 className="mt-2 text-sm font-medium text-gray-900">No sections found</h3>
         <p className="mt-1 text-sm text-gray-500">
-          No sections are available for the selected quarter and academic year.
+          No sections are available for the selected {periodNoun.toLowerCase()} and academic year.
         </p>
       </div>
     );
@@ -68,7 +71,7 @@ export function ConsolidatedGradesGrid({
 
           <div className="flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              Quarter {selectedQuarter} • {selectedAcademicYear}
+              {periodNoun} {selectedQuarter} • {selectedAcademicYear}
             </div>
             <Button
               onClick={() => navigate(`/consolidated-grades/${section.id}/${selectedQuarter}`)}

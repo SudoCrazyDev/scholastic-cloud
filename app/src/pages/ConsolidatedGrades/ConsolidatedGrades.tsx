@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useRoleAccess } from '../../hooks/useRoleAccess';
 import { useClassSections } from '../../hooks/useClassSections';
+import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods';
 import { ConsolidatedGradesHeader, ConsolidatedGradesGrid } from './components';
 import { Navigate } from 'react-router-dom';
 
@@ -9,6 +10,10 @@ export default function ConsolidatedGrades() {
   const [selectedQuarter, setSelectedQuarter] = useState('1');
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025-2026');
 
+
+  // 4 quarters or 3 terms, resolved for the *selected* year — a school that moved
+  // to terms this year still reports last year's grades as 4 quarters.
+  const gradingPeriods = useGradingPeriodsForYear(selectedAcademicYear);
 
   // Fetch class sections
   const { classSections, loading: sectionsLoading } = useClassSections();
@@ -25,12 +30,10 @@ export default function ConsolidatedGrades() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const quarters = [
-    { value: '1', label: 'First Quarter' },
-    { value: '2', label: 'Second Quarter' },
-    { value: '3', label: 'Third Quarter' },
-    { value: '4', label: 'Fourth Quarter' },
-  ];
+  const quarters = gradingPeriods.periods.map((period) => ({
+    value: period.value,
+    label: period.label,
+  }));
 
   // Use available academic years from data, with fallback to default years
   const academicYears = availableAcademicYears.length > 0 ? availableAcademicYears : [
@@ -47,6 +50,14 @@ export default function ConsolidatedGrades() {
     }
   }, [availableAcademicYears, selectedAcademicYear]);
 
+  // Switching to a term-based year drops period 4, so never leave the filter
+  // pointing at a period that year does not have.
+  React.useEffect(() => {
+    if (!gradingPeriods.hasPeriod(selectedQuarter)) {
+      setSelectedQuarter('1');
+    }
+  }, [gradingPeriods, selectedQuarter]);
+
   const handleQuarterChange = (quarter: string) => {
     setSelectedQuarter(quarter);
   };
@@ -62,7 +73,8 @@ export default function ConsolidatedGrades() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Consolidated Grades</h1>
           <p className="mt-2 text-gray-600">
-            View and manage consolidated grades for all sections by quarter and academic year.
+            View and manage consolidated grades for all sections by{' '}
+            {gradingPeriods.noun.toLowerCase()} and academic year.
           </p>
         </div>
 
@@ -72,6 +84,7 @@ export default function ConsolidatedGrades() {
           selectedAcademicYear={selectedAcademicYear}
           quarters={quarters}
           academicYears={academicYears}
+          periodNoun={gradingPeriods.noun}
           onQuarterChange={handleQuarterChange}
           onAcademicYearChange={handleAcademicYearChange}
         />
@@ -87,6 +100,7 @@ export default function ConsolidatedGrades() {
             sections={filteredSections}
             selectedQuarter={selectedQuarter}
             selectedAcademicYear={selectedAcademicYear}
+            periodNoun={gradingPeriods.noun}
           />
         )}
 

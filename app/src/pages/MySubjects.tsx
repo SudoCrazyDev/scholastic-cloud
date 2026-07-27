@@ -8,15 +8,14 @@ import { useQuery } from '@tanstack/react-query'
 import { studentRunningGradeService } from '../services/studentRunningGradeService'
 import type { StudentRunningGrade } from '../services/studentRunningGradeService'
 import { roundGrade, getGradeRemarks } from '../utils/gradeUtils'
+import { useGradingPeriodsForYear } from '../hooks/useGradingPeriods'
 
 interface SubjectGradeRow {
   subject_id: string
   subject_title: string
   subject_code?: string
-  quarter1?: number
-  quarter2?: number
-  quarter3?: number
-  quarter4?: number
+  /** Grade per grading period ordinal ('1'..'4'); a term-based year never uses '4'. */
+  periodGrades: Record<string, number | undefined>
   final_grade?: number
   remarks?: string
   academic_year?: string
@@ -34,6 +33,11 @@ export default function MySubjects() {
   })
 
   const grades = gradesResponse?.data as StudentRunningGrade[] | undefined
+
+  // 4 quarters or 3 terms, per the academic year the grades belong to.
+  const academicYear = grades?.[0]?.academic_year
+  const gradingPeriods = useGradingPeriodsForYear(academicYear)
+
   const subjects = useMemo((): SubjectGradeRow[] => {
     if (!grades || !Array.isArray(grades)) return []
     const bySubject: Record<string, SubjectGradeRow> = {}
@@ -44,27 +48,28 @@ export default function MySubjects() {
           subject_title: (g.subject as { title?: string })?.title || 'Subject',
           subject_code: (g.subject as { code?: string })?.code,
           academic_year: g.academic_year,
+          periodGrades: {},
         }
       }
       const row = bySubject[g.subject_id]
       const rounded = roundGrade(g.final_grade ?? g.grade)
-      if (g.quarter === '1') row.quarter1 = rounded
-      if (g.quarter === '2') row.quarter2 = rounded
-      if (g.quarter === '3') row.quarter3 = rounded
-      if (g.quarter === '4') row.quarter4 = rounded
+      row.periodGrades[String(g.quarter)] = rounded
+
       if (rounded !== undefined) {
-        const quarters = [row.quarter1, row.quarter2, row.quarter3, row.quarter4].filter(
-          (q): q is number => q !== undefined && q > 0
-        )
+        // Average only the periods this year actually has, so a leftover 4th-period
+        // record from a previous structure can never skew a 3-term final grade.
+        const periodGrades = gradingPeriods.values
+          .map((period) => row.periodGrades[period])
+          .filter((q): q is number => q !== undefined && q > 0)
         row.final_grade =
-          quarters.length > 0
-            ? Math.round(quarters.reduce((a, b) => a + b, 0) / quarters.length)
+          periodGrades.length > 0
+            ? Math.round(periodGrades.reduce((a, b) => a + b, 0) / periodGrades.length)
             : undefined
         row.remarks = row.final_grade !== undefined ? getGradeRemarks(row.final_grade) : undefined
       }
     })
     return Object.values(bySubject)
-  }, [grades])
+  }, [grades, gradingPeriods])
 
   const handleBack = () => navigate('/dashboard')
 
@@ -169,23 +174,18 @@ export default function MySubjects() {
                 <div className="p-3 sm:p-5">
                   <p className="text-xs sm:text-sm font-medium text-gray-500 mb-2 sm:mb-3">Grades</p>
                   {/* Mobile: 2 cols (3 rows). Tablet: 3 cols (2 rows). Desktop: 6 cols (1 row) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4">
-                    <div className="bg-gray-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
-                      <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Q1</p>
-                      <p className="text-base sm:text-lg font-semibold text-gray-900 mt-0.5 sm:mt-1">{subject.quarter1 ?? '—'}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
-                      <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Q2</p>
-                      <p className="text-base sm:text-lg font-semibold text-gray-900 mt-0.5 sm:mt-1">{subject.quarter2 ?? '—'}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
-                      <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Q3</p>
-                      <p className="text-base sm:text-lg font-semibold text-gray-900 mt-0.5 sm:mt-1">{subject.quarter3 ?? '—'}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
-                      <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Q4</p>
-                      <p className="text-base sm:text-lg font-semibold text-gray-900 mt-0.5 sm:mt-1">{subject.quarter4 ?? '—'}</p>
-                    </div>
+                  {/* One tile per grading period, plus Final and Remarks. */}
+                  <div
+                    className={`grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 ${
+                      gradingPeriods.count === 3 ? 'md:grid-cols-5' : 'md:grid-cols-6'
+                    }`}
+                  >
+                    {gradingPeriods.periods.map((period) => (
+                      <div key={period.value} className="bg-gray-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
+                        <p className="text-[10px] sm:text-xs font-medium text-gray-500 uppercase" title={period.label}>{period.short}</p>
+                        <p className="text-base sm:text-lg font-semibold text-gray-900 mt-0.5 sm:mt-1">{subject.periodGrades[period.value] ?? '—'}</p>
+                      </div>
+                    ))}
                     <div className="bg-primary-50 rounded-lg p-2.5 sm:p-3 text-center min-w-0">
                       <p className="text-[10px] sm:text-xs font-medium text-primary-600 uppercase">Final</p>
                       <p className="text-base sm:text-lg font-semibold text-primary-900 mt-0.5 sm:mt-1">{subject.final_grade ?? '—'}</p>

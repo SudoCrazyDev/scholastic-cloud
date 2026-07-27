@@ -14,6 +14,7 @@ import { Button } from '../../../components/button'
 import { useStudents } from '../../../hooks/useStudents'
 import { useStudentRunningGrades } from '../../../hooks/useStudentRunningGrades'
 import { useUpdateFinalGrade, useUpsertFinalGrade, useBulkUpsertFinalGrades } from '../../../hooks/useStudentRunningGrades'
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
 import { StudentGradesByQuarter } from './StudentGradesByQuarter'
 import { Alert } from '../../../components/alert'
 import { ErrorHandler } from '../../../utils/errorHandler'
@@ -56,8 +57,11 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
     classSectionId,
   });
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  console.log("RUNNING GRADES DATA: ", runningGradesData);
-  // Quarter filter state for mobile/tablet
+
+  // 4 quarters or 3 terms, depending on the academic year's configured structure.
+  const gradingPeriods = useGradingPeriods();
+
+  // Grading period filter state for mobile/tablet
   const [selectedQuarter, setSelectedQuarter] = useState<string>('1');
   
   // Batch submission state
@@ -77,13 +81,16 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
   const upsertFinalGradeMutation = useUpsertFinalGrade();
   const bulkUpsertFinalGradesMutation = useBulkUpsertFinalGrades();
   
-  // Quarter options for the filter
-  const quarterOptions = [
-    { value: '1', label: 'Quarter 1' },
-    { value: '2', label: 'Quarter 2' },
-    { value: '3', label: 'Quarter 3' },
-    { value: '4', label: 'Quarter 4' },
-  ];
+  // Grading period options for the filter
+  const quarterOptions = gradingPeriods.options;
+
+  // A year that switches from quarters to terms drops period 4, so never leave the
+  // filter pointing at a period this year does not have.
+  useEffect(() => {
+    if (!gradingPeriods.hasPeriod(selectedQuarter)) {
+      setSelectedQuarter('1');
+    }
+  }, [gradingPeriods, selectedQuarter]);
 
   // Handle errors
   useEffect(() => {
@@ -526,22 +533,24 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
         </div>
       </div>
 
-      {/* Quarter Filter - Only visible on mobile and tablet */}
+      {/* Grading period filter - Only visible on mobile and tablet */}
       <div className="lg:hidden bg-white rounded-lg border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-medium text-gray-900">Filter by Quarter</h4>
-          <span className="text-xs text-gray-500">Select to focus on specific quarter</span>
+          <h4 className="text-sm font-medium text-gray-900">Filter by {gradingPeriods.noun}</h4>
+          <span className="text-xs text-gray-500">
+            Select to focus on specific {gradingPeriods.noun.toLowerCase()}
+          </span>
         </div>
         <Select
           value={selectedQuarter}
           onChange={(e) => setSelectedQuarter(e.target.value)}
           options={quarterOptions}
-          placeholder="Select quarter"
+          placeholder={`Select ${gradingPeriods.noun.toLowerCase()}`}
           className="w-full"
         />
         <div className="mt-3 p-2 bg-blue-50 rounded-lg">
           <p className="text-xs text-blue-700">
-            Showing Quarter {selectedQuarter} grades for {totalStudents} students
+            Showing {gradingPeriods.numberedLabelFor(selectedQuarter)} grades for {totalStudents} students
           </p>
         </div>
       </div>
@@ -649,7 +658,9 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
       {/* Student Grades List */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-          <h4 className="text-sm font-medium text-gray-900">Student Final Grades by Quarter</h4>
+          <h4 className="text-sm font-medium text-gray-900">
+            Student Final Grades by {gradingPeriods.noun}
+          </h4>
         </div>
         
         <div className="divide-y divide-gray-200">

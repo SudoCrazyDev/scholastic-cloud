@@ -19,14 +19,14 @@ export default function SectionGrades() {
     parseInt(quarter || '1')
   );
 
+  // The API resolves quarters vs terms for the section's academic year and returns
+  // it alongside the grades, so historical sections keep their original labels.
+  const gradingPeriods = data?.grading_periods;
+  const periodNoun = gradingPeriods?.noun ?? 'Quarter';
+
   const getQuarterLabel = (quarter: number) => {
-    const quarters = {
-      1: 'First Quarter',
-      2: 'Second Quarter',
-      3: 'Third Quarter',
-      4: 'Fourth Quarter',
-    };
-    return quarters[quarter as keyof typeof quarters] || `Quarter ${quarter}`;
+    const period = gradingPeriods?.periods?.find((p) => p.value === String(quarter));
+    return period?.label ?? `${periodNoun} ${quarter}`;
   };
 
   const formatGrade = (grade: number | string | null) => {

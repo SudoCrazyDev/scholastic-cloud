@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ClassSection;
 use App\Models\StudentRunningGrade;
+use App\Support\GradingPeriods;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,6 +27,15 @@ class SectionConsolidatedGradesController extends Controller
         // Get the section with its students and subjects (eager load childSubjects)
         $section = ClassSection::with(['students', 'subjects.childSubjects', 'subjects.gradingScale.bands'])->findOrFail($sectionId);
 
+        // Quarters vs terms is a property of the section's academic year, so a
+        // 3-term year averages over 3 periods and never looks for a 4th.
+        $periodType = GradingPeriods::forInstitution($section->institution_id, $section->academic_year);
+        $periodValues = GradingPeriods::intValues($periodType);
+
+        if (! $isFinal) {
+            GradingPeriods::assertValidPeriod($periodType, $quarter);
+        }
+
         // Get all students in this section and sort by last name alphabetically
         $students = $section->students->sortBy('last_name');
 
@@ -41,12 +51,12 @@ class SectionConsolidatedGradesController extends Controller
             }
         });
 
-        // Get grades: all 4 quarters for final, single quarter otherwise
+        // Get grades: every grading period for final, single period otherwise
         $gradesQuery = StudentRunningGrade::whereIn('student_id', $students->pluck('id'))
             ->whereIn('subject_id', $subjects->pluck('id'));
 
         if ($isFinal) {
-            $gradesQuery->whereIn('quarter', [1, 2, 3, 4]);
+            $gradesQuery->whereIn('quarter', $periodValues);
         } else {
             $gradesQuery->where('quarter', (int) $quarter);
         }
@@ -61,13 +71,14 @@ class SectionConsolidatedGradesController extends Controller
             return trim($title);
         };
 
-        // Helper: compute the average grade for a subject across all 4 quarters.
-        // Round each quarter to whole number first, then average, then round — matches
-        // Final Report Card (gradeUtils.calculateFinalGrade / getQuarterGrade) and DepEd rules.
-        $averageAcrossQuarters = function ($studentId, $subjectId) use ($grades) {
+        // Helper: compute the average grade for a subject across every grading period
+        // of the year. Round each period to a whole number first, then average, then
+        // round — matches Final Report Card (gradeUtils.calculateFinalGrade /
+        // getQuarterGrade) and DepEd rules.
+        $averageAcrossQuarters = function ($studentId, $subjectId) use ($grades, $periodValues) {
             $quarterGrades = $grades->where('student_id', $studentId)
                 ->where('subject_id', $subjectId)
-                ->whereIn('quarter', [1, 2, 3, 4]);
+                ->whereIn('quarter', $periodValues);
             $rounded = [];
             foreach ($quarterGrades as $g) {
                 $v = $g->final_grade ?? $g->grade;
@@ -273,6 +284,7 @@ class SectionConsolidatedGradesController extends Controller
                     'academic_year' => $section->academic_year,
                 ],
                 'quarter' => $quarter,
+                'grading_periods' => GradingPeriods::config($periodType),
                 'students' => $consolidatedGrades,
                 'subjects_meta' => $subjectsMeta,
             ],

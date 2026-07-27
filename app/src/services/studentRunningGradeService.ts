@@ -114,7 +114,8 @@ class StudentRunningGradeService {
     return response.data;
   }
 
-  async recalculateParentGrades(studentId: string, quarter: '1' | '2' | '3' | '4', academicYear: string) {
+  /** `quarter` is a grading period ordinal ('1'..'4'); how many a year has comes from useGradingPeriods. */
+  async recalculateParentGrades(studentId: string, quarter: string | number, academicYear: string) {
     const response = await api.post(`${this.baseUrl}/recalculate-parent-grades`, {
       student_id: studentId,
       quarter,

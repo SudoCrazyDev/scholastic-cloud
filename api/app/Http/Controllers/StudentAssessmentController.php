@@ -7,14 +7,12 @@ use App\Http\Controllers\Concerns\ResolvesStudentSubjects;
 use App\Models\Student;
 use App\Models\StudentAssessmentAttempt;
 use App\Models\StudentEcrItemScore;
-use App\Models\StudentSection;
-use App\Models\StudentSubject;
-use App\Models\Subject;
 use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentScoringService;
 use App\Services\AssessmentV2Service;
 use App\Services\RunningGradeRecalcService;
+use App\Support\MediaUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,8 +31,7 @@ class StudentAssessmentController extends Controller
         protected RunningGradeRecalcService $runningGradeRecalcService,
         protected AssessmentScoringService $scoringService,
         protected AssessmentV2Service $v2
-    ) {
-    }
+    ) {}
 
     /**
      * List assessments (quizzes, assignments, exams) for the current student.
@@ -43,7 +40,7 @@ class StudentAssessmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'success' => false,
                 'message' => 'Not linked to a student account. Link your user to a student to see assessments.',
@@ -88,7 +85,7 @@ class StudentAssessmentController extends Controller
             $inProgress = $group->first(fn (StudentAssessmentAttempt $a) => $a->submitted_at === null);
             $attemptsAllowed = $this->effectiveMaxAttempts($item, $rules);
             $canRetake = $submittedCount < $attemptsAllowed;
-            $hasQuestions = !empty($item->resolvedQuestions());
+            $hasQuestions = ! empty($item->resolvedQuestions());
             $status = 'not_started';
             $score = null;
             $maxScore = null;
@@ -141,18 +138,18 @@ class StudentAssessmentController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json(['success' => false, 'message' => 'Not linked to a student account.'], 403);
         }
 
         $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($id);
-        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
+        if (! $this->isSupportedAssessmentItem($item) || ! $this->isPublishedForStudents($item)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
         $eligibleSubjectIds = $this->eligibleSubjectIds($student);
-        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
+        if (! $subjectId || ! in_array($subjectId, $eligibleSubjectIds, true)) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -196,7 +193,7 @@ class StudentAssessmentController extends Controller
         ];
 
         $questions = $item->resolvedQuestions();
-        if (!empty($questions)) {
+        if (! empty($questions)) {
             $payload['questions'] = $this->stripAnswersFromQuestions($questions);
             $payload['max_score_possible'] = $this->scoringService->maxScore($questions);
         } else {
@@ -247,18 +244,18 @@ class StudentAssessmentController extends Controller
     public function start(Request $request, string $id): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json(['success' => false, 'message' => 'Not linked to a student account.'], 403);
         }
 
         $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($id);
-        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
+        if (! $this->isSupportedAssessmentItem($item) || ! $this->isPublishedForStudents($item)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
         $eligibleSubjectIds = $this->eligibleSubjectIds($student);
-        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
+        if (! $subjectId || ! in_array($subjectId, $eligibleSubjectIds, true)) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -300,6 +297,7 @@ class StudentAssessmentController extends Controller
             $message = $item->type === 'exam'
                 ? 'You have already submitted this assessment. Answers can no longer be changed.'
                 : 'You have reached the maximum number of attempts for this assessment.';
+
             return response()->json([
                 'success' => false,
                 'message' => $message,
@@ -329,7 +327,7 @@ class StudentAssessmentController extends Controller
     public function submit(Request $request, string $id): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json(['success' => false, 'message' => 'Not linked to a student account.'], 403);
         }
 
@@ -340,13 +338,13 @@ class StudentAssessmentController extends Controller
         ]);
 
         $item = SubjectEcrItem::find($id);
-        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
+        if (! $this->isSupportedAssessmentItem($item) || ! $this->isPublishedForStudents($item)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
         $eligibleSubjectIds = $this->eligibleSubjectIds($student);
-        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
+        if (! $subjectId || ! in_array($subjectId, $eligibleSubjectIds, true)) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -368,6 +366,7 @@ class StudentAssessmentController extends Controller
             $message = $item->type === 'exam'
                 ? 'You have already submitted this assessment. Answers can no longer be changed.'
                 : 'You have reached the maximum number of attempts for this assessment.';
+
             return response()->json([
                 'success' => false,
                 'message' => $message,
@@ -380,7 +379,7 @@ class StudentAssessmentController extends Controller
             ->latest('created_at')
             ->first();
 
-        if (!$attempt) {
+        if (! $attempt) {
             return response()->json([
                 'success' => false,
                 'message' => 'No attempt in progress. Start the assessment first.',
@@ -456,7 +455,7 @@ class StudentAssessmentController extends Controller
     public function uploadAttachment(Request $request, string $id): JsonResponse
     {
         $student = $this->resolveStudent($request);
-        if (!$student) {
+        if (! $student) {
             return response()->json(['success' => false, 'message' => 'Not linked to a student account.'], 403);
         }
 
@@ -467,13 +466,13 @@ class StudentAssessmentController extends Controller
         ]);
 
         $item = SubjectEcrItem::with(['subjectEcr.subject'])->find($id);
-        if (!$this->isSupportedAssessmentItem($item) || !$this->isPublishedForStudents($item)) {
+        if (! $this->isSupportedAssessmentItem($item) || ! $this->isPublishedForStudents($item)) {
             return response()->json(['success' => false, 'message' => 'Assessment not found.'], 404);
         }
 
         $subjectId = $item->subjectEcr?->subject_id;
         $eligibleSubjectIds = $this->eligibleSubjectIds($student);
-        if (!$subjectId || !in_array($subjectId, $eligibleSubjectIds, true)) {
+        if (! $subjectId || ! in_array($subjectId, $eligibleSubjectIds, true)) {
             return response()->json(['success' => false, 'message' => 'Access denied.'], 403);
         }
 
@@ -488,7 +487,7 @@ class StudentAssessmentController extends Controller
             ->whereNull('submitted_at')
             ->latest('created_at')
             ->first();
-        if (!$attempt) {
+        if (! $attempt) {
             return response()->json([
                 'success' => false,
                 'message' => 'No attempt in progress. Start the assessment first.',
@@ -499,7 +498,7 @@ class StudentAssessmentController extends Controller
         $qIndex = (int) $validated['question_index'];
         $question = $questions[$qIndex] ?? null;
         $type = $question['type'] ?? null;
-        if (!$question || !in_array($type, ['image_upload', 'video_upload'], true)) {
+        if (! $question || ! in_array($type, ['image_upload', 'video_upload'], true)) {
             return response()->json(['success' => false, 'message' => 'This question does not accept file uploads.'], 422);
         }
 
@@ -508,10 +507,10 @@ class StudentAssessmentController extends Controller
         $isImage = str_starts_with((string) $mime, 'image/');
         $isVideo = str_starts_with((string) $mime, 'video/');
 
-        if ($type === 'image_upload' && !$isImage) {
+        if ($type === 'image_upload' && ! $isImage) {
             return response()->json(['success' => false, 'message' => 'Please upload an image file.'], 422);
         }
-        if ($type === 'video_upload' && !$isVideo) {
+        if ($type === 'video_upload' && ! $isVideo) {
             return response()->json(['success' => false, 'message' => 'Please upload a video file.'], 422);
         }
         if ($type === 'image_upload' && $file->getSize() > 25 * 1024 * 1024) {
@@ -520,8 +519,8 @@ class StudentAssessmentController extends Controller
 
         $institutionId = $student->institutions()->first()?->id ?? 'unknown';
         $extension = $file->getClientOriginalExtension() ?: ($isVideo ? 'mp4' : 'bin');
-        $fileName = Str::uuid() . '.' . $extension;
-        $path = $institutionId . '/student/' . $student->id . '/assessments/' . $item->id . '/' . $attempt->id . '/q' . $qIndex . '/' . $fileName;
+        $fileName = Str::uuid().'.'.$extension;
+        $path = $institutionId.'/student/'.$student->id.'/assessments/'.$item->id.'/'.$attempt->id.'/q'.$qIndex.'/'.$fileName;
 
         Storage::disk('r2')->put($path, file_get_contents($file->getRealPath()));
 
@@ -529,7 +528,7 @@ class StudentAssessmentController extends Controller
             'success' => true,
             'data' => [
                 'path' => $path,
-                'url' => $this->temporaryFileUrl($path),
+                'url' => $this->permanentFileUrl($path),
                 'name' => $file->getClientOriginalName(),
                 'mime' => $mime,
                 'size' => $file->getSize(),
@@ -538,19 +537,11 @@ class StudentAssessmentController extends Controller
     }
 
     /**
-     * Best-effort viewable URL for an R2 object: presigned if supported, else public URL.
+     * Non-expiring viewable URL for an R2 object.
      */
-    private function temporaryFileUrl(string $path): ?string
+    private function permanentFileUrl(string $path): ?string
     {
-        try {
-            return Storage::disk('r2')->temporaryUrl($path, now()->addDays(7));
-        } catch (\Throwable) {
-            try {
-                return Storage::disk('r2')->url($path);
-            } catch (\Throwable) {
-                return null;
-            }
-        }
+        return MediaUrl::for($path);
     }
 
     private function stripAnswersFromQuestions(array $questions): array
@@ -615,6 +606,7 @@ class StudentAssessmentController extends Controller
             }
             $out[] = $entry;
         }
+
         return $out;
     }
 
@@ -684,7 +676,7 @@ class StudentAssessmentController extends Controller
 
     private function availabilityError(SubjectEcrItem $item): ?string
     {
-        if (!$this->isPublishedForStudents($item)) {
+        if (! $this->isPublishedForStudents($item)) {
             return 'This assessment is still in draft mode.';
         }
 
@@ -695,7 +687,7 @@ class StudentAssessmentController extends Controller
         if ($item->close_at && $now->gt($item->close_at)) {
             return 'This assessment is already closed.';
         }
-        if ($item->due_at && !$item->allow_late_submission && $now->gt($item->due_at)) {
+        if ($item->due_at && ! $item->allow_late_submission && $now->gt($item->due_at)) {
             return 'The due date for this assessment has passed.';
         }
 
@@ -707,6 +699,7 @@ class StudentAssessmentController extends Controller
         $questions = $item->resolvedQuestions();
         $rules = $this->assessmentRules($item);
         $answers = $item->isV2() ? $this->v2->answersMap($attempt) : ($attempt->answers ?? []);
+
         return [
             'id' => $item->id,
             'type' => $item->type,

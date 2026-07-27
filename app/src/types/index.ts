@@ -996,6 +996,49 @@ export interface DisbursementFormData {
 }
 
 // Institution types
+/**
+ * How a school year is divided into grading periods. DepEd's newer structure
+ * uses 3 terms; the legacy structure uses 4 quarters. Institutions adopt the
+ * change on a school-year boundary, so this is recorded per academic year.
+ *
+ * The stored period value stays a plain ordinal ('1'..'4') everywhere, so a
+ * term-based year simply never uses '4'. Only the count and labels change.
+ */
+export type GradingPeriodType = 'quarter' | 'term';
+
+export interface GradingPeriod {
+  /** Stored ordinal, e.g. '1'. */
+  value: string;
+  /** Ordinal label, e.g. '1st Quarter' or '2nd Term'. */
+  label: string;
+  /** Compact label, e.g. 'Q1' or 'T2'. */
+  short: string;
+  /** Numbered label, e.g. 'Quarter 1' or 'Term 2'. */
+  numbered: string;
+}
+
+export interface GradingPeriodConfig {
+  type: GradingPeriodType;
+  /** 4 for quarters, 3 for terms. */
+  count: number;
+  /** 'Quarter' | 'Term' */
+  noun: string;
+  /** 'Quarters' | 'Terms' */
+  noun_plural: string;
+  periods: GradingPeriod[];
+}
+
+export interface InstitutionAcademicYear {
+  id: string;
+  institution_id: string;
+  year: string;
+  grading_period_type: GradingPeriodType;
+  grading_periods?: GradingPeriodConfig;
+  is_current: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Institution {
   id: string;
   title: string;
@@ -1009,6 +1052,8 @@ export interface Institution {
   default_department_id?: string | null;
   default_department?: Department | null;
   current_academic_year?: string | null;
+  /** Resolved quarter-vs-term config for the institution's current academic year. */
+  grading_periods?: GradingPeriodConfig | null;
   created_at: string;
   updated_at: string;
 }

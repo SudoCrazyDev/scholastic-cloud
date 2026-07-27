@@ -3,9 +3,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRoleAccess } from '../../hooks/useRoleAccess';
 import { useClassSections } from '../../hooks/useClassSections';
 import { useGradeLevels } from '../../hooks/useGradeLevels';
+import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods';
 import { useQuery } from '@tanstack/react-query';
 import {
   proficiencyService,
+  periodPassingPercentage,
   type ProficiencyRow,
   type ProficiencyBySectionRow,
 } from '../../services/proficiencyService';
@@ -28,6 +30,10 @@ export default function Proficiency() {
 
   const { classSections } = useClassSections();
   const { gradeLevels: gradeLevelsFromApi } = useGradeLevels();
+
+  // 4 quarters or 3 terms, resolved for the *selected* year — a school that moved
+  // to terms this year still reports last year's grades as 4 quarters.
+  const gradingPeriods = useGradingPeriodsForYear(selectedAcademicYear);
 
   const availableAcademicYears = [
     ...new Set(
@@ -298,7 +304,7 @@ export default function Proficiency() {
                 </h4>
                 <ul className="mt-2 text-sm text-amber-800 list-disc list-inside space-y-1">
                   <li><strong>Passing grade is 75.</strong> Percent shown is the share of students with average grade ≥ 75.</li>
-                  <li>Ensure <strong>quarter grades</strong> are entered in Consolidated Grades for the selected academic year.</li>
+                  <li>Ensure <strong>{gradingPeriods.noun.toLowerCase()} grades</strong> are entered in Consolidated Grades for the selected academic year.</li>
                   <li>Grades must be in <code className="bg-amber-100 px-1 rounded">student_running_grades</code> with the same <code className="bg-amber-100 px-1 rounded">academic_year</code> as the section.</li>
                   <li>Subject IDs in grades must match the <strong>subjects attached to the class section</strong> (not a different section/template).</li>
                 </ul>
@@ -331,18 +337,15 @@ export default function Proficiency() {
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Avg Grade
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q1 %
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q2 %
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q3 %
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q4 %
-                    </th>
+                    {gradingPeriods.periods.map((period) => (
+                      <th
+                        key={period.value}
+                        title={period.label}
+                        className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider"
+                      >
+                        {period.short} %
+                      </th>
+                    ))}
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Of passed: Girl %
                     </th>
@@ -395,18 +398,11 @@ export default function Proficiency() {
                         <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
                           {row.average_grade != null ? row.average_grade.toFixed(2) : '—'}
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                          <PctCell pct={row.q1_passing_percentage ?? 0} />
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                          <PctCell pct={row.q2_passing_percentage ?? 0} />
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                          <PctCell pct={row.q3_passing_percentage ?? 0} />
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                          <PctCell pct={row.q4_passing_percentage ?? 0} />
-                        </td>
+                        {gradingPeriods.periods.map((period) => (
+                          <td key={period.value} className="px-3 py-3 whitespace-nowrap text-right text-sm">
+                            <PctCell pct={periodPassingPercentage(row, period.value)} />
+                          </td>
+                        ))}
                         <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
                           {girlPct}%
                         </td>
@@ -447,18 +443,15 @@ export default function Proficiency() {
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Avg Grade
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q1 %
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q2 %
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q3 %
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Q4 %
-                    </th>
+                    {gradingPeriods.periods.map((period) => (
+                      <th
+                        key={period.value}
+                        title={period.label}
+                        className="px-3 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider"
+                      >
+                        {period.short} %
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -485,18 +478,11 @@ export default function Proficiency() {
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-600 text-right">
                         {row.average_grade != null ? row.average_grade.toFixed(2) : '—'}
                       </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                        <PctCell pct={row.q1_passing_percentage ?? 0} />
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                        <PctCell pct={row.q2_passing_percentage ?? 0} />
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                        <PctCell pct={row.q3_passing_percentage ?? 0} />
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                        <PctCell pct={row.q4_passing_percentage ?? 0} />
-                      </td>
+                      {gradingPeriods.periods.map((period) => (
+                        <td key={period.value} className="px-3 py-3 whitespace-nowrap text-right text-sm">
+                          <PctCell pct={periodPassingPercentage(row, period.value)} />
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>

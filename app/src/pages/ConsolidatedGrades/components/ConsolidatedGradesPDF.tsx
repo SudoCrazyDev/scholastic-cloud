@@ -1,5 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import type { GradingPeriodConfig } from '../../../types';
 
 // Register fonts (you may need to adjust paths based on your setup)
 Font.register({
@@ -140,6 +141,8 @@ interface ConsolidatedGradesPDFProps {
       academic_year: string;
     };
     quarter: number | string;
+    /** Quarters vs terms for the section's academic year, resolved server-side. */
+    grading_periods?: GradingPeriodConfig;
     students: Array<{
       student_id: string;
       student_name: string;
@@ -167,15 +170,14 @@ const formatGrade = (grade: number | string | null) => {
   return Math.round(numGrade).toString();
 };
 
-const getQuarterLabel = (quarter: number | string) => {
-  if (quarter === 'final') return 'Final Quarter';
-  const quarters: Record<number, string> = {
-    1: 'First Quarter',
-    2: 'Second Quarter',
-    3: 'Third Quarter',
-    4: 'Fourth Quarter',
-  };
-  return quarters[quarter as number] || `Quarter ${quarter}`;
+const getQuarterLabel = (
+  quarter: number | string,
+  gradingPeriods?: GradingPeriodConfig
+) => {
+  const noun = gradingPeriods?.noun ?? 'Quarter';
+  if (quarter === 'final') return `Final ${noun}`;
+  const period = gradingPeriods?.periods?.find((p) => p.value === String(quarter));
+  return period?.label ?? `${noun} ${quarter}`;
 };
 
 const getRemarks = (finalGrade: number | null) => {
@@ -190,7 +192,7 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
   data, 
   institutionName = 'School Institution' 
 }) => {
-  const { section, students, quarter } = data;
+  const { section, students, quarter, grading_periods: gradingPeriods } = data;
 
   // Helper to get base subject title
   const getBaseTitle = (title: string) => title.split(/[-(]/)[0].trim();
@@ -248,7 +250,7 @@ export const ConsolidatedGradesPDF: React.FC<ConsolidatedGradesPDFProps> = ({
             Grade {section.grade_level} - {section.title}
           </Text>
           <Text style={styles.quarterInfo}>
-            {getQuarterLabel(quarter)} • Academic Year {section.academic_year}
+            {getQuarterLabel(quarter, gradingPeriods)} • Academic Year {section.academic_year}
           </Text>
         </View>
 

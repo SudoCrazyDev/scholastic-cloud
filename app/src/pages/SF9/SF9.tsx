@@ -244,7 +244,10 @@ const SF9: React.FC = () => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     {Object.entries(sf9Data.academic_performance).map(([quarter, grades]) => (
                       <div key={quarter} className="text-center">
-                        <div className="font-medium text-gray-900">Quarter {quarter}</div>
+                        <div className="font-medium text-gray-900">
+                          {sf9Data.grading_periods?.periods?.find(p => p.value === String(quarter))
+                            ?.numbered ?? `${sf9Data.grading_periods?.noun ?? 'Quarter'} ${quarter}`}
+                        </div>
                         <div className="text-gray-600">{grades.length} subjects</div>
                         <div className="text-primary-600 font-medium">
                           {grades.filter(g => g.final_grade !== null).length > 0

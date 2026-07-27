@@ -15,7 +15,12 @@ import { Alert } from '../../components/alert'
 import { Building2, CalendarDays } from 'lucide-react'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import AppearanceSettings from './components/AppearanceSettings'
-import type { UpdateInstitutionData } from '../../types'
+import type { GradingPeriodType, UpdateInstitutionData } from '../../types'
+
+const GRADING_PERIOD_OPTIONS: { value: GradingPeriodType; label: string }[] = [
+  { value: 'quarter', label: '4 Quarters' },
+  { value: 'term', label: '3 Terms' },
+]
 
 const Settings: React.FC = () => {
   const { user, refreshProfile } = useAuth()
@@ -24,6 +29,10 @@ const Settings: React.FC = () => {
   const { hasAccess } = useRoleAccess(['principal', 'institution-administrator'])
   const [academicYearInput, setAcademicYearInput] = useState('')
   const [academicYearError, setAcademicYearError] = useState('')
+  // Structure applied when setting a year that does not exist yet. DepEd's newer
+  // structure is 3 terms; institutions adopt it on a school-year boundary, so the
+  // default stays quarters until an admin picks terms for a new year.
+  const [newYearPeriodType, setNewYearPeriodType] = useState<GradingPeriodType>('quarter')
   const [formData, setFormData] = useState({
     title: '',
     abbr: '',
@@ -85,18 +94,38 @@ const Settings: React.FC = () => {
     enabled: !!institutionId && hasAccess,
   })
 
-  // Academic year mutation
+  // Academic year mutation. The grading period structure is only sent when the
+  // admin picked one for a brand-new year — re-selecting an existing year must not
+  // silently re-label the grades already entered under it.
   const academicYearMutation = useMutation({
-    mutationFn: (year: string) =>
-      institutionService.updateAcademicYear(institutionId!, year),
+    mutationFn: ({ year, gradingPeriodType }: { year: string; gradingPeriodType?: GradingPeriodType }) =>
+      institutionService.updateAcademicYear(institutionId!, year, gradingPeriodType),
     onSuccess: async () => {
       await refreshProfile()
       queryClient.invalidateQueries({ queryKey: ['institution', institutionId] })
+      queryClient.invalidateQueries({ queryKey: ['grading-periods'] })
       refetchAcademicYears()
       toast.success('Academic year updated successfully!')
     },
     onError: (error: any) => {
       const msg = error.response?.data?.message || 'Failed to update academic year'
+      toast.error(msg)
+    },
+  })
+
+  // Switch an existing academic year between 4 quarters and 3 terms.
+  const gradingPeriodMutation = useMutation({
+    mutationFn: ({ year, gradingPeriodType }: { year: string; gradingPeriodType: GradingPeriodType }) =>
+      institutionService.updateAcademicYearGradingPeriods(institutionId!, year, gradingPeriodType),
+    onSuccess: async () => {
+      await refreshProfile()
+      queryClient.invalidateQueries({ queryKey: ['institution', institutionId] })
+      queryClient.invalidateQueries({ queryKey: ['grading-periods'] })
+      refetchAcademicYears()
+      toast.success('Grading period structure updated successfully!')
+    },
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || 'Failed to update grading period structure'
       toast.error(msg)
     },
   })
@@ -288,7 +317,8 @@ const Settings: React.FC = () => {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Academic Year</h2>
               <p className="text-sm text-gray-500">
-                Set the current school year. This will be applied globally as the default for all new records.
+                Set the current school year and how it is divided into grading periods. This will be
+                applied globally as the default for all new records.
               </p>
             </div>
           </div>
@@ -309,6 +339,20 @@ const Settings: React.FC = () => {
               />
               <p className="mt-1 text-xs text-gray-500">Format: YYYY-YYYY (e.g. 2025-2026)</p>
             </div>
+            <div className="flex-1 max-w-xs">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Grading Periods
+              </label>
+              <Select
+                value={newYearPeriodType}
+                onChange={(e) => setNewYearPeriodType(e.target.value as GradingPeriodType)}
+                options={GRADING_PERIOD_OPTIONS}
+                disabled={academicYearMutation.isPending}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Only applied when adding a year that does not exist yet.
+              </p>
+            </div>
             <div className="mb-6">
               <Button
                 type="button"
@@ -325,7 +369,13 @@ const Settings: React.FC = () => {
                     return
                   }
                   setAcademicYearError('')
-                  academicYearMutation.mutate(trimmed)
+                  // Existing years keep their structure; only a new year takes the
+                  // selection above, so switching to current never re-labels grades.
+                  const isExistingYear = academicYears.some((ay) => ay.year === trimmed)
+                  academicYearMutation.mutate({
+                    year: trimmed,
+                    gradingPeriodType: isExistingYear ? undefined : newYearPeriodType,
+                  })
                 }}
               >
                 {academicYearMutation.isPending ? 'Saving...' : 'Set Academic Year'}
@@ -344,6 +394,9 @@ const Settings: React.FC = () => {
                         Year
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Grading Periods
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -356,6 +409,21 @@ const Settings: React.FC = () => {
                       <tr key={ay.id} className={ay.is_current ? 'bg-primary-50' : ''}>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
                           {ay.year}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <div className="max-w-[10rem]">
+                            <Select
+                              value={ay.grading_period_type ?? 'quarter'}
+                              onChange={(e) =>
+                                gradingPeriodMutation.mutate({
+                                  year: ay.year,
+                                  gradingPeriodType: e.target.value as GradingPeriodType,
+                                })
+                              }
+                              options={GRADING_PERIOD_OPTIONS}
+                              disabled={gradingPeriodMutation.isPending}
+                            />
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {ay.is_current ? (
@@ -371,7 +439,7 @@ const Settings: React.FC = () => {
                             <button
                               type="button"
                               disabled={academicYearMutation.isPending}
-                              onClick={() => academicYearMutation.mutate(ay.year)}
+                              onClick={() => academicYearMutation.mutate({ year: ay.year })}
                               className="text-xs text-primary-600 hover:text-primary-800 font-medium disabled:opacity-50"
                             >
                               Set as current
@@ -383,6 +451,11 @@ const Settings: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              <p className="mt-3 text-xs text-gray-500">
+                Grading periods are set per academic year: switching a year to 3 terms
+                changes how that year's grades are labelled and how its final grades are
+                averaged. Change it only for a year that has not been graded yet.
+              </p>
             </div>
           )}
         </div>

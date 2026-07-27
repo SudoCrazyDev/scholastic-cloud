@@ -1,5 +1,12 @@
 import { api } from '../lib/api'
-import type { Institution, PaginatedResponse, CreateInstitutionData, UpdateInstitutionData } from '../types'
+import type {
+  Institution,
+  InstitutionAcademicYear,
+  GradingPeriodType,
+  PaginatedResponse,
+  CreateInstitutionData,
+  UpdateInstitutionData,
+} from '../types'
 
 class InstitutionService {
   private baseUrl = '/institutions'
@@ -101,17 +108,43 @@ class InstitutionService {
     await api.delete(`${this.baseUrl}/${id}`)
   }
 
-  async getAcademicYears(institutionId: string): Promise<{ id: string; year: string; is_current: boolean; created_at: string }[]> {
-    const response = await api.get<{ data: { id: string; year: string; is_current: boolean; created_at: string }[] }>(
+  async getAcademicYears(institutionId: string): Promise<InstitutionAcademicYear[]> {
+    const response = await api.get<{ data: InstitutionAcademicYear[] }>(
       `${this.baseUrl}/${institutionId}/academic-years`
     )
     return response.data.data
   }
 
-  async updateAcademicYear(institutionId: string, academicYear: string) {
+  /**
+   * Set the current academic year. `gradingPeriodType` is only sent when creating
+   * or deliberately changing the structure — omitting it leaves an existing year's
+   * quarters-vs-terms setting untouched.
+   */
+  async updateAcademicYear(
+    institutionId: string,
+    academicYear: string,
+    gradingPeriodType?: GradingPeriodType
+  ) {
     const response = await api.put<{ data: Institution }>(`${this.baseUrl}/${institutionId}/academic-year`, {
       current_academic_year: academicYear,
+      ...(gradingPeriodType ? { grading_period_type: gradingPeriodType } : {}),
     })
+    return response.data
+  }
+
+  /**
+   * Switch an academic year between 4 quarters and 3 terms. Scoped per year so
+   * past years keep reporting on the structure their grades were entered under.
+   */
+  async updateAcademicYearGradingPeriods(
+    institutionId: string,
+    year: string,
+    gradingPeriodType: GradingPeriodType
+  ) {
+    const response = await api.put<{ data: InstitutionAcademicYear }>(
+      `${this.baseUrl}/${institutionId}/academic-years/grading-periods`,
+      { year, grading_period_type: gradingPeriodType }
+    )
     return response.data
   }
 

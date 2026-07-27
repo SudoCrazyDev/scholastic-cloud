@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\StudentRunningGrade;
 use App\Services\ParentSubjectGradeService;
+use App\Support\GradingPeriods;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +71,11 @@ class StudentRunningGradeController extends Controller
             'academic_year' => 'required|string',
         ]);
 
+        GradingPeriods::assertValidPeriod(
+            GradingPeriods::forSubject($validated['subject_id'], $validated['academic_year']),
+            $validated['quarter']
+        );
+
         $runningGrade = StudentRunningGrade::create($validated);
 
         // If this is a final grade, calculate parent subject grades
@@ -113,6 +119,16 @@ class StudentRunningGradeController extends Controller
             'final_grade' => 'sometimes|numeric|between:0,100',
             'academic_year' => 'sometimes|required|string',
         ]);
+
+        if (isset($validated['quarter'])) {
+            GradingPeriods::assertValidPeriod(
+                GradingPeriods::forSubject(
+                    $validated['subject_id'] ?? $studentRunningGrade->subject_id,
+                    $validated['academic_year'] ?? $studentRunningGrade->academic_year
+                ),
+                $validated['quarter']
+            );
+        }
 
         $studentRunningGrade->update($validated);
 
@@ -158,6 +174,11 @@ class StudentRunningGradeController extends Controller
             'final_grade' => 'required|numeric|between:0,100',
             'academic_year' => 'required|string',
         ]);
+
+        GradingPeriods::assertValidPeriod(
+            GradingPeriods::forSubject($validated['subject_id'], $validated['academic_year']),
+            $validated['quarter']
+        );
 
         try {
             // Check if a running grade already exists for this student, subject, quarter, and academic year
@@ -237,6 +258,14 @@ class StudentRunningGradeController extends Controller
             'grades.*.academic_year' => 'required|string',
             'grades.*.grade_id' => 'sometimes|string|exists:student_running_grades,id',
         ]);
+
+        foreach ($validated['grades'] as $index => $gradeData) {
+            GradingPeriods::assertValidPeriod(
+                GradingPeriods::forSubject($gradeData['subject_id'], $gradeData['academic_year']),
+                $gradeData['quarter'],
+                "grades.{$index}.quarter"
+            );
+        }
 
         DB::beginTransaction();
         try {

@@ -9,6 +9,7 @@ use App\Models\AnnouncementGradeLevel;
 use App\Models\AnnouncementRead;
 use App\Models\ClassSection;
 use App\Services\AnnouncementService;
+use App\Support\MediaUrl;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,9 +23,7 @@ class AnnouncementController extends Controller
 {
     private const ADMIN_ROLES = ['super-administrator', 'principal', 'institution-administrator'];
 
-    public function __construct(private readonly AnnouncementService $service)
-    {
-    }
+    public function __construct(private readonly AnnouncementService $service) {}
 
     /* ===================== Authoring (teachers + admins) ===================== */
 
@@ -611,7 +610,7 @@ class AnnouncementController extends Controller
             'name' => $attachment->file_name,
             'mime' => $attachment->mime_type,
             'size' => $attachment->size,
-            'url' => $this->temporaryFileUrl($attachment->file_path),
+            'url' => $this->permanentFileUrl($attachment->file_path),
         ];
     }
 
@@ -681,17 +680,10 @@ class AnnouncementController extends Controller
         return (string) ($role->slug ?? '') === 'student';
     }
 
-    private function temporaryFileUrl(string $path): ?string
+    /** Non-expiring URL for an attachment stored on R2. */
+    private function permanentFileUrl(string $path): ?string
     {
-        try {
-            return Storage::disk('r2')->temporaryUrl($path, now()->addDays(7));
-        } catch (\Throwable) {
-            try {
-                return Storage::disk('r2')->url($path);
-            } catch (\Throwable) {
-                return null;
-            }
-        }
+        return MediaUrl::for($path);
     }
 
     private function deleteStoredFile(?string $path): void

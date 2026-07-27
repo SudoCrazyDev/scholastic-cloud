@@ -8,6 +8,7 @@ import { ConfirmationModal } from '../../../components/ConfirmationModal';
 import { studentRunningGradeService } from '../../../services/studentRunningGradeService';
 import type { StudentRunningGrade } from '../../../services/studentRunningGradeService';
 import type { Student, Subject } from '../../../types';
+import { useGradingPeriodsForYear } from '../../../hooks/useGradingPeriods';
 
 // ─── Debounce hook ────────────────────────────────────────────────────────────
 
@@ -33,18 +34,20 @@ interface DebugGradesModalProps {
   onClose: () => void;
 }
 
-const QUARTER_FILTERS = [
-  { value: 'all', label: 'All' },
-  { value: '1',   label: 'Q1' },
-  { value: '2',   label: 'Q2' },
-  { value: '3',   label: 'Q3' },
-  { value: '4',   label: 'Q4' },
-] as const;
-
-type QuarterFilter = typeof QUARTER_FILTERS[number]['value'];
+/** 'all' or a grading period ordinal ('1'..'4'). */
+type QuarterFilter = string;
 
 function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYear, onClose }: DebugGradesModalProps) {
   const queryClient = useQueryClient();
+  // 4 quarters or 3 terms, per this section's academic year.
+  const gradingPeriods = useGradingPeriodsForYear(academicYear);
+  const quarterFilters = useMemo(
+    () => [
+      { value: 'all', label: 'All' },
+      ...gradingPeriods.periods.map((period) => ({ value: period.value, label: period.short })),
+    ],
+    [gradingPeriods]
+  );
   const [quarterFilter, setQuarterFilter] = useState<QuarterFilter>('all');
   const [subjectSearch, setSubjectSearch] = useState('');
   const debouncedSearch = useDebounce(subjectSearch, 300);
@@ -110,9 +113,9 @@ function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYe
     setRecalcLoading(true);
     setRecalcResult(null);
     try {
-      // Run all 4 quarters in parallel
+      // Run every grading period of the year in parallel (4 quarters or 3 terms)
       await Promise.all(
-        (['1', '2', '3', '4'] as const).map((q) =>
+        gradingPeriods.values.map((q) =>
           studentRunningGradeService.recalculateParentGrades(studentId, q, academicYear)
         )
       );
@@ -167,7 +170,7 @@ function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYe
                     <button
                       onClick={handleRecalculate}
                       disabled={recalcLoading || !academicYear}
-                      title="Re-run ParentSubjectGradeService for all 4 quarters. Fixes decimal/stale parent grades."
+                      title={`Re-run ParentSubjectGradeService for all ${gradingPeriods.count} ${gradingPeriods.noun_plural.toLowerCase()}. Fixes decimal/stale parent grades.`}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                         recalcResult === 'success'
                           ? 'bg-green-50 border-green-300 text-green-700'
@@ -232,7 +235,7 @@ function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYe
                 {/* Quarter pills */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-xs text-gray-400 mr-0.5">Quarter:</span>
-                  {QUARTER_FILTERS.map((f) => (
+                  {quarterFilters.map((f) => (
                     <button
                       key={f.value}
                       onClick={() => setQuarterFilter(f.value)}
@@ -297,7 +300,7 @@ function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYe
                             </td>
                             <td className="px-5 py-3">
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700">
-                                Q{grade.quarter}
+                                {gradingPeriods.shortLabelFor(grade.quarter)}
                               </span>
                             </td>
                             <td className={`px-5 py-3 font-mono text-xs ${hasMismatch ? 'text-amber-600' : 'text-gray-500'}`}>
@@ -317,7 +320,7 @@ function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYe
                                 onClick={() =>
                                   setGradeToDelete({
                                     id: grade.id!,
-                                    label: `Q${grade.quarter} grade for "${getSubjectTitle(grade.subject_id)}" (displayed: ${displayed ?? '—'})`,
+                                    label: `${gradingPeriods.shortLabelFor(grade.quarter)} grade for "${getSubjectTitle(grade.subject_id)}" (displayed: ${displayed ?? '—'})`,
                                   })
                                 }
                                 className="text-red-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50"

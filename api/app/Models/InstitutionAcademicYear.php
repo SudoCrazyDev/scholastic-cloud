@@ -24,6 +24,7 @@ class InstitutionAcademicYear extends Model
     protected $fillable = [
         'institution_id',
         'year',
+        'grading_period_type',
         'is_current',
     ];
 

@@ -17,6 +17,7 @@ import { EditGradeItemModal } from './EditGradeItemModal'
 import { useSubjectEcrItems, useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
 import { useStudents } from '../../../hooks/useStudents'
 import { useStudentScores } from '../../../hooks/useStudentScores'
+import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
 import { toast } from 'react-hot-toast'
 import { ErrorHandler } from '../../../utils/errorHandler'
 import { Alert } from '../../../components/alert'
@@ -101,8 +102,9 @@ interface GradeItem {
   description: string
   score: number
   type?: 'quiz' | 'assignment' | 'activity' | 'project'
-  category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment'
-  quarter: 'First Quarter' | 'Second Quarter' | 'Third Quarter' | 'Fourth Quarter'
+  category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment' | string
+  /** Stored grading period ordinal ('1'..'4'); label comes from useGradingPeriods. */
+  quarter: string
   subject_ecr: {
     id: string
     title: string
@@ -235,6 +237,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   onEditItem,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const gradingPeriods = useGradingPeriods()
 
   // Group students by gender and sort alphabetically
   const groupedStudents = students.reduce((groups, student) => {
@@ -302,7 +305,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
                 <span className="text-xs text-gray-400">•</span>
                 <span className="text-xs text-gray-500">{item.subject_ecr?.title || item.category}</span>
                 <span className="text-xs text-gray-400">•</span>
-                <span className="text-xs text-gray-500">{item.quarter}</span>
+                <span className="text-xs text-gray-500">{gradingPeriods.labelFor(item.quarter)}</span>
               </div>
             </div>
           </div>
@@ -415,6 +418,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   }, [subjectId, classSectionId, refetchGradeItems, refetchScores])
 
   const [activeQuarter, setActiveQuarter] = useState<string>('All')
+  const gradingPeriods = useGradingPeriods()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedGradeItem, setSelectedGradeItem] = useState<any>(null)
@@ -453,9 +457,9 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
     refetchGradeItems()
   }
 
-  // Filtered items
-  const quarters = ['1', '2', '3', '4']
-  
+  // Filtered items — 4 quarters or 3 terms, per the academic year's structure
+  const quarters = gradingPeriods.values
+
   // Only process grade items if we have valid subject ECR IDs for this subject
   // This ensures we don't show items from other subjects
   const gradeItems = (subjectEcrIds.length > 0 && gradeItemsData?.data) ? gradeItemsData.data : []
@@ -606,12 +610,14 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         </div>
       </div>
 
-      {/* Quarter Tabs */}
+      {/* Grading period tabs */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-4" aria-label="Quarters">
+          <nav className="flex space-x-8 px-4" aria-label={gradingPeriods.noun_plural}>
             {['All', ...quarters].map((quarter) => {
-              const quarterLabel = quarter === 'All' ? 'All Quarters' : `Quarter ${quarter}`
+              const quarterLabel = quarter === 'All'
+                ? `All ${gradingPeriods.noun_plural}`
+                : gradingPeriods.numberedLabelFor(quarter)
               return (
                 <button
                   key={quarter}
@@ -637,7 +643,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-800">
             {subjectEcrsData.data.map((component: any) => (
               <div key={component.id}>
-                <span className="font-medium">{component.title}:</span> {component.percentage}% of Quarter Grade
+                <span className="font-medium">{component.title}:</span> {component.percentage}% of {gradingPeriods.noun} Grade
               </div>
             ))}
           </div>

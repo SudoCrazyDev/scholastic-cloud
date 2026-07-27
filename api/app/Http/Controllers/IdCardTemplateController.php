@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\IdCardTemplate;
 use App\Models\User;
+use App\Support\MediaUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -23,7 +24,7 @@ class IdCardTemplateController extends Controller
             ->where('is_default', true)
             ->first();
 
-        if (!$defaultInstitution) {
+        if (! $defaultInstitution) {
             $defaultInstitution = $user->userInstitutions()
                 ->where('is_main', true)
                 ->first();
@@ -36,7 +37,7 @@ class IdCardTemplateController extends Controller
     {
         $institutionId = $this->resolveInstitutionId();
 
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json(['data' => [], 'meta' => ['total' => 0]]);
         }
 
@@ -49,7 +50,7 @@ class IdCardTemplateController extends Controller
     {
         $institutionId = $this->resolveInstitutionId();
 
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json(['message' => 'No institution found'], 404);
         }
 
@@ -57,7 +58,7 @@ class IdCardTemplateController extends Controller
             ->where('institution_id', $institutionId)
             ->first();
 
-        if (!$template) {
+        if (! $template) {
             return response()->json(['message' => 'ID card template not found'], 404);
         }
 
@@ -68,7 +69,7 @@ class IdCardTemplateController extends Controller
     {
         $institutionId = $this->resolveInstitutionId();
 
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json(['message' => 'No institution found'], 400);
         }
 
@@ -92,7 +93,7 @@ class IdCardTemplateController extends Controller
     {
         $institutionId = $this->resolveInstitutionId();
 
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json(['message' => 'No institution found'], 400);
         }
 
@@ -100,7 +101,7 @@ class IdCardTemplateController extends Controller
             ->where('institution_id', $institutionId)
             ->first();
 
-        if (!$template) {
+        if (! $template) {
             return response()->json(['message' => 'ID card template not found'], 404);
         }
 
@@ -120,7 +121,7 @@ class IdCardTemplateController extends Controller
     {
         $institutionId = $this->resolveInstitutionId();
 
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json(['message' => 'No institution found'], 400);
         }
 
@@ -128,11 +129,12 @@ class IdCardTemplateController extends Controller
             ->where('institution_id', $institutionId)
             ->first();
 
-        if (!$template) {
+        if (! $template) {
             return response()->json(['message' => 'ID card template not found'], 404);
         }
 
         $template->delete();
+
         return response()->json(['message' => 'Deleted']);
     }
 
@@ -144,7 +146,7 @@ class IdCardTemplateController extends Controller
     {
         $institutionId = $this->resolveInstitutionId();
 
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json(['message' => 'No institution found'], 400);
         }
 
@@ -154,18 +156,14 @@ class IdCardTemplateController extends Controller
 
         $file = $request->file('file');
         $extension = $file->getClientOriginalExtension() ?: 'png';
-        $fileName = Str::uuid() . '.' . $extension;
-        $r2Path = $institutionId . '/id-cards/assets/' . $fileName;
+        $fileName = Str::uuid().'.'.$extension;
+        $r2Path = $institutionId.'/id-cards/assets/'.$fileName;
 
         Storage::disk('r2')->put($r2Path, file_get_contents($file->getRealPath()));
 
-        // Build a public URL the same way the Student profile_picture accessor does.
-        $r2Url = config('filesystems.disks.r2.url');
-        if ($r2Url) {
-            $url = rtrim($r2Url, '/') . '/' . ltrim($r2Path, '/');
-        } else {
-            $url = Storage::disk('r2')->temporaryUrl($r2Path, now()->addHours(24));
-        }
+        // Permanent URL — ID card assets are referenced by stored templates and
+        // must not go stale.
+        $url = MediaUrl::for($r2Path);
 
         return response()->json([
             'url' => $url,

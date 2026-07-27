@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import type { AssessmentMethod } from '@/services/assessmentMethodService'
 import { Button } from '@/components/button'
+import { useGradingPeriods } from '@/hooks/useGradingPeriods'
 import { QuestionPromptView } from './QuestionPromptView'
 
 interface PreviewAssessmentModalProps {
@@ -41,6 +42,7 @@ const ChoiceContent: React.FC<{ text: string; imageUrl?: string }> = ({ text, im
  * inert — this is purely a "view as student" preview for teachers/admins.
  */
 export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ method, onClose }) => {
+  const gradingPeriods = useGradingPeriods()
   const questions = method.questions
   const maxScore = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0)
 
@@ -81,7 +83,7 @@ export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ 
               </div>
               {method.description && <p className="mb-4 text-sm text-gray-600">{method.description}</p>}
               <p className="text-sm text-gray-500">
-                {method.quarter && <span>Quarter {method.quarter}</span>}
+                {method.quarter && <span>{gradingPeriods.numberedLabelFor(method.quarter)}</span>}
                 <span> · Max score: {maxScore}</span>
               </p>
             </div>

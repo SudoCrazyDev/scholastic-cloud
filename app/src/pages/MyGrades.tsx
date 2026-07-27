@@ -8,15 +8,14 @@ import { useQuery } from '@tanstack/react-query'
 import { studentRunningGradeService } from '../services/studentRunningGradeService'
 import type { StudentRunningGrade } from '../services/studentRunningGradeService'
 import { roundGrade, getGradeRemarks } from '../utils/gradeUtils'
+import { useGradingPeriodsForYear } from '../hooks/useGradingPeriods'
 
 interface SubjectGradeRow {
   subject_id: string
   subject_title: string
   subject_code?: string
-  quarter1?: number
-  quarter2?: number
-  quarter3?: number
-  quarter4?: number
+  /** Grade per grading period ordinal ('1'..'4'); a term-based year never uses '4'. */
+  periodGrades: Record<string, number | undefined>
   final_grade?: number
   remarks?: string
   academic_year?: string
@@ -34,6 +33,11 @@ export default function MyGrades() {
   })
 
   const grades = gradesResponse?.data as StudentRunningGrade[] | undefined
+
+  // 4 quarters or 3 terms, per the academic year the grades belong to.
+  const academicYear = grades?.[0]?.academic_year
+  const gradingPeriods = useGradingPeriodsForYear(academicYear)
+
   const rows = useMemo((): SubjectGradeRow[] => {
     if (!grades || !Array.isArray(grades)) return []
     const bySubject: Record<string, SubjectGradeRow> = {}
@@ -44,27 +48,28 @@ export default function MyGrades() {
           subject_title: (g.subject as { title?: string })?.title || 'Subject',
           subject_code: (g.subject as { code?: string })?.code,
           academic_year: g.academic_year,
+          periodGrades: {},
         }
       }
       const row = bySubject[g.subject_id]
       const rounded = roundGrade(g.final_grade ?? g.grade)
-      if (g.quarter === '1') row.quarter1 = rounded
-      if (g.quarter === '2') row.quarter2 = rounded
-      if (g.quarter === '3') row.quarter3 = rounded
-      if (g.quarter === '4') row.quarter4 = rounded
+      row.periodGrades[String(g.quarter)] = rounded
+
       if (rounded !== undefined) {
-        const quarters = [row.quarter1, row.quarter2, row.quarter3, row.quarter4].filter(
-          (q): q is number => q !== undefined && q > 0
-        )
+        // Average only the periods this year actually has, so a leftover 4th-period
+        // record from a previous structure can never skew a 3-term final grade.
+        const periodGrades = gradingPeriods.values
+          .map((period) => row.periodGrades[period])
+          .filter((q): q is number => q !== undefined && q > 0)
         row.final_grade =
-          quarters.length > 0
-            ? Math.round(quarters.reduce((a, b) => a + b, 0) / quarters.length)
+          periodGrades.length > 0
+            ? Math.round(periodGrades.reduce((a, b) => a + b, 0) / periodGrades.length)
             : undefined
         row.remarks = row.final_grade !== undefined ? getGradeRemarks(row.final_grade) : undefined
       }
     })
     return Object.values(bySubject)
-  }, [grades])
+  }, [grades, gradingPeriods])
 
   const handleBack = () => navigate('/dashboard')
 
@@ -152,30 +157,16 @@ export default function MyGrades() {
                     >
                       Subject
                     </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Q1
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Q2
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Q3
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      Q4
-                    </th>
+                    {gradingPeriods.periods.map((period) => (
+                      <th
+                        key={period.value}
+                        scope="col"
+                        title={period.label}
+                        className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {period.short}
+                      </th>
+                    ))}
                     <th
                       scope="col"
                       className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -199,18 +190,14 @@ export default function MyGrades() {
                           <span className="ml-2 text-sm text-gray-500">({row.subject_code})</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center text-gray-700">
-                        {row.quarter1 ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-700">
-                        {row.quarter2 ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-700">
-                        {row.quarter3 ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-700">
-                        {row.quarter4 ?? '—'}
-                      </td>
+                      {gradingPeriods.periods.map((period) => (
+                        <td
+                          key={period.value}
+                          className="px-4 py-3 text-center text-gray-700"
+                        >
+                          {row.periodGrades[period.value] ?? '—'}
+                        </td>
+                      ))}
                       <td className="px-4 py-3 text-center font-medium text-gray-900">
                         {row.final_grade ?? '—'}
                       </td>

@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Topic;
 use App\Models\Subject;
-use Illuminate\Http\Request;
+use App\Models\Topic;
+use App\Support\MediaUrl;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class TopicController extends Controller
 {
@@ -20,13 +20,14 @@ class TopicController extends Controller
     public function index(Request $request): JsonResponse
     {
         Log::info('Topic index request:', $request->all());
-        
+
         $validator = Validator::make($request->all(), [
             'subject_id' => 'required|exists:subjects,id',
         ]);
 
         if ($validator->fails()) {
             Log::error('Topic index validation failed:', $validator->errors()->toArray());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
@@ -49,6 +50,7 @@ class TopicController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Topic index error:', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve topics',
@@ -63,7 +65,7 @@ class TopicController extends Controller
     public function store(Request $request): JsonResponse
     {
         Log::info('Topic store request:', $request->all());
-        
+
         $validator = Validator::make($request->all(), [
             'subject_id' => 'required|exists:subjects,id',
             'quarter' => 'nullable|string',
@@ -80,6 +82,7 @@ class TopicController extends Controller
 
         if ($validator->fails()) {
             Log::error('Topic validation failed:', $validator->errors()->toArray());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
@@ -89,7 +92,7 @@ class TopicController extends Controller
 
         try {
             // If order is not provided, get the next order number
-            if (!isset($request->order)) {
+            if (! isset($request->order)) {
                 $maxOrder = Topic::where('subject_id', $request->subject_id)->max('order') ?? 0;
                 $request->merge(['order' => $maxOrder + 1]);
             }
@@ -160,7 +163,16 @@ class TopicController extends Controller
 
         try {
             $topic = Topic::findOrFail($id);
+            $previousFiles = Topic::filePathsIn($topic->content);
+
             $topic->update($request->all());
+
+            // A file block that is gone from the saved content — removed, or
+            // replaced by a fresh upload — leaves its object behind in R2.
+            // Drop those so storage tracks what the lesson actually shows.
+            if ($request->has('content')) {
+                $this->deleteOrphanedFiles($previousFiles, Topic::filePathsIn($topic->content));
+            }
 
             return response()->json([
                 'success' => true,
@@ -183,7 +195,9 @@ class TopicController extends Controller
     {
         try {
             $topic = Topic::findOrFail($id);
+            $files = Topic::filePathsIn($topic->content);
             $topic->delete();
+            $this->deleteOrphanedFiles($files, []);
 
             return response()->json([
                 'success' => true,
@@ -251,7 +265,7 @@ class TopicController extends Controller
     {
         try {
             $topic = Topic::findOrFail($id);
-            $topic->update(['is_completed' => !$topic->is_completed]);
+            $topic->update(['is_completed' => ! $topic->is_completed]);
 
             return response()->json([
                 'success' => true,
@@ -294,8 +308,8 @@ class TopicController extends Controller
 
             $file = $request->file('file');
             $extension = $file->getClientOriginalExtension() ?: 'bin';
-            $fileName = Str::uuid() . '.' . $extension;
-            $path = $institutionId . '/subjects/' . $topic->subject_id . '/lessons/' . $topic->id . '/' . $fileName;
+            $fileName = Str::uuid().'.'.$extension;
+            $path = $institutionId.'/subjects/'.$topic->subject_id.'/lessons/'.$topic->id.'/'.$fileName;
 
             Storage::disk('r2')->put($path, file_get_contents($file->getRealPath()));
 
@@ -311,6 +325,7 @@ class TopicController extends Controller
             ], 201);
         } catch (\Exception $e) {
             Log::error('Topic attachment upload error:', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to upload attachment',
@@ -320,9 +335,168 @@ class TopicController extends Controller
     }
 
     /**
-     * Re-sign file-block URLs before returning content to the client. Stored
-     * URLs are presigned at upload time and expire, so responses must never
-     * echo them back as-is.
+     * Duplicate this lesson into one or more other subjects — typically the same
+     * lesson across every section a teacher handles.
+     *
+     * Attached files are copied to their own object in the target lesson's
+     * folder, so deleting either lesson can never break the other. Blocks that
+     * link an assessment are dropped: those ids belong to the source subject
+     * and have no meaning in the target.
+     */
+    public function copyToSubjects(Request $request, string $id): JsonResponse
+    {
+        $defaultInstitution = $request->user()->userInstitutions()
+            ->where('is_default', true)
+            ->first();
+
+        if (! $defaultInstitution) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No default institution found for authenticated user',
+            ], 403);
+        }
+
+        $validated = Validator::make($request->all(), [
+            'target_subject_ids' => 'required|array|min:1',
+            'target_subject_ids.*' => 'uuid|exists:subjects,id',
+        ])->validate();
+
+        $source = Topic::with('subject')->find($id);
+        if (! $source || $source->subject?->institution_id !== $defaultInstitution->institution_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lesson not found or access denied',
+            ], 404);
+        }
+
+        $copied = 0;
+        $skipped = [];
+        $droppedAssessmentBlocks = 0;
+
+        foreach (array_unique($validated['target_subject_ids']) as $targetSubjectId) {
+            $target = Subject::where('id', $targetSubjectId)
+                ->where('institution_id', $defaultInstitution->institution_id)
+                ->first();
+
+            if (! $target) {
+                $skipped[] = [
+                    'subject_id' => $targetSubjectId,
+                    'subject_title' => '',
+                    'reason' => 'Subject not found in your institution.',
+                ];
+
+                continue;
+            }
+
+            if ($target->id === $source->subject_id) {
+                $skipped[] = [
+                    'subject_id' => $target->id,
+                    'subject_title' => $target->title,
+                    'reason' => 'This is the subject the lesson already belongs to.',
+                ];
+
+                continue;
+            }
+
+            $copy = $source->replicate(['created_at', 'updated_at']);
+            $copy->subject_id = $target->id;
+            $copy->is_completed = false;
+            // Copies start hidden so the teacher can adjust before students see them.
+            $copy->is_published = false;
+            $copy->order = (int) (Topic::where('subject_id', $target->id)->max('order') ?? -1) + 1;
+            $copy->content = [];
+            $copy->save();
+
+            [$content, $dropped] = $this->duplicateContentFor($copy, $source->content);
+            $droppedAssessmentBlocks += $dropped;
+            $copy->content = $content;
+            $copy->save();
+
+            $copied++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'copied' => $copied,
+                'skipped' => $skipped,
+                'dropped_assessment_blocks' => $droppedAssessmentBlocks,
+            ],
+            'message' => $copied === 1
+                ? 'Lesson copied to 1 subject as a draft.'
+                : "Lesson copied to {$copied} subjects as drafts.",
+        ]);
+    }
+
+    /**
+     * Rebuild a lesson's content blocks for a copy: duplicate each attached file
+     * into the new lesson's folder and drop assessment links.
+     *
+     * @return array{0: array<int, array<string, mixed>>, 1: int}
+     */
+    private function duplicateContentFor(Topic $copy, mixed $blocks): array
+    {
+        $dropped = 0;
+        $result = [];
+
+        foreach (is_array($blocks) ? $blocks : [] as $block) {
+            $type = $block['type'] ?? null;
+
+            if ($type === 'assessment') {
+                $dropped++;
+
+                continue;
+            }
+
+            if ($type === 'file' && ! empty($block['path'])) {
+                $newPath = $this->copyStoredFile(
+                    (string) $block['path'],
+                    $copy->subject?->institution_id ?? 'unknown',
+                    $copy->subject_id,
+                    $copy->id
+                );
+                if ($newPath === null) {
+                    // The original object is gone; keeping a dead reference
+                    // would just show a broken link in the copy.
+                    continue;
+                }
+                $block['path'] = $newPath;
+                $block['url'] = Topic::freshFileUrl($newPath);
+            }
+
+            $result[] = $block;
+        }
+
+        return [$result, $dropped];
+    }
+
+    /**
+     * Copy an R2 object into a lesson's own folder. Returns the new key, or null
+     * when the source object no longer exists.
+     */
+    private function copyStoredFile(string $sourcePath, string $institutionId, string $subjectId, string $topicId): ?string
+    {
+        try {
+            $disk = Storage::disk('r2');
+            if (! $disk->exists($sourcePath)) {
+                return null;
+            }
+
+            $extension = pathinfo($sourcePath, PATHINFO_EXTENSION) ?: 'bin';
+            $newPath = $institutionId.'/subjects/'.$subjectId.'/lessons/'.$topicId.'/'.Str::uuid().'.'.$extension;
+            $disk->copy($sourcePath, $newPath);
+
+            return $newPath;
+        } catch (\Throwable $e) {
+            Log::error('Failed to copy lesson attachment', ['path' => $sourcePath, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Rebuild file-block URLs from their stored `path` before returning content
+     * to the client, so old rows holding expired presigned links still resolve.
      */
     private function refreshContentUrls(Topic $topic): Topic
     {
@@ -331,5 +505,22 @@ class TopicController extends Controller
         }
 
         return $topic;
+    }
+
+    /**
+     * Delete R2 objects that the lesson no longer references. A path still used
+     * by another lesson (e.g. one created by "copy to another subject") is kept.
+     *
+     * @param  array<int, string>  $before
+     * @param  array<int, string>  $after
+     */
+    private function deleteOrphanedFiles(array $before, array $after): void
+    {
+        foreach (array_diff($before, $after) as $path) {
+            if (Topic::where('content', 'like', '%'.$path.'%')->exists()) {
+                continue;
+            }
+            MediaUrl::deleteByPath($path);
+        }
     }
 }

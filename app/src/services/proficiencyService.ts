@@ -1,4 +1,5 @@
 import { api } from '../lib/api'
+import type { GradingPeriodConfig } from '../types'
 
 export interface ProficiencyRow {
   grade_level: string
@@ -47,14 +48,34 @@ export interface ProficiencyBySectionRow {
   q4_passing_percentage: number
 }
 
+/**
+ * Passing-percentage keys are fixed q1..q4 on the wire. A term-based year simply
+ * leaves q4 at zero; how many periods to render comes from `grading_periods`.
+ */
+export type PeriodPassingKey =
+  | 'q1_passing_percentage'
+  | 'q2_passing_percentage'
+  | 'q3_passing_percentage'
+  | 'q4_passing_percentage'
+
+/** Passing percentage for a grading period ordinal ('1'..'4'). */
+export const periodPassingPercentage = (
+  row: ProficiencyRow | ProficiencyBySectionRow,
+  period: string
+): number => row[`q${period}_passing_percentage` as PeriodPassingKey] ?? 0
+
 export interface ProficiencyResponse {
   success: boolean
   data: ProficiencyRow[]
+  /** Quarters vs terms for the requested academic year. */
+  grading_periods?: GradingPeriodConfig
 }
 
 export interface ProficiencyBySectionResponse {
   success: boolean
   data: ProficiencyBySectionRow[]
+  /** Quarters vs terms for the requested academic year. */
+  grading_periods?: GradingPeriodConfig
 }
 
 class ProficiencyService {

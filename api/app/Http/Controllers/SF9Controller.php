@@ -9,6 +9,7 @@ use App\Models\RealtimeAttendance;
 use App\Models\StudentSection;
 use App\Models\ClassSection;
 use App\Models\Institution;
+use App\Support\GradingPeriods;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +97,11 @@ class SF9Controller extends Controller
                     'gov_id' => $institution->gov_id,
                 ],
                 'current_academic_year' => $academicYear,
+                // Whether this year is reported as 4 quarters or 3 terms, so the SF9
+                // renders the right number of columns for the year it covers.
+                'grading_periods' => GradingPeriods::config(
+                    GradingPeriods::forInstitution($institution->id, $academicYear)
+                ),
                 'current_sections' => $studentSections->map(function ($studentSection) {
                     return [
                         'section_id' => $studentSection->section_id,

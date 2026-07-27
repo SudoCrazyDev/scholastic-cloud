@@ -49,7 +49,24 @@ export interface BulkCreateTopicsData {
   }>
 }
 
+export interface CopyTopicResult {
+  copied: number
+  skipped: Array<{ subject_id: string; subject_title: string; reason: string }>
+  dropped_assessment_blocks: number
+}
+
 export const topicService = {
+  /**
+   * Duplicate a lesson into one or more other subjects. Copies are created as
+   * unpublished drafts; attached files are duplicated in storage.
+   */
+  async copyToSubjects(topicId: string, targetSubjectIds: string[]): Promise<CopyTopicResult> {
+    const response = await api.post<ApiResponse<CopyTopicResult>>(`/topics/${topicId}/copy`, {
+      target_subject_ids: targetSubjectIds,
+    })
+    return response.data.data
+  },
+
   /**
    * Get all topics for a subject
    */

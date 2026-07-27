@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCoreValueMarkings, useCreateCoreValueMarking, useUpdateCoreValueMarking } from '../../../hooks/useCoreValueMarkings';
 import { useStudents } from '../../../hooks/useStudents';
+import { useGradingPeriodsForYear } from '../../../hooks/useGradingPeriods';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Input } from '../../../components/input';
@@ -55,8 +56,6 @@ const CORE_VALUES = [
   },
 ];
 
-const QUARTER_LABELS = ['1st Quarter', '2nd Quarter', '3rd Quarter', '4th Quarter'];
-const QUARTERS = [1, 2, 3, 4];
 const MARKINGS = ['AO', 'SO', 'RO', 'NO'];
 
 const getFullName = (student: Student) => {
@@ -82,8 +81,17 @@ const CORE_VALUE_CODE: Record<string, string> = {
 const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ classSectionId, classSectionData }) => {
   const queryClient = useQueryClient();
   const academicYear = classSectionData?.academic_year || '';
+  // 4 quarters or 3 terms, per this section's academic year.
+  const gradingPeriods = useGradingPeriodsForYear(academicYear);
   const [selectedQuarter, setSelectedQuarter] = React.useState<string>('1');
   const [studentFilter, setStudentFilter] = React.useState('');
+
+  // A term-based year has no 4th period, so never leave the filter on one.
+  React.useEffect(() => {
+    if (!gradingPeriods.hasPeriod(selectedQuarter)) {
+      setSelectedQuarter('1');
+    }
+  }, [gradingPeriods, selectedQuarter]);
 
   // Fetch students by class section
   const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId });
@@ -327,9 +335,12 @@ const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ c
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Core Values</h3>
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-700">Quarter:</span>
+            <span className="text-sm text-gray-700">{gradingPeriods.noun}:</span>
             <Select
-              options={QUARTERS.map(q => ({ value: q.toString(), label: QUARTER_LABELS[q-1] }))}
+              options={gradingPeriods.periods.map(period => ({
+                value: period.value,
+                label: period.label,
+              }))}
               value={selectedQuarter}
               onChange={e => setSelectedQuarter(e.target.value)}
               className="min-w-[140px]"
