@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AssessmentQuestion;
 use App\Models\Subject;
 use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
@@ -505,7 +506,12 @@ class SubjectEcrItemController extends Controller
                 continue;
             }
 
-            DB::transaction(function () use ($source, $targetEcr) {
+            DB::transaction(function () use ($source, $targetEcr, $defaultInstitution) {
+                // Each copy gets its own image objects, so replacing an image in
+                // one section's quiz can never blank it out in another's.
+                $imageMap = [];
+                $prefix = $defaultInstitution->institution_id.'/assessments/images/';
+
                 $copy = $source->replicate([
                     'created_at',
                     'updated_at',
@@ -517,12 +523,15 @@ class SubjectEcrItemController extends Controller
                 $copy->open_at = null;
                 $copy->close_at = null;
                 $copy->due_at = null;
+                $copy->content = $this->duplicateImages($source->content, $prefix, $imageMap);
                 $copy->save();
 
                 if ($source->isV2()) {
                     foreach ($source->questions as $question) {
                         $questionCopy = $question->replicate(['created_at', 'updated_at', 'deleted_at']);
                         $questionCopy->subject_ecr_item_id = $copy->id;
+                        $questionCopy->question = $this->duplicateImages($question->question, $prefix, $imageMap);
+                        $questionCopy->config = $this->duplicateImages($question->config, $prefix, $imageMap);
                         $questionCopy->save();
                     }
                 }
@@ -538,6 +547,77 @@ class SubjectEcrItemController extends Controller
                 ? 'Assessment method copied to 1 subject as a draft.'
                 : "Assessment method copied to {$copied} subjects as drafts.",
         ]);
+    }
+
+    /**
+     * Give a copied assessment its own R2 object for every image it references,
+     * rewriting the URLs as it goes. Walks whatever shape it is handed: content
+     * arrays, question config, and `<img src>` inside rich-text prompts.
+     *
+     * `$map` is shared across one copy operation so an image used by several
+     * questions is duplicated once and points at the same new object.
+     *
+     * @param  array<string, string>  $map  original URL => replacement URL
+     */
+    private function duplicateImages(mixed $value, string $allowedPrefix, array &$map): mixed
+    {
+        if (is_array($value)) {
+            return array_map(fn ($child) => $this->duplicateImages($child, $allowedPrefix, $map), $value);
+        }
+
+        if (! is_string($value) || $value === '') {
+            return $value;
+        }
+
+        // Rich-text prompts embed images in markup; everything else is a bare URL.
+        if (str_contains($value, '<')) {
+            return preg_replace_callback(
+                '#(src=["\'])([^"\']+)(["\'])#i',
+                function (array $match) use ($allowedPrefix, &$map): string {
+                    $replacement = $this->duplicateImage(html_entity_decode($match[2]), $allowedPrefix, $map);
+
+                    return $replacement === null ? $match[0] : $match[1].e($replacement).$match[3];
+                },
+                $value
+            ) ?? $value;
+        }
+
+        return $this->duplicateImage($value, $allowedPrefix, $map) ?? $value;
+    }
+
+    /**
+     * Copy one image object and return its new URL, or null when the value is
+     * not one of our assessment images (a third-party link, plain text, or an
+     * object that has since been deleted).
+     *
+     * @param  array<string, string>  $map
+     */
+    private function duplicateImage(string $url, string $allowedPrefix, array &$map): ?string
+    {
+        if (isset($map[$url])) {
+            return $map[$url];
+        }
+
+        $path = MediaUrl::pathFrom($url);
+        if ($path === null || ! str_starts_with($path, $allowedPrefix)) {
+            return null;
+        }
+
+        try {
+            $disk = Storage::disk('r2');
+            if (! $disk->exists($path)) {
+                return null;
+            }
+            $extension = pathinfo($path, PATHINFO_EXTENSION) ?: 'png';
+            $newPath = $allowedPrefix.Str::uuid().'.'.$extension;
+            $disk->copy($path, $newPath);
+        } catch (\Throwable) {
+            // A copy we cannot make is better left pointing at the original than
+            // rewritten to a URL with nothing behind it.
+            return null;
+        }
+
+        return $map[$url] = MediaUrl::for($newPath);
     }
 
     /**
@@ -578,8 +658,38 @@ class SubjectEcrItemController extends Controller
     private function deleteReplacedUpload(?string $previous, string $allowedPrefix): void
     {
         $path = MediaUrl::pathFrom($previous);
-        if ($path && str_starts_with($path, $allowedPrefix)) {
-            MediaUrl::deleteByPath($path);
+        if (! $path || ! str_starts_with($path, $allowedPrefix)) {
+            return;
         }
+
+        // The assessment being edited still holds the old URL at this point — its
+        // save comes after the upload — so one referencing assessment is expected.
+        // Two means something else points at the same object (a copy made before
+        // images were duplicated per-copy, or one whose duplication failed), and
+        // deleting it would blank the image out of that other section's quiz.
+        if ($this->imageReferenceCount($path) > 1) {
+            return;
+        }
+
+        MediaUrl::deleteByPath($path);
+    }
+
+    /**
+     * How many distinct assessments reference this image object, counting both
+     * the content JSON and v2 question rows.
+     */
+    private function imageReferenceCount(string $path): int
+    {
+        // Match on the file name, not the full key: signed URLs percent-encode
+        // the path and the JSON cast escapes slashes, so the raw key never
+        // appears verbatim in storage. Names are UUIDs, so this is unambiguous.
+        $needle = '%'.basename($path).'%';
+
+        $viaContent = SubjectEcrItem::where('content', 'like', $needle)->pluck('id');
+        $viaQuestions = AssessmentQuestion::where(
+            fn ($query) => $query->where('question', 'like', $needle)->orWhere('config', 'like', $needle)
+        )->pluck('subject_ecr_item_id');
+
+        return $viaContent->merge($viaQuestions)->unique()->count();
     }
 }

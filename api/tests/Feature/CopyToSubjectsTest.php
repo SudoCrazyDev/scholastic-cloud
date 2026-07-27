@@ -11,6 +11,7 @@ use App\Models\SubjectEcrItem;
 use App\Models\Topic;
 use App\Models\User;
 use App\Models\UserInstitution;
+use App\Support\MediaUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -134,6 +135,87 @@ class CopyToSubjectsTest extends TestCase
         $item->refresh();
         $this->assertSame('published', $item->status);
         $this->assertCount(1, AssessmentQuestion::where('subject_ecr_item_id', $item->id)->get());
+    }
+
+    /**
+     * A copied quiz must not share image objects with its original, or replacing
+     * an image in one section's copy would blank it out in the other's.
+     */
+    public function test_a_copied_assessment_gets_its_own_images(): void
+    {
+        $imagePath = $this->institution->id.'/assessments/images/diagram.png';
+        Storage::disk('r2')->put($imagePath, 'png-bytes');
+        $imageUrl = MediaUrl::for($imagePath);
+
+        $sourceEcr = SubjectEcr::where('subject_id', $this->source->id)->first();
+        $item = SubjectEcrItem::create([
+            'subject_ecr_id' => $sourceEcr->id,
+            'type' => 'quiz',
+            'title' => 'Quiz with pictures',
+            'content_version' => 2,
+        ]);
+        AssessmentQuestion::create([
+            'subject_ecr_item_id' => $item->id,
+            'position' => 0,
+            'type' => 'single_choice',
+            'question' => '<p>Which shape? <img src="'.e($imageUrl).'"></p>',
+            'points' => 1,
+            'config' => ['choices' => ['a', 'b'], 'choiceImages' => [$imageUrl, ''], 'answer' => 'A'],
+        ]);
+
+        $this->auth()->postJson("/api/subjects-ecr-items/{$item->id}/copy", [
+            'target_subject_ids' => [$this->target->id],
+        ])->assertOk();
+
+        $copy = SubjectEcrItem::where('title', 'Quiz with pictures')->where('id', '!=', $item->id)->firstOrFail();
+        $copiedQuestion = AssessmentQuestion::where('subject_ecr_item_id', $copy->id)->firstOrFail();
+
+        $copiedImageUrl = $copiedQuestion->config['choiceImages'][0];
+        $this->assertNotSame($imageUrl, $copiedImageUrl, 'the copy should not reuse the original object');
+
+        $copiedImagePath = MediaUrl::pathFrom($copiedImageUrl);
+        Storage::disk('r2')->assertExists($copiedImagePath);
+
+        // The same image used twice in one assessment is duplicated only once.
+        $this->assertStringContainsString(e($copiedImageUrl), $copiedQuestion->question);
+
+        // Replacing the image on the original leaves the copy intact.
+        $this->auth()->post('/api/subjects-ecr-items/images', [
+            'file' => UploadedFile::fake()->create('new.png', 8, 'image/png'),
+            'previous_url' => $imageUrl,
+        ])->assertCreated();
+
+        Storage::disk('r2')->assertMissing($imagePath);
+        Storage::disk('r2')->assertExists($copiedImagePath);
+    }
+
+    /**
+     * Copies made before per-copy duplication existed still share an object, so
+     * a re-upload must leave anything with a second referent alone.
+     */
+    public function test_an_image_shared_by_two_assessments_survives_a_re_upload(): void
+    {
+        $sharedPath = $this->institution->id.'/assessments/images/shared.png';
+        Storage::disk('r2')->put($sharedPath, 'png-bytes');
+        $sharedUrl = MediaUrl::for($sharedPath);
+
+        foreach ([$this->source, $this->target] as $subject) {
+            $ecr = SubjectEcr::where('subject_id', $subject->id)->first();
+            SubjectEcrItem::create([
+                'subject_ecr_id' => $ecr->id,
+                'type' => 'quiz',
+                'title' => 'Legacy shared quiz',
+                'content_version' => 1,
+                'content' => ['questions' => [['type' => 'single_choice', 'question' => 'q', 'choiceImages' => [$sharedUrl]]]],
+            ]);
+        }
+
+        $this->auth()->post('/api/subjects-ecr-items/images', [
+            'file' => UploadedFile::fake()->create('replacement.png', 8, 'image/png'),
+            'previous_url' => $sharedUrl,
+        ])->assertCreated();
+
+        Storage::disk('r2')->assertExists($sharedPath);
     }
 
     public function test_a_target_without_components_is_reported_not_silently_dropped(): void
