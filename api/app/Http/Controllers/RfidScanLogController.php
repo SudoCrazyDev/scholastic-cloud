@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ClassSection;
 use App\Models\RfidScanLog;
 use App\Models\Student;
 use App\Models\StudentRfidTag;
 use App\Models\StudentSection;
 use App\Services\GateSmsNotifier;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -22,10 +24,15 @@ class RfidScanLogController extends Controller
         $validator = Validator::make($request->all(), [
             'institution_id' => 'required|uuid|exists:institutions,id',
             'student_id' => 'nullable|uuid|exists:students,id',
+            'search' => 'nullable|string|max:255',
             'date' => 'nullable|date',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date',
+            'datetime_from' => 'nullable|date',
+            'datetime_to' => 'nullable|date',
             'type' => 'nullable|in:enter,exit',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:200',
         ]);
 
         if ($validator->fails()) {
@@ -43,6 +50,17 @@ class RfidScanLogController extends Controller
             $query->where('student_id', $request->student_id);
         }
 
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->whereHas('student', function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('middle_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('lrn', 'like', "%{$search}%")
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, middle_name, last_name) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
         if ($request->filled('date')) {
             $query->whereDate('scanned_at', $request->date);
         }
@@ -55,15 +73,121 @@ class RfidScanLogController extends Controller
             $query->whereDate('scanned_at', '<=', $request->date_to);
         }
 
+        // Full timestamp bounds — lets the UI narrow a range down to the minute.
+        if ($request->filled('datetime_from')) {
+            $query->where('scanned_at', '>=', Carbon::parse($request->datetime_from));
+        }
+
+        if ($request->filled('datetime_to')) {
+            $query->where('scanned_at', '<=', Carbon::parse($request->datetime_to));
+        }
+
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
 
-        $logs = $query->orderBy('scanned_at', 'desc')->get();
+        $perPage = (int) $request->input('per_page', 25);
+        $logs = $query->orderBy('scanned_at', 'desc')->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $logs,
+            'data' => $logs->items(),
+            'pagination' => [
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'per_page' => $logs->perPage(),
+                'total' => $logs->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Daily gate attendance for one class section.
+     *
+     * Returns every active student of the section for the given day with their
+     * first entrance scan, last exit scan and total scan count, so an adviser
+     * can see who actually showed up without reading the raw log.
+     */
+    public function classSectionDaily(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'class_section_id' => 'required|uuid|exists:class_sections,id',
+            'date' => 'required|date',
+            'search' => 'nullable|string|max:255',
+            'tz_offset' => 'nullable|integer|between:-840,840',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $section = ClassSection::find($request->class_section_id);
+        $date = Carbon::parse($request->date)->toDateString();
+
+        // Scans are stored in UTC but a school day is a local-wall-clock day.
+        // tz_offset is the viewer's JS getTimezoneOffset() (minutes behind UTC),
+        // so adding it to the UTC midnight gives the local day's real UTC window.
+        $tzOffset = (int) $request->input('tz_offset', 0);
+        $dayStart = Carbon::parse($date, 'UTC')->startOfDay()->addMinutes($tzOffset);
+        $dayEnd = $dayStart->copy()->addDay();
+
+        $studentsQuery = Student::whereHas('studentSections', function ($q) use ($section) {
+            $q->where('section_id', $section->id)
+                ->where('is_active', true);
+        });
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $studentsQuery->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('middle_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('lrn', 'like', "%{$search}%")
+                    ->orWhereRaw("CONCAT_WS(' ', first_name, middle_name, last_name) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        $students = $studentsQuery
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'lrn', 'gender']);
+
+        $logs = RfidScanLog::where('institution_id', $section->institution_id)
+            ->whereIn('student_id', $students->pluck('id'))
+            ->where('scanned_at', '>=', $dayStart)
+            ->where('scanned_at', '<', $dayEnd)
+            ->orderBy('scanned_at')
+            ->get(['id', 'student_id', 'scanned_at', 'type', 'device_name'])
+            ->groupBy('student_id');
+
+        $rows = $students->map(function ($student) use ($logs) {
+            $studentLogs = $logs->get($student->id, collect());
+            $firstIn = $studentLogs->firstWhere('type', 'enter');
+            $lastOut = $studentLogs->where('type', 'exit')->last();
+
+            return [
+                'student' => $student,
+                'first_in' => $firstIn?->scanned_at?->toIso8601String(),
+                'last_out' => $lastOut?->scanned_at?->toIso8601String(),
+                'scan_count' => $studentLogs->count(),
+                'status' => $studentLogs->isEmpty() ? 'absent' : 'present',
+                'logs' => $studentLogs->values(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $rows->values(),
+            'summary' => [
+                'date' => $date,
+                'total_students' => $students->count(),
+                'present' => $rows->where('status', 'present')->count(),
+                'absent' => $rows->where('status', 'absent')->count(),
+            ],
         ]);
     }
 

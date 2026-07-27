@@ -1,5 +1,14 @@
 import { api } from '../lib/api'
-import type { RfidScanLog, CreateRfidScanLogData, RfidScanRequest, KioskScanRequest, KioskScanResponse } from '../types'
+import type {
+  RfidScanLog,
+  CreateRfidScanLogData,
+  RfidScanRequest,
+  KioskScanRequest,
+  KioskScanResponse,
+  RfidScanLogPagination,
+  ClassSectionDailyAttendanceRow,
+  ClassSectionDailyAttendanceSummary,
+} from '../types'
 
 class RfidScanLogService {
   private baseUrl = '/rfid-scan-logs'
@@ -7,16 +16,24 @@ class RfidScanLogService {
   async getLogs(params: {
     institution_id: string
     student_id?: string
+    search?: string
     date?: string
     date_from?: string
     date_to?: string
+    datetime_from?: string
+    datetime_to?: string
     type?: 'enter' | 'exit'
+    page?: number
+    per_page?: number
   }) {
     const queryParams = new URLSearchParams()
     queryParams.append('institution_id', params.institution_id)
 
     if (params.student_id) {
       queryParams.append('student_id', params.student_id)
+    }
+    if (params.search) {
+      queryParams.append('search', params.search)
     }
     if (params.date) {
       queryParams.append('date', params.date)
@@ -27,13 +44,49 @@ class RfidScanLogService {
     if (params.date_to) {
       queryParams.append('date_to', params.date_to)
     }
+    if (params.datetime_from) {
+      queryParams.append('datetime_from', params.datetime_from)
+    }
+    if (params.datetime_to) {
+      queryParams.append('datetime_to', params.datetime_to)
+    }
     if (params.type) {
       queryParams.append('type', params.type)
     }
+    if (params.page) {
+      queryParams.append('page', String(params.page))
+    }
+    if (params.per_page) {
+      queryParams.append('per_page', String(params.per_page))
+    }
 
-    const response = await api.get<{ success: boolean; data: RfidScanLog[] }>(
-      `${this.baseUrl}?${queryParams.toString()}`
-    )
+    const response = await api.get<{
+      success: boolean
+      data: RfidScanLog[]
+      pagination: RfidScanLogPagination
+    }>(`${this.baseUrl}?${queryParams.toString()}`)
+    return response.data
+  }
+
+  async getClassSectionDaily(params: {
+    class_section_id: string
+    date: string
+    search?: string
+  }) {
+    const queryParams = new URLSearchParams()
+    queryParams.append('class_section_id', params.class_section_id)
+    queryParams.append('date', params.date)
+    // Scans are stored in UTC; tell the API which wall-clock day the viewer means.
+    queryParams.append('tz_offset', String(new Date(`${params.date}T00:00:00`).getTimezoneOffset()))
+    if (params.search) {
+      queryParams.append('search', params.search)
+    }
+
+    const response = await api.get<{
+      success: boolean
+      data: ClassSectionDailyAttendanceRow[]
+      summary: ClassSectionDailyAttendanceSummary
+    }>(`${this.baseUrl}/class-section-daily?${queryParams.toString()}`)
     return response.data
   }
 

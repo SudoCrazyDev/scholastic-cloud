@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentAttendanceService } from '../services/studentAttendanceService'
-import type { CreateStudentAttendanceData, UpdateStudentAttendanceData, BulkUpsertStudentAttendanceData } from '../types'
+import type { StudentAttendance, CreateStudentAttendanceData, UpdateStudentAttendanceData, BulkUpsertStudentAttendanceData } from '../types'
 import { toast } from 'react-hot-toast'
+
+// Stable reference — a fresh `[]` fallback on every render makes `attendances`
+// a new dependency each time and sends effects that watch it into a loop.
+const NO_ATTENDANCES: StudentAttendance[] = []
 
 interface UseStudentAttendanceOptions {
   classSectionId: string
@@ -100,7 +104,7 @@ export const useStudentAttendance = (options: UseStudentAttendanceOptions) => {
   })
 
   return {
-    attendances: query.data?.data || [],
+    attendances: query.data?.data ?? NO_ATTENDANCES,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,

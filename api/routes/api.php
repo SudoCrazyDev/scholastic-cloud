@@ -417,6 +417,7 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('student-rfid-tags', StudentRfidTagController::class);
     // RFID Scan Log routes
     Route::post('rfid-scan-logs/scan', [RfidScanLogController::class, 'scan']);
+    Route::get('rfid-scan-logs/class-section-daily', [RfidScanLogController::class, 'classSectionDaily']);
     Route::apiResource('rfid-scan-logs', RfidScanLogController::class)->only(['index', 'store', 'show', 'destroy']);
     // Core Value Marking routes
     Route::apiResource('core-value-markings', CoreValueMarkingController::class);

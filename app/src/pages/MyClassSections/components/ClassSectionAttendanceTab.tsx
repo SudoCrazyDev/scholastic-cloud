@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useStudentAttendance } from '../../../hooks/useStudentAttendance'
-import { Loader2, Calendar, Save, User, Search } from 'lucide-react'
+import { Loader2, Calendar, Save, User, Search, ScanLine } from 'lucide-react'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
 import { Badge } from '../../../components/badge'
+import ClassSectionGateAttendance from './ClassSectionGateAttendance'
 import type { Student } from '../../../types'
 
 interface ClassSectionAttendanceTabProps {
@@ -14,6 +15,8 @@ interface ClassSectionAttendanceTabProps {
   academicYear: string
   getFullName: (student: Student) => string
 }
+
+type AttendanceView = 'monthly' | 'gate'
 
 const MONTHS = [
   { value: '1', label: 'January' },
@@ -39,6 +42,7 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
 
+  const [view, setView] = useState<AttendanceView>('monthly')
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth.toString())
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [searchTerm, setSearchTerm] = useState('')
@@ -163,12 +167,53 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
     other: 'Other',
   }
 
+  const viewTabs = (
+    <div className="flex gap-1 border-b border-gray-200">
+      <button
+        type="button"
+        onClick={() => setView('monthly')}
+        className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          view === 'monthly'
+            ? 'border-primary-600 text-primary-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+        }`}
+      >
+        <Calendar className="w-4 h-4" />
+        Monthly Summary
+      </button>
+      <button
+        type="button"
+        onClick={() => setView('gate')}
+        className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          view === 'gate'
+            ? 'border-primary-600 text-primary-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+        }`}
+      >
+        <ScanLine className="w-4 h-4" />
+        Gate Records
+      </button>
+    </div>
+  )
+
+  if (view === 'gate') {
+    return (
+      <div className="space-y-6">
+        {viewTabs}
+        <ClassSectionGateAttendance classSectionId={classSectionId} />
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
-      <div className="min-h-[300px] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-600" />
-          <p className="mt-2 text-sm text-gray-600">Loading attendance records...</p>
+      <div className="space-y-6">
+        {viewTabs}
+        <div className="min-h-[300px] flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-600" />
+            <p className="mt-2 text-sm text-gray-600">Loading attendance records...</p>
+          </div>
         </div>
       </div>
     )
@@ -176,6 +221,8 @@ const ClassSectionAttendanceTab: React.FC<ClassSectionAttendanceTabProps> = ({
 
   return (
     <div className="space-y-6">
+      {viewTabs}
+
       {/* Header with filters */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

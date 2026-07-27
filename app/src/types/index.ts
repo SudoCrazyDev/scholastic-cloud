@@ -1943,6 +1943,29 @@ export interface KioskScanResponse extends RfidScanLog {
   class_section?: ClassSection;
 }
 
+export interface RfidScanLogPagination {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface ClassSectionDailyAttendanceRow {
+  student: Pick<Student, 'id' | 'first_name' | 'middle_name' | 'last_name' | 'lrn' | 'gender'>;
+  first_in: string | null;
+  last_out: string | null;
+  scan_count: number;
+  status: 'present' | 'absent';
+  logs: Array<Pick<RfidScanLog, 'id' | 'student_id' | 'scanned_at' | 'type' | 'device_name'>>;
+}
+
+export interface ClassSectionDailyAttendanceSummary {
+  date: string;
+  total_students: number;
+  present: number;
+  absent: number;
+}
+
 // School Days types
 export interface SchoolDay {
   id: string;
