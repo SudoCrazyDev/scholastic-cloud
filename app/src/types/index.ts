@@ -199,6 +199,9 @@ export interface StudentPayment {
   institution_id: string;
   student_id: string;
   school_fee_id?: string | null;
+  // Set instead of school_fee_id when the payment settles an additional fee (ad-hoc
+  // charge or a late fee booked for an overdue installment).
+  student_additional_fee_id?: string | null;
   academic_year: string;
   amount: number;
   payment_date: string;
@@ -210,6 +213,7 @@ export interface StudentPayment {
   created_at: string;
   updated_at: string;
   school_fee?: SchoolFee;
+  additional_fee?: StudentAdditionalFee;
   student?: Student;
 }
 
@@ -236,6 +240,9 @@ export interface PaymentTransaction {
 
 export interface CreatePaymentTransactionItem {
   school_fee_id?: string | null;
+  // Allocates the line to an additional fee (late fees included). Mutually
+  // exclusive with school_fee_id.
+  additional_fee_id?: string | null;
   amount: number;
   remarks?: string;
 }
@@ -399,6 +406,11 @@ export interface StudentLedgerEntry {
   discount_type?: 'fixed' | 'percentage';
   discount_value?: number;
   discount_scope?: 'student' | 'grade_level';
+  // Present on charges and payments tied to an additional fee; 'late_fee' marks an
+  // overdue-installment charge.
+  source?: StudentAdditionalFeeSource;
+  installment_sequence?: number;
+  late_fee_percentage?: number;
   running_balance?: number;
   processed_by?: string | null;
   voided?: boolean;
@@ -674,7 +686,10 @@ export interface StudentInstallment {
   overdue_date: string;
   is_overdue: boolean;
   late_fee_percentage: number;
+  // Amount actually charged for this installment's late fee (0 when none was booked).
   late_fee_amount: number;
+  late_fee_applied?: boolean;
+  late_fee_id?: string | null;
   amount: number;
   original_amount: number;
   discount_amount: number;
@@ -686,6 +701,8 @@ export interface LedgerFeeBreakdown {
   fee_id: string;
   fee_name: string;
   is_additional: boolean;
+  source?: StudentAdditionalFeeSource;
+  installment_sequence?: number | null;
   charge: number;
   discount: number;
   paid: number;
@@ -700,6 +717,8 @@ export interface StudentLedgerResponse {
   entries: StudentLedgerEntry[];
   totals: {
     charges: number;
+    // Portion of `charges` booked as late fees for overdue installments.
+    late_fees?: number;
     discounts: number;
     payments: number;
     balance_forward: number;
@@ -720,6 +739,9 @@ export interface StudentNOAResponse {
     fee_id: string;
     fee_name: string;
     amount: number;
+    is_additional?: boolean;
+    source?: StudentAdditionalFeeSource;
+    installment_sequence?: number | null;
   }>;
   discounts?: Array<{
     discount_id: string;
@@ -741,6 +763,7 @@ export interface StudentNOAResponse {
   }>;
   totals: {
     charges: number;
+    late_fees?: number;
     discounts: number;
     payments: number;
     balance_forward: number;
@@ -810,6 +833,8 @@ export interface CreateGradeLevelDiscountData {
 }
 
 // Student additional fee types
+export type StudentAdditionalFeeSource = 'manual' | 'late_fee';
+
 export interface StudentAdditionalFee {
   id: string;
   institution_id: string;
@@ -817,6 +842,12 @@ export interface StudentAdditionalFee {
   academic_year: string;
   name: string;
   description?: string | null;
+  // 'late_fee' rows are booked automatically for overdue payment-plan installments;
+  // deleting one waives the fee.
+  source?: StudentAdditionalFeeSource;
+  installment_sequence?: number | null;
+  late_fee_percentage?: number | null;
+  base_amount?: number | null;
   amount: number;
   created_at: string;
   updated_at: string;

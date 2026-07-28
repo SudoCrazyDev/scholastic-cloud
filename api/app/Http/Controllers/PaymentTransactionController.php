@@ -29,7 +29,7 @@ class PaymentTransactionController extends Controller
             ], 400);
         }
 
-        $transaction = PaymentTransaction::with(['items.schoolFee', 'student', 'receivedBy'])
+        $transaction = PaymentTransaction::with(['items.schoolFee', 'items.additionalFee', 'student', 'receivedBy'])
             ->where('institution_id', $institutionId)
             ->find($id);
 
@@ -66,7 +66,7 @@ class PaymentTransactionController extends Controller
             ], 400);
         }
 
-        $transaction = PaymentTransaction::with(['items.schoolFee', 'student', 'institution', 'receivedBy'])
+        $transaction = PaymentTransaction::with(['items.schoolFee', 'items.additionalFee', 'student', 'institution', 'receivedBy'])
             ->where('institution_id', $institutionId)
             ->find($id);
 

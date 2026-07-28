@@ -12,14 +12,18 @@ use App\Models\StudentSection;
 use App\Models\SchoolFeeDefault;
 use App\Models\StudentDiscount;
 use App\Models\StudentPayment;
+use App\Services\LateFeeService;
 use App\Services\PaymentPlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class StudentFinanceController extends Controller
 {
-    public function __construct(private PaymentPlanService $planService)
-    {
+    public function __construct(
+        private PaymentPlanService $planService,
+        private LateFeeService $lateFeeService
+    ) {
     }
 
     /**
@@ -78,7 +82,7 @@ class StudentFinanceController extends Controller
                 ->get();
         }
 
-        $payments = StudentPayment::with(['schoolFee', 'receivedBy', 'voidedBy'])
+        $payments = StudentPayment::with(['schoolFee', 'additionalFee', 'receivedBy', 'voidedBy'])
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -119,12 +123,21 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        // Late fees are additional-fee rows materialized from overdue installments
+        // (source `late_fee`). They are kept apart from ad-hoc fees because they must
+        // not feed the installment split, and payments settling one must not fill
+        // installment principal.
+        $manualAdditionalFees = $additionalFees->reject(fn ($fee) => $fee->isLateFee())->values();
+        $chargedLateFees = $additionalFees
+            ->filter(fn ($fee) => $fee->isLateFee())
+            ->keyBy(fn ($fee) => (int) $fee->installment_sequence);
+
         $feeAmountMap = $feeDefaults->keyBy('school_fee_id')->map(function ($default) {
             return (float) $default->amount;
         });
 
-        $chargesTotal = (float) $feeDefaults->sum('amount') + (float) $additionalFees->sum('amount');
         $standardCharges = (float) $feeDefaults->sum('amount');
+        $principalCharges = $standardCharges + (float) $manualAdditionalFees->sum('amount');
         $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
         $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
         // Voided discounts stay visible in the ledger for audit, but they are
@@ -137,6 +150,9 @@ class StudentFinanceController extends Controller
         );
         $discountsTotal = (float) $activeDiscountsWithAmount->sum('amount') + (float) $activeGradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $activePayments->sum('amount');
+        // Money collected against late fees settles those charges, not the installments.
+        $lateFeePaymentsTotal = (float) $this->paymentsForFees($activePayments, $chargedLateFees)->sum('amount');
+        $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal, 2));
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
             $academicYear,
@@ -150,35 +166,53 @@ class StudentFinanceController extends Controller
             ->where('academic_year', $academicYear)
             ->first();
 
-        // Installments are split from the principal charges (before late fees) so the
+        // Installments are split from the principal charges (before late fees) so a
         // late fee never feeds back into the per-installment amounts.
         $installments = $this->planService->buildInstallments(
             $paymentPlan,
             $academicYear,
-            (float) $chargesTotal,
+            $principalCharges,
             (float) $discountsTotal,
-            (float) $paymentsTotal
+            $principalPayments
         );
 
-        // Overdue installments accrue a one-time late fee, computed live (no stored charge
-        // record). Surface each as a ledger charge and fold the total into charges/balance.
-        $lateFeeEntries = collect($installments)
-            ->filter(fn ($inst) => ($inst['late_fee_amount'] ?? 0) > 0)
-            ->map(function ($inst) {
-                $pct = rtrim(rtrim(number_format((float) $inst['late_fee_percentage'], 2), '0'), '.');
+        // Book a real charge for any installment that has newly gone overdue, then work
+        // from the charged rows. Once booked the fee stays — settling the installment no
+        // longer erases it, and finance can waive it by deleting the charge.
+        $chargedLateFees = $this->lateFeeService->apply(
+            $institutionId,
+            $studentId,
+            $academicYear,
+            $installments
+        );
+        $installments = $this->planService->withLateFees($installments, $chargedLateFees);
+
+        $lateFeesTotal = (float) $chargedLateFees->sum(fn ($fee) => (float) $fee->amount);
+        $chargesTotal = round($principalCharges + $lateFeesTotal, 2);
+        $overdueDatesBySequence = collect($installments)
+            ->keyBy(fn ($inst) => (int) $inst['sequence'])
+            ->map(fn ($inst) => $inst['overdue_date'] ?? null);
+
+        $lateFeeEntries = $chargedLateFees
+            ->sortBy(fn ($fee) => (int) $fee->installment_sequence)
+            ->map(function ($fee) use ($overdueDatesBySequence) {
+                $sequence = (int) $fee->installment_sequence;
+                $pct = $this->lateFeeService->formatPercentage((float) $fee->late_fee_percentage);
 
                 return [
                     'type' => 'charge',
-                    'description' => 'Late fee — ' . $inst['label'] . ' (' . $pct . '% overdue)',
-                    'amount' => (float) $inst['late_fee_amount'],
-                    'date' => $inst['overdue_date'],
-                    'fee_id' => 'late-fee-' . $inst['sequence'],
-                    'fee_name' => 'Late Fee',
+                    'description' => $fee->name . ' (' . $pct . '% overdue)',
+                    'amount' => (float) $fee->amount,
+                    // Dated when the fee was incurred, not when the row happened to be written.
+                    'date' => $overdueDatesBySequence->get($sequence) ?? $fee->created_at?->toDateString(),
+                    'fee_id' => $fee->id,
+                    'fee_name' => $fee->name,
+                    'source' => StudentAdditionalFee::SOURCE_LATE_FEE,
+                    'installment_sequence' => $sequence,
+                    'late_fee_percentage' => (float) $fee->late_fee_percentage,
                 ];
             })
             ->values();
-        $lateFeesTotal = (float) $lateFeeEntries->sum('amount');
-        $chargesTotal += $lateFeesTotal;
 
         $entries = collect();
         if (abs($balanceForward) > 0.0001) {
@@ -201,7 +235,7 @@ class StudentFinanceController extends Controller
             ];
         });
 
-        $additionalFeeEntries = $additionalFees->map(function ($af) {
+        $additionalFeeEntries = $manualAdditionalFees->map(function ($af) {
             return [
                 'type' => 'charge',
                 'description' => 'Additional: ' . $af->name,
@@ -209,6 +243,7 @@ class StudentFinanceController extends Controller
                 'date' => $af->created_at?->toDateString(),
                 'fee_id' => $af->id,
                 'fee_name' => $af->name,
+                'source' => $af->source,
             ];
         });
 
@@ -282,7 +317,8 @@ class StudentFinanceController extends Controller
         });
 
         $paymentEntries = $payments->map(function ($payment) {
-            $feeName = $payment->schoolFee?->name;
+            // A payment settles either a school fee or an additional fee (late fees included).
+            $feeName = $payment->schoolFee?->name ?? $payment->additionalFee?->name;
             $label = $feeName ? 'Payment - ' . $feeName : 'Payment';
             $receivedBy = $payment->receivedBy;
             $processedByName = $receivedBy
@@ -303,8 +339,9 @@ class StudentFinanceController extends Controller
                 'receipt_number' => $payment->receipt_number,
                 'reference_number' => $payment->reference_number,
                 'payment_id' => $payment->id,
-                'fee_id' => $payment->school_fee_id,
+                'fee_id' => $payment->school_fee_id ?? $payment->student_additional_fee_id,
                 'fee_name' => $feeName,
+                'source' => $payment->additionalFee?->source,
                 'processed_by' => $processedByName,
                 'voided' => $isVoided,
                 'voided_at' => $payment->voided_at?->toDateTimeString(),
@@ -352,6 +389,13 @@ class StudentFinanceController extends Controller
             ->groupBy('school_fee_id')
             ->map(fn ($group) => (float) $group->sum('amount'));
 
+        // Additional fees (ad-hoc charges and late fees) are settled through
+        // student_additional_fee_id, so their collections track separately.
+        $paidByAdditionalFee = $activePayments
+            ->filter(fn ($payment) => $payment->student_additional_fee_id)
+            ->groupBy('student_additional_fee_id')
+            ->map(fn ($group) => (float) $group->sum('amount'));
+
         $discountByFee = $activeDiscountsWithAmount
             ->merge($gradeLevelDiscountsWithAmount)
             ->filter(fn ($payload) => $payload['discount']->school_fee_id)
@@ -373,39 +417,32 @@ class StudentFinanceController extends Controller
                 'paid' => round($paid, 2),
                 'outstanding' => round($charge - $discount - $paid, 2),
             ];
-        })->toBase()->merge($additionalFees->map(function ($af) use ($paidByFee, $discountByFee) {
-            $charge = (float) $af->amount;
-            $discount = (float) ($discountByFee[$af->id] ?? 0);
-            $paid = (float) ($paidByFee[$af->id] ?? 0);
+        })->toBase()->merge(
+            // Ad-hoc fees first, then the late fees charged for overdue installments —
+            // each its own collectible line, in installment order.
+            $manualAdditionalFees
+                ->merge($chargedLateFees->sortBy(fn ($fee) => (int) $fee->installment_sequence)->values())
+                ->map(function ($af) use ($paidByAdditionalFee, $discountByFee) {
+                    $charge = (float) $af->amount;
+                    $discount = (float) ($discountByFee[$af->id] ?? 0);
+                    $paid = (float) ($paidByAdditionalFee[$af->id] ?? 0);
 
-            return [
-                'fee_id' => $af->id,
-                'fee_name' => $af->name,
-                'is_additional' => true,
-                'charge' => round($charge, 2),
-                'discount' => round($discount, 2),
-                'paid' => round($paid, 2),
-                'outstanding' => round($charge - $discount - $paid, 2),
-            ];
-        }))->values();
-
-        // Late fees aren't tied to a school fee; show them as a single outstanding
-        // breakdown line so the per-fee outstanding totals reconcile with the balance.
-        if ($lateFeesTotal > 0.0001) {
-            $feeBreakdown->push([
-                'fee_id' => 'late-fees',
-                'fee_name' => 'Late Fees',
-                'is_additional' => true,
-                'charge' => round($lateFeesTotal, 2),
-                'discount' => 0.0,
-                'paid' => 0.0,
-                'outstanding' => round($lateFeesTotal, 2),
-            ]);
-            $feeBreakdown = $feeBreakdown->values();
-        }
+                    return [
+                        'fee_id' => $af->id,
+                        'fee_name' => $af->name,
+                        'is_additional' => true,
+                        'source' => $af->source,
+                        'installment_sequence' => $af->installment_sequence,
+                        'charge' => round($charge, 2),
+                        'discount' => round($discount, 2),
+                        'paid' => round($paid, 2),
+                        'outstanding' => round($charge - $discount - $paid, 2),
+                    ];
+                })
+        )->values();
 
         $unallocatedPayments = (float) $activePayments
-            ->filter(fn ($payment) => !$payment->school_fee_id)
+            ->filter(fn ($payment) => !$payment->school_fee_id && !$payment->student_additional_fee_id)
             ->sum('amount');
 
         return response()->json([
@@ -418,6 +455,7 @@ class StudentFinanceController extends Controller
                 'entries' => $entries,
                 'totals' => [
                     'charges' => round($chargesTotal, 2),
+                    'late_fees' => round($lateFeesTotal, 2),
                     'discounts' => round($discountsTotal, 2),
                     'payments' => round($paymentsTotal, 2),
                     'balance_forward' => round($balanceForward, 2),
@@ -517,7 +555,7 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $payments = StudentPayment::with('schoolFee')
+        $payments = StudentPayment::with(['schoolFee', 'additionalFee'])
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -530,12 +568,21 @@ class StudentFinanceController extends Controller
             return (float) $default->amount;
         });
 
+        // Same split as the ledger: late fees are charges in their own right, and are
+        // excluded from the principal the installment schedule is divided from.
+        $manualAdditionalFees = $additionalFees->reject(fn ($fee) => $fee->isLateFee())->values();
+        $chargedLateFees = $additionalFees
+            ->filter(fn ($fee) => $fee->isLateFee())
+            ->keyBy(fn ($fee) => (int) $fee->installment_sequence);
+
         $standardCharges = (float) $feeDefaults->sum('amount');
-        $chargesTotal = $standardCharges + (float) $additionalFees->sum('amount');
+        $principalCharges = $standardCharges + (float) $manualAdditionalFees->sum('amount');
         $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
         $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
         $discountsTotal = (float) $discountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $payments->sum('amount');
+        $lateFeePaymentsTotal = (float) $this->paymentsForFees($payments, $chargedLateFees)->sum('amount');
+        $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal, 2));
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
             $academicYear,
@@ -543,6 +590,32 @@ class StudentFinanceController extends Controller
             $studentId
         );
 
+        $paymentPlan = StudentPaymentPlan::with('paymentPlan.installments')
+            ->where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->first();
+
+        $installments = $this->planService->buildInstallments(
+            $paymentPlan,
+            $academicYear,
+            $principalCharges,
+            (float) $discountsTotal,
+            $principalPayments
+        );
+
+        // The notice of account books newly-overdue late fees just like the ledger, so a
+        // printed NOA and the on-screen balance can never disagree about them.
+        $chargedLateFees = $this->lateFeeService->apply(
+            $institutionId,
+            $studentId,
+            $academicYear,
+            $installments
+        );
+        $installments = $this->planService->withLateFees($installments, $chargedLateFees);
+
+        $lateFeesTotal = (float) $chargedLateFees->sum(fn ($fee) => (float) $fee->amount);
+        $chargesTotal = round($principalCharges + $lateFeesTotal, 2);
         $balance = $balanceForward + $chargesTotal - $discountsTotal - $paymentsTotal;
 
         $allDiscountsMapped = $discountsWithAmount->map(function ($payload) {
@@ -582,27 +655,19 @@ class StudentFinanceController extends Controller
                 'amount' => (float) $default->amount,
                 'is_additional' => false,
             ];
-        })->toBase()->merge($additionalFees->map(function ($af) {
-            return [
-                'fee_id' => $af->id,
-                'fee_name' => $af->name,
-                'amount' => (float) $af->amount,
-                'is_additional' => true,
-            ];
-        }));
-
-        $paymentPlan = StudentPaymentPlan::with('paymentPlan.installments')
-            ->where('institution_id', $institutionId)
-            ->where('student_id', $studentId)
-            ->where('academic_year', $academicYear)
-            ->first();
-
-        $installments = $this->planService->buildInstallments(
-            $paymentPlan,
-            $academicYear,
-            (float) $chargesTotal,
-            (float) $discountsTotal,
-            (float) $paymentsTotal
+        })->toBase()->merge(
+            $manualAdditionalFees
+                ->merge($chargedLateFees->sortBy(fn ($fee) => (int) $fee->installment_sequence)->values())
+                ->map(function ($af) {
+                    return [
+                        'fee_id' => $af->id,
+                        'fee_name' => $af->name,
+                        'amount' => (float) $af->amount,
+                        'is_additional' => true,
+                        'source' => $af->source,
+                        'installment_sequence' => $af->installment_sequence,
+                    ];
+                })
         );
 
         return response()->json([
@@ -620,11 +685,12 @@ class StudentFinanceController extends Controller
                         'payment_date' => $payment->payment_date?->toDateString(),
                         'receipt_number' => $payment->receipt_number,
                         'reference_number' => $payment->reference_number,
-                        'fee_name' => $payment->schoolFee?->name,
+                        'fee_name' => $payment->schoolFee?->name ?? $payment->additionalFee?->name,
                     ];
                 }),
                 'totals' => [
                     'charges' => round($chargesTotal, 2),
+                    'late_fees' => round($lateFeesTotal, 2),
                     'discounts' => round($discountsTotal, 2),
                     'payments' => round($paymentsTotal, 2),
                     'balance_forward' => round($balanceForward, 2),
@@ -635,6 +701,24 @@ class StudentFinanceController extends Controller
                 'available_academic_years' => $availableAcademicYears,
             ]
         ]);
+    }
+
+    /**
+     * Payments allocated to any of the given additional-fee rows.
+     *
+     * @param  iterable  $fees  StudentAdditionalFee models
+     */
+    private function paymentsForFees($payments, $fees): Collection
+    {
+        $ids = collect($fees)->pluck('id')->filter()->all();
+        if (empty($ids)) {
+            return collect();
+        }
+
+        return collect($payments)->filter(
+            fn ($payment) => $payment->student_additional_fee_id
+                && in_array($payment->student_additional_fee_id, $ids, true)
+        );
     }
 
     private function resolveInstitutionId(Request $request): ?string
@@ -804,6 +888,14 @@ class StudentFinanceController extends Controller
                 $discountsTotal = (float) $this->applyDiscounts($discounts, $feeAmountMap, $charges)
                     ->sum('amount');
             }
+
+            // Additional fees (ad-hoc charges and late fees booked for that year) are
+            // owed just like school fees, so they have to carry forward too — otherwise
+            // payments made against them would drag the carried balance negative.
+            $charges += (float) StudentAdditionalFee::where('institution_id', $institutionId)
+                ->where('student_id', $studentId)
+                ->where('academic_year', $year)
+                ->sum('amount');
 
             $payments = (float) StudentPayment::where('institution_id', $institutionId)
                 ->where('student_id', $studentId)

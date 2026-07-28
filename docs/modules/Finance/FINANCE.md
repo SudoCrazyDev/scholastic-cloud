@@ -66,9 +66,9 @@ views' requests.
 - **Payment transaction** (`payment_transactions`) — the receipt-level header (unique
   `receipt_number`, `total_amount`, `amount_tendered`, `change_due`). Its line items are
   **`student_payments` rows** linked by `student_payments.payment_transaction_id` — there is *no*
-  separate transaction-items table. A line's `school_fee_id` is nullable: null means a
-  "General / Other" payment (also used when paying an additional fee, since additional fees are
-  not `school_fees` rows).
+  separate transaction-items table. A line settles **either** a school fee (`school_fee_id`) or an
+  additional fee (`student_additional_fee_id`) — never both; with neither set it is a
+  "General / Other" payment.
 - **Discounts — three different things**:
   1. **Student discounts** (`student_discounts`) — applied to one student for a year, fixed or
      percentage, optionally tied to one fee or **split across fees** via `allocations`. Created
@@ -78,14 +78,30 @@ views' requests.
      grade level for a year. Managed in Setup → Grade Level Discounts (`DiscountsView.tsx`).
   3. **Default discounts** (`default_discounts`) — named, reusable **templates** (e.g. "Sibling
      10%"). Managed in Setup → Default Discounts; the Ledger discount form can prefill from one.
-- **Additional fees** (`student_additional_fees`) — ad-hoc per-student charges (name + amount),
-  added from the Ledger view. They appear in the ledger/NOA fee breakdown flagged
-  `is_additional`, and are paid as general (null `school_fee_id`) lines in cashiering.
+- **Additional fees** (`student_additional_fees`) — per-student charges outside the grade-level
+  defaults. `source` distinguishes them: `manual` (ad-hoc, added from the Ledger view) and
+  `late_fee` (auto-charged, see below). They appear in the ledger/NOA fee breakdown flagged
+  `is_additional`, each as its own collectible line, and are settled in cashiering through
+  `student_payments.student_additional_fee_id`. **Soft-deleted** — removing one keeps the row.
 - **Payment plans** (`payment_plans` + `payment_plan_installments`) — institution-defined
   installment schedules (label, due month/day, share %, grace days, late fee). A student's chosen
   plan lives in `student_payment_plans` (unique per student+year), with every change audited in
   `student_payment_plan_changes`. Plans are managed on the standalone `/payment-plans` page; the
   Ledger's monthly/quarterly schedule views and My Finance consume them.
+- **Late fees** (`LateFeeService`) — the first time a ledger or NOA load sees an installment past
+  `due_date + grace_period_days` while it still owes money, the plan's `late_fee_percentage` of the
+  installment's net amount is **booked as a real charge**: a `student_additional_fees` row with
+  `source: 'late_fee'`, the originating `installment_sequence`, and the frozen
+  `late_fee_percentage` / `base_amount`. Consequences worth knowing:
+  - Unique per `(institution, student, academic_year, installment_sequence)`, so repeat loads
+    never double-charge. There is no cron — the charge is booked on read.
+  - It **survives payment** of the installment (the old behavior recomputed it live, so it
+    vanished when the installment was settled and could never be collected).
+  - Excluded from the principal the installment schedule is divided from, and payments allocated
+    to a late fee do not fill installment principal.
+  - **Waiving** = deleting the row (`DELETE /student-additional-fees/{id}`). The soft-deleted row
+    keeps its slot in the unique index, so a waived installment is never re-charged.
+  - Covered by `tests/Feature/LateFeeChargeTest.php`.
 - **Void workflow (payments)** — voiding a posted payment goes through
   `payment_void_requests`, keyed by `receipt_number`. `finance` submits a request (note
   required); approver roles approve/disapprove with a review note. **When an approver submits a
@@ -260,11 +276,11 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 | `school_fees` | Fee catalog. unique(institution_id, name), `is_active` |
 | `school_fee_defaults` | Amount per fee+grade+year. unique(school_fee_id, grade_level, academic_year) |
 | `payment_transactions` | Receipt header: `receipt_number` (unique), `total_amount`, `amount_tendered`, `change_due`, `or_number`-era fields |
-| `student_payments` | Payment **lines**: nullable `school_fee_id`, `payment_transaction_id`, `receipt_number` (shared across lines), void columns (`voided_at/voided_by/void_note`) |
+| `student_payments` | Payment **lines**: nullable `school_fee_id` **or** `student_additional_fee_id` (mutually exclusive), `payment_transaction_id`, `receipt_number` (shared across lines), void columns (`voided_at/voided_by/void_note`) |
 | `student_discounts` | Per-student discount: `discount_type` fixed/percentage, nullable `school_fee_id`, void columns |
 | `default_discounts` | Reusable templates. unique(institution_id, name) |
 | `grade_level_discounts` | Bulk per-grade discounts |
-| `student_additional_fees` | Ad-hoc per-student charges (name, amount) |
+| `student_additional_fees` | Per-student charges (name, amount). `source` `manual`/`late_fee`; late fees carry `installment_sequence`, `late_fee_percentage`, `base_amount`, unique per (institution, student, year, sequence). Soft-deleted (a deleted late fee = waived) |
 | `payment_void_requests` | `receipt_number`, `status` pending/approved/disapproved, request/review notes, requested_by/reviewed_by |
 | `payment_receipt_submissions` | Student-uploaded receipt: `installment_sequence/label`, R2 `file_path`, `status` pending/approved/rejected, `review_note`, `amount` (verified), `student_payment_id` (set on approval) |
 | `payment_plans` / `payment_plan_installments` | Plans + installment rows (sequence, label, due_month/day, share_percentage, grace, late fee) |

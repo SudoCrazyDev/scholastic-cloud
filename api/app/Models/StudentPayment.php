@@ -16,6 +16,7 @@ class StudentPayment extends Model
         'student_id',
         'payment_transaction_id',
         'school_fee_id',
+        'student_additional_fee_id',
         'academic_year',
         'amount',
         'payment_date',
@@ -49,6 +50,15 @@ class StudentPayment extends Model
     public function schoolFee()
     {
         return $this->belongsTo(SchoolFee::class);
+    }
+
+    /**
+     * Set when the payment settles an additional fee (ad-hoc charge or late fee)
+     * rather than a school fee. Mutually exclusive with school_fee_id.
+     */
+    public function additionalFee()
+    {
+        return $this->belongsTo(StudentAdditionalFee::class, 'student_additional_fee_id');
     }
 
     public function paymentTransaction()

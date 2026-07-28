@@ -920,14 +920,21 @@ const Finance: React.FC = () => {
 
   // Build the list of fee lines the cashier has entered an amount for.
   const cashierLineItems = useMemo(() => {
-    const items: { school_fee_id: string | null; fee_name: string; amount: number }[] = []
+    const items: {
+      school_fee_id: string | null
+      additional_fee_id: string | null
+      fee_name: string
+      amount: number
+    }[] = []
     for (const fee of cashierFeeBreakdown) {
       const raw = cashierLineAmounts[fee.fee_id]
       const amount = Number(raw)
       if (raw && amount > 0) {
-        // Additional fees are not real school_fees; record them as general lines.
+        // Additional fees (ad-hoc charges and late fees) are not school_fees rows, so
+        // they are allocated through additional_fee_id instead.
         items.push({
           school_fee_id: fee.is_additional ? null : fee.fee_id,
+          additional_fee_id: fee.is_additional ? fee.fee_id : null,
           fee_name: fee.fee_name,
           amount,
         })
@@ -935,7 +942,12 @@ const Finance: React.FC = () => {
     }
     const generalAmount = Number(cashierGeneralAmount)
     if (cashierGeneralAmount && generalAmount > 0) {
-      items.push({ school_fee_id: null, fee_name: 'General / Other', amount: generalAmount })
+      items.push({
+        school_fee_id: null,
+        additional_fee_id: null,
+        fee_name: 'General / Other',
+        amount: generalAmount,
+      })
     }
     return items
   }, [cashierFeeBreakdown, cashierLineAmounts, cashierGeneralAmount])
@@ -989,6 +1001,7 @@ const Finance: React.FC = () => {
       amount_tendered: cashierTendered ? cashierTenderedValue : undefined,
       items: cashierLineItems.map((item) => ({
         school_fee_id: item.school_fee_id,
+        additional_fee_id: item.additional_fee_id,
         amount: item.amount,
       })),
     }
@@ -1774,8 +1787,14 @@ const Finance: React.FC = () => {
                             <p className="truncate text-sm font-medium text-gray-900">
                               {fee.fee_name}
                               {fee.is_additional && (
-                                <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                                  Additional
+                                <span
+                                  className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                                    fee.source === 'late_fee'
+                                      ? 'bg-red-50 text-red-600'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  {fee.source === 'late_fee' ? 'Late fee' : 'Additional'}
                                 </span>
                               )}
                             </p>
@@ -2478,9 +2497,18 @@ const Finance: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 bg-white">
-                          {ledgerAdditionalFeesQuery.data?.data?.map((fee) => (
-                            <tr key={fee.id}>
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{fee.name}</td>
+                          {ledgerAdditionalFeesQuery.data?.data?.map((fee) => {
+                            const isLateFee = fee.source === 'late_fee'
+                            return (
+                            <tr key={fee.id} className={isLateFee ? 'bg-red-50/40' : undefined}>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                                {fee.name}
+                                {isLateFee && (
+                                  <span className="ml-1.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-700">
+                                    Auto
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
                                 {formatCurrency(fee.amount)}
                               </td>
@@ -2491,19 +2519,24 @@ const Finance: React.FC = () => {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      if (window.confirm('Remove this additional fee?')) {
+                                      // Deleting an auto-charged late fee is how finance waives it.
+                                      const message = isLateFee
+                                        ? 'Waive this late fee? It will be removed from the balance.'
+                                        : 'Remove this additional fee?'
+                                      if (window.confirm(message)) {
                                         deleteLedgerAdditionalFeeMutation.mutate(fee.id)
                                       }
                                     }}
                                     className="text-red-600 border-red-200 hover:bg-red-50"
-                                    title="Remove fee"
+                                    title={isLateFee ? 'Waive late fee' : 'Remove fee'}
                                   >
                                     <TrashIcon className="w-4 h-4" />
                                   </Button>
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -2593,7 +2626,13 @@ const Finance: React.FC = () => {
                               key={
                                 `${entry.type}-${entry.payment_id ?? entry.discount_id ?? entry.fee_id ?? index}`
                               }
-                              className={entry.voided ? 'bg-gray-50' : undefined}
+                              className={
+                                entry.voided
+                                  ? 'bg-gray-50'
+                                  : entry.source === 'late_fee'
+                                  ? 'bg-red-50/40'
+                                  : undefined
+                              }
                             >
                               <td className="px-4 py-3 text-sm text-gray-600 capitalize">
                                 {entry.type.replace('_', ' ')}
@@ -2602,6 +2641,14 @@ const Finance: React.FC = () => {
                                 <span className={entry.voided ? 'line-through text-gray-400' : undefined}>
                                   {entry.description}
                                 </span>
+                                {entry.source === 'late_fee' && !entry.voided && (
+                                  <span
+                                    className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
+                                    title="Charged automatically for an overdue installment"
+                                  >
+                                    Late fee
+                                  </span>
+                                )}
                                 {entry.voided && (
                                   <span
                                     className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"

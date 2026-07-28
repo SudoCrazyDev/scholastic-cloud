@@ -26,6 +26,7 @@ import type {
   PaymentPlan,
   PaymentReceiptSubmission,
   Student,
+  StudentInstallment,
 } from '../../../types'
 
 interface StudentFinanceTabProps {
@@ -253,6 +254,21 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)
+  }
+
+  // A late fee is a booked charge, so the note stays after the installment is settled —
+  // only 'Overdue' drops off once it is paid. It disappears entirely if finance waives
+  // the fee, because the charge row is gone.
+  const lateFeeNote = (installment: StudentInstallment) => {
+    const parts: string[] = []
+    if (installment.is_overdue) {
+      parts.push('Overdue')
+    }
+    if (installment.late_fee_amount > 0) {
+      parts.push(`${formatAmount(installment.late_fee_amount)} late fee charged`)
+    }
+
+    return parts.length > 0 ? parts.join(' · ') : null
   }
 
   const studentFullName = [student.first_name, student.last_name]
@@ -954,9 +970,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                             day: 'numeric',
                           })}
                         </p>
-                        {installment.is_overdue && installment.late_fee_amount > 0 && (
+                        {lateFeeNote(installment) && (
                           <p className="text-xs font-medium text-red-600 mt-0.5">
-                            Overdue · +{formatAmount(installment.late_fee_amount)} late fee
+                            {lateFeeNote(installment)}
                           </p>
                         )}
                       </div>
@@ -1090,9 +1106,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                           month: 'short',
                           day: 'numeric',
                         })}
-                        {installment.is_overdue && installment.late_fee_amount > 0 && (
+                        {lateFeeNote(installment) && (
                           <span className="block text-xs font-medium text-red-600">
-                            Overdue · +{formatAmount(installment.late_fee_amount)} late fee
+                            {lateFeeNote(installment)}
                           </span>
                         )}
                       </td>
@@ -1202,9 +1218,19 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {visibleLedgerEntries?.map((entry, index) => (
-                  <tr key={`${entry.type}-${entry.payment_id || entry.discount_id || entry.fee_id || index}`}>
+                  <tr
+                    key={`${entry.type}-${entry.payment_id || entry.discount_id || entry.fee_id || index}`}
+                    className={entry.source === 'late_fee' ? 'bg-red-50/40' : undefined}
+                  >
                     <td className="px-4 py-2 text-sm text-gray-600 capitalize">{entry.type.replace('_', ' ')}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700">{entry.description}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700">
+                      {entry.description}
+                      {entry.source === 'late_fee' && (
+                        <span className="ml-1.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-700">
+                          Late fee
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-sm text-gray-600">{entry.date || '—'}</td>
                     <td
                       className={`px-4 py-2 text-sm text-right ${

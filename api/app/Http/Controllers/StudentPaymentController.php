@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Student;
 use App\Models\SchoolFee;
+use App\Models\StudentAdditionalFee;
 use App\Models\StudentPayment;
 use App\Models\PaymentTransaction;
 use App\Auth\StudentPortalUser;
@@ -111,6 +112,7 @@ class StudentPaymentController extends Controller
             'reference_number' => 'nullable|string|max:255',
             'remarks' => 'nullable|string',
             'school_fee_id' => 'nullable|uuid|exists:school_fees,id',
+            'additional_fee_id' => 'nullable|uuid|exists:student_additional_fees,id',
         ]);
 
         $student = Student::whereHas('studentInstitutions', function ($query) use ($institutionId) {
@@ -122,6 +124,13 @@ class StudentPaymentController extends Controller
                 'success' => false,
                 'message' => 'Student not found in this institution'
             ], 404);
+        }
+
+        if (!empty($validated['school_fee_id']) && !empty($validated['additional_fee_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A payment can settle a school fee or an additional fee, not both'
+            ], 422);
         }
 
         if (!empty($validated['school_fee_id'])) {
@@ -137,10 +146,24 @@ class StudentPaymentController extends Controller
             }
         }
 
+        if (!empty($validated['additional_fee_id'])) {
+            $error = $this->assertAdditionalFeesBelongTo(
+                [$validated['additional_fee_id']],
+                $institutionId,
+                $validated['student_id'],
+                $validated['academic_year']
+            );
+
+            if ($error) {
+                return $error;
+            }
+        }
+
         $payment = StudentPayment::create([
             'institution_id' => $institutionId,
             'student_id' => $validated['student_id'],
             'school_fee_id' => $validated['school_fee_id'] ?? null,
+            'student_additional_fee_id' => $validated['additional_fee_id'] ?? null,
             'academic_year' => $validated['academic_year'],
             'amount' => $validated['amount'],
             'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
@@ -151,7 +174,7 @@ class StudentPaymentController extends Controller
             'received_by' => $request->user()?->id,
         ]);
 
-        $payment->load(['schoolFee', 'student']);
+        $payment->load(['schoolFee', 'additionalFee', 'student']);
 
         return response()->json([
             'success' => true,
@@ -176,6 +199,7 @@ class StudentPaymentController extends Controller
             'amount_tendered' => 'nullable|numeric|min:0',
             'items' => 'required|array|min:1',
             'items.*.school_fee_id' => 'nullable|uuid|exists:school_fees,id',
+            'items.*.additional_fee_id' => 'nullable|uuid|exists:student_additional_fees,id',
             'items.*.amount' => 'required|numeric|min:0.01',
             'items.*.remarks' => 'nullable|string',
         ]);
@@ -209,6 +233,38 @@ class StudentPaymentController extends Controller
                     'message' => 'One or more school fees were not found for this institution'
                 ], 404);
             }
+        }
+
+        // Additional-fee lines (ad-hoc charges and late fees) settle a specific charge
+        // row, so verify each one belongs to this student and year.
+        $additionalFeeIds = collect($validated['items'])
+            ->pluck('additional_fee_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($additionalFeeIds->isNotEmpty()) {
+            $error = $this->assertAdditionalFeesBelongTo(
+                $additionalFeeIds->all(),
+                $institutionId,
+                $validated['student_id'],
+                $validated['academic_year']
+            );
+
+            if ($error) {
+                return $error;
+            }
+        }
+
+        $mixedLine = collect($validated['items'])->first(
+            fn ($item) => !empty($item['school_fee_id']) && !empty($item['additional_fee_id'])
+        );
+
+        if ($mixedLine) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A payment line can settle a school fee or an additional fee, not both'
+            ], 422);
         }
 
         $totalAmount = collect($validated['items'])->sum(fn ($item) => (float) $item['amount']);
@@ -250,6 +306,7 @@ class StudentPaymentController extends Controller
                     'student_id' => $validated['student_id'],
                     'payment_transaction_id' => $transaction->id,
                     'school_fee_id' => $item['school_fee_id'] ?? null,
+                    'student_additional_fee_id' => $item['additional_fee_id'] ?? null,
                     'academic_year' => $validated['academic_year'],
                     'amount' => $item['amount'],
                     'payment_date' => $paymentDate,
@@ -265,7 +322,7 @@ class StudentPaymentController extends Controller
             return $transaction;
         });
 
-        $transaction->load(['items.schoolFee', 'student', 'receivedBy']);
+        $transaction->load(['items.schoolFee', 'items.additionalFee', 'student', 'receivedBy']);
 
         return response()->json([
             'success' => true,
@@ -351,6 +408,38 @@ class StudentPaymentController extends Controller
                 'received_by' => $payment->receivedBy,
             ]
         ]);
+    }
+
+    /**
+     * Guard additional-fee allocations: every referenced charge must belong to this
+     * institution, student, and academic year. Returns an error response, or null when
+     * all of them check out.
+     */
+    private function assertAdditionalFeesBelongTo(
+        array $additionalFeeIds,
+        string $institutionId,
+        string $studentId,
+        string $academicYear
+    ): ?JsonResponse {
+        $ids = array_values(array_unique(array_filter($additionalFeeIds)));
+        if (empty($ids)) {
+            return null;
+        }
+
+        $found = StudentAdditionalFee::where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->whereIn('id', $ids)
+            ->count();
+
+        if ($found !== count($ids)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'One or more additional fees were not found for this student and academic year'
+            ], 404);
+        }
+
+        return null;
     }
 
     private function isStudentUser(Request $request): bool

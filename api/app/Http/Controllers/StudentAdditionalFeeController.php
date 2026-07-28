@@ -122,9 +122,14 @@ class StudentAdditionalFeeController extends Controller
             return response()->json(['success' => false, 'message' => 'Not found'], 404);
         }
 
+        // Soft delete: for an auto-charged late fee this records the waiver, which is
+        // what stops the next ledger load from charging that installment again.
         $fee->delete();
 
-        return response()->json(['success' => true, 'message' => 'Deleted']);
+        return response()->json([
+            'success' => true,
+            'message' => $fee->isLateFee() ? 'Late fee waived' : 'Deleted',
+        ]);
     }
 
     private function resolveInstitutionId(Request $request): ?string

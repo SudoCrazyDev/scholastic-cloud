@@ -85,12 +85,12 @@ class PaymentPlanService
                 $status = 'partial';
             }
 
-            // Live, one-time late fee: applies when today is past the grace window and the
-            // installment is not fully paid. Based on the installment's net amount. No charge
-            // record is persisted — the ledger computes and folds this in on each load.
+            // `is_overdue` marks an installment past its grace window that still owes
+            // money — the trigger LateFeeService uses to book a one-time late fee. The
+            // fee amount itself is not computed here: it lives on a real charge row, so
+            // withLateFees() fills it in from what was actually charged.
             $lateFeePercentage = max(0.0, (float) $template->late_fee_percentage);
             $isOverdue = $status !== 'paid' && $amount > 0 && Carbon::today()->greaterThan($overdueDate);
-            $lateFeeAmount = $isOverdue ? round($amount * $lateFeePercentage / 100, 2) : 0.0;
 
             $installments[] = [
                 'sequence' => $i + 1,
@@ -100,7 +100,9 @@ class PaymentPlanService
                 'overdue_date' => $overdueDate->toDateString(),
                 'is_overdue' => $isOverdue,
                 'late_fee_percentage' => $lateFeePercentage,
-                'late_fee_amount' => $lateFeeAmount,
+                'late_fee_amount' => 0.0,
+                'late_fee_applied' => false,
+                'late_fee_id' => null,
                 'amount' => $amount,
                 'original_amount' => $originalAmount,
                 'discount_amount' => $discountAmount,
@@ -110,6 +112,39 @@ class PaymentPlanService
         }
 
         return $installments;
+    }
+
+    /**
+     * Stamp each installment with the late fee actually charged against it, so the
+     * schedule shows the booked amount rather than a recomputed guess. A fee stays
+     * visible after the installment is settled (and after a waiver it disappears,
+     * because the charge row is gone).
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\StudentAdditionalFee>  $lateFees
+     *         keyed by installment sequence
+     */
+    public function withLateFees(array $installments, $lateFees): array
+    {
+        $lateFees = collect($lateFees);
+        if ($lateFees->isEmpty()) {
+            return $installments;
+        }
+
+        return array_map(function (array $installment) use ($lateFees) {
+            $fee = $lateFees->get((int) $installment['sequence']);
+            if (! $fee) {
+                return $installment;
+            }
+
+            $installment['late_fee_amount'] = (float) $fee->amount;
+            $installment['late_fee_applied'] = true;
+            $installment['late_fee_id'] = $fee->id;
+            if ($fee->late_fee_percentage !== null) {
+                $installment['late_fee_percentage'] = (float) $fee->late_fee_percentage;
+            }
+
+            return $installment;
+        }, $installments);
     }
 
     public function serializePlan(?StudentPaymentPlan $plan): ?array

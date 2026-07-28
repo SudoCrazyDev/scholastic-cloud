@@ -25,7 +25,9 @@ function ItemsTable({ transaction }: { transaction: PaymentTransaction }) {
       <tbody>
         {items.map((item) => (
           <tr key={item.id}>
-            <td className="py-0.5 pr-2">{item.school_fee?.name || 'General / Other'}</td>
+            <td className="py-0.5 pr-2">
+              {item.school_fee?.name || item.additional_fee?.name || 'General / Other'}
+            </td>
             <td className="py-0.5 text-right tabular-nums whitespace-nowrap">
               {formatAmount(Number(item.amount))}
             </td>
