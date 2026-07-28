@@ -98,38 +98,72 @@ class PermanentMediaUrlTest extends TestCase
     public function test_a_link_still_validates_when_the_request_arrives_over_a_different_scheme(): void
     {
         Storage::fake('r2');
+        config(['filesystems.disks.r2.url' => null]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+
+        $url = MediaUrl::for(self::PATH);
+
+        $this->get(str_replace('http://', 'https://', $url))->assertOk();
+    }
+
+    /**
+     * The origin comes from the request, never from `APP_URL`. On these
+     * deployments `APP_URL` has pointed at the *frontend*, and a media link on
+     * that origin is answered by the SPA's index.html — so every image and PDF
+     * renders as the login page instead of the file.
+     */
+    public function test_the_origin_comes_from_the_request_not_app_url(): void
+    {
+        Storage::fake('r2');
         config([
             'filesystems.disks.r2.url' => null,
-            'app.url' => 'https://api.example.test',
+            'app.url' => 'https://app.example.test',
         ]);
         Storage::disk('r2')->put(self::PATH, 'image-bytes');
 
         $url = MediaUrl::for(self::PATH);
-        $this->assertStringStartsWith('https://api.example.test/', $url);
 
-        $this->get(str_replace('https://', 'http://', $url))->assertOk();
+        $this->assertStringNotContainsString('app.example.test', $url);
+        $this->assertSame(request()->getHttpHost(), parse_url($url, PHP_URL_HOST).':'.parse_url($url, PHP_URL_PORT));
     }
 
     /**
      * Assessment content stores the finished URL, so moving the API to a new
      * domain must not invalidate the signatures already embedded in it. The
-     * origin needs repointing; the signature itself stays good.
+     * origin needs repointing — that is what `media:repair-urls` does — but the
+     * signature itself stays good.
      */
     public function test_a_link_survives_a_move_to_a_new_domain(): void
     {
         Storage::fake('r2');
-        config([
-            'filesystems.disks.r2.url' => null,
-            'app.url' => 'https://old.example.test',
-        ]);
+        config(['filesystems.disks.r2.url' => null]);
         Storage::disk('r2')->put(self::PATH, 'image-bytes');
 
+        MediaUrl::forceOrigin('https://old.example.test');
         $minted = MediaUrl::for(self::PATH);
+        MediaUrl::forceOrigin(null);
 
-        config(['app.url' => 'https://new.example.test']);
-
+        $this->assertStringStartsWith('https://old.example.test/', $minted);
         $this->assertTrue(MediaUrl::isStaleMediaUrl($minted));
-        $this->get(str_replace('https://old.example.test', 'https://new.example.test', $minted))->assertOk();
+
+        // Same signature, served on the origin the API answers on today.
+        $this->get(str_replace('https://old.example.test', '', $minted))->assertOk();
+    }
+
+    /**
+     * `--origin=` exists so stored content can be repointed at the real API
+     * origin without first correcting `APP_URL` on the server.
+     */
+    public function test_an_explicit_origin_overrides_everything_else(): void
+    {
+        config(['filesystems.disks.r2.url' => null]);
+
+        MediaUrl::forceOrigin('https://api.example.test/');
+        try {
+            $this->assertStringStartsWith('https://api.example.test/api/media', MediaUrl::for(self::PATH));
+        } finally {
+            MediaUrl::forceOrigin(null);
+        }
     }
 
     /**
@@ -175,10 +209,7 @@ class PermanentMediaUrlTest extends TestCase
      */
     public function test_current_links_are_not_treated_as_stale(): void
     {
-        config([
-            'filesystems.disks.r2.url' => null,
-            'app.url' => 'https://api.example.test',
-        ]);
+        config(['filesystems.disks.r2.url' => null]);
 
         $this->assertFalse(MediaUrl::isStaleMediaUrl(MediaUrl::for(self::PATH)));
         $this->assertFalse(MediaUrl::isStaleMediaUrl('https://www.youtube.com/watch?v=abc123'));

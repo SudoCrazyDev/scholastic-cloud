@@ -39,6 +39,19 @@ use Illuminate\Support\Facades\URL;
 class MediaUrl
 {
     /**
+     * Origin to write into links instead of the one derived from the request or
+     * `APP_URL`. Set by `media:repair-urls --origin=` so stored content can be
+     * repointed at the real API origin without first correcting `APP_URL`.
+     */
+    private static ?string $originOverride = null;
+
+    public static function forceOrigin(?string $origin): void
+    {
+        $origin = rtrim(trim((string) $origin), '/');
+        self::$originOverride = $origin === '' ? null : $origin;
+    }
+
+    /**
      * Permanent, publicly-fetchable URL for an object key on the r2 disk.
      */
     public static function for(?string $path): ?string
@@ -67,12 +80,38 @@ class MediaUrl
     }
 
     /**
-     * The origin signed media links are handed out under. Absolute because the
+     * The origin signed media links are handed out under. Absolute, because the
      * links are embedded in pages served from the frontend's own origin.
+     *
+     * Taken from the incoming request, not from `APP_URL`. The request's own
+     * root is the one origin guaranteed to reach this API — it is how the caller
+     * just reached it — whereas `APP_URL` is routinely stale or, on these
+     * deployments, points at the *frontend*, which answers with the SPA's
+     * index.html and makes every image and PDF render as the login page.
+     *
+     * Console and queue runs have no real request, but Laravel builds one from
+     * `APP_URL` for them, so that stays the fallback there.
      */
     private static function origin(): string
     {
-        return rtrim((string) config('app.url'), '/');
+        if (self::$originOverride !== null) {
+            return self::$originOverride;
+        }
+
+        $root = rtrim((string) (request()?->root() ?: ''), '/');
+        if ($root === '') {
+            return rtrim((string) config('app.url'), '/');
+        }
+
+        // A proxy that terminates TLS and forwards plain HTTP makes the request
+        // look insecure. The signature no longer covers the scheme, so this is
+        // not a correctness problem — but an http link inside an https page is
+        // blocked as mixed content, so a declared https origin wins.
+        if (str_starts_with($root, 'http://') && str_starts_with((string) config('app.url'), 'https://')) {
+            $root = 'https://'.substr($root, strlen('http://'));
+        }
+
+        return $root;
     }
 
     /**

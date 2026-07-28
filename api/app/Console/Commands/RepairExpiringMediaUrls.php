@@ -28,7 +28,9 @@ use Illuminate\Console\Command;
  */
 class RepairExpiringMediaUrls extends Command
 {
-    protected $signature = 'media:repair-urls {--dry-run : Report what would change without writing}';
+    protected $signature = 'media:repair-urls
+        {--dry-run : Report what would change without writing}
+        {--origin= : API origin to write into links, e.g. https://api.example.com (defaults to APP_URL)}';
 
     protected $description = 'Repoint stale upload URLs in stored content (expired presigned links, links from a previous domain)';
 
@@ -39,6 +41,17 @@ class RepairExpiringMediaUrls extends Command
     public function handle(): int
     {
         $this->dryRun = (bool) $this->option('dry-run');
+
+        MediaUrl::forceOrigin($this->option('origin'));
+
+        // There is no request to derive the origin from here, so it comes from
+        // APP_URL — which is exactly the value that tends to be wrong. Say what
+        // is about to be written into every row rather than let a bad origin be
+        // discovered later as broken images.
+        $target = MediaUrl::for('probe.png');
+        $this->line('Writing links under: <options=bold>'.(string) $target.'</>');
+        $this->line('If that is not the origin your API is reachable on, stop and pass --origin=');
+        $this->newLine();
 
         $this->repairAssessmentItems();
         $this->repairAssessmentQuestions();
