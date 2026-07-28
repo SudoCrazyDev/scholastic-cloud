@@ -21,9 +21,10 @@ import { paymentPlanService } from '../../../services/paymentPlanService'
 import { studentOnlinePaymentService } from '../../../services/studentOnlinePaymentService'
 import { paymentReceiptService } from '../../../services/paymentReceiptService'
 import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
+import { PaymentPlanPicker } from '../../../components/payment-plan-picker'
+import { PaymentPlanHistoryTable } from '../../../components/payment-plan-history-table'
 import type {
   CreateStudentOnlinePaymentCheckoutData,
-  PaymentPlan,
   PaymentReceiptSubmission,
   Student,
   StudentInstallment,
@@ -553,52 +554,10 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           <p className="text-sm text-gray-500 mb-4">
             Every plan selection and change for {resolvedAcademicYear}.
           </p>
-          {planHistoryQuery.isLoading ? (
-            <p className="text-gray-500">Loading history...</p>
-          ) : !planHistory.length ? (
-            <p className="text-sm text-gray-500">No payment plan changes recorded yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Changed From</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">By</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Note</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {planHistory.map((change) => (
-                    <tr key={change.id}>
-                      <td className="px-4 py-2 text-sm text-gray-600">
-                        {change.changed_at
-                          ? new Date(change.changed_at).toLocaleString('en-PH', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                        {change.plan_name || '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-600">
-                        {change.previous_plan_name || '—'}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-600">
-                        {change.changed_by_name || (change.changed_by_student ? 'Student' : '—')}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{change.note || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <PaymentPlanHistoryTable
+            changes={planHistory}
+            loading={planHistoryQuery.isLoading}
+          />
         </div>
       )}
 
@@ -1259,83 +1218,6 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       )
       })()}
 
-    </div>
-  )
-}
-
-interface PaymentPlanPickerProps {
-  plans: PaymentPlan[]
-  loading: boolean
-  plansLoading?: boolean
-  currentPlanId?: string
-  onSelect: (paymentPlanId: string) => void
-}
-
-const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({
-  plans,
-  loading,
-  plansLoading,
-  currentPlanId,
-  onSelect,
-}) => {
-  const [choice, setChoice] = useState<string | null>(currentPlanId ?? null)
-
-  const cardClass = (active: boolean) =>
-    `flex-1 text-left cursor-pointer rounded-xl border p-5 transition shadow-sm ${
-      active
-        ? 'border-primary-500 ring-2 ring-primary-200 bg-white'
-        : 'border-gray-200 bg-white hover:border-primary-300'
-    }`
-
-  if (plansLoading) {
-    return <p className="text-sm text-gray-500">Loading available plans…</p>
-  }
-
-  if (!plans.length) {
-    return (
-      <p className="text-sm text-gray-600">
-        No payment plans are available yet. Please contact your school registrar.
-      </p>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {plans.map((plan) => (
-          <button
-            key={plan.id}
-            type="button"
-            className={cardClass(choice === plan.id)}
-            onClick={() => setChoice(plan.id)}
-          >
-            <div className="flex items-center justify-between mb-2 gap-2">
-              <h5 className="text-base font-semibold text-gray-900">{plan.name}</h5>
-              <span className="text-xs font-medium text-primary-600 bg-primary-50 rounded-full px-2 py-0.5 whitespace-nowrap">
-                {plan.installment_count} installment{plan.installment_count === 1 ? '' : 's'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600">
-              {plan.description
-                ? plan.description
-                : `Pay your net fees in ${plan.installment_count} installment${
-                    plan.installment_count === 1 ? '' : 's'
-                  }.`}
-            </p>
-          </button>
-        ))}
-      </div>
-
-      <div className="flex justify-end">
-        <Button
-          disabled={!choice || loading || choice === currentPlanId}
-          loading={loading}
-          onClick={() => choice && onSelect(choice)}
-          className="bg-primary-600 hover:bg-primary-700 text-white"
-        >
-          {currentPlanId ? 'Update plan' : 'Confirm plan'}
-        </Button>
-      </div>
     </div>
   )
 }

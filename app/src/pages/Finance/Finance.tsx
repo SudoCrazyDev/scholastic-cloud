@@ -32,8 +32,11 @@ import { defaultDiscountService } from '../../services/defaultDiscountService'
 import { studentAdditionalFeeService } from '../../services/studentAdditionalFeeService'
 import { studentFeeService } from '../../services/studentFeeService'
 import { paymentVoidService } from '../../services/paymentVoidService'
+import { paymentPlanService } from '../../services/paymentPlanService'
 import { useAuth } from '../../hooks/useAuth'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
+import { PaymentPlanPicker } from '../../components/payment-plan-picker'
+import { PaymentPlanHistoryTable } from '../../components/payment-plan-history-table'
 import DashboardCharts from './DashboardCharts'
 import CollectionsView from './CollectionsView'
 import ReceiptApprovalsView from './ReceiptApprovalsView'
@@ -152,6 +155,9 @@ const Finance: React.FC = () => {
   const roleSlug: string | undefined = user?.role?.slug
   const isVoidApprover = Boolean(roleSlug && VOID_APPROVER_ROLES.includes(roleSlug))
   const canRequestVoid = roleSlug === 'finance' || isVoidApprover
+  // Students may make their first plan selection in the portal; every later change
+  // is staff-only, and the API rejects a student attempting one either way.
+  const canManagePaymentPlan = roleSlug !== 'student'
 
   const currentYear = new Date().getFullYear()
   const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
@@ -240,6 +246,7 @@ const Finance: React.FC = () => {
     amount: '',
   })
   const [ledgerAdditionalFeeError, setLedgerAdditionalFeeError] = useState<string | null>(null)
+  const [showLedgerPlanPicker, setShowLedgerPlanPicker] = useState(false)
 
   const createLedgerDiscountMutation = useMutation({
     mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
@@ -356,6 +363,47 @@ const Finance: React.FC = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to remove fee.')
+    },
+  })
+
+  // ---- Student payment plan (ledger) ----
+  const ledgerActivePlansQuery = useQuery({
+    queryKey: ['active-payment-plans'],
+    queryFn: () => paymentPlanService.getPlans({ is_active: true }),
+    enabled: view === 'ledger' && canManagePaymentPlan && Boolean(selectedLedgerStudent?.id),
+  })
+
+  const ledgerPlanHistoryQuery = useQuery({
+    queryKey: ['payment-plan-changes', selectedLedgerStudent?.id, ledgerAcademicYear],
+    queryFn: () =>
+      paymentPlanService.getChangeHistory({
+        student_id: selectedLedgerStudent!.id,
+        academic_year: ledgerAcademicYear,
+      }),
+    enabled:
+      view === 'ledger' &&
+      canManagePaymentPlan &&
+      Boolean(selectedLedgerStudent?.id && ledgerAcademicYear),
+  })
+
+  const setLedgerPaymentPlanMutation = useMutation({
+    mutationFn: (payload: { payment_plan_id: string; note?: string }) =>
+      studentFinanceService.setPaymentPlan(selectedLedgerStudent!.id, {
+        academic_year: ledgerAcademicYear,
+        payment_plan_id: payload.payment_plan_id,
+        note: payload.note,
+      }),
+    onSuccess: () => {
+      setShowLedgerPlanPicker(false)
+      // The schedule every ledger view renders comes from this plan, and the
+      // change itself has to show up in the history table below.
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['payment-plan-changes', selectedLedgerStudent?.id] })
+      toast.success('Payment plan updated.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update payment plan.')
     },
   })
 
@@ -2234,6 +2282,79 @@ const Finance: React.FC = () => {
                     </p>
                   </div>
                 </div>
+
+                {canManagePaymentPlan && (
+                <div className="rounded-xl border border-gray-200 bg-white">
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">Payment Plan</h3>
+                      {ledgerQuery.data?.data?.payment_plan ? (
+                        <p className="text-xs text-gray-500">
+                          <span className="font-medium text-gray-700">
+                            {ledgerQuery.data.data.payment_plan.name || 'Assigned plan'}
+                          </span>{' '}
+                          · {ledgerQuery.data.data.payment_plan.installment_count} installments ·
+                          drives the Monthly and Quarterly views for{' '}
+                          <span className="font-medium">{ledgerAcademicYear}</span>.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-600">
+                          No plan assigned for {ledgerAcademicYear} — the schedule falls back to an
+                          even split until one is set.
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowLedgerPlanPicker((prev) => !prev)}
+                    >
+                      {showLedgerPlanPicker
+                        ? 'Cancel'
+                        : ledgerQuery.data?.data?.payment_plan
+                          ? 'Change Plan'
+                          : 'Set Plan'}
+                    </Button>
+                  </div>
+
+                  {showLedgerPlanPicker && (
+                    <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                      <p className="text-xs text-gray-500 mb-3">
+                        Changing the plan re-splits the outstanding balance across the new
+                        installments. Payments already collected keep their receipts and are
+                        re-applied to the new schedule oldest-first.
+                      </p>
+                      <PaymentPlanPicker
+                        plans={ledgerActivePlansQuery.data?.data || []}
+                        plansLoading={ledgerActivePlansQuery.isLoading}
+                        loading={setLedgerPaymentPlanMutation.isPending}
+                        currentPlanId={
+                          ledgerQuery.data?.data?.payment_plan?.payment_plan_id ?? undefined
+                        }
+                        withNote
+                        onSelect={(paymentPlanId, note) =>
+                          setLedgerPaymentPlanMutation.mutate({
+                            payment_plan_id: paymentPlanId,
+                            note,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+
+                  <div className="p-4">
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                      Plan Change History
+                    </h4>
+                    <PaymentPlanHistoryTable
+                      changes={ledgerPlanHistoryQuery.data?.data || []}
+                      loading={ledgerPlanHistoryQuery.isLoading}
+                      emptyMessage={`No plan changes recorded for ${ledgerAcademicYear}.`}
+                    />
+                  </div>
+                </div>
+                )}
 
                 <div className="rounded-xl border border-gray-200 bg-white">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
