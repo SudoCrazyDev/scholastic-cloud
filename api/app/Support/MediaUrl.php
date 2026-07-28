@@ -20,8 +20,21 @@ use Illuminate\Support\Facades\URL;
  *    with the app key, so the link cannot be forged or edited to reach another
  *    object, but it also never goes stale.
  *
- * NOTE: signed URLs are absolute and built from `APP_URL`, so that value must
- * point at the public API origin in every deployed environment.
+ * The signature deliberately covers only the *path and query* — never the
+ * scheme or host. Assessment content stores the finished URL, so an
+ * origin-bound signature breaks the moment the origin as Laravel sees it stops
+ * matching the one the URL was minted under, which happens routinely:
+ *
+ *  - TLS terminated at a proxy that forwards plain HTTP (no trusted proxies
+ *    configured), so the URL says `https` but `$request->url()` says `http`;
+ *  - the API moving to a new domain, which invalidates every URL already
+ *    embedded in a question or lesson.
+ *
+ * Signing relatively makes the link survive both. `APP_URL` still supplies the
+ * origin the URL is handed out under, so it must point at the public API origin
+ * in every deployed environment — but getting it wrong now only misdirects new
+ * URLs instead of silently invalidating old ones, and `media:repair-urls`
+ * re-points stored content afterwards.
  */
 class MediaUrl
 {
@@ -41,7 +54,8 @@ class MediaUrl
         }
 
         try {
-            return URL::signedRoute('media.show', ['path' => $path]);
+            // absolute: false — sign the path+query only; see the class docblock.
+            return self::origin().URL::signedRoute('media.show', ['path' => $path], null, false);
         } catch (\Throwable) {
             // Last resort: whatever the disk can produce. Better a URL than null.
             try {
@@ -50,6 +64,45 @@ class MediaUrl
                 return null;
             }
         }
+    }
+
+    /**
+     * The origin signed media links are handed out under. Absolute because the
+     * links are embedded in pages served from the frontend's own origin.
+     */
+    private static function origin(): string
+    {
+        return rtrim((string) config('app.url'), '/');
+    }
+
+    /**
+     * True when `$url` is one of our own `media.show` links but was minted for a
+     * different origin than the one we hand out today — i.e. content carried
+     * over from a previous domain, or from a run with a stale `APP_URL`. Such a
+     * URL still resolves to a valid object key, it just points somewhere the
+     * browser can no longer reach.
+     */
+    public static function isStaleMediaUrl(?string $url): bool
+    {
+        $url = trim((string) $url);
+        if ($url === '' || ! preg_match('#^https?://#i', $url)) {
+            return false;
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['query'])) {
+            return false;
+        }
+
+        parse_str($parts['query'], $query);
+        if (empty($query['path']) || empty($query['signature'])) {
+            return false;
+        }
+
+        $origin = ($parts['scheme'] ?? '').'://'.($parts['host'] ?? '')
+            .(isset($parts['port']) ? ':'.$parts['port'] : '');
+
+        return $origin !== self::origin();
     }
 
     /**

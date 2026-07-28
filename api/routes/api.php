@@ -108,7 +108,7 @@ Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan']);
 // because browsers request these from <img>/<a> without the bearer token —
 // the signature on the URL is the access control.
 Route::get('/media', [\App\Http\Controllers\MediaController::class, 'show'])
-    ->middleware('signed')
+    ->middleware(\App\Http\Middleware\ValidateMediaSignature::class)
     ->name('media.show');
 
 // Public online admission form (no auth)

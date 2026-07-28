@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Support\MediaUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 /**
@@ -86,5 +87,101 @@ class PermanentMediaUrlTest extends TestCase
         $this->assertNull(MediaUrl::pathFrom('https://www.youtube.com/watch?v=abc123'));
         $this->assertNull(MediaUrl::pathFrom(''));
         $this->assertNull(MediaUrl::clean('../../etc/passwd'));
+    }
+
+    /**
+     * The signature must not cover the scheme. TLS is terminated at a proxy in
+     * production and forwarded as plain HTTP, so a URL minted as `https` arrives
+     * looking like `http` — which used to fail the check and turn every image
+     * and PDF into a broken link.
+     */
+    public function test_a_link_still_validates_when_the_request_arrives_over_a_different_scheme(): void
+    {
+        Storage::fake('r2');
+        config([
+            'filesystems.disks.r2.url' => null,
+            'app.url' => 'https://api.example.test',
+        ]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+
+        $url = MediaUrl::for(self::PATH);
+        $this->assertStringStartsWith('https://api.example.test/', $url);
+
+        $this->get(str_replace('https://', 'http://', $url))->assertOk();
+    }
+
+    /**
+     * Assessment content stores the finished URL, so moving the API to a new
+     * domain must not invalidate the signatures already embedded in it. The
+     * origin needs repointing; the signature itself stays good.
+     */
+    public function test_a_link_survives_a_move_to_a_new_domain(): void
+    {
+        Storage::fake('r2');
+        config([
+            'filesystems.disks.r2.url' => null,
+            'app.url' => 'https://old.example.test',
+        ]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+
+        $minted = MediaUrl::for(self::PATH);
+
+        config(['app.url' => 'https://new.example.test']);
+
+        $this->assertTrue(MediaUrl::isStaleMediaUrl($minted));
+        $this->get(str_replace('https://old.example.test', 'https://new.example.test', $minted))->assertOk();
+    }
+
+    /**
+     * Links minted before signatures went relative are still stored in content
+     * and must keep working on the origin they were signed for.
+     */
+    public function test_legacy_absolute_signatures_are_still_accepted(): void
+    {
+        Storage::fake('r2');
+        config([
+            'filesystems.disks.r2.url' => null,
+            'app.url' => 'http://localhost',
+        ]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+
+        $legacy = URL::signedRoute('media.show', ['path' => self::PATH]);
+
+        $this->get($legacy)->assertOk();
+    }
+
+    /**
+     * Relative signing must not weaken the check: swapping the object key still
+     * has to be rejected, and so does a signature borrowed from another key.
+     */
+    public function test_relative_signing_still_rejects_a_swapped_key(): void
+    {
+        Storage::fake('r2');
+        config(['filesystems.disks.r2.url' => null]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+        Storage::disk('r2')->put('inst-2/secrets/private.png', 'not-yours');
+
+        $url = MediaUrl::for(self::PATH);
+
+        $this->get(str_replace(rawurlencode(self::PATH), rawurlencode('inst-2/secrets/private.png'), $url))
+            ->assertForbidden();
+        $this->get('/api/media?path='.rawurlencode('inst-2/secrets/private.png'))
+            ->assertForbidden();
+    }
+
+    /**
+     * A URL already pointing at the current origin is not stale — the repair
+     * command must leave it alone rather than rewrite every row on every run.
+     */
+    public function test_current_links_are_not_treated_as_stale(): void
+    {
+        config([
+            'filesystems.disks.r2.url' => null,
+            'app.url' => 'https://api.example.test',
+        ]);
+
+        $this->assertFalse(MediaUrl::isStaleMediaUrl(MediaUrl::for(self::PATH)));
+        $this->assertFalse(MediaUrl::isStaleMediaUrl('https://www.youtube.com/watch?v=abc123'));
+        $this->assertFalse(MediaUrl::isStaleMediaUrl(self::PATH));
     }
 }

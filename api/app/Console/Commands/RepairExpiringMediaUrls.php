@@ -9,19 +9,28 @@ use App\Support\MediaUrl;
 use Illuminate\Console\Command;
 
 /**
- * Rewrites presigned (expiring) R2 links that were baked into stored content
- * before uploads switched to permanent URLs.
+ * Repoints upload links baked into stored content at the URL the app hands out
+ * today. Two kinds go stale:
+ *
+ *  - presigned (expiring) R2 links, from before uploads switched to permanent
+ *    URLs;
+ *  - our own `media.show` links minted for a different origin — content carried
+ *    over from a previous domain, or written while `APP_URL` was wrong. The
+ *    object key survives inside the link, so it can be re-signed for the
+ *    current origin.
  *
  * Lesson file blocks keep a `path` and are already re-derived on read, but
  * assessment content stores only the URL — question prompt HTML, per-choice
  * images and Drag The Picture cards — so those rows have to be rewritten in
  * place or the images stay broken.
+ *
+ * Run this after any change to `APP_URL`, `APP_KEY` or the API's domain.
  */
 class RepairExpiringMediaUrls extends Command
 {
     protected $signature = 'media:repair-urls {--dry-run : Report what would change without writing}';
 
-    protected $description = 'Replace expiring presigned upload URLs in stored content with permanent ones';
+    protected $description = 'Repoint stale upload URLs in stored content (expired presigned links, links from a previous domain)';
 
     private bool $dryRun = false;
 
@@ -144,18 +153,22 @@ class RepairExpiringMediaUrls extends Command
     }
 
     /**
-     * Returns the permanent replacement for an expiring URL, or null when the
-     * value is not an expiring R2 link (already permanent, or third-party).
+     * Returns the permanent replacement for a stale URL, or null when the value
+     * needs no repair (already current, or a third-party link).
      */
     private function rewriteUrl(string $url): ?string
     {
-        // Presigned links are the only ones that expire; they always carry the
-        // signature query parameters.
-        if (! str_contains($url, 'X-Amz-Signature') && ! str_contains($url, 'X-Amz-Expires')) {
+        $decoded = html_entity_decode($url);
+
+        // Presigned links always carry the signature query parameters; our own
+        // links go stale instead by naming an origin we no longer serve.
+        $expiring = str_contains($decoded, 'X-Amz-Signature') || str_contains($decoded, 'X-Amz-Expires');
+
+        if (! $expiring && ! MediaUrl::isStaleMediaUrl($decoded)) {
             return null;
         }
 
-        $path = MediaUrl::pathFrom(html_entity_decode($url));
+        $path = MediaUrl::pathFrom($decoded);
         if ($path === null) {
             return null;
         }

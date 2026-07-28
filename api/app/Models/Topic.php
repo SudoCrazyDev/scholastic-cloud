@@ -61,8 +61,16 @@ class Topic extends Model
         $blocks = is_array($this->content) ? $this->content : [];
 
         return array_map(function ($block) {
-            if (($block['type'] ?? null) === 'file' && ! empty($block['path'])) {
-                $block['url'] = self::freshFileUrl($block['path']) ?? ($block['url'] ?? null);
+            if (($block['type'] ?? null) !== 'file') {
+                return $block;
+            }
+
+            // Blocks written before `path` was stored only have the URL to go on;
+            // the object key is still recoverable from it, so those attachments
+            // get re-derived too instead of serving a link to a dead origin.
+            $path = MediaUrl::clean($block['path'] ?? null) ?? MediaUrl::pathFrom($block['url'] ?? null);
+            if ($path !== null) {
+                $block['url'] = self::freshFileUrl($path) ?? ($block['url'] ?? null);
             }
 
             return $block;
