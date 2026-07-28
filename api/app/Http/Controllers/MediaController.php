@@ -45,11 +45,13 @@ class MediaController extends Controller
 
     public function show(Request $request): StreamedResponse
     {
-        $path = MediaUrl::clean($request->query('path'));
+        // Resolves rather than just cleans: links repaired from legacy presigned
+        // URLs can carry a stale bucket segment ahead of the object key, and
+        // those are already signed and stored in content.
+        $path = MediaUrl::resolveExisting($request->query('path'));
         abort_if($path === null, 404);
 
         $disk = Storage::disk('r2');
-        abort_unless($disk->exists($path), 404);
 
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         $mime = self::MIME_TYPES[$extension] ?? 'application/octet-stream';

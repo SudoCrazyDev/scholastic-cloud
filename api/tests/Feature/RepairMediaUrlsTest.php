@@ -174,6 +174,37 @@ class RepairMediaUrlsTest extends TestCase
     }
 
     /**
+     * A link repaired out of a path-style presigned URL can keep the bucket name
+     * ahead of the object key, because `pathFrom()` only strips a bucket segment
+     * matching the configured name. Serving tolerates it, but the stored path has
+     * to be settled or every later repair re-signs a key that does not exist.
+     */
+    public function test_it_drops_a_stale_bucket_segment_from_the_stored_path(): void
+    {
+        Storage::disk('r2')->put(self::CHOICE, 'image-bytes');
+
+        MediaUrl::forceOrigin('https://api.example.test');
+        $withBucket = MediaUrl::for('old-bucket-name/'.self::CHOICE);
+        MediaUrl::forceOrigin(null);
+
+        $item = $this->makeItem([[
+            'type' => 'single_choice',
+            'question' => 'Faith means trusting God.',
+            'choices' => [null, null],
+            'choiceImages' => [$withBucket, ''],
+            'answer' => 'A',
+            'points' => 1,
+        ]]);
+
+        $this->artisan('media:repair-urls')->assertSuccessful();
+
+        $repaired = $item->fresh()->content['questions'][0]['choiceImages'][0];
+        $this->assertStringNotContainsString('old-bucket-name', $repaired);
+        $this->assertSame(MediaUrl::for(self::CHOICE), $repaired);
+        $this->get($repaired)->assertOk();
+    }
+
+    /**
      * The console has no request to derive an origin from, so it falls back to
      * APP_URL — which is exactly the value that tends to be wrong on a server.
      * `--origin=` is how content gets repointed without editing `.env` first.

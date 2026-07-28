@@ -220,6 +220,61 @@ class MediaUrl
     }
 
     /**
+     * The object key a stored path actually refers to, or null when nothing
+     * matching is in the bucket.
+     *
+     * A path-style presigned URL is `…/<bucket>/<key>`, and `pathFrom()` can only
+     * strip a bucket segment it recognises — so links repaired out of one can
+     * end up with `<bucket>/` glued to the front of the key. Maranatha's
+     * assessment images stored `scholastic-cloud/<institution>/…` where the
+     * object is really at `<institution>/…`, and every one of them failed.
+     *
+     * Verified against the bucket rather than guessed: the leading segment is
+     * only dropped when doing so names a real object.
+     */
+    public static function resolveExisting(?string $path): ?string
+    {
+        $path = self::clean($path);
+        if ($path === null) {
+            return null;
+        }
+
+        // Drop one leading segment — the stale bucket name — as the fallback. The
+        // path arrived inside a signature we issued, so a caller cannot steer
+        // this; it only ever reaches keys we put into content ourselves.
+        $candidates = [$path];
+        $position = strpos($path, '/');
+        if ($position !== false && ($withoutBucket = self::clean(substr($path, $position + 1))) !== null) {
+            $candidates[] = $withoutBucket;
+        }
+
+        foreach ($candidates as $candidate) {
+            if (self::objectExists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether an object is really in the bucket, treating "cannot tell" as no.
+     *
+     * R2 answers HeadObject for a key that is not there with 403 rather than 404
+     * when the token cannot list the bucket, and Flysystem turns not being able
+     * to tell into an exception. Left to propagate that surfaces as a 500 on the
+     * very request that should simply have moved on to the next candidate.
+     */
+    private static function objectExists(string $path): bool
+    {
+        try {
+            return Storage::disk('r2')->exists($path);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Delete an object previously handed out under `$url`, ignoring anything
      * that is not one of our own R2 objects. Used to drop the old file when a
      * teacher re-uploads over an existing image or attachment.

@@ -6,6 +6,7 @@ use App\Support\MediaUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use League\Flysystem\UnableToCheckExistence;
 use Tests\TestCase;
 
 /**
@@ -228,5 +229,99 @@ class PermanentMediaUrlTest extends TestCase
 
         config(['filesystems.disks.r2.url' => 'https://cdn.example.test']);
         $this->assertTrue(MediaUrl::isOurs('https://cdn.example.test/'.self::PATH));
+    }
+
+    /**
+     * A path-style presigned URL is `…/<bucket>/<key>`, and `pathFrom()` only
+     * strips a bucket segment matching the configured name. Links minted under a
+     * bucket the config no longer uses therefore kept `<bucket>/` on the front of
+     * the key, and every one of them 404'd.
+     */
+    public function test_a_stale_bucket_segment_still_resolves_to_the_object(): void
+    {
+        Storage::fake('r2');
+        config(['filesystems.disks.r2.url' => null]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+
+        $this->assertSame(self::PATH, MediaUrl::resolveExisting('old-bucket-name/'.self::PATH));
+        $this->assertSame(self::PATH, MediaUrl::resolveExisting(self::PATH));
+    }
+
+    public function test_a_path_matching_no_object_does_not_resolve(): void
+    {
+        Storage::fake('r2');
+        config(['filesystems.disks.r2.url' => null]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+
+        $this->assertNull(MediaUrl::resolveExisting('inst-1/assessments/images/absent.png'));
+        $this->assertNull(MediaUrl::resolveExisting('diagram.png'));
+        $this->assertNull(MediaUrl::resolveExisting('../../etc/passwd'));
+        $this->assertNull(MediaUrl::resolveExisting(null));
+    }
+
+    /**
+     * Dropping the leading segment must not become a way to reach a sibling
+     * object: only the exact remainder is tried, and only if it really exists.
+     */
+    public function test_resolving_cannot_walk_to_another_object(): void
+    {
+        Storage::fake('r2');
+        config(['filesystems.disks.r2.url' => null]);
+        Storage::disk('r2')->put('inst-2/secrets/private.png', 'not-yours');
+
+        $this->assertNull(MediaUrl::resolveExisting('inst-1/inst-2/secrets/other.png'));
+        $this->assertSame('inst-2/secrets/private.png', MediaUrl::resolveExisting('bucket/inst-2/secrets/private.png'));
+    }
+
+    /**
+     * R2 answers HeadObject for a key that is not there with 403 rather than 404
+     * when the token cannot list the bucket, and Flysystem turns that into an
+     * exception. Left to propagate it produced a 500 on the request that should
+     * simply have tried the key without the stale bucket segment — which is what
+     * every broken assessment image was actually hitting.
+     */
+    public function test_a_bucket_that_cannot_answer_existence_falls_through_to_the_next_candidate(): void
+    {
+        config(['filesystems.disks.r2.url' => null]);
+
+        $disk = \Mockery::mock(\Illuminate\Contracts\Filesystem\Filesystem::class);
+        $disk->shouldReceive('exists')
+            ->with('old-bucket-name/'.self::PATH)
+            ->andThrow(UnableToCheckExistence::forLocation('old-bucket-name/'.self::PATH));
+        $disk->shouldReceive('exists')->with(self::PATH)->andReturnTrue();
+
+        Storage::shouldReceive('disk')->with('r2')->andReturn($disk);
+
+        $this->assertSame(self::PATH, MediaUrl::resolveExisting('old-bucket-name/'.self::PATH));
+    }
+
+    public function test_an_unanswerable_existence_check_does_not_escape(): void
+    {
+        config(['filesystems.disks.r2.url' => null]);
+
+        $disk = \Mockery::mock(\Illuminate\Contracts\Filesystem\Filesystem::class);
+        $disk->shouldReceive('exists')->andThrow(UnableToCheckExistence::forLocation('anything'));
+
+        Storage::shouldReceive('disk')->with('r2')->andReturn($disk);
+
+        $this->assertNull(MediaUrl::resolveExisting('some-bucket/'.self::PATH));
+    }
+
+    /**
+     * The signature covers the path, so a stale bucket segment has to survive
+     * the round trip: minted, stored, requested, served.
+     */
+    public function test_a_link_carrying_a_stale_bucket_segment_serves_the_object(): void
+    {
+        Storage::fake('r2');
+        config(['filesystems.disks.r2.url' => null]);
+        Storage::disk('r2')->put(self::PATH, 'image-bytes');
+
+        $url = MediaUrl::for('old-bucket-name/'.self::PATH);
+
+        $response = $this->get($url);
+
+        $response->assertOk();
+        $this->assertSame('image-bytes', $response->streamedContent());
     }
 }

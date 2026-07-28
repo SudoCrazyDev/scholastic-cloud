@@ -185,6 +185,12 @@ class RepairExpiringMediaUrls extends Command
             return null;
         }
 
+        // A link repaired from a path-style presigned URL can carry a stale
+        // bucket segment ahead of the key. Serving tolerates that, but leaving it
+        // in the stored path means every future repair faithfully re-signs a key
+        // that does not exist, so settle it here against the real bucket.
+        $path = MediaUrl::resolveExisting($path) ?? $path;
+
         // Compare against the canonical form instead of testing for particular
         // kinds of staleness. A link goes bad for more reasons than are
         // practical to enumerate — it expired, it names an origin we no longer
