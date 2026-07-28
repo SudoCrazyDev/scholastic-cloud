@@ -25,6 +25,13 @@ modules should consume its data.
   early dismissal time and a pay treatment, plus per-staff requests (early out, excused late
   arrival, official business, missed punch) that a principal approves. Waives late/undertime
   penalties and can guarantee the full daily rate. Read before changing pay arithmetic.
+- [Media & Uploads](Media/MEDIA.md) — Shared infrastructure, not a nav module. The layer under every
+  uploaded file: assessment images, lesson and announcement attachments, student submissions, ID card
+  assets, logos, profile pictures, documents, receipts. Private Cloudflare R2 bucket + permanent
+  signed `/api/media` links via `MediaUrl`. **Read before adding an upload** (`MediaUrl::for()`, never
+  `temporaryUrl()`), before changing `APP_URL`/`APP_KEY`/a tenant domain (run `media:repair-urls`
+  after), or when files are broken in a deployed tenant — it has a
+  [status-code → cause table](Media/MEDIA.md#diagnosing-a-broken-file).
 - [SMS Gateway](SMS_GATEWAY/SMS_GATEWAY.md) — Communication. Sends/receives SMS over local prepaid
   SIMs via an on-prem **kiosk** (Raspberry Pi / Windows PC) with a USB GSM modem, managed entirely
   from the portal. Clones the HRIS bridge pattern: per-device agent, pairing-code → hashed token,
