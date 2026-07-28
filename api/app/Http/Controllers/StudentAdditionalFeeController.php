@@ -52,6 +52,7 @@ class StudentAdditionalFeeController extends Controller
 
         $validated = $request->validate([
             'student_id' => 'required|uuid|exists:students,id',
+            'student_fee_id' => 'nullable|uuid|exists:student_fees,id',
             'academic_year' => 'required|string|max:255',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -69,6 +70,7 @@ class StudentAdditionalFeeController extends Controller
         $fee = StudentAdditionalFee::create([
             'institution_id' => $institutionId,
             'student_id' => $validated['student_id'],
+            'student_fee_id' => $validated['student_fee_id'] ?? null,
             'academic_year' => $validated['academic_year'],
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,

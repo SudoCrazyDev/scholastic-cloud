@@ -20,6 +20,7 @@ class StudentAdditionalFee extends Model
     protected $fillable = [
         'institution_id',
         'student_id',
+        'student_fee_id',
         'academic_year',
         'name',
         'description',
@@ -51,6 +52,12 @@ class StudentAdditionalFee extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** The reusable student fee this charge was picked from, when it was not typed by hand. */
+    public function studentFee()
+    {
+        return $this->belongsTo(StudentFee::class);
     }
 
     public function payments()

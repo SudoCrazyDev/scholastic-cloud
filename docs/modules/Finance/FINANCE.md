@@ -31,7 +31,8 @@ Navigation is **two-level** (data-driven constants at the top of `Finance.tsx`):
 - `PRIMARY_NAV` — the top row: **Dashboard**, **Cashiering**, **Ledger**, **Collections**,
   **Receipt Approvals**, **Void Requests** (only when `canRequestVoid`), and **Setup**.
 - `SETUP_NAV` — a sub-row that appears only while a setup view is active: **School Fees**,
-  **Default Amounts**, **Grade Level Discounts**, **Default Discounts**, **Receipt Builder**.
+  **School Fees Amounts**, **Student Fees**, **Grade Level Discounts**, **Default Discounts**,
+  **Sibling Discounts**, **Receipt Builder**.
   The "Setup" primary item links to `/finance/school-fees` and is highlighted whenever `view` is
   in `SETUP_VIEWS`.
 - `VIEW_SUBTITLES` — per-view one-liner shown under the page `h1`.
@@ -45,7 +46,8 @@ Navigation is **two-level** (data-driven constants at the top of `Finance.tsx`):
 | `receipt-approvals` | `/finance/receipt-approvals` | Student-uploaded payment receipt review queue |
 | `void-requests` | `/finance/void-requests` | Payment void request queue (role-gated) |
 | `school-fees` | `/finance/school-fees` | Setup: fee type catalog |
-| `default-amounts` | `/finance/default-amounts` | Setup: fee amount per grade level per year |
+| `default-amounts` | `/finance/default-amounts` | Setup: "School Fees Amounts" — fee amount per grade level per year |
+| `student-fees` | `/finance/student-fees` | Setup: reusable student fee templates for the ledger |
 | `discounts` | `/finance/discounts` | Setup: bulk discounts for a whole grade level |
 | `default-discounts` | `/finance/default-discounts` | Setup: reusable discount templates |
 | `receipt-builder` | `/finance/receipt-builder` | Setup: drag-and-drop receipt layout |
@@ -127,7 +129,7 @@ views' requests.
 ## File map
 
 **Frontend (`app/`)**
-- Shell + Dashboard/Cashiering/Ledger/School Fees/Default Amounts/Void Requests views:
+- Shell + Dashboard/Cashiering/Ledger/School Fees/School Fees Amounts/Void Requests views:
   `src/pages/Finance/Finance.tsx` (nav constants `PRIMARY_NAV`/`SETUP_NAV`/`VIEW_SUBTITLES` at
   top; `view` memo maps pathname → view).
 - Sub-view components (same folder): `CollectionsView.tsx`, `DiscountsView.tsx` (grade-level),
@@ -223,10 +225,16 @@ invalidates ledger/NOA queries afterwards.
 ### Setup → School Fees (`/finance/school-fees`)
 CRUD on the fee catalog (`name`, `description`, `is_active`) via `/school-fees`.
 
-### Setup → Default Amounts (`/finance/default-amounts`)
+### Setup → School Fees Amounts (`/finance/default-amounts`)
 Fee amounts per grade level + academic year via `/school-fee-defaults`. Supports single upsert,
 `apply_to_all` (every grade at once → `/school-fee-defaults/apply-all`), and bulk upsert. Filterable
-by grade/year.
+by grade/year. The route keeps its `default-amounts` slug; only the label reads "School Fees Amounts".
+
+### Setup → Student Fees (`/finance/student-fees`) — `StudentFeesView.tsx`
+CRUD on reusable student fee templates via `/student-fees` (name, amount, description, active flag).
+The Ledger's **Additional Fees** form has an `Autocomplete` over the active ones: picking a fee fills
+in name/amount/description and stores `student_fee_id` on the resulting `student_additional_fees` row,
+so the charge can be traced back to the template. Cashiers can still type a one-off fee by hand.
 
 ### Setup → Grade Level Discounts (`/finance/discounts`) — `DiscountsView.tsx`
 Bulk discounts applied to an entire grade level for a year (fixed/percentage, optionally tied to

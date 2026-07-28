@@ -39,6 +39,7 @@ use App\Http\Controllers\SiblingGroupController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StrandController;
 use App\Http\Controllers\StudentAdditionalFeeController;
+use App\Http\Controllers\StudentFeeController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentDiscountController;
@@ -384,6 +385,9 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::patch('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::delete('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'destroy']);
+
+    // Reusable student fees, searched and picked from the ledger
+    Route::apiResource('student-fees', StudentFeeController::class);
 
     // Payment receipt submissions (student uploads proof of payment, finance verifies)
     Route::get('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'index']);

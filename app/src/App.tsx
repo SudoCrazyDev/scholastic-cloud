@@ -174,6 +174,7 @@ function App() {
               <Route path="disbursements" element={<Disbursements />} />
               <Route path="finance-announcements" element={<FinanceAnnouncementsView />} />
               <Route path="finance/default-amounts" element={<Finance />} />
+              <Route path="finance/student-fees" element={<Finance />} />
               <Route path="finance/cashiering" element={<Finance />} />
               <Route path="finance/ledger" element={<Finance />} />
               <Route path="finance/collections" element={<Finance />} />

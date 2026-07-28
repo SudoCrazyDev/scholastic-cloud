@@ -839,6 +839,8 @@ export interface StudentAdditionalFee {
   id: string;
   institution_id: string;
   student_id: string;
+  // Set when the charge was picked from a saved student fee instead of typed by hand.
+  student_fee_id?: string | null;
   academic_year: string;
   name: string;
   description?: string | null;
@@ -855,10 +857,36 @@ export interface StudentAdditionalFee {
 
 export interface CreateStudentAdditionalFeeData {
   student_id: string;
+  student_fee_id?: string;
   academic_year: string;
   name: string;
   description?: string;
   amount: number;
+}
+
+export interface StudentFee {
+  id: string;
+  institution_id: string;
+  name: string;
+  amount: number;
+  description?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStudentFeeData {
+  name: string;
+  amount: number;
+  description?: string;
+  is_active?: boolean;
+}
+
+export interface UpdateStudentFeeData {
+  name?: string;
+  amount?: number;
+  description?: string;
+  is_active?: boolean;
 }
 
 // Receipt template types

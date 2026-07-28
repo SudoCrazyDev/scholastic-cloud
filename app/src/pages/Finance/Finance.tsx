@@ -19,6 +19,7 @@ import { toast } from 'react-hot-toast'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Select } from '../../components/select'
+import { Autocomplete } from '../../components/autocomplete'
 import { schoolFeeService } from '../../services/schoolFeeService'
 import { schoolFeeDefaultService } from '../../services/schoolFeeDefaultService'
 import { financeDashboardService } from '../../services/financeDashboardService'
@@ -29,6 +30,7 @@ import { studentDiscountService } from '../../services/studentDiscountService'
 import { gradeLevelDiscountService } from '../../services/gradeLevelDiscountService'
 import { defaultDiscountService } from '../../services/defaultDiscountService'
 import { studentAdditionalFeeService } from '../../services/studentAdditionalFeeService'
+import { studentFeeService } from '../../services/studentFeeService'
 import { paymentVoidService } from '../../services/paymentVoidService'
 import { useAuth } from '../../hooks/useAuth'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
@@ -37,10 +39,11 @@ import CollectionsView from './CollectionsView'
 import ReceiptApprovalsView from './ReceiptApprovalsView'
 import DiscountsView from './DiscountsView'
 import DefaultDiscountsView from './DefaultDiscountsView'
+import StudentFeesView from './StudentFeesView'
 import SiblingDiscountsView from './SiblingDiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
-import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
 
 const VOID_APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator']
 
@@ -48,6 +51,7 @@ type FinanceView =
   | 'dashboard'
   | 'school-fees'
   | 'default-amounts'
+  | 'student-fees'
   | 'cashiering'
   | 'ledger'
   | 'collections'
@@ -61,6 +65,7 @@ type FinanceView =
 const SETUP_VIEWS: FinanceView[] = [
   'school-fees',
   'default-amounts',
+  'student-fees',
   'discounts',
   'default-discounts',
   'sibling-discounts',
@@ -99,7 +104,8 @@ const PRIMARY_NAV: FinanceNavItem[] = [
 
 const SETUP_NAV: { label: string; to: string; view: FinanceView }[] = [
   { label: 'School Fees', to: '/finance/school-fees', view: 'school-fees' },
-  { label: 'Default Amounts', to: '/finance/default-amounts', view: 'default-amounts' },
+  { label: 'School Fees Amounts', to: '/finance/default-amounts', view: 'default-amounts' },
+  { label: 'Student Fees', to: '/finance/student-fees', view: 'student-fees' },
   { label: 'Grade Level Discounts', to: '/finance/discounts', view: 'discounts' },
   { label: 'Default Discounts', to: '/finance/default-discounts', view: 'default-discounts' },
   { label: 'Sibling Discounts', to: '/finance/sibling-discounts', view: 'sibling-discounts' },
@@ -115,6 +121,7 @@ const VIEW_SUBTITLES: Record<FinanceView, string> = {
   'void-requests': 'Request and approve voiding of posted payments.',
   'school-fees': 'Define the fee types your school charges.',
   'default-amounts': 'Set default fee amounts per grade level and academic year.',
+  'student-fees': 'Maintain reusable student fees that can be searched and added from the ledger.',
   discounts: 'Apply discounts in bulk to every student in a grade level.',
   'default-discounts': 'Maintain reusable discount templates for the cashier and ledger.',
   'sibling-discounts': "Link students as siblings and apply each sibling's own discount for the academic year.",
@@ -128,6 +135,7 @@ const Finance: React.FC = () => {
     const pathname = location.pathname
     if (pathname.endsWith('/school-fees')) return 'school-fees'
     if (pathname.endsWith('/default-amounts')) return 'default-amounts'
+    if (pathname.endsWith('/student-fees')) return 'student-fees'
     if (pathname.endsWith('/cashiering')) return 'cashiering'
     if (pathname.endsWith('/ledger')) return 'ledger'
     if (pathname.endsWith('/collections')) return 'collections'
@@ -226,6 +234,7 @@ const Finance: React.FC = () => {
   const [ledgerDiscountError, setLedgerDiscountError] = useState<string | null>(null)
   const [showLedgerAdditionalFee, setShowLedgerAdditionalFee] = useState(false)
   const [ledgerAdditionalFeeForm, setLedgerAdditionalFeeForm] = useState({
+    student_fee_id: '',
     name: '',
     description: '',
     amount: '',
@@ -322,7 +331,7 @@ const Finance: React.FC = () => {
     mutationFn: (payload: CreateStudentAdditionalFeeData) =>
       studentAdditionalFeeService.createFee(payload),
     onSuccess: () => {
-      setLedgerAdditionalFeeForm({ name: '', description: '', amount: '' })
+      setLedgerAdditionalFeeForm({ student_fee_id: '', name: '', description: '', amount: '' })
       setLedgerAdditionalFeeError(null)
       setShowLedgerAdditionalFee(false)
       queryClient.invalidateQueries({ queryKey: ['student-additional-fees', selectedLedgerStudent?.id] })
@@ -502,6 +511,7 @@ const Finance: React.FC = () => {
 
     createLedgerAdditionalFeeMutation.mutate({
       student_id: selectedLedgerStudent.id,
+      student_fee_id: ledgerAdditionalFeeForm.student_fee_id || undefined,
       academic_year: ledgerAcademicYear,
       name: ledgerAdditionalFeeForm.name,
       description: ledgerAdditionalFeeForm.description || undefined,
@@ -561,6 +571,50 @@ const Finance: React.FC = () => {
     setLedgerDiscountAllocations((prev) => [
       { school_fee_id: prev[0]?.school_fee_id ?? '', value: preset.value.toString() },
     ])
+  }
+
+  const ledgerStudentFeesQuery = useQuery({
+    queryKey: ['student-fees', 'active'],
+    queryFn: () => studentFeeService.getStudentFees({ is_active: true }),
+    enabled: view === 'ledger',
+  })
+  const studentFeeOptions: StudentFee[] = ledgerStudentFeesQuery.data?.data || []
+
+  const studentFeeAutocompleteOptions = useMemo(
+    () =>
+      studentFeeOptions.map((fee: StudentFee) => ({
+        id: fee.id,
+        label: fee.name,
+        description: `₱${Number(fee.amount).toLocaleString('en-PH', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}${fee.description ? ` — ${fee.description}` : ''}`,
+      })),
+    [studentFeeOptions]
+  )
+
+  const selectedStudentFeeOption = useMemo(
+    () =>
+      studentFeeAutocompleteOptions.find(
+        (option) => option.id === ledgerAdditionalFeeForm.student_fee_id
+      ) ?? null,
+    [studentFeeAutocompleteOptions, ledgerAdditionalFeeForm.student_fee_id]
+  )
+
+  // Picking a saved student fee fills the form; the cashier can still edit the fields.
+  const handleSelectStudentFee = (id: string) => {
+    if (!id) {
+      setLedgerAdditionalFeeForm((prev) => ({ ...prev, student_fee_id: '' }))
+      return
+    }
+    const preset = studentFeeOptions.find((fee: StudentFee) => fee.id === id)
+    if (!preset) return
+    setLedgerAdditionalFeeForm({
+      student_fee_id: preset.id,
+      name: preset.name,
+      description: preset.description || '',
+      amount: Number(preset.amount).toString(),
+    })
   }
 
   const dashboardQuery = useQuery({
@@ -1347,7 +1401,7 @@ const Finance: React.FC = () => {
       {view === 'default-amounts' && (
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Default Amounts</h2>
+            <h2 className="text-xl font-semibold text-gray-900">School Fees Amounts</h2>
             <p className="text-sm text-gray-500 mt-1">
               Set default fee amounts per grade level and academic year. These are used when assigning fees to students.
             </p>
@@ -2444,11 +2498,33 @@ const Finance: React.FC = () => {
                       className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4"
                       onSubmit={handleLedgerAdditionalFeeSubmit}
                     >
+                      {studentFeeAutocompleteOptions.length > 0 && (
+                        <div className="sm:col-span-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Search a saved student fee
+                          </label>
+                          <Autocomplete
+                            value={selectedStudentFeeOption}
+                            onChange={(option) => handleSelectStudentFee(option?.id ?? '')}
+                            options={studentFeeAutocompleteOptions}
+                            placeholder="Type to search student fees..."
+                            loading={ledgerStudentFeesQuery.isLoading}
+                          />
+                          <p className="mt-1 text-xs text-gray-500">
+                            Pick a saved student fee to fill in the name and amount automatically, or
+                            just type the fields below.
+                          </p>
+                        </div>
+                      )}
                       <Input
                         label="Fee Name"
                         value={ledgerAdditionalFeeForm.name}
                         onChange={(e) =>
-                          setLedgerAdditionalFeeForm((prev) => ({ ...prev, name: e.target.value }))
+                          setLedgerAdditionalFeeForm((prev) => ({
+                            ...prev,
+                            student_fee_id: '',
+                            name: e.target.value,
+                          }))
                         }
                         placeholder="e.g. Lab Fee, Field Trip"
                       />
@@ -3101,6 +3177,8 @@ const Finance: React.FC = () => {
           fees={fees}
         />
       )}
+
+      {view === 'student-fees' && <StudentFeesView />}
 
       {view === 'default-discounts' && <DefaultDiscountsView />}
 
