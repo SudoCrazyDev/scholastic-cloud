@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
-import { Select } from '../../../components/select'
+import { Autocomplete } from '../../../components/autocomplete'
 import { payrollService } from '../../../services/payrollService'
 import type { Payslip, PayslipDay, PayrollDeductionType, UpdatePayslipData } from '../../../types'
 import { dayLabel, errorMessage, numberOrZero, peso, time12 } from './helpers'
@@ -53,7 +53,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
   const [dayForm, setDayForm] = useState({ time_in: '', time_out: '', overtime: '' })
   const [form, setForm] = useState<RatesForm | null>(null)
   const [deductionRows, setDeductionRows] = useState<DeductionRow[]>([])
-  const [addSelection, setAddSelection] = useState('')
+  // Bumped after every pick so the autocomplete remounts and clears its typed query.
+  const [addPickerKey, setAddPickerKey] = useState(0)
 
   const payslipQuery = useQuery({
     queryKey: ['payslip', payslipId],
@@ -127,7 +128,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
     setForm((prev) => (prev ? { ...prev, [key]: e.target.value } : prev))
 
   const addDeduction = (value: string) => {
-    setAddSelection('')
+    setAddPickerKey((k) => k + 1)
     if (!value) return
     if (value === 'custom') {
       setDeductionRows((prev) => [
@@ -173,12 +174,19 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
     })
   }
 
+  const usedTypeIds = new Set(deductionRows.map((row) => row.deduction_type_id).filter(Boolean))
+  const usedNames = new Set(
+    deductionRows.map((row) => row.name.trim().toLowerCase()).filter((name) => name !== '')
+  )
   const addOptions = [
-    ...activeTypes.map((type) => ({
-      value: type.id,
-      label: type.default_amount > 0 ? `${type.name} (${peso(type.default_amount)})` : type.name,
-    })),
-    { value: 'custom', label: 'Custom deduction…' },
+    ...activeTypes
+      .filter((type) => !usedTypeIds.has(type.id) && !usedNames.has(type.name.trim().toLowerCase()))
+      .map((type) => ({
+        id: type.id,
+        label: type.name,
+        description: type.default_amount > 0 ? peso(type.default_amount) : undefined,
+      })),
+    { id: 'custom', label: 'Custom deduction…' },
   ]
 
   return (
@@ -519,13 +527,20 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                   })}
                 </div>
                 {!readOnly && (
-                  <div className="mt-2">
-                    <Select
-                      inputSize="sm"
+                  <div
+                    className="mt-2"
+                    // Enter picks an option; an unhandled Enter must not submit the payslip form.
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.defaultPrevented) e.preventDefault()
+                    }}
+                  >
+                    <Autocomplete
+                      key={addPickerKey}
+                      value={null}
+                      immediate
                       options={addOptions}
                       placeholder="+ Add deduction…"
-                      value={addSelection}
-                      onChange={(e) => addDeduction(e.target.value)}
+                      onChange={(option) => addDeduction(option?.id || '')}
                     />
                   </div>
                 )}

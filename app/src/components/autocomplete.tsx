@@ -22,6 +22,8 @@ interface AutocompleteProps {
   filter?: (option: AutocompleteOption, query: string) => boolean
   onQueryChange?: (query: string) => void
   debounceMs?: number
+  /** Open the option list as soon as the input is focused, without typing. */
+  immediate?: boolean
 }
 
 export function Autocomplete({
@@ -36,6 +38,7 @@ export function Autocomplete({
   filter,
   onQueryChange,
   debounceMs = 300,
+  immediate = false,
 }: AutocompleteProps) {
   const [query, setQuery] = useState('')
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -77,10 +80,11 @@ export function Autocomplete({
         )
 
   return (
-    <Headless.Combobox 
-      value={value} 
+    <Headless.Combobox
+      value={value}
       onChange={onChange}
       disabled={disabled}
+      immediate={immediate}
     >
       {({ open }) => (
         <div className="relative">
@@ -149,7 +153,7 @@ export function Autocomplete({
           </Headless.ComboboxButton>
           <Headless.ComboboxOptions 
             static={false}
-            className="absolute z-[100] mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+            className="absolute z-[100] mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm"
           >
             {filteredOptions.length === 0 && query !== '' ? (
               <div className="relative cursor-default select-none py-2 px-4 text-gray-700">
