@@ -2498,24 +2498,45 @@ const Finance: React.FC = () => {
                       className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4"
                       onSubmit={handleLedgerAdditionalFeeSubmit}
                     >
-                      {studentFeeAutocompleteOptions.length > 0 && (
-                        <div className="sm:col-span-3">
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            Search a saved student fee
-                          </label>
-                          <Autocomplete
-                            value={selectedStudentFeeOption}
-                            onChange={(option) => handleSelectStudentFee(option?.id ?? '')}
-                            options={studentFeeAutocompleteOptions}
-                            placeholder="Type to search student fees..."
-                            loading={ledgerStudentFeesQuery.isLoading}
-                          />
+                      {/* Always shown: hiding it when nothing loads leaves no clue why. */}
+                      <div className="sm:col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Search a saved student fee
+                        </label>
+                        <Autocomplete
+                          value={selectedStudentFeeOption}
+                          onChange={(option) => handleSelectStudentFee(option?.id ?? '')}
+                          options={studentFeeAutocompleteOptions}
+                          placeholder={
+                            ledgerStudentFeesQuery.isLoading
+                              ? 'Loading student fees...'
+                              : 'Type to search student fees...'
+                          }
+                          loading={ledgerStudentFeesQuery.isLoading}
+                        />
+                        {ledgerStudentFeesQuery.isError ? (
+                          <p className="mt-1 text-xs text-red-600">
+                            Could not load saved student fees. You can still type the fee below.
+                          </p>
+                        ) : !ledgerStudentFeesQuery.isLoading &&
+                          studentFeeAutocompleteOptions.length === 0 ? (
+                          <p className="mt-1 text-xs text-gray-500">
+                            No active student fees yet — add them under{' '}
+                            <NavLink
+                              to="/finance/student-fees"
+                              className="font-medium text-primary-600 hover:text-primary-700"
+                            >
+                              Setup → Student Fees
+                            </NavLink>
+                            , or just type the fee below.
+                          </p>
+                        ) : (
                           <p className="mt-1 text-xs text-gray-500">
                             Pick a saved student fee to fill in the name and amount automatically, or
                             just type the fields below.
                           </p>
-                        </div>
-                      )}
+                        )}
+                      </div>
                       <Input
                         label="Fee Name"
                         value={ledgerAdditionalFeeForm.name}
