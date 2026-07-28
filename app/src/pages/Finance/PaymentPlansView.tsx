@@ -64,6 +64,11 @@ const PaymentPlansView: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['payment-plans'] })
     // Pickers elsewhere read the active plan list.
     queryClient.invalidateQueries({ queryKey: ['active-payment-plans'] })
+    // A plan's installments drive every student schedule built from it, so cached
+    // ledgers and notices would otherwise keep showing the pre-edit breakdown.
+    queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+    queryClient.invalidateQueries({ queryKey: ['cashier-ledger'] })
+    queryClient.invalidateQueries({ queryKey: ['student-noa'] })
   }
 
   const createMutation = useMutation({

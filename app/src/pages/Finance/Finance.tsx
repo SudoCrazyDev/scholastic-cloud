@@ -2740,61 +2740,175 @@ const Finance: React.FC = () => {
                   )}
 
                   {(ledgerViewMode === 'monthly' || ledgerViewMode === 'quarterly') && (() => {
-                    const totals = ledgerQuery.data?.data?.totals
-                    const totalPayable = (totals?.balance_forward ?? 0) + (totals?.charges ?? 0) - (totals?.discounts ?? 0)
+                    const ledger = ledgerQuery.data?.data
+                    const totals = ledger?.totals
+                    const balanceForward = totals?.balance_forward ?? 0
+                    const totalPayable = balanceForward + (totals?.charges ?? 0) - (totals?.discounts ?? 0)
                     const startYear = Number(ledgerAcademicYear.split('-')[0]) || currentYear
+                    const allEntries = ledger?.entries ?? []
+                    // Voided payments stay listed for audit but never count as collected.
+                    const activePayments = allEntries.filter((e) => e.type === 'payment' && !e.voided)
+                    const planInstallments = ledger?.installments ?? []
+                    const plan = ledger?.payment_plan
 
-                    const schoolMonths = [
-                      { month: 6, year: startYear, label: 'June' },
-                      { month: 7, year: startYear, label: 'July' },
-                      { month: 8, year: startYear, label: 'August' },
-                      { month: 9, year: startYear, label: 'September' },
-                      { month: 10, year: startYear, label: 'October' },
-                      { month: 11, year: startYear, label: 'November' },
-                      { month: 12, year: startYear, label: 'December' },
-                      { month: 1, year: startYear + 1, label: 'January' },
-                      { month: 2, year: startYear + 1, label: 'February' },
-                      { month: 3, year: startYear + 1, label: 'March' },
-                    ]
-
-                    const payments = ledgerQuery.data?.data?.entries?.filter(
-                      (e) => e.type === 'payment'
-                    ) || []
-
-                    const paidByMonth: Record<string, number> = {}
-                    for (const p of payments) {
-                      if (!p.date) continue
-                      const d = new Date(p.date)
-                      const key = `${d.getMonth() + 1}-${d.getFullYear()}`
-                      paidByMonth[key] = (paidByMonth[key] ?? 0) + Math.abs(p.amount)
+                    // A late fee is charged against one installment, and the payment that
+                    // settles it points at the fee row — map fee back to installment so the
+                    // collection lands on the period that incurred it.
+                    const lateFeeSequenceByFee = new Map<string, number>()
+                    for (const e of allEntries) {
+                      if (e.type === 'charge' && e.source === 'late_fee' && e.fee_id && e.installment_sequence) {
+                        lateFeeSequenceByFee.set(e.fee_id, e.installment_sequence)
+                      }
+                    }
+                    const lateFeePaidBySequence: Record<number, number> = {}
+                    for (const p of activePayments) {
+                      if (p.source !== 'late_fee' || !p.fee_id) continue
+                      const sequence = lateFeeSequenceByFee.get(p.fee_id)
+                      if (!sequence) continue
+                      lateFeePaidBySequence[sequence] =
+                        (lateFeePaidBySequence[sequence] ?? 0) + Math.abs(p.amount)
                     }
 
-                    if (ledgerViewMode === 'monthly') {
-                      const monthlyDue = totalPayable > 0 ? totalPayable / 10 : 0
+                    type SchedulePeriod = {
+                      key: string
+                      label: string
+                      sublabel?: string
+                      monthLabel: string
+                      due: number
+                      paid: number
+                      // Months elapsed since the first scheduled due date; drives quarter grouping.
+                      monthOffset: number
+                    }
+
+                    let periods: SchedulePeriod[]
+
+                    if (planInstallments.length > 0) {
+                      // The student's assigned plan is authoritative: it carries the real
+                      // installment amounts (even split or share percentages), due dates and
+                      // the payments already allocated to each.
+                      const firstDue = new Date(`${planInstallments[0].due_date}T00:00:00`)
+                      const firstMonthIndex = firstDue.getFullYear() * 12 + firstDue.getMonth()
+
+                      periods = planInstallments.map((inst) => {
+                        const due = new Date(`${inst.due_date}T00:00:00`)
+                        return {
+                          key: `installment-${inst.sequence}`,
+                          label: inst.label,
+                          sublabel: `Due ${due.toLocaleDateString('en-PH', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}`,
+                          monthLabel: due.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' }),
+                          // The plan splits principal only, so an overdue fee is added back here —
+                          // it is collected together with the installment that incurred it.
+                          due: inst.amount + (inst.late_fee_amount ?? 0),
+                          paid: inst.paid_amount + (lateFeePaidBySequence[inst.sequence] ?? 0),
+                          monthOffset: due.getFullYear() * 12 + due.getMonth() - firstMonthIndex,
+                        }
+                      })
+                    } else {
+                      // No plan assigned — fall back to an even split across the school year and
+                      // bucket collections by the month they were received.
+                      const schoolMonths = [
+                        { month: 6, year: startYear, label: 'June' },
+                        { month: 7, year: startYear, label: 'July' },
+                        { month: 8, year: startYear, label: 'August' },
+                        { month: 9, year: startYear, label: 'September' },
+                        { month: 10, year: startYear, label: 'October' },
+                        { month: 11, year: startYear, label: 'November' },
+                        { month: 12, year: startYear, label: 'December' },
+                        { month: 1, year: startYear + 1, label: 'January' },
+                        { month: 2, year: startYear + 1, label: 'February' },
+                        { month: 3, year: startYear + 1, label: 'March' },
+                      ]
+
+                      const paidByMonth: Record<string, number> = {}
+                      for (const p of activePayments) {
+                        if (!p.date) continue
+                        const d = new Date(`${p.date}T00:00:00`)
+                        const key = `${d.getMonth() + 1}-${d.getFullYear()}`
+                        paidByMonth[key] = (paidByMonth[key] ?? 0) + Math.abs(p.amount)
+                      }
+
+                      const evenDue = totalPayable > 0 ? totalPayable / schoolMonths.length : 0
+                      periods = schoolMonths.map((sm, index) => ({
+                        key: `${sm.month}-${sm.year}`,
+                        label: `${sm.label} ${sm.year}`,
+                        monthLabel: `${sm.label.slice(0, 3)} ${sm.year}`,
+                        due: evenDue,
+                        paid: paidByMonth[`${sm.month}-${sm.year}`] ?? 0,
+                        monthOffset: index,
+                      }))
+                    }
+
+                    // Balance carried from previous years sits outside the plan split but is part
+                    // of Total Payable, so it leads the schedule rather than disappearing.
+                    const leadingRows =
+                      Math.abs(balanceForward) > 0.01
+                        ? [
+                            {
+                              key: 'balance-forward',
+                              label: 'Balance forward',
+                              sublabel: 'From previous academic years',
+                              due: balanceForward,
+                              paid: 0,
+                            },
+                          ]
+                        : []
+
+                    const buildRows = (base: Array<{ key: string; label: string; sublabel?: string; due: number; paid: number }>) => {
                       let cumulativeDue = 0
                       let cumulativePaid = 0
-
-                      const rows = schoolMonths.map((sm) => {
-                        const key = `${sm.month}-${sm.year}`
-                        const paid = paidByMonth[key] ?? 0
-                        cumulativeDue += monthlyDue
-                        cumulativePaid += paid
-                        const remaining = Math.max(cumulativeDue - cumulativePaid, 0)
-                        return { ...sm, due: monthlyDue, paid, cumulativeDue, cumulativePaid, remaining }
+                      return [...leadingRows, ...base].map((r) => {
+                        cumulativeDue += r.due
+                        cumulativePaid += r.paid
+                        return {
+                          ...r,
+                          cumulativeDue,
+                          cumulativePaid,
+                          remaining: Math.max(cumulativeDue - cumulativePaid, 0),
+                        }
                       })
+                    }
+
+                    // Anything collected beyond the schedule (overpayment, or money against a
+                    // balance forward the plan does not model) is called out instead of silently
+                    // making the columns disagree with the entries view.
+                    const unapplied = Math.max(
+                      (totals?.payments ?? 0) - periods.reduce((s, p) => s + p.paid, 0),
+                      0
+                    )
+
+                    if (ledgerViewMode === 'monthly') {
+                      const rows = buildRows(periods)
+                      const totalDue = rows.reduce((s, r) => s + r.due, 0)
+                      const totalPaid = rows.reduce((s, r) => s + r.paid, 0)
 
                       return (
                         <div className="space-y-4">
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
                             <span>Total Payable: <strong className="text-gray-900">{formatCurrency(totalPayable)}</strong></span>
-                            <span>Monthly Due: <strong className="text-gray-900">{formatCurrency(monthlyDue)}</strong></span>
+                            {planInstallments.length > 0 ? (
+                              <span>
+                                Plan: <strong className="text-gray-900">{plan?.name ?? 'Assigned plan'}</strong>{' '}
+                                ({planInstallments.length} installment{planInstallments.length === 1 ? '' : 's'})
+                              </span>
+                            ) : (
+                              <span className="text-amber-600">
+                                No payment plan assigned — showing an even 10-month split.
+                              </span>
+                            )}
+                            {unapplied > 0.01 && (
+                              <span>Unapplied payments: <strong className="text-gray-900">{formatCurrency(unapplied)}</strong></span>
+                            )}
                           </div>
                           <div className="overflow-x-auto rounded-lg border border-gray-200">
                             <table className="min-w-full divide-y divide-gray-200">
                               <thead className="bg-gray-50">
                                 <tr>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
-                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monthly Due</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
+                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount Due</th>
                                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
                                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Due</th>
                                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Paid</th>
@@ -2806,8 +2920,13 @@ const Finance: React.FC = () => {
                                 {rows.map((r) => {
                                   const isFullyPaid = r.cumulativePaid >= r.cumulativeDue - 0.01
                                   return (
-                                    <tr key={`${r.month}-${r.year}`} className="hover:bg-gray-50/50">
-                                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.label} {r.year}</td>
+                                    <tr key={r.key} className="hover:bg-gray-50/50">
+                                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                        {r.label}
+                                        {r.sublabel && (
+                                          <span className="block text-xs font-normal text-gray-500">{r.sublabel}</span>
+                                        )}
+                                      </td>
                                       <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.due)}</td>
                                       <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.paid)}</td>
                                       <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativeDue)}</td>
@@ -2831,13 +2950,13 @@ const Finance: React.FC = () => {
                               <tfoot className="bg-gray-50">
                                 <tr className="font-semibold">
                                   <td className="px-4 py-3 text-sm text-gray-900">Total</td>
-                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalPayable)}</td>
+                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalDue)}</td>
                                   <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                    {formatCurrency(rows.reduce((s, r) => s + r.paid, 0))}
+                                    {formatCurrency(totalPaid)}
                                   </td>
                                   <td colSpan={2} />
                                   <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                    {formatCurrency(Math.max(totalPayable - rows.reduce((s, r) => s + r.paid, 0), 0))}
+                                    {formatCurrency(Math.max(totalDue - totalPaid - unapplied, 0))}
                                   </td>
                                   <td />
                                 </tr>
@@ -2848,49 +2967,58 @@ const Finance: React.FC = () => {
                       )
                     }
 
-                    const quarters = [
-                      { label: 'Q1 (Jun–Aug)', monthIndices: [0, 1, 2] },
-                      { label: 'Q2 (Sep–Nov)', monthIndices: [3, 4, 5] },
-                      { label: 'Q3 (Dec–Feb)', monthIndices: [6, 7, 8] },
-                      { label: 'Q4 (Mar)', monthIndices: [9] },
-                    ]
+                    // Quarters are the schedule's own first, second, third and fourth
+                    // three-month windows, so grouping holds for any plan shape.
+                    const qRows = buildRows(
+                      [0, 1, 2, 3]
+                        .map((qi) => {
+                          const members = periods.filter(
+                            (p) => Math.min(Math.floor(p.monthOffset / 3), 3) === qi
+                          )
+                          const span = members.length
+                            ? members[0].monthLabel === members[members.length - 1].monthLabel
+                              ? members[0].monthLabel
+                              : `${members[0].monthLabel} – ${members[members.length - 1].monthLabel}`
+                            : ''
 
-                    const quarterlyDues = [
-                      totalPayable * 3 / 10,
-                      totalPayable * 3 / 10,
-                      totalPayable * 3 / 10,
-                      totalPayable * 1 / 10,
-                    ]
-
-                    let qCumulativeDue = 0
-                    let qCumulativePaid = 0
-
-                    const qRows = quarters.map((q, qi) => {
-                      let paid = 0
-                      for (const idx of q.monthIndices) {
-                        const sm = schoolMonths[idx]
-                        const key = `${sm.month}-${sm.year}`
-                        paid += paidByMonth[key] ?? 0
-                      }
-                      const due = quarterlyDues[qi]
-                      qCumulativeDue += due
-                      qCumulativePaid += paid
-                      const remaining = Math.max(qCumulativeDue - qCumulativePaid, 0)
-                      return { ...q, due, paid, cumulativeDue: qCumulativeDue, cumulativePaid: qCumulativePaid, remaining }
-                    })
+                          return {
+                            key: `quarter-${qi + 1}`,
+                            label: `Q${qi + 1}`,
+                            sublabel: span,
+                            due: members.reduce((s, m) => s + m.due, 0),
+                            paid: members.reduce((s, m) => s + m.paid, 0),
+                            memberCount: members.length,
+                          }
+                        })
+                        .filter((q) => q.memberCount > 0)
+                    )
+                    const qTotalDue = qRows.reduce((s, r) => s + r.due, 0)
+                    const qTotalPaid = qRows.reduce((s, r) => s + r.paid, 0)
 
                     return (
                       <div className="space-y-4">
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
                           <span>Total Payable: <strong className="text-gray-900">{formatCurrency(totalPayable)}</strong></span>
-                          <span>Quarterly breakdown is proportional to months in each quarter (3-3-3-1).</span>
+                          {planInstallments.length > 0 ? (
+                            <span>
+                              Plan: <strong className="text-gray-900">{plan?.name ?? 'Assigned plan'}</strong>{' '}
+                              — installments grouped into three-month windows.
+                            </span>
+                          ) : (
+                            <span className="text-amber-600">
+                              No payment plan assigned — showing an even 10-month split grouped by quarter.
+                            </span>
+                          )}
+                          {unapplied > 0.01 && (
+                            <span>Unapplied payments: <strong className="text-gray-900">{formatCurrency(unapplied)}</strong></span>
+                          )}
                         </div>
                         <div className="overflow-x-auto rounded-lg border border-gray-200">
                           <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                               <tr>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quarter</th>
-                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quarterly Due</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount Due</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Due</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Paid</th>
@@ -2899,11 +3027,16 @@ const Finance: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 bg-white">
-                              {qRows.map((r, idx) => {
+                              {qRows.map((r) => {
                                 const isFullyPaid = r.cumulativePaid >= r.cumulativeDue - 0.01
                                 return (
-                                  <tr key={idx} className="hover:bg-gray-50/50">
-                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.label}</td>
+                                  <tr key={r.key} className="hover:bg-gray-50/50">
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                      {r.label}
+                                      {r.sublabel && (
+                                        <span className="block text-xs font-normal text-gray-500">{r.sublabel}</span>
+                                      )}
+                                    </td>
                                     <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.due)}</td>
                                     <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.paid)}</td>
                                     <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativeDue)}</td>
@@ -2927,13 +3060,13 @@ const Finance: React.FC = () => {
                             <tfoot className="bg-gray-50">
                               <tr className="font-semibold">
                                 <td className="px-4 py-3 text-sm text-gray-900">Total</td>
-                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalPayable)}</td>
+                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(qTotalDue)}</td>
                                 <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                  {formatCurrency(qRows.reduce((s, r) => s + r.paid, 0))}
+                                  {formatCurrency(qTotalPaid)}
                                 </td>
                                 <td colSpan={2} />
                                 <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                  {formatCurrency(Math.max(totalPayable - qRows.reduce((s, r) => s + r.paid, 0), 0))}
+                                  {formatCurrency(Math.max(qTotalDue - qTotalPaid - unapplied, 0))}
                                 </td>
                                 <td />
                               </tr>
