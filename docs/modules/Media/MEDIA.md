@@ -34,6 +34,30 @@ See [Serving from R2 directly](#serving-from-r2-directly).
 most 7 days, so assessment images and lesson attachments quietly rotted. Nothing may hand out a
 presigned URL any more.
 
+### Nothing persists on the server
+
+Every upload endpoint writes to the `r2` disk and only that disk. There is no bare `Storage::put()`
+anywhere in `app/` — which matters, because `FILESYSTEM_DISK=local`, so one would silently land in
+`storage/app/private` — and no `->store()`, `->storeAs()`, `move_uploaded_file()` or
+`file_put_contents()` into the app tree.
+
+Two qualifications:
+
+- **Uploads transit the server's temp dir.** Each endpoint does
+  `file_get_contents($file->getRealPath())` and pushes the bytes to R2; PHP writes the multipart body
+  to `upload_tmp_dir` first and removes it at end of request. Nothing persists, but a 200 MB video
+  submission needs 200 MB of temp space while it is in flight.
+- **Two pre-R2 stores still hold data**, and are still referenced by delete/read-only branches. The
+  local `public` disk held institution logos (`storage/app/public/institutions/logos/…`; three
+  `Storage::disk('public')->delete()` calls in `InstitutionController` clean them up on replace), and
+  an AWS S3 bucket (`aws-scholastic-cloud`, `ap-southeast-1`) held student profile pictures (six
+  `exists`/`delete` branches in `StudentController`). Nothing new is written to either.
+
+The S3 fallback in `Student::getProfilePictureAttribute()` is **dead code**: `MediaUrl::for()` returns
+null only for an empty path, so any non-empty value gets an `/api/media` URL first and the fallback
+never runs. A row still holding a legacy S3 key therefore yields a broken image rather than the S3
+URL the code intends.
+
 ### The one distinction that matters
 
 Two kinds of consumer store the result differently, and it decides everything about how a breakage
