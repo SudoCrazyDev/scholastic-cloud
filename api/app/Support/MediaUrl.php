@@ -115,33 +115,50 @@ class MediaUrl
     }
 
     /**
-     * True when `$url` is one of our own `media.show` links but was minted for a
-     * different origin than the one we hand out today — i.e. content carried
-     * over from a previous domain, or from a run with a stale `APP_URL`. Such a
-     * URL still resolves to a valid object key, it just points somewhere the
-     * browser can no longer reach.
+     * True when `$url` is a link this app handed out for an R2 object, on any
+     * origin it has ever been served under: the signed `media.show` route, a
+     * public bucket URL, or a legacy presigned S3/R2 link.
+     *
+     * Deliberately narrow. `media:repair-urls` walks *every* string in a content
+     * tree, so this is what stands between it and rewriting a choice that merely
+     * reads like a URL. `pathFrom()` is too permissive to gate on — it will hand
+     * back a key for any value carrying a `path` query parameter, and for a bare
+     * string like a one-letter answer choice.
      */
-    public static function isStaleMediaUrl(?string $url): bool
+    public static function isOurs(?string $url): bool
     {
         $url = trim((string) $url);
         if ($url === '' || ! preg_match('#^https?://#i', $url)) {
             return false;
         }
 
+        $publicBase = config('filesystems.disks.r2.url');
+        if ($publicBase && str_starts_with($url, rtrim($publicBase, '/').'/')) {
+            return true;
+        }
+
         $parts = parse_url($url);
-        if ($parts === false || empty($parts['query'])) {
+        if ($parts === false) {
             return false;
         }
 
-        parse_str($parts['query'], $query);
-        if (empty($query['path']) || empty($query['signature'])) {
+        // Presigned link straight to object storage.
+        $host = $parts['host'] ?? '';
+        if ((str_contains($host, 'r2.cloudflarestorage.com') || str_contains($host, 'amazonaws.com'))
+            && (str_contains($url, 'X-Amz-Signature') || str_contains($url, 'X-Amz-Expires'))) {
+            return true;
+        }
+
+        // Our own media route. Matched on the tail so a deployment in a
+        // subdirectory, which prefixes a base path, still counts.
+        $routePath = (string) parse_url((string) URL::route('media.show', ['path' => 'x'], false), PHP_URL_PATH);
+        if ($routePath === '' || ! str_ends_with('/'.ltrim($parts['path'] ?? '', '/'), $routePath)) {
             return false;
         }
 
-        $origin = ($parts['scheme'] ?? '').'://'.($parts['host'] ?? '')
-            .(isset($parts['port']) ? ':'.$parts['port'] : '');
+        parse_str($parts['query'] ?? '', $query);
 
-        return $origin !== self::origin();
+        return ! empty($query['path']);
     }
 
     /**

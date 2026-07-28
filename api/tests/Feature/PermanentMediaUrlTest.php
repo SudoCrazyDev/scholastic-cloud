@@ -144,7 +144,7 @@ class PermanentMediaUrlTest extends TestCase
         MediaUrl::forceOrigin(null);
 
         $this->assertStringStartsWith('https://old.example.test/', $minted);
-        $this->assertTrue(MediaUrl::isStaleMediaUrl($minted));
+        $this->assertTrue(MediaUrl::isOurs($minted));
 
         // Same signature, served on the origin the API answers on today.
         $this->get(str_replace('https://old.example.test', '', $minted))->assertOk();
@@ -204,15 +204,29 @@ class PermanentMediaUrlTest extends TestCase
     }
 
     /**
-     * A URL already pointing at the current origin is not stale — the repair
-     * command must leave it alone rather than rewrite every row on every run.
+     * `media:repair-urls` walks every string in a content tree and gates on
+     * `isOurs()`, so this is what keeps it from rewriting question text, answer
+     * choices and embedded third-party links into media URLs.
      */
-    public function test_current_links_are_not_treated_as_stale(): void
+    public function test_only_links_we_handed_out_are_claimed(): void
     {
         config(['filesystems.disks.r2.url' => null]);
 
-        $this->assertFalse(MediaUrl::isStaleMediaUrl(MediaUrl::for(self::PATH)));
-        $this->assertFalse(MediaUrl::isStaleMediaUrl('https://www.youtube.com/watch?v=abc123'));
-        $this->assertFalse(MediaUrl::isStaleMediaUrl(self::PATH));
+        $this->assertTrue(MediaUrl::isOurs(MediaUrl::for(self::PATH)));
+        $this->assertTrue(MediaUrl::isOurs(
+            'https://bucket.acct.r2.cloudflarestorage.com/'.self::PATH.'?X-Amz-Expires=604800&X-Amz-Signature=abc'
+        ));
+
+        // Not ours: third-party embeds, bare answer choices, and anything that
+        // merely happens to carry a `path` query parameter.
+        $this->assertFalse(MediaUrl::isOurs('https://www.youtube.com/watch?v=abc123'));
+        $this->assertFalse(MediaUrl::isOurs('https://example.test/download?path=secret.png'));
+        $this->assertFalse(MediaUrl::isOurs(self::PATH));
+        $this->assertFalse(MediaUrl::isOurs('A'));
+        $this->assertFalse(MediaUrl::isOurs('The sum of two negative integers'));
+        $this->assertFalse(MediaUrl::isOurs(null));
+
+        config(['filesystems.disks.r2.url' => 'https://cdn.example.test']);
+        $this->assertTrue(MediaUrl::isOurs('https://cdn.example.test/'.self::PATH));
     }
 }

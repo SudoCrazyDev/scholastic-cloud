@@ -41,6 +41,9 @@ class RepairExpiringMediaUrls extends Command
     public function handle(): int
     {
         $this->dryRun = (bool) $this->option('dry-run');
+        // Console commands are resolved once and reused, so a second invocation
+        // in the same process would otherwise report the first run's total.
+        $this->rewritten = 0;
 
         MediaUrl::forceOrigin($this->option('origin'));
 
@@ -173,11 +176,7 @@ class RepairExpiringMediaUrls extends Command
     {
         $decoded = html_entity_decode($url);
 
-        // Presigned links always carry the signature query parameters; our own
-        // links go stale instead by naming an origin we no longer serve.
-        $expiring = str_contains($decoded, 'X-Amz-Signature') || str_contains($decoded, 'X-Amz-Expires');
-
-        if (! $expiring && ! MediaUrl::isStaleMediaUrl($decoded)) {
+        if (! MediaUrl::isOurs($decoded)) {
             return null;
         }
 
@@ -186,8 +185,16 @@ class RepairExpiringMediaUrls extends Command
             return null;
         }
 
+        // Compare against the canonical form instead of testing for particular
+        // kinds of staleness. A link goes bad for more reasons than are
+        // practical to enumerate — it expired, it names an origin we no longer
+        // serve, it was signed with a rotated APP_KEY, it predates relative
+        // signatures, the bucket has since been made public — and every one of
+        // them shows up as "differs from what we would hand out now". Comparing
+        // the decoded value keeps it idempotent for URLs stored inside HTML,
+        // which come back here escaped.
         $permanent = MediaUrl::for($path);
-        if ($permanent === null || $permanent === $url) {
+        if ($permanent === null || $permanent === $decoded) {
             return null;
         }
 
