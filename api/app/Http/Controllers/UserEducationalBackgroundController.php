@@ -15,7 +15,7 @@ class UserEducationalBackgroundController extends Controller
             return response()->json(['message' => 'Educational background already exists.'], 409);
         }
         $data = $request->validate([
-            'educ_details' => 'required|array',
+            'educ_details' => 'present|array',
         ]);
         $data['user_id'] = $user->id;
         $record = UserEducationalBackground::create($data);
@@ -40,7 +40,7 @@ class UserEducationalBackgroundController extends Controller
             return response()->json(['message' => 'Not found.'], 404);
         }
         $data = $request->validate([
-            'educ_details' => 'required|array',
+            'educ_details' => 'present|array',
         ]);
         $record->update($data);
         return response()->json(['success' => true, 'data' => $record]);

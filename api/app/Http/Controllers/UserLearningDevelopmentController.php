@@ -19,7 +19,7 @@ class UserLearningDevelopmentController extends Controller
     {
         $user = Auth::user();
         $data = $request->validate([
-            'development_details' => 'required|array',
+            'development_details' => 'present|array',
         ]);
         $data['user_id'] = $user->id;
         // Enforce one record per user
@@ -42,7 +42,7 @@ class UserLearningDevelopmentController extends Controller
         $user = Auth::user();
         $record = UserLearningDevelopment::where('user_id', $user->id)->firstOrFail();
         $data = $request->validate([
-            'development_details' => 'required|array',
+            'development_details' => 'present|array',
         ]);
         $record->update($data);
         return response()->json($record);

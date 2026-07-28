@@ -10,26 +10,30 @@ class UserCivilServiceEligibilityController extends Controller
 {
     public function index(Request $request)
     {
-        $query = UserCivilServiceEligibility::query();
-        if ($request->has('user_id')) {
-            $query->where('user_id', $request->user_id);
-        }
-        return response()->json($query->get());
+        $user = Auth::user();
+        $eligibilities = UserCivilServiceEligibility::where('user_id', $user->id)->get();
+        return response()->json($eligibilities);
     }
 
     public function store(Request $request)
     {
+        $user = Auth::user();
         $validated = $request->validate([
-            'user_id' => 'required|uuid|exists:users,id|unique:user_civil_service_eligibility,user_id',
-            'details' => 'required|array',
+            'details' => 'present|array',
         ]);
-        $eligibility = UserCivilServiceEligibility::create($validated);
+        if (UserCivilServiceEligibility::where('user_id', $user->id)->exists()) {
+            return response()->json(['message' => 'Civil service eligibility already exists.'], 409);
+        }
+        $eligibility = UserCivilServiceEligibility::create([
+            'user_id' => $user->id,
+            'details' => $validated['details'],
+        ]);
         return response()->json($eligibility, 201);
     }
 
     public function show($id)
     {
-        $eligibility = UserCivilServiceEligibility::find($id);
+        $eligibility = $this->findForUser($id);
         if (!$eligibility) {
             return response()->json(['message' => 'Not found'], 404);
         }
@@ -38,7 +42,7 @@ class UserCivilServiceEligibilityController extends Controller
 
     public function update(Request $request, $id)
     {
-        $eligibility = UserCivilServiceEligibility::find($id);
+        $eligibility = $this->findForUser($id);
         if (!$eligibility) {
             return response()->json(['message' => 'Not found'], 404);
         }
@@ -51,11 +55,19 @@ class UserCivilServiceEligibilityController extends Controller
 
     public function destroy($id)
     {
-        $eligibility = UserCivilServiceEligibility::find($id);
+        $eligibility = $this->findForUser($id);
         if (!$eligibility) {
             return response()->json(['message' => 'Not found'], 404);
         }
         $eligibility->delete();
         return response()->json(['message' => 'Deleted successfully']);
     }
-} 
+
+    private function findForUser($id): ?UserCivilServiceEligibility
+    {
+        $user = Auth::user();
+        return UserCivilServiceEligibility::where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+    }
+}
