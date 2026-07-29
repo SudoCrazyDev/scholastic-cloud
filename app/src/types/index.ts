@@ -470,12 +470,19 @@ export interface PaymentReceiptSubmission {
 // Legacy enum kept for back-compat; plans are now identified by payment_plan_id + name.
 export type StudentPaymentPlanType = 'monthly' | 'quarterly';
 
+// How money collected before the schedule's first month is treated.
+//   'equal_split'        — it settles installments earliest-first (the default).
+//   'net_of_downpayment' — it is a downpayment deducted from the amount being divided,
+//                          so every installment is smaller.
+export type AdvancePaymentMode = 'equal_split' | 'net_of_downpayment';
+
 export interface StudentPaymentPlan {
   id: string;
   academic_year: string;
   payment_plan_id?: string | null;
   name?: string | null;
   plan_type?: StudentPaymentPlanType | null;
+  advance_payment_mode?: AdvancePaymentMode;
   installment_count: number;
   selected_at?: string | null;
   selected_by_student: boolean;
@@ -498,6 +505,7 @@ export interface PaymentPlan {
   institution_id?: string;
   name: string;
   description?: string | null;
+  advance_payment_mode?: AdvancePaymentMode;
   is_active: boolean;
   sort_order: number;
   installment_count: number;
@@ -509,6 +517,7 @@ export interface PaymentPlan {
 export interface CreatePaymentPlanData {
   name: string;
   description?: string | null;
+  advance_payment_mode?: AdvancePaymentMode;
   is_active?: boolean;
   sort_order?: number;
   installments: Array<Omit<PaymentPlanInstallmentTemplate, 'id' | 'sequence'> & { sequence?: number }>;
@@ -697,6 +706,14 @@ export interface StudentInstallment {
   status: 'paid' | 'partial' | 'pending';
 }
 
+// Money collected before the schedule's first month on a 'net_of_downpayment' plan. Zero
+// (with a null boundary) on every other plan.
+export interface ScheduleDownpayment {
+  amount: number;
+  // First day of the first installment's month — payments before it are the downpayment.
+  boundary?: string | null;
+}
+
 export interface LedgerFeeBreakdown {
   fee_id: string;
   fee_name: string;
@@ -727,6 +744,7 @@ export interface StudentLedgerResponse {
   fee_breakdown?: LedgerFeeBreakdown[];
   unallocated_payments?: number;
   payment_plan?: StudentPaymentPlan | null;
+  downpayment?: ScheduleDownpayment;
   installments?: StudentInstallment[];
   available_academic_years?: string[];
 }
@@ -770,6 +788,7 @@ export interface StudentNOAResponse {
     balance: number;
   };
   payment_plan?: StudentPaymentPlan | null;
+  downpayment?: ScheduleDownpayment;
   installments?: StudentInstallment[];
   available_academic_years?: string[];
 }

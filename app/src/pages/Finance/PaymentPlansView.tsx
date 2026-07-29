@@ -9,9 +9,27 @@ import { Select } from '../../components/select'
 import { MonthDayPicker } from '../../components/month-day-picker'
 import { MONTH_NAMES } from '../../utils/monthNames'
 import { paymentPlanService } from '../../services/paymentPlanService'
-import type { CreatePaymentPlanData, PaymentPlan } from '../../types'
+import type { AdvancePaymentMode, CreatePaymentPlanData, PaymentPlan } from '../../types'
 
 const monthName = (month: number) => MONTH_NAMES[month - 1] ?? String(month)
+
+const ADVANCE_MODE_OPTIONS: Array<{ value: AdvancePaymentMode; label: string; hint: string }> = [
+  {
+    value: 'equal_split',
+    label: 'Pays off the earliest installments',
+    hint:
+      'Each installment is the same fixed amount. Money paid before the schedule starts settles ' +
+      'installment 1, then 2, and so on — a student who pays early is simply months ahead.',
+  },
+  {
+    value: 'net_of_downpayment',
+    label: 'Counts as a downpayment (lowers every installment)',
+    hint:
+      'Anything collected before the first installment’s month is deducted from the amount ' +
+      'being divided, so the monthly figure itself drops. Paying ₱8,100 up front on ₱30,600 ' +
+      'over 9 installments gives ₱2,500 a month instead of ₱3,400.',
+  },
+]
 
 const errorMessage = (err: unknown, fallback: string): string => {
   const response = (err as { response?: { data?: { message?: string } } })?.response
@@ -37,6 +55,7 @@ const emptyInstallment = (): InstallmentRow => ({
 const emptyForm = () => ({
   name: '',
   description: '',
+  advance_payment_mode: 'equal_split' as AdvancePaymentMode,
   is_active: true,
   installments: [emptyInstallment()],
 })
@@ -116,6 +135,9 @@ const PaymentPlansView: React.FC = () => {
       paymentPlanService.updatePlan(plan.id, {
         name: plan.name,
         description: plan.description,
+        // Carried through, otherwise a disable/enable would silently reset the plan
+        // to the default split and change every student's installment amounts.
+        advance_payment_mode: plan.advance_payment_mode ?? 'equal_split',
         is_active: !plan.is_active,
         sort_order: plan.sort_order,
         installments: plan.installments.map((inst) => ({
@@ -144,6 +166,7 @@ const PaymentPlansView: React.FC = () => {
     setForm({
       name: plan.name,
       description: plan.description || '',
+      advance_payment_mode: plan.advance_payment_mode ?? 'equal_split',
       is_active: plan.is_active,
       installments: plan.installments.length
         ? plan.installments.map((inst) => ({
@@ -226,6 +249,7 @@ const PaymentPlansView: React.FC = () => {
     const payload: CreatePaymentPlanData = {
       name: form.name.trim(),
       description: form.description.trim() || null,
+      advance_payment_mode: form.advance_payment_mode,
       is_active: form.is_active,
       installments: form.installments.map((inst) => ({
         label: inst.label.trim() || null,
@@ -297,11 +321,50 @@ const PaymentPlansView: React.FC = () => {
           />
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payments made before the schedule starts
+            </label>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {ADVANCE_MODE_OPTIONS.map((option) => {
+                const selected = form.advance_payment_mode === option.value
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      selected
+                        ? 'border-primary-400 bg-primary-50/50 ring-1 ring-primary-200'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                    } ${isSaving ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="advance_payment_mode"
+                      className="mt-0.5 h-4 w-4 shrink-0 text-primary-600 focus:ring-primary-500"
+                      value={option.value}
+                      checked={selected}
+                      onChange={() =>
+                        setForm((prev) => ({ ...prev, advance_payment_mode: option.value }))
+                      }
+                      disabled={isSaving}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-gray-900">{option.label}</span>
+                      <span className="block text-xs text-gray-500 mt-1">{option.hint}</span>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+
+          <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700">
                 Installments
                 <span className="ml-2 text-xs font-normal text-gray-500">
-                  Net charges are split evenly across these installments.
+                  {form.advance_payment_mode === 'net_of_downpayment'
+                    ? 'Net charges less any downpayment are split evenly across these installments.'
+                    : 'Net charges are split evenly across these installments.'}
                 </span>
               </label>
               <Button type="button" variant="outline" size="sm" onClick={addInstallment} disabled={isSaving}>
@@ -435,6 +498,14 @@ const PaymentPlansView: React.FC = () => {
                       <span className="inline-flex rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">
                         {plan.installment_count} installment{plan.installment_count === 1 ? '' : 's'}
                       </span>
+                      {plan.advance_payment_mode === 'net_of_downpayment' && (
+                        <span
+                          className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800"
+                          title="Payments received before the first installment's month are deducted from the amount being divided."
+                        >
+                          Net of downpayment
+                        </span>
+                      )}
                     </div>
                     {plan.description && (
                       <p className="text-sm text-gray-500 mt-1">{plan.description}</p>

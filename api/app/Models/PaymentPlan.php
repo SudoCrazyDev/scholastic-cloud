@@ -10,10 +10,22 @@ class PaymentPlan extends Model
 {
     use HasFactory, HasUuids;
 
+    /** Payments received before the schedule starts settle installments earliest-first. */
+    public const ADVANCE_EQUAL_SPLIT = 'equal_split';
+
+    /** Payments received before the schedule starts are a downpayment: they shrink every installment. */
+    public const ADVANCE_NET_OF_DOWNPAYMENT = 'net_of_downpayment';
+
+    public const ADVANCE_PAYMENT_MODES = [
+        self::ADVANCE_EQUAL_SPLIT,
+        self::ADVANCE_NET_OF_DOWNPAYMENT,
+    ];
+
     protected $fillable = [
         'institution_id',
         'name',
         'description',
+        'advance_payment_mode',
         'is_active',
         'sort_order',
         'created_by',
@@ -23,6 +35,11 @@ class PaymentPlan extends Model
         'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
+
+    public function deductsDownpayment(): bool
+    {
+        return $this->advance_payment_mode === self::ADVANCE_NET_OF_DOWNPAYMENT;
+    }
 
     public function institution()
     {

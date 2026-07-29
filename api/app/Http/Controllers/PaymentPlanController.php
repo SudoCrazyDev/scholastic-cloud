@@ -68,6 +68,8 @@ class PaymentPlanController extends Controller
                 'institution_id' => $institutionId,
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
+                'advance_payment_mode' => $validated['advance_payment_mode']
+                    ?? PaymentPlan::ADVANCE_EQUAL_SPLIT,
                 'is_active' => $validated['is_active'] ?? true,
                 'sort_order' => $validated['sort_order'] ?? 0,
                 'created_by' => $request->user()?->id,
@@ -135,6 +137,8 @@ class PaymentPlanController extends Controller
             $plan->update([
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
+                'advance_payment_mode' => $validated['advance_payment_mode']
+                    ?? $plan->advance_payment_mode,
                 'is_active' => $validated['is_active'] ?? $plan->is_active,
                 'sort_order' => $validated['sort_order'] ?? $plan->sort_order,
             ]);
@@ -196,6 +200,7 @@ class PaymentPlanController extends Controller
                     ->ignore($ignoreId),
             ],
             'description' => 'nullable|string',
+            'advance_payment_mode' => ['nullable', Rule::in(PaymentPlan::ADVANCE_PAYMENT_MODES)],
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
             'installments' => 'required|array|min:1',
@@ -244,6 +249,7 @@ class PaymentPlanController extends Controller
             'institution_id' => $plan->institution_id,
             'name' => $plan->name,
             'description' => $plan->description,
+            'advance_payment_mode' => $plan->advance_payment_mode ?? PaymentPlan::ADVANCE_EQUAL_SPLIT,
             'is_active' => (bool) $plan->is_active,
             'sort_order' => (int) $plan->sort_order,
             'installment_count' => $plan->installments->count(),

@@ -384,6 +384,10 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const paymentPlan = ledgerData?.payment_plan ?? null
   const installmentsData = ledgerData?.installments
   const installments = useMemo(() => installmentsData ?? [], [installmentsData])
+  // Paid ahead of the schedule on a net-of-downpayment plan: it is why the installments
+  // below are smaller than charges ÷ count, so it has to be stated on the card.
+  const downpayment = ledgerData?.downpayment?.amount ?? 0
+  const downpaymentBoundary = ledgerData?.downpayment?.boundary ?? null
   const needsPlanSelection = isStudentUser && !paymentPlan && !ledgerQuery.isLoading
 
   const receiptSubmissions = useMemo(
@@ -888,6 +892,21 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
             Net charges (after discounts) divided across {paymentPlan.installment_count}{' '}
             installments for academic year {resolvedAcademicYear}.
           </p>
+
+          {downpayment > 0.01 && (
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              <span className="font-semibold">{formatAmount(downpayment)}</span> paid
+              {downpaymentBoundary
+                ? ` before ${new Date(`${downpaymentBoundary}T00:00:00`).toLocaleDateString('en-PH', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}`
+                : ' ahead of schedule'}{' '}
+              was credited as a downpayment, so it is already deducted from every installment
+              below.
+            </div>
+          )}
 
           {/* Mobile: stacked cards */}
           <ul className="space-y-3 sm:hidden">

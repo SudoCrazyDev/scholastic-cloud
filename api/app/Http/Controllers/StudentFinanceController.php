@@ -153,6 +153,9 @@ class StudentFinanceController extends Controller
         // Money collected against late fees settles those charges, not the installments.
         $lateFeePaymentsTotal = (float) $this->paymentsForFees($activePayments, $chargedLateFees)->sum('amount');
         $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal, 2));
+        // The same money as $principalPayments but row by row: a downpayment is decided by
+        // payment date, which a single total cannot answer.
+        $principalPaymentRows = $this->paymentsExcludingFees($activePayments, $chargedLateFees);
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
             $academicYear,
@@ -173,7 +176,19 @@ class StudentFinanceController extends Controller
             $academicYear,
             $principalCharges,
             (float) $discountsTotal,
-            $principalPayments
+            $principalPayments,
+            $principalPaymentRows
+        );
+
+        // Reported alongside the schedule so the monthly view can show the downpayment as
+        // its own settled row — without it the schedule totals less than Total Payable and
+        // the collected money looks unapplied.
+        $downpayment = $this->planService->resolveDownpayment(
+            $paymentPlan,
+            $academicYear,
+            $principalCharges,
+            (float) $discountsTotal,
+            $principalPaymentRows
         );
 
         // Book a real charge for any installment that has newly gone overdue, then work
@@ -464,6 +479,7 @@ class StudentFinanceController extends Controller
                 'fee_breakdown' => $feeBreakdown,
                 'unallocated_payments' => round($unallocatedPayments, 2),
                 'payment_plan' => $this->planService->serializePlan($paymentPlan),
+                'downpayment' => $downpayment,
                 'installments' => $installments,
                 'available_academic_years' => $availableAcademicYears,
             ]
@@ -583,6 +599,7 @@ class StudentFinanceController extends Controller
         $paymentsTotal = (float) $payments->sum('amount');
         $lateFeePaymentsTotal = (float) $this->paymentsForFees($payments, $chargedLateFees)->sum('amount');
         $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal, 2));
+        $principalPaymentRows = $this->paymentsExcludingFees($payments, $chargedLateFees);
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
             $academicYear,
@@ -601,7 +618,16 @@ class StudentFinanceController extends Controller
             $academicYear,
             $principalCharges,
             (float) $discountsTotal,
-            $principalPayments
+            $principalPayments,
+            $principalPaymentRows
+        );
+
+        $downpayment = $this->planService->resolveDownpayment(
+            $paymentPlan,
+            $academicYear,
+            $principalCharges,
+            (float) $discountsTotal,
+            $principalPaymentRows
         );
 
         // The notice of account books newly-overdue late fees just like the ledger, so a
@@ -697,6 +723,7 @@ class StudentFinanceController extends Controller
                     'balance' => round($balance, 2),
                 ],
                 'payment_plan' => $this->planService->serializePlan($paymentPlan),
+                'downpayment' => $downpayment,
                 'installments' => $installments,
                 'available_academic_years' => $availableAcademicYears,
             ]
@@ -719,6 +746,22 @@ class StudentFinanceController extends Controller
             fn ($payment) => $payment->student_additional_fee_id
                 && in_array($payment->student_additional_fee_id, $ids, true)
         );
+    }
+
+    /**
+     * The complement of paymentsForFees(): everything settling plan principal rather than
+     * one of the given fee rows.
+     *
+     * @param  iterable  $fees  StudentAdditionalFee models
+     */
+    private function paymentsExcludingFees($payments, $fees): Collection
+    {
+        $ids = collect($fees)->pluck('id')->filter()->all();
+
+        return collect($payments)->reject(
+            fn ($payment) => $payment->student_additional_fee_id
+                && in_array($payment->student_additional_fee_id, $ids, true)
+        )->values();
     }
 
     private function resolveInstitutionId(Request $request): ?string

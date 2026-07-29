@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PaymentPlan;
 use App\Models\StudentPaymentPlan;
 use Carbon\Carbon;
 
@@ -15,13 +16,22 @@ class PaymentPlanService
      * evenly across installments unless every template specifies a share
      * percentage, in which case they are allocated proportionally. The final
      * installment absorbs rounding so totals reconcile exactly.
+     *
+     * On a `net_of_downpayment` plan, money collected before the schedule's first
+     * month is a downpayment: it comes off the amount being divided, so every
+     * installment is smaller rather than the earliest ones being settled outright.
+     *
+     * @param  iterable|null  $principalPayments  Non-voided payments that settle plan
+     *         principal (late-fee collections excluded) — needed to date the
+     *         downpayment. Omit to skip downpayment detection entirely.
      */
     public function buildInstallments(
         ?StudentPaymentPlan $plan,
         string $academicYear,
         float $grossCharges,
         float $discountsTotal = 0.0,
-        float $paymentsTotal = 0.0
+        float $paymentsTotal = 0.0,
+        $principalPayments = null
     ): array {
         $definition = $plan?->paymentPlan;
         if (! $definition) {
@@ -42,10 +52,25 @@ class PaymentPlanService
         $netCharges = max(0.0, $grossCharges - $discountsTotal);
         $usePercentage = $templates->every(fn ($t) => $t->share_percentage !== null);
 
+        // A downpayment is already-settled money, so it leaves the schedule twice over:
+        // it shrinks the base being divided, and it is withheld from the pool that fills
+        // installments — otherwise it would both lower the amounts and pay them off.
+        $downpayment = $this->resolveDownpayment(
+            $plan,
+            $academicYear,
+            $grossCharges,
+            $discountsTotal,
+            $principalPayments
+        )['amount'];
+        // Deducted from gross as well as net so `original_amount - discount_amount`
+        // still equals `amount` and no phantom discount appears.
+        $netCharges = max(0.0, round($netCharges - $downpayment, 2));
+        $grossCharges = max(0.0, round($grossCharges - $downpayment, 2));
+
         $installments = [];
         $netAssigned = 0.0;
         $grossAssigned = 0.0;
-        $remainingPaid = max(0.0, $paymentsTotal);
+        $remainingPaid = max(0.0, round(max(0.0, $paymentsTotal) - $downpayment, 2));
 
         foreach ($templates->values() as $i => $template) {
             // Last installment absorbs rounding for BOTH gross and net so
@@ -115,6 +140,85 @@ class PaymentPlanService
     }
 
     /**
+     * How much of what has been collected counts as a downpayment against the schedule,
+     * and the date that decides it.
+     *
+     * The boundary is the first day of the schedule's earliest month — the moment it
+     * starts collecting. Anything received before it was paid ahead of the plan and comes
+     * off the amortized amount; anything on or after it lands inside a period and settles
+     * installments the ordinary way. Anchoring on the month (not the due date) means the
+     * monthly figure stops moving the day the schedule opens.
+     *
+     * Returns ['amount' => float, 'boundary' => ?string] — a zero amount and a null
+     * boundary for plans that do not opt in, so callers can treat both modes uniformly.
+     *
+     * @param  iterable|null  $principalPayments  Non-voided payments settling plan principal
+     */
+    public function resolveDownpayment(
+        ?StudentPaymentPlan $plan,
+        string $academicYear,
+        float $grossCharges,
+        float $discountsTotal = 0.0,
+        $principalPayments = null
+    ): array {
+        $none = ['amount' => 0.0, 'boundary' => null];
+
+        $definition = $plan?->paymentPlan;
+        if (! $definition || ! $definition->deductsDownpayment()) {
+            return $none;
+        }
+
+        $templates = $definition->installments;
+        if ($templates->isEmpty()) {
+            return $none;
+        }
+
+        $startYear = $this->resolveStartYear($academicYear);
+        if ($startYear === null) {
+            return $none;
+        }
+
+        // Earliest resolved period, not sequence 1: a plan may list July first and still
+        // have it fall after March, because Jan–Jul belong to the academic year's second
+        // calendar year. Anchoring on sequence there would put the boundary at the end of
+        // the schedule and let mid-year payments keep shrinking it.
+        $boundary = null;
+        foreach ($templates as $template) {
+            $monthStart = $this->resolveDueDate($startYear, (int) $template->due_month, 1);
+            if ($boundary === null || $monthStart->lessThan($boundary)) {
+                $boundary = $monthStart;
+            }
+        }
+
+        $received = collect($principalPayments ?? [])
+            ->filter(function ($payment) use ($boundary) {
+                $paidOn = $this->paymentDate($payment);
+
+                return $paidOn && $paidOn->lessThan($boundary);
+            })
+            ->sum(fn ($payment) => (float) (is_array($payment) ? $payment['amount'] : $payment->amount));
+
+        // Capped at what is actually owed: overpayment stays visible as unapplied credit
+        // rather than driving the schedule negative.
+        $netCharges = max(0.0, $grossCharges - $discountsTotal);
+
+        return [
+            'amount' => round(min(max(0.0, (float) $received), $netCharges), 2),
+            'boundary' => $boundary->toDateString(),
+        ];
+    }
+
+    private function paymentDate($payment): ?Carbon
+    {
+        $raw = is_array($payment) ? ($payment['payment_date'] ?? null) : ($payment->payment_date ?? null);
+        if (! $raw) {
+            return null;
+        }
+
+        return ($raw instanceof Carbon ? $raw->copy() : Carbon::parse($raw))->startOfDay();
+    }
+
+    /**
      * Stamp each installment with the late fee actually charged against it, so the
      * schedule shows the booked amount rather than a recomputed guess. A fee stays
      * visible after the installment is settled (and after a waiver it disappears,
@@ -167,6 +271,8 @@ class PaymentPlanService
             'plan_type' => $plan->plan_type,
             'name' => $definition?->name
                 ?? ($plan->plan_type ? ucfirst((string) $plan->plan_type) : null),
+            'advance_payment_mode' => $definition?->advance_payment_mode
+                ?? PaymentPlan::ADVANCE_EQUAL_SPLIT,
             'installment_count' => $installmentCount,
             'selected_at' => $plan->selected_at?->toIso8601String(),
             'selected_by_student' => (bool) $plan->selected_by_student,

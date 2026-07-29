@@ -3062,7 +3062,13 @@ const Finance: React.FC = () => {
 
                     // Balance carried from previous years sits outside the plan split but is part
                     // of Total Payable, so it leads the schedule rather than disappearing.
-                    const leadingRows =
+                    const leadingRows: Array<{
+                      key: string
+                      label: string
+                      sublabel?: string
+                      due: number
+                      paid: number
+                    }> =
                       Math.abs(balanceForward) > 0.01
                         ? [
                             {
@@ -3074,6 +3080,28 @@ const Finance: React.FC = () => {
                             },
                           ]
                         : []
+
+                    // On a net-of-downpayment plan the money paid before the schedule started is
+                    // not inside any period — it lowered them all. Showing it as a settled row
+                    // keeps Cumulative Due climbing to Total Payable and stops the collection
+                    // from looking unapplied.
+                    const downpayment = ledger?.downpayment?.amount ?? 0
+                    if (downpayment > 0.01) {
+                      const boundary = ledger?.downpayment?.boundary
+                      leadingRows.push({
+                        key: 'downpayment',
+                        label: 'Downpayment',
+                        sublabel: boundary
+                          ? `Received before ${new Date(`${boundary}T00:00:00`).toLocaleDateString('en-PH', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}`
+                          : 'Received before the schedule started',
+                        due: downpayment,
+                        paid: downpayment,
+                      })
+                    }
 
                     const buildRows = (base: Array<{ key: string; label: string; sublabel?: string; due: number; paid: number }>) => {
                       let cumulativeDue = 0
@@ -3092,9 +3120,11 @@ const Finance: React.FC = () => {
 
                     // Anything collected beyond the schedule (overpayment, or money against a
                     // balance forward the plan does not model) is called out instead of silently
-                    // making the columns disagree with the entries view.
+                    // making the columns disagree with the entries view. A downpayment is
+                    // already accounted for by its leading row, so it is not "unapplied".
                     const unapplied = Math.max(
-                      (totals?.payments ?? 0) - periods.reduce((s, p) => s + p.paid, 0),
+                      (totals?.payments ?? 0) -
+                        [...leadingRows, ...periods].reduce((s, p) => s + p.paid, 0),
                       0
                     )
 
