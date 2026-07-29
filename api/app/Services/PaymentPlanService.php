@@ -49,6 +49,7 @@ class PaymentPlanService
         }
 
         $count = $templates->count();
+        $pivotMonth = $this->resolvePivotMonth($templates);
         $netCharges = max(0.0, $grossCharges - $discountsTotal);
         $usePercentage = $templates->every(fn ($t) => $t->share_percentage !== null);
 
@@ -92,7 +93,12 @@ class PaymentPlanService
             }
 
             $discountAmount = round($originalAmount - $amount, 2);
-            $dueDate = $this->resolveDueDate($startYear, (int) $template->due_month, (int) $template->due_day);
+            $dueDate = $this->resolveDueDate(
+                $startYear,
+                (int) $template->due_month,
+                (int) $template->due_day,
+                $pivotMonth
+            );
             // Overdue charges only apply once the grace window after the due date has elapsed.
             $graceDays = max(0, (int) $template->grace_period_days);
             $overdueDate = $dueDate->copy()->addDays($graceDays);
@@ -178,17 +184,11 @@ class PaymentPlanService
             return $none;
         }
 
-        // Earliest resolved period, not sequence 1: a plan may list July first and still
-        // have it fall after March, because Jan–Jul belong to the academic year's second
-        // calendar year. Anchoring on sequence there would put the boundary at the end of
-        // the schedule and let mid-year payments keep shrinking it.
-        $boundary = null;
-        foreach ($templates as $template) {
-            $monthStart = $this->resolveDueDate($startYear, (int) $template->due_month, 1);
-            if ($boundary === null || $monthStart->lessThan($boundary)) {
-                $boundary = $monthStart;
-            }
-        }
+        // The schedule opens on the first day of its first installment's month. That month
+        // is also the pivot, so every later template resolves after it — no other period
+        // can start earlier, and a mid-year payment can never be read as a downpayment.
+        $pivotMonth = $this->resolvePivotMonth($templates);
+        $boundary = $this->resolveDueDate($startYear, $pivotMonth, 1, $pivotMonth);
 
         $received = collect($principalPayments ?? [])
             ->filter(function ($payment) use ($boundary) {
@@ -289,15 +289,38 @@ class PaymentPlanService
     }
 
     /**
-     * Resolve a template's calendar month/day to an actual date within the
-     * academic year. PH school years start in August, so months Aug–Dec fall in
-     * the start year and Jan–Jul in the following year. The day is clamped to the
+     * The calendar month a plan's schedule opens in, taken from its first installment.
+     *
+     * An academic year spans two calendar years, so a bare month number is ambiguous:
+     * "July" in AY 2026-2027 could mean July 2026 or July 2027. The plan itself answers
+     * it — sequence 1 is by definition the first period, so its month starts the year and
+     * every earlier month belongs to the second calendar year. Falls back to August, the
+     * usual PH school-year start, when there is no template to learn from.
+     *
+     * @param  \Illuminate\Support\Collection  $templates  ordered by sequence
+     */
+    private function resolvePivotMonth($templates): int
+    {
+        $first = $templates->first();
+        if (! $first) {
+            return 8;
+        }
+
+        return min(max(1, (int) $first->due_month), 12);
+    }
+
+    /**
+     * Resolve a template's calendar month/day to an actual date within the academic year.
+     * Months from the schedule's opening month onward fall in the start year; earlier ones
+     * roll into the following year — so a July-to-March plan puts July in the start year,
+     * while an August-to-May plan puts January in the next. The day is clamped to the
      * month length (e.g. day 31 in February becomes 28/29).
      */
-    private function resolveDueDate(int $startYear, int $month, int $day): Carbon
+    private function resolveDueDate(int $startYear, int $month, int $day, int $pivotMonth = 8): Carbon
     {
         $month = min(max(1, $month), 12);
-        $year = $month >= 8 ? $startYear : $startYear + 1;
+        $pivotMonth = min(max(1, $pivotMonth), 12);
+        $year = $month >= $pivotMonth ? $startYear : $startYear + 1;
         $base = Carbon::create($year, $month, 1, 0, 0, 0);
         $clampedDay = min(max(1, $day), $base->daysInMonth);
 
