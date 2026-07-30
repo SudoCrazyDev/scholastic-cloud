@@ -2280,6 +2280,9 @@ export interface SavePayrollDeductionTypeData {
   has_employer_share?: boolean;
   default_employer_amount?: number;
   is_active?: boolean;
+  // Edit only: overwrite every staff member's own amount with these defaults.
+  // New types are handed to all staff automatically.
+  apply_to_all_staff?: boolean;
 }
 
 // A staff member's default amounts for one deduction type.

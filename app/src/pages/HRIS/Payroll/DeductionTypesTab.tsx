@@ -19,6 +19,7 @@ const DeductionTypesTab: React.FC = () => {
     has_employer_share: false,
     default_employer_amount: '',
     is_active: true,
+    apply_to_all_staff: false,
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<PayrollDeductionType | null>(null)
@@ -40,10 +41,13 @@ const DeductionTypesTab: React.FC = () => {
       payload.id
         ? payrollService.updateDeductionType(payload.id, payload.data)
         : payrollService.createDeductionType(payload.data),
-    onSuccess: (_, payload) => {
+    // The server message reports how many employees the amounts reached.
+    onSuccess: (response, payload) => {
       invalidate()
       setShowForm(false)
-      toast.success(payload.id ? 'Deduction type updated.' : 'Deduction type added.')
+      toast.success(
+        response?.message || (payload.id ? 'Deduction type updated.' : 'Deduction type added.')
+      )
     },
     onError: (err: unknown) => {
       const message = errorMessage(err, 'Failed to save deduction type.')
@@ -72,6 +76,7 @@ const DeductionTypesTab: React.FC = () => {
       has_employer_share: false,
       default_employer_amount: '',
       is_active: true,
+      apply_to_all_staff: false,
     })
     setEditingId(null)
     setFormError(null)
@@ -85,6 +90,7 @@ const DeductionTypesTab: React.FC = () => {
       has_employer_share: type.has_employer_share,
       default_employer_amount: String(type.default_employer_amount),
       is_active: type.is_active,
+      apply_to_all_staff: false,
     })
     setEditingId(type.id)
     setFormError(null)
@@ -103,6 +109,7 @@ const DeductionTypesTab: React.FC = () => {
           ? numberOrZero(form.default_employer_amount)
           : 0,
         is_active: form.is_active,
+        apply_to_all_staff: editingId ? form.apply_to_all_staff : undefined,
       },
     })
   }
@@ -114,7 +121,8 @@ const DeductionTypesTab: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-900">Deduction Types</h2>
           <p className="text-sm text-gray-500">
             The deductions your institution uses — e.g. SSS, Pag-IBIG, PhilHealth, Cash Advance.
-            The default amount pre-fills new entries; per-employee amounts are set in Employee Rates.
+            A type saved with a default amount is applied to every employee's rates right away, so
+            you never add it one by one. Individual amounts can still be adjusted in Employee Rates.
           </p>
         </div>
         <Button size="sm" onClick={openCreate}>
@@ -284,6 +292,31 @@ const DeductionTypesTab: React.FC = () => {
                 />
                 Active (available on rates and payslips)
               </label>
+              {editingId ? (
+                <label className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.apply_to_all_staff}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, apply_to_all_staff: e.target.checked }))
+                    }
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span>
+                    Apply these amounts to all employees
+                    <span className="block text-xs text-gray-500">
+                      Replaces every employee's own amount for this deduction — use it for a rate
+                      change everyone is on. Leave it off to only reach employees who don't have
+                      this deduction yet. Already-generated payslips keep their amounts.
+                    </span>
+                  </span>
+                </label>
+              ) : (
+                <p className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs text-gray-500">
+                  Saving with a default amount above applies it to every employee's rates right
+                  away.
+                </p>
+              )}
               <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
                 <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                   Cancel
