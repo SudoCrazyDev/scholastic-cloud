@@ -481,6 +481,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('payroll-periods/{id}/finalize', [\App\Http\Controllers\PayrollPeriodController::class, 'finalize']);
     Route::post('payroll-periods/{id}/reopen', [\App\Http\Controllers\PayrollPeriodController::class, 'reopen']);
     Route::get('payroll-periods/{periodId}/payslips', [\App\Http\Controllers\PayslipController::class, 'indexByPeriod']);
+    Route::get('payroll-periods/{periodId}/sheet', [\App\Http\Controllers\PayslipController::class, 'sheetByPeriod']);
     Route::apiResource('payroll-periods', \App\Http\Controllers\PayrollPeriodController::class);
     Route::apiResource('payslip-templates', \App\Http\Controllers\PayslipTemplateController::class);
     Route::get('payslips/{id}', [\App\Http\Controllers\PayslipController::class, 'show']);

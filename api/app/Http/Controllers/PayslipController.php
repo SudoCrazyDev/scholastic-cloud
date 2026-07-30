@@ -48,6 +48,147 @@ class PayslipController extends Controller
     }
 
     /**
+     * The whole period on one sheet — the printed "Monthly Summary of
+     * Employee's Working Time & Salary". One row per payslip, with a column
+     * per deduction line used anywhere in the period so the sheet only ever
+     * carries the columns this institution actually uses.
+     */
+    public function sheetByPeriod(Request $request, string $periodId): JsonResponse
+    {
+        if (! $this->isPayrollManager($request)) {
+            return $this->payrollForbidden();
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (! $institutionId) {
+            return $this->noInstitution();
+        }
+
+        $period = PayrollPeriod::with('institution')
+            ->where('institution_id', $institutionId)
+            ->find($periodId);
+
+        if (! $period) {
+            return response()->json(['success' => false, 'message' => 'Payroll period not found'], 404);
+        }
+
+        $payslips = $period->payslips()->with(['user', 'deductions'])->get()
+            ->sortBy(fn (Payslip $payslip) => mb_strtolower((string) $this->staffName($payslip->user)))
+            ->values();
+
+        // Column order follows the institution's deduction catalog so the sheet
+        // keeps the same shape month to month.
+        $catalog = PayrollDeductionType::where('institution_id', $institutionId)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->values();
+        $catalogPosition = $catalog->pluck('id')->flip();
+
+        // A line the employer co-pays gets a column under OTHER BENEFITS as
+        // well — that is what separates an SSS contribution from a cash advance.
+        $sharesEmployer = $catalog->filter(fn (PayrollDeductionType $type) => (bool) $type->has_employer_share)
+            ->pluck('id')
+            ->flip();
+
+        $lines = [];
+        foreach ($payslips as $payslip) {
+            foreach ($payslip->deductions as $deduction) {
+                $key = $this->sheetLineKey($deduction);
+                if (! isset($lines[$key])) {
+                    $lines[$key] = [
+                        'key' => $key,
+                        'label' => $deduction->name,
+                        // Ad-hoc lines (no catalog type) trail behind the catalog ones.
+                        'position' => $deduction->deduction_type_id !== null
+                            ? ($catalogPosition[$deduction->deduction_type_id] ?? 9998)
+                            : 9999,
+                        'employer' => $deduction->deduction_type_id !== null
+                            && $sharesEmployer->has($deduction->deduction_type_id),
+                    ];
+                }
+                if ((float) $deduction->employer_amount > 0) {
+                    $lines[$key]['employer'] = true;
+                }
+            }
+        }
+
+        $ordered = collect($lines)
+            ->sortBy(fn (array $line) => sprintf('%04d', $line['position']).mb_strtolower($line['label']))
+            ->values()
+            ->map(fn (array $line) => ['key' => $line['key'], 'label' => $line['label'], 'employer' => $line['employer']]);
+
+        $deductionColumns = $ordered->map(fn (array $line) => ['key' => $line['key'], 'label' => $line['label']])->values();
+        $benefitColumns = $ordered->filter(fn (array $line) => $line['employer'])
+            ->map(fn (array $line) => ['key' => $line['key'], 'label' => $line['label']])
+            ->values();
+
+        $rows = $payslips->map(function (Payslip $payslip, int $index) use ($benefitColumns, $deductionColumns) {
+            // Two lines can collapse onto one column (same catalog type, or the
+            // same ad-hoc name) — the sheet shows their sum.
+            $byKey = [];
+            foreach ($payslip->deductions as $deduction) {
+                $key = $this->sheetLineKey($deduction);
+                $byKey[$key] = [
+                    'amount' => ($byKey[$key]['amount'] ?? 0) + (float) $deduction->amount,
+                    'employer_amount' => ($byKey[$key]['employer_amount'] ?? 0) + (float) $deduction->employer_amount,
+                ];
+            }
+
+            return [
+                'no' => $index + 1,
+                'payslip_id' => $payslip->id,
+                'staff_name' => $this->staffName($payslip->user),
+                'designation' => $payslip->designation,
+                'days_worked' => (float) $payslip->days_worked,
+                'hours_worked' => (float) $payslip->hours_worked,
+                'daily_rate' => (float) $payslip->daily_rate,
+                'benefits' => $benefitColumns
+                    ->map(fn (array $col) => round((float) ($byKey[$col['key']]['employer_amount'] ?? 0), 2))
+                    ->values(),
+                'employer_share_total' => round((float) $payslip->deductions->sum('employer_amount'), 2),
+                'gross_pay' => (float) $payslip->gross_pay,
+                'deductions' => $deductionColumns
+                    ->map(fn (array $col) => round((float) ($byKey[$col['key']]['amount'] ?? 0), 2))
+                    ->values(),
+                'total_deductions' => (float) $payslip->total_deductions,
+                'net_pay' => (float) $payslip->net_pay,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'period' => [
+                    'id' => $period->id,
+                    'name' => $period->name,
+                    'date_from' => $period->date_from?->toDateString(),
+                    'date_to' => $period->date_to?->toDateString(),
+                    'status' => $period->status,
+                    'paid_on' => $period->paid_on?->toDateString(),
+                ],
+                'institution' => [
+                    'name' => $period->institution?->title,
+                    'address' => $period->institution?->address,
+                    'logo' => $period->institution?->logo,
+                ],
+                'benefit_columns' => $benefitColumns,
+                'deduction_columns' => $deductionColumns,
+                'rows' => $rows,
+            ],
+        ]);
+    }
+
+    /**
+     * Which sheet column a deduction line belongs to. Lines off the same
+     * catalog type share a column; ad-hoc lines group by name.
+     */
+    private function sheetLineKey(PayslipDeduction $deduction): string
+    {
+        return $deduction->deduction_type_id ?: 'name:'.mb_strtolower(trim($deduction->name));
+    }
+
+    /**
      * Full payslip with the daily working-time breakdown (print-ready).
      */
     public function show(Request $request, string $id): JsonResponse

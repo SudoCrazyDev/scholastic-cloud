@@ -2429,6 +2429,53 @@ export interface PayslipSummary {
   net_pay: number;
 }
 
+// =====================
+// Payroll sheet (the printed monthly summary of a whole period)
+// =====================
+
+// One deduction / employer-share column on the sheet. `key` groups the payslip
+// lines that share it; `label` is the printed heading.
+export interface PayrollSheetColumn {
+  key: string;
+  label: string;
+}
+
+export interface PayrollSheetRow {
+  no: number;
+  payslip_id: string;
+  staff_name: string | null;
+  designation: string | null;
+  days_worked: number;
+  hours_worked: number;
+  daily_rate: number;
+  // Aligned index-for-index with the sheet's benefit_columns / deduction_columns.
+  benefits: number[];
+  employer_share_total: number;
+  gross_pay: number;
+  deductions: number[];
+  total_deductions: number;
+  net_pay: number;
+}
+
+export interface PayrollSheet {
+  period: {
+    id: string;
+    name: string;
+    date_from: string;
+    date_to: string;
+    status: PayrollPeriodStatus;
+    paid_on: string | null;
+  };
+  institution: {
+    name: string | null;
+    address: string | null;
+    logo: string | null;
+  };
+  benefit_columns: PayrollSheetColumn[];
+  deduction_columns: PayrollSheetColumn[];
+  rows: PayrollSheetRow[];
+}
+
 // How a payslip day is priced once any exception is taken into account.
 // 'full_day' guarantees the daily rate regardless of hours worked.
 export type PayslipDayPayPolicy = 'normal' | 'full_day' | 'no_pay';

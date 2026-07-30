@@ -8,6 +8,7 @@ import type {
   PayrollDeductionType,
   PayrollPeriod,
   PayrollSettings,
+  PayrollSheet,
   PayrollStaffCompensation,
   PayslipTemplate,
   SavePayrollCompensationData,
@@ -145,6 +146,14 @@ class PayrollService {
   async getPayslips(periodId: string) {
     const response = await api.get<ApiResponse<PayslipSummary[]>>(
       `/payroll-periods/${periodId}/payslips`
+    )
+    return response.data
+  }
+
+  // The whole period on one printable sheet (monthly summary).
+  async getPeriodSheet(periodId: string) {
+    const response = await api.get<ApiResponse<PayrollSheet>>(
+      `/payroll-periods/${periodId}/sheet`
     )
     return response.data
   }

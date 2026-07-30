@@ -7,8 +7,10 @@ import {
   LockOpenIcon,
   PencilSquareIcon,
   PlusIcon,
+  PrinterIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline'
+import { pdf } from '@react-pdf/renderer'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
@@ -25,6 +27,7 @@ import type {
   StaffSchedule,
 } from '../../../types'
 import { errorMessage, peso, shortDate } from './helpers'
+import PayrollSheetPDF from './PayrollSheetPDF'
 import PayslipDetail from './PayslipDetail'
 
 interface PeriodForm {
@@ -192,6 +195,39 @@ const PeriodsTab: React.FC = () => {
     },
   })
 
+  // The sheet is fetched (and the PDF rendered) only when asked for — it is a
+  // much heavier payload than the payslip list this screen already shows.
+  const printSheetMutation = useMutation({
+    mutationFn: async (period: PayrollPeriod) => {
+      const response = await payrollService.getPeriodSheet(period.id)
+      const blob = await pdf(<PayrollSheetPDF sheet={response.data} />).toBlob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Payroll - ${period.name}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      // Revoking in the same tick can cancel the download in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    },
+    onError: (err: unknown) => {
+      // A request that never reached the API carries no server message, and
+      // blaming the PDF for that sends you looking in the wrong place.
+      const unreachable = (err as { request?: unknown; response?: unknown })?.request
+        && !(err as { response?: unknown })?.response
+      toast.error(
+        errorMessage(
+          err,
+          unreachable
+            ? 'Could not reach the server to load the payroll.'
+            : 'Failed to build the payroll PDF.'
+        )
+      )
+      console.error('Print Payroll failed', err)
+    },
+  })
+
   const openCreate = () => {
     const now = new Date()
     const first = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -317,6 +353,20 @@ const PeriodsTab: React.FC = () => {
                 </Button>
               </>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => printSheetMutation.mutate(currentPeriod)}
+              disabled={currentPeriod.payslip_count === 0 || printSheetMutation.isPending}
+              title={
+                currentPeriod.payslip_count === 0
+                  ? 'Generate payslips before printing the payroll'
+                  : undefined
+              }
+            >
+              <PrinterIcon className="h-4 w-4" />
+              {printSheetMutation.isPending ? 'Preparing…' : 'Print Payroll'}
+            </Button>
             {currentPeriod.status === 'finalized' && (
               <Button
                 variant="outline"
