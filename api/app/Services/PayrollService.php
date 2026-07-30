@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AttendanceLog;
 use App\Models\Institution;
 use App\Models\PayrollCompensation;
+use App\Models\PayrollDeductionType;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipDay;
@@ -42,6 +43,15 @@ class PayrollService
             ->get();
         $userIds = $compensations->pluck('user_id')->all();
 
+        // The institution's deduction catalog. A type carrying a default
+        // amount applies to every staff member who has no amount of their own,
+        // so a new deduction reaches payroll without being typed per employee.
+        $deductionTypes = PayrollDeductionType::where('institution_id', $institutionId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
         $calendarEntries = StaffCalendarEvent::where('institution_id', $institutionId)
             ->whereBetween('event_date', [$from->toDateString(), $to->toDateString()])
             ->get();
@@ -77,7 +87,7 @@ class PayrollService
 
         $generated = 0;
 
-        DB::transaction(function () use ($period, $compensations, $assignments, $punches, $holidayDates, $dayPolicies, $staffExceptions, $lateRate, $undertimeRate, $defaultOvertimeRate, &$generated) {
+        DB::transaction(function () use ($period, $compensations, $deductionTypes, $assignments, $punches, $holidayDates, $dayPolicies, $staffExceptions, $lateRate, $undertimeRate, $defaultOvertimeRate, &$generated) {
             $period->payslips()->delete();
 
             foreach ($compensations as $compensation) {
@@ -86,6 +96,7 @@ class PayrollService
                 $this->buildPayslip(
                     $period,
                     $compensation,
+                    $deductionTypes,
                     $assignments->get($compensation->user_id),
                     $punches[$compensation->user_id] ?? [],
                     $holidayDates,
@@ -103,12 +114,14 @@ class PayrollService
     }
 
     /**
+     * @param  \Illuminate\Support\Collection<int, PayrollDeductionType>  $deductionTypes  the institution's active catalog
      * @param  array<string, array>  $dayPolicies  institution-wide policy keyed by Y-m-d
      * @param  array<string, array>  $userExceptions  this staff member's approved exceptions keyed by Y-m-d
      */
     private function buildPayslip(
         PayrollPeriod $period,
         PayrollCompensation $compensation,
+        \Illuminate\Support\Collection $deductionTypes,
         ?StaffScheduleAssignment $assignment,
         array $userPunches,
         \Illuminate\Support\Collection $holidayDates,
@@ -234,23 +247,67 @@ class PayrollService
 
         $payslip->days()->saveMany($rows);
 
-        // Copy the staff member's default deductions onto the payslip.
-        foreach ($compensation->deductions as $deduction) {
-            $hasAmount = (float) $deduction->amount > 0 || (float) $deduction->employer_amount > 0;
-            if (! $hasAmount || ! $deduction->deductionType?->is_active) {
-                continue;
-            }
-            $payslip->deductions()->create([
-                'deduction_type_id' => $deduction->deduction_type_id,
-                'name' => $deduction->deductionType->name,
-                'amount' => $deduction->amount,
-                'employer_amount' => $deduction->employer_amount,
-            ]);
+        foreach ($this->resolveDeductions($compensation, $deductionTypes) as $line) {
+            $payslip->deductions()->create($line);
         }
 
         $this->recomputeTotals($payslip);
 
         return $payslip;
+    }
+
+    /**
+     * The deduction lines a payslip starts with.
+     *
+     * Each active type in the catalog resolves to one amount: the staff
+     * member's own figure when they have a row for it, otherwise the type's
+     * default. That fallback is what lets a deduction added to the catalog
+     * reach payroll on the next generate without being entered per employee.
+     *
+     * A staff row of 0 against a type that *does* carry a default is an
+     * exemption and stays at 0 — somebody set that deliberately in Employee
+     * Rates. Lines that resolve to nothing on both sides are skipped.
+     *
+     * @param  \Illuminate\Support\Collection<int, PayrollDeductionType>  $deductionTypes
+     * @return array<int, array{deduction_type_id: string, name: string, amount: float, employer_amount: float}>
+     */
+    public function resolveDeductions(PayrollCompensation $compensation, \Illuminate\Support\Collection $deductionTypes): array
+    {
+        $staffAmounts = $compensation->deductions->keyBy('deduction_type_id');
+        $lines = [];
+
+        foreach ($deductionTypes as $type) {
+            if (! $type->is_active) {
+                continue;
+            }
+
+            $own = $staffAmounts->get($type->id);
+
+            $amount = $own !== null
+                ? (float) $own->amount
+                : (float) $type->default_amount;
+
+            $employerAmount = 0.0;
+            if ($type->has_employer_share) {
+                $employerAmount = $own !== null
+                    ? (float) $own->employer_amount
+                    : (float) $type->default_employer_amount;
+            }
+
+            if ($amount <= 0 && $employerAmount <= 0) {
+                continue;
+            }
+
+            $lines[] = [
+                'deduction_type_id' => $type->id,
+                // Snapshot the name so deleting the type never rewrites history.
+                'name' => $type->name,
+                'amount' => $amount,
+                'employer_amount' => $employerAmount,
+            ];
+        }
+
+        return $lines;
     }
 
     /**

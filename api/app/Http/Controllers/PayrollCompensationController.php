@@ -5,15 +5,20 @@ namespace App\Http\Controllers;
 use App\Auth\StudentPortalUser;
 use App\Models\Institution;
 use App\Models\PayrollCompensation;
+use App\Models\PayrollDeductionType;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class PayrollCompensationController extends Controller
 {
+    public function __construct(private readonly PayrollService $payrollService) {}
+
     /**
      * List staff of the current institution with their compensation
      * settings (null when rates have not been set yet).
@@ -59,17 +64,18 @@ class PayrollCompensationController extends Controller
             ->keyBy('user_id');
 
         $defaultOvertimeRate = $this->defaultOvertimeRate($institutionId);
+        $types = $this->activeDeductionTypes($institutionId);
 
         return response()->json([
             'success' => true,
-            'data' => $staff->map(function (User $user) use ($compensations, $defaultOvertimeRate) {
+            'data' => $staff->map(function (User $user) use ($compensations, $defaultOvertimeRate, $types) {
                 return [
                     'user_id' => $user->id,
                     'staff_name' => $this->staffName($user),
                     'email' => $user->email,
                     'role_title' => $user->userInstitutions->first()?->role?->title,
                     'default_overtime_rate' => $defaultOvertimeRate,
-                    'compensation' => $this->serialize($compensations->get($user->id), $defaultOvertimeRate),
+                    'compensation' => $this->serialize($compensations->get($user->id), $defaultOvertimeRate, $types),
                 ];
             })->values(),
         ]);
@@ -130,11 +136,29 @@ class PayrollCompensationController extends Controller
 
             // Deduction defaults are fully replaced on every save.
             $compensation->deductions()->delete();
+            $defaults = $this->deductionDefaults($institutionId);
+
             foreach ($validated['deductions'] ?? [] as $deduction) {
+                $amount = (float) $deduction['amount'];
+                $employerAmount = (float) ($deduction['employer_amount'] ?? 0);
+                $default = $defaults->get($deduction['deduction_type_id']);
+
+                // An all-zero row against a type with no default of its own
+                // says nothing — storing it would only stop a default set
+                // later from reaching this staff member. Against a type that
+                // does carry a default, the same row is a deliberate
+                // exemption and is kept.
+                $typeHasDefault = $default !== null
+                    && ((float) $default->default_amount > 0 || (float) $default->default_employer_amount > 0);
+
+                if ($amount <= 0 && $employerAmount <= 0 && ! $typeHasDefault) {
+                    continue;
+                }
+
                 $compensation->deductions()->create([
                     'deduction_type_id' => $deduction['deduction_type_id'],
-                    'amount' => $deduction['amount'],
-                    'employer_amount' => $deduction['employer_amount'] ?? 0,
+                    'amount' => $amount,
+                    'employer_amount' => $employerAmount,
                 ]);
             }
 
@@ -146,16 +170,58 @@ class PayrollCompensationController extends Controller
             'message' => 'Compensation saved successfully',
             'data' => $this->serialize(
                 $compensation->fresh('deductions.deductionType'),
-                $this->defaultOvertimeRate($institutionId)
+                $this->defaultOvertimeRate($institutionId),
+                $this->activeDeductionTypes($institutionId)
             ),
         ]);
     }
 
-    private function serialize(?PayrollCompensation $compensation, float $defaultOvertimeRate = 0): ?array
+    /**
+     * The institution's active deduction catalog, keyed by id.
+     *
+     * @return Collection<string, PayrollDeductionType>
+     */
+    private function activeDeductionTypes(string $institutionId): Collection
+    {
+        return PayrollDeductionType::where('institution_id', $institutionId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->keyBy('id');
+    }
+
+    /**
+     * Same lookup keyed for the upsert guard, without the active filter — an
+     * inactive type's default still counts as "the type has a default".
+     *
+     * @return Collection<string, PayrollDeductionType>
+     */
+    private function deductionDefaults(string $institutionId): Collection
+    {
+        return PayrollDeductionType::where('institution_id', $institutionId)->get()->keyBy('id');
+    }
+
+    /**
+     * @param  Collection<string, PayrollDeductionType>  $types
+     */
+    private function serialize(?PayrollCompensation $compensation, float $defaultOvertimeRate, Collection $types): ?array
     {
         if (! $compensation) {
             return null;
         }
+
+        // What payroll would actually deduct, so the grid shows the catalog
+        // defaults a staff member inherits and not just their own rows.
+        $ownTypeIds = $compensation->deductions->pluck('deduction_type_id')->flip();
+        $effective = collect($this->payrollService->resolveDeductions($compensation, $types->values()))
+            ->map(fn (array $line) => [
+                'deduction_type_id' => $line['deduction_type_id'],
+                'name' => $line['name'],
+                'amount' => $line['amount'],
+                'employer_amount' => $line['employer_amount'],
+                'from_default' => ! $ownTypeIds->has($line['deduction_type_id']),
+            ]);
 
         return [
             'id' => $compensation->id,
@@ -167,14 +233,9 @@ class PayrollCompensationController extends Controller
             'hours_per_day' => (float) $compensation->hours_per_day,
             'overtime_rate_per_minute' => $compensation->overtime_rate_per_minute !== null ? (float) $compensation->overtime_rate_per_minute : null,
             'effective_overtime_rate' => $compensation->effectiveOvertimeRate($defaultOvertimeRate),
-            'deductions' => $compensation->deductions->map(fn ($deduction) => [
-                'deduction_type_id' => $deduction->deduction_type_id,
-                'name' => $deduction->deductionType?->name,
-                'amount' => (float) $deduction->amount,
-                'employer_amount' => (float) $deduction->employer_amount,
-            ])->values(),
-            'deductions_total' => round((float) $compensation->deductions->sum('amount'), 2),
-            'employer_share_total' => round((float) $compensation->deductions->sum('employer_amount'), 2),
+            'deductions' => $effective->values(),
+            'deductions_total' => round((float) $effective->sum('amount'), 2),
+            'employer_share_total' => round((float) $effective->sum('employer_amount'), 2),
             'updated_at' => $compensation->updated_at?->toIso8601String(),
         ];
     }

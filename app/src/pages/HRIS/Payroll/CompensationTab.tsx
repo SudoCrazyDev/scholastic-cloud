@@ -93,17 +93,14 @@ const CompensationTab: React.FC = () => {
     const employerAmounts: Record<string, string> = {}
     for (const type of activeTypes) {
       const existing = c?.deductions.find((d) => d.deduction_type_id === type.id)
-      // Existing staff amounts win; otherwise pre-fill the type's defaults.
+      // The staff member's own amount wins; otherwise they inherit the type's
+      // default, which is what payroll itself would apply.
       deductionAmounts[type.id] = existing
         ? String(existing.amount)
-        : c
-          ? '0'
-          : String(type.default_amount)
+        : String(type.default_amount)
       employerAmounts[type.id] = existing
         ? String(existing.employer_amount)
-        : c
-          ? '0'
-          : String(type.default_employer_amount)
+        : String(type.default_employer_amount)
     }
     setForm({
       designation: c?.designation || '',
@@ -245,7 +242,14 @@ const CompensationTab: React.FC = () => {
                     <td className="px-4 py-3 text-gray-600">
                       {c ? (
                         appliedDeductions.length > 0 ? (
-                          <span title={appliedDeductions.map((d) => `${d.name}: ${peso(d.amount)}`).join(', ')}>
+                          <span
+                            title={appliedDeductions
+                              .map(
+                                (d) =>
+                                  `${d.name}: ${peso(d.amount)}${d.from_default ? ' (type default)' : ''}`
+                              )
+                              .join(', ')}
+                          >
                             <span className="tabular-nums font-medium">{peso(c.deductions_total)}</span>
                             <span className="ml-1 text-xs text-gray-400">
                               ({appliedDeductions.map((d) => d.name).join(', ')})
@@ -413,8 +417,9 @@ const CompensationTab: React.FC = () => {
                   </div>
                 )}
                 <p className="mt-1.5 text-xs text-gray-400">
-                  Rows where both amounts are 0 are not applied when generating payslips.
-                  Employer shares appear under Other Benefits on the printed record.
+                  Amounts start from each type's default and apply to this staff member on the next
+                  payroll generate. Set one to 0 to exempt them from that deduction. Employer shares
+                  appear under Other Benefits on the printed record.
                 </p>
               </div>
 

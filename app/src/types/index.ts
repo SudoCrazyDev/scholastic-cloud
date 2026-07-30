@@ -2291,6 +2291,9 @@ export interface PayrollCompensationDeduction {
   name: string | null;
   amount: number;
   employer_amount: number;
+  // True when the staff member has no amount of their own and inherits the
+  // deduction type's default.
+  from_default?: boolean;
 }
 
 export interface PayrollCompensation {
