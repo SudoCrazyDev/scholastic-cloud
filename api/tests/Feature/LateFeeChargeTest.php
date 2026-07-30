@@ -277,7 +277,9 @@ class LateFeeChargeTest extends TestCase
         $lateFee = StudentAdditionalFee::lateFees()->sole();
 
         $this->withHeader('Authorization', 'Bearer test-token')
-            ->deleteJson("/api/student-additional-fees/{$lateFee->id}")
+            ->deleteJson("/api/student-additional-fees/{$lateFee->id}", [
+                'note' => 'Approved by finance head',
+            ])
             ->assertOk();
 
         $data = $this->ledger();
@@ -289,6 +291,103 @@ class LateFeeChargeTest extends TestCase
         $this->assertEquals(0.0, $this->ledger()['totals']['late_fees']);
         $this->assertSame(0, StudentAdditionalFee::lateFees()->count());
         $this->assertSame(1, StudentAdditionalFee::lateFees()->withTrashed()->count());
+    }
+
+    public function test_waiving_a_late_fee_requires_a_reason(): void
+    {
+        $this->ledger();
+        $lateFee = StudentAdditionalFee::lateFees()->sole();
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->deleteJson("/api/student-additional-fees/{$lateFee->id}")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('note');
+
+        // Rejected outright: the charge is still standing.
+        $this->assertSame(1, StudentAdditionalFee::lateFees()->count());
+        $this->assertEquals(150.0, $this->ledger()['totals']['late_fees']);
+    }
+
+    public function test_waiving_records_who_did_it_and_why(): void
+    {
+        $this->ledger();
+        $lateFee = StudentAdditionalFee::lateFees()->sole();
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->deleteJson("/api/student-additional-fees/{$lateFee->id}", [
+                'note' => 'Family hardship — approved',
+            ])
+            ->assertOk();
+
+        $waived = StudentAdditionalFee::withTrashed()->find($lateFee->id);
+        $this->assertNotNull($waived->deleted_at);
+        $this->assertSame('Family hardship — approved', $waived->waive_note);
+        $this->assertSame($this->user->id, $waived->deleted_by);
+    }
+
+    public function test_a_waived_late_fee_can_be_restored(): void
+    {
+        $this->ledger();
+        $lateFee = StudentAdditionalFee::lateFees()->sole();
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->deleteJson("/api/student-additional-fees/{$lateFee->id}", ['note' => 'Waived in error'])
+            ->assertOk();
+        $this->assertEquals(0.0, $this->ledger()['totals']['late_fees']);
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->postJson("/api/student-additional-fees/{$lateFee->id}/restore")
+            ->assertOk();
+
+        // Back on the balance at the amount originally booked, with the stamp cleared.
+        $restored = StudentAdditionalFee::find($lateFee->id);
+        $this->assertNotNull($restored);
+        $this->assertNull($restored->deleted_at);
+        $this->assertNull($restored->deleted_by);
+        $this->assertNull($restored->waive_note);
+
+        $data = $this->ledger();
+        $this->assertEquals(150.0, $data['totals']['late_fees']);
+        $this->assertEquals(10150.0, $data['totals']['balance']);
+        $this->assertSame(1, StudentAdditionalFee::lateFees()->count());
+    }
+
+    public function test_restoring_a_fee_that_was_never_waived_is_rejected(): void
+    {
+        $this->ledger();
+        $lateFee = StudentAdditionalFee::lateFees()->sole();
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->postJson("/api/student-additional-fees/{$lateFee->id}/restore")
+            ->assertStatus(404);
+    }
+
+    public function test_waived_fees_are_listed_only_when_asked_for(): void
+    {
+        $this->ledger();
+        $lateFee = StudentAdditionalFee::lateFees()->sole();
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->deleteJson("/api/student-additional-fees/{$lateFee->id}", ['note' => 'Waived in error'])
+            ->assertOk();
+
+        $hidden = $this->withHeader('Authorization', 'Bearer test-token')
+            ->getJson('/api/student-additional-fees?student_id=' . $this->student->id
+                . '&academic_year=' . self::YEAR)
+            ->assertOk()
+            ->json('data');
+        $this->assertEmpty(collect($hidden)->where('source', 'late_fee'));
+
+        $shown = $this->withHeader('Authorization', 'Bearer test-token')
+            ->getJson('/api/student-additional-fees?student_id=' . $this->student->id
+                . '&academic_year=' . self::YEAR . '&with_waived=1')
+            ->assertOk()
+            ->json('data');
+
+        $row = collect($shown)->firstWhere('source', 'late_fee');
+        $this->assertNotNull($row, 'The waived late fee should be listed with with_waived.');
+        $this->assertNotNull($row['deleted_at']);
+        $this->assertSame('Waived in error', $row['waive_note']);
     }
 
     public function test_no_late_fee_before_the_grace_window_elapses(): void

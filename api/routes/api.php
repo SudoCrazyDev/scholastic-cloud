@@ -385,6 +385,7 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::patch('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
     Route::delete('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'destroy']);
+    Route::post('student-additional-fees/{id}/restore', [StudentAdditionalFeeController::class, 'restore']);
 
     // Reusable student fees, searched and picked from the ledger
     Route::apiResource('student-fees', StudentFeeController::class);

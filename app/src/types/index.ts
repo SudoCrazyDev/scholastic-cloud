@@ -872,6 +872,12 @@ export interface StudentAdditionalFee {
   amount: number;
   created_at: string;
   updated_at: string;
+  // Present only when the fee list was fetched with `with_waived`. A waived late fee is
+  // never re-charged, so these identify what was written off and by whom.
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  waived_by_name?: string | null;
+  waive_note?: string | null;
 }
 
 export interface CreateStudentAdditionalFeeData {

@@ -1,7 +1,13 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { PencilSquareIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import {
+  PencilSquareIcon,
+  TrashIcon,
+  PlusIcon,
+  XMarkIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
@@ -441,6 +447,20 @@ const PaymentPlansView: React.FC = () => {
               late fee is a one-time charge of that percent of the installment, added to the
               student's balance while the installment stays unpaid.
             </p>
+
+            {/* A plan left at 0% silently never surcharges anyone, and nothing downstream
+                reports it — the omission only surfaces when finance asks why a late payment
+                went uncharged. Say so here, while it is still being edited. */}
+            {!form.installments.some((inst) => Number(inst.late_fee) > 0) && (
+              <div className="mt-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-amber-600" />
+                <p className="text-xs text-amber-800">
+                  <span className="font-medium">No late fee is set on any installment.</span>{' '}
+                  Students on this plan will never be charged a surcharge, however late they pay.
+                  Leave it at 0% only if that is intended.
+                </p>
+              </div>
+            )}
           </div>
 
           {error && (
@@ -504,6 +524,14 @@ const PaymentPlansView: React.FC = () => {
                           title="Payments received before the first installment's month are deducted from the amount being divided."
                         >
                           Net of downpayment
+                        </span>
+                      )}
+                      {!plan.installments.some((inst) => Number(inst.late_fee_percentage) > 0) && (
+                        <span
+                          className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700"
+                          title="No installment has a late fee percentage, so students on this plan are never surcharged for paying late."
+                        >
+                          No late fee
                         </span>
                       )}
                     </div>

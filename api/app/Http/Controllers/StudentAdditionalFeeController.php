@@ -24,18 +24,36 @@ class StudentAdditionalFeeController extends Controller
         $validated = $request->validate([
             'student_id' => 'required|uuid|exists:students,id',
             'academic_year' => 'nullable|string|max:255',
+            'with_waived' => 'nullable|boolean',
         ]);
 
-        $query = StudentAdditionalFee::where('institution_id', $institutionId)
+        $query = StudentAdditionalFee::with('waivedBy')
+            ->where('institution_id', $institutionId)
             ->where('student_id', $validated['student_id']);
 
         if ($request->filled('academic_year')) {
             $query->where('academic_year', $request->get('academic_year'));
         }
 
+        // Waived charges are hidden by default. The ledger asks for them so finance can see
+        // what was written off — and restore it when a delete was not meant as a waiver.
+        if ($request->boolean('with_waived')) {
+            $query->withTrashed();
+        }
+
+        $fees = $query->orderBy('created_at', 'desc')->get()->map(function ($fee) {
+            $data = $fee->toArray();
+            $waivedBy = $fee->waivedBy;
+            $data['waived_by_name'] = $waivedBy
+                ? trim(($waivedBy->first_name ?? '') . ' ' . ($waivedBy->last_name ?? ''))
+                : null;
+
+            return $data;
+        });
+
         return response()->json([
             'success' => true,
-            'data' => $query->orderBy('created_at', 'desc')->get(),
+            'data' => $fees,
         ]);
     }
 
@@ -124,6 +142,19 @@ class StudentAdditionalFeeController extends Controller
             return response()->json(['success' => false, 'message' => 'Not found'], 404);
         }
 
+        // Waiving a late fee permanently forgives that installment's surcharge, so the
+        // reason is required — an ad-hoc fee can still be removed without one.
+        $validated = $request->validate([
+            'note' => ($fee->isLateFee() ? 'required' : 'nullable') . '|string|max:255',
+        ]);
+
+        // Stamp the audit fields before deleting: once the row is trashed the ordinary
+        // query scope hides it, so this is the only chance to say who did it and why.
+        $fee->forceFill([
+            'deleted_by' => $request->user()?->id,
+            'waive_note' => $validated['note'] ?? null,
+        ])->save();
+
         // Soft delete: for an auto-charged late fee this records the waiver, which is
         // what stops the next ledger load from charging that installment again.
         $fee->delete();
@@ -131,6 +162,43 @@ class StudentAdditionalFeeController extends Controller
         return response()->json([
             'success' => true,
             'message' => $fee->isLateFee() ? 'Late fee waived' : 'Deleted',
+        ]);
+    }
+
+    /**
+     * Un-waive a charge.
+     *
+     * A waived late fee is otherwise unrecoverable: `LateFeeService` counts trashed rows as
+     * already handled, so the installment is never re-charged and no UI action could bring
+     * the money back. Restoring clears the audit stamp and returns the row to the ledger at
+     * the amount originally booked.
+     */
+    public function restore(Request $request, string $id): JsonResponse
+    {
+        if ($this->isStudentUser($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (! $institutionId) {
+            return response()->json(['success' => false, 'message' => 'No institution assigned'], 400);
+        }
+
+        $fee = StudentAdditionalFee::onlyTrashed()
+            ->where('institution_id', $institutionId)
+            ->find($id);
+
+        if (! $fee) {
+            return response()->json(['success' => false, 'message' => 'No waived fee to restore'], 404);
+        }
+
+        $fee->restore();
+        $fee->forceFill(['deleted_by' => null, 'waive_note' => null])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => $fee->isLateFee() ? 'Late fee restored' : 'Fee restored',
+            'data' => $fee,
         ]);
     }
 

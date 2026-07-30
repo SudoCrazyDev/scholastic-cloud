@@ -102,8 +102,24 @@ views' requests.
   - Excluded from the principal the installment schedule is divided from, and payments allocated
     to a late fee do not fill installment principal.
   - **Waiving** = deleting the row (`DELETE /student-additional-fees/{id}`). The soft-deleted row
-    keeps its slot in the unique index, so a waived installment is never re-charged.
+    keeps its slot in the unique index, so a waived installment is never re-charged. A **`note` is
+    required** when the row is a late fee (optional for `manual`); it is stored on `waive_note`
+    alongside `deleted_by`, so every waiver records who forgave the charge and why.
+  - **Un-waiving** — `POST /student-additional-fees/{id}/restore` brings a waived charge back at
+    the amount originally booked and clears the audit stamp. Without it a waiver is unrecoverable
+    through the app, since `LateFeeService` counts trashed rows as already handled. The ledger
+    lists waived charges (greyed, struck through, with the reason) when the fee list is fetched
+    with `with_waived=1`, which is where the restore action lives.
+  - A restored fee keeps its **frozen** `base_amount` / `late_fee_percentage`, so if the
+    underlying charges changed since it was booked the restored amount is the old one. To re-book
+    at the current base, hard-delete the trashed row instead and let the next ledger load charge
+    it fresh.
   - Covered by `tests/Feature/LateFeeChargeTest.php`.
+- **Plans with no late fee** — `payment_plan_installments.late_fee_percentage` defaults to `0`, and
+  a plan left that way silently never surcharges anyone. `/payment-plans` now flags it: an amber
+  warning while editing, and a red "No late fee" badge on any saved plan where no installment
+  charges. Watch for **duplicate plan names** too — two plans can share a name while only one is
+  configured, and the student-facing picker cannot tell them apart.
 - **Void workflow (payments)** — voiding a posted payment goes through
   `payment_void_requests`, keyed by `receipt_number`. `finance` submits a request (note
   required); approver roles approve/disapprove with a review note. **When an approver submits a

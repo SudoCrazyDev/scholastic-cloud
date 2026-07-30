@@ -13,6 +13,7 @@ import {
   Cog6ToothIcon,
   DocumentCheckIcon,
   ReceiptRefundIcon,
+  ArrowUturnLeftIcon,
 } from '@heroicons/react/24/outline'
 import { NavLink, useLocation } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
@@ -330,6 +331,9 @@ const Finance: React.FC = () => {
       studentAdditionalFeeService.getFees({
         student_id: selectedLedgerStudent!.id,
         academic_year: ledgerAcademicYear,
+        // Waived charges are listed too, so a late fee written off by mistake can be
+        // restored — nothing else in the app can bring one back.
+        with_waived: true,
       }),
     enabled: view === 'ledger' && Boolean(selectedLedgerStudent?.id && ledgerAcademicYear),
   })
@@ -354,7 +358,8 @@ const Finance: React.FC = () => {
   })
 
   const deleteLedgerAdditionalFeeMutation = useMutation({
-    mutationFn: (id: string) => studentAdditionalFeeService.deleteFee(id),
+    mutationFn: ({ id, note }: { id: string; note?: string }) =>
+      studentAdditionalFeeService.deleteFee(id, note),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-additional-fees', selectedLedgerStudent?.id] })
       queryClient.invalidateQueries({ queryKey: ['student-ledger', selectedLedgerStudent?.id] })
@@ -363,6 +368,19 @@ const Finance: React.FC = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to remove fee.')
+    },
+  })
+
+  const restoreLedgerAdditionalFeeMutation = useMutation({
+    mutationFn: (id: string) => studentAdditionalFeeService.restoreFee(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-additional-fees', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger', selectedLedgerStudent?.id] })
+      queryClient.invalidateQueries({ queryKey: ['student-noa', selectedLedgerStudent?.id] })
+      toast.success('Fee restored to the balance.')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to restore fee.')
     },
   })
 
@@ -947,6 +965,15 @@ const Finance: React.FC = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)
+  }
+
+  // Date-only rendering for audit stamps (when a charge was waived, etc.).
+  const formatDate = (value?: string | null) => {
+    if (!value) return ''
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime())
+      ? String(value)
+      : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
   const isSavingDefault = upsertDefaultMutation.isPending || updateDefaultMutation.isPending || applyAllDefaultMutation.isPending
@@ -2717,39 +2744,111 @@ const Finance: React.FC = () => {
                         <tbody className="divide-y divide-gray-200 bg-white">
                           {ledgerAdditionalFeesQuery.data?.data?.map((fee) => {
                             const isLateFee = fee.source === 'late_fee'
+                            const isWaived = Boolean(fee.deleted_at)
                             return (
-                            <tr key={fee.id} className={isLateFee ? 'bg-red-50/40' : undefined}>
+                            <tr
+                              key={fee.id}
+                              className={
+                                isWaived
+                                  ? 'bg-gray-50 text-gray-400'
+                                  : isLateFee
+                                    ? 'bg-red-50/40'
+                                    : undefined
+                              }
+                            >
                               <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                                {fee.name}
-                                {isLateFee && (
+                                <span className={isWaived ? 'line-through text-gray-400' : undefined}>
+                                  {fee.name}
+                                </span>
+                                {isLateFee && !isWaived && (
                                   <span className="ml-1.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-red-700">
                                     Auto
                                   </span>
                                 )}
+                                {isWaived && (
+                                  <span className="ml-1.5 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600">
+                                    Waived
+                                  </span>
+                                )}
+                                {isWaived && isLateFee && (
+                                  <span className="block text-[11px] font-normal text-amber-700 mt-0.5">
+                                    This installment will never be re-charged while the waiver stands.
+                                  </span>
+                                )}
                               </td>
-                              <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
+                              <td
+                                className={`px-4 py-2 text-sm text-right tabular-nums ${
+                                  isWaived ? 'text-gray-400 line-through' : 'text-gray-900'
+                                }`}
+                              >
                                 {formatCurrency(fee.amount)}
                               </td>
-                              <td className="px-4 py-2 text-sm text-gray-600">{fee.description || '—'}</td>
+                              <td className="px-4 py-2 text-sm text-gray-600">
+                                {isWaived ? (
+                                  <span className="text-xs text-gray-500">
+                                    {fee.waive_note || 'No reason recorded'}
+                                    {fee.waived_by_name ? ` — ${fee.waived_by_name}` : ''}
+                                    {fee.deleted_at ? ` · ${formatDate(fee.deleted_at)}` : ''}
+                                  </span>
+                                ) : (
+                                  fee.description || '—'
+                                )}
+                              </td>
                               <td className="px-4 py-2">
                                 <div className="flex justify-end">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      // Deleting an auto-charged late fee is how finance waives it.
-                                      const message = isLateFee
-                                        ? 'Waive this late fee? It will be removed from the balance.'
-                                        : 'Remove this additional fee?'
-                                      if (window.confirm(message)) {
-                                        deleteLedgerAdditionalFeeMutation.mutate(fee.id)
-                                      }
-                                    }}
-                                    className="text-red-600 border-red-200 hover:bg-red-50"
-                                    title={isLateFee ? 'Waive late fee' : 'Remove fee'}
-                                  >
-                                    <TrashIcon className="w-4 h-4" />
-                                  </Button>
+                                  {isWaived ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      loading={restoreLedgerAdditionalFeeMutation.isPending}
+                                      onClick={() => {
+                                        if (
+                                          window.confirm(
+                                            isLateFee
+                                              ? 'Restore this waived late fee? It goes back on the balance at the amount originally charged.'
+                                              : 'Restore this fee to the balance?'
+                                          )
+                                        ) {
+                                          restoreLedgerAdditionalFeeMutation.mutate(fee.id)
+                                        }
+                                      }}
+                                      className="text-primary-700 border-primary-200 hover:bg-primary-50"
+                                      title="Restore fee"
+                                    >
+                                      <ArrowUturnLeftIcon className="w-4 h-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        // Deleting an auto-charged late fee is how finance waives
+                                        // it, and the waiver is permanent — so a reason is required.
+                                        if (isLateFee) {
+                                          const note = window.prompt(
+                                            'Waive this late fee?\n\nIt leaves the balance and this installment is never charged again. Give a reason (required):'
+                                          )
+                                          if (note === null) return
+                                          if (!note.trim()) {
+                                            toast.error('A reason is required to waive a late fee.')
+                                            return
+                                          }
+                                          deleteLedgerAdditionalFeeMutation.mutate({
+                                            id: fee.id,
+                                            note: note.trim(),
+                                          })
+                                          return
+                                        }
+                                        if (window.confirm('Remove this additional fee?')) {
+                                          deleteLedgerAdditionalFeeMutation.mutate({ id: fee.id })
+                                        }
+                                      }}
+                                      className="text-red-600 border-red-200 hover:bg-red-50"
+                                      title={isLateFee ? 'Waive late fee' : 'Remove fee'}
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

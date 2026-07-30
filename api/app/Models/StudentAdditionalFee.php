@@ -30,6 +30,8 @@ class StudentAdditionalFee extends Model
         'base_amount',
         'amount',
         'created_by',
+        'deleted_by',
+        'waive_note',
     ];
 
     protected $casts = [
@@ -52,6 +54,12 @@ class StudentAdditionalFee extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Who waived the charge. Set alongside `deleted_at`, cleared when it is restored. */
+    public function waivedBy()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
     }
 
     /** The reusable student fee this charge was picked from, when it was not typed by hand. */
