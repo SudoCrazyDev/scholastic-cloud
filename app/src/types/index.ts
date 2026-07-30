@@ -2268,13 +2268,27 @@ export interface CreateAnnouncementData {
 // Payroll (HRIS)
 // =====================
 
+// How a deduction arrives at its peso figure: a flat amount, or a percentage
+// of the salary named by `percent_basis`.
+export type PayrollDeductionCalculationType = 'fixed' | 'percentage';
+
+// What a percentage deduction is taken from.
+// 'basic_pay'  — daily rate × scheduled working days, before any late,
+//                undertime or absence is taken off (SSS and friends).
+// 'gross_pay'  — what the staff member actually earned, penalties and all.
+export type PayrollDeductionPercentBasis = 'basic_pay' | 'gross_pay';
+
 // Institution-defined deduction catalog entry (SSS, Pag-IBIG, Cash Advance, ...).
 export interface PayrollDeductionType {
   id: string;
   name: string;
-  default_amount: number;
+  calculation_type: PayrollDeductionCalculationType;
+  default_amount: number; // fixed types only
+  rate_percent: number; // percentage types only — percent, not a fraction (5 = 5%)
   has_employer_share: boolean;
   default_employer_amount: number;
+  employer_rate_percent: number;
+  percent_basis: PayrollDeductionPercentBasis;
   is_active: boolean;
   sort_order: number;
   updated_at?: string;
@@ -2282,22 +2296,32 @@ export interface PayrollDeductionType {
 
 export interface SavePayrollDeductionTypeData {
   name: string;
+  calculation_type?: PayrollDeductionCalculationType;
   default_amount?: number;
+  rate_percent?: number;
   has_employer_share?: boolean;
   default_employer_amount?: number;
+  employer_rate_percent?: number;
+  percent_basis?: PayrollDeductionPercentBasis;
   is_active?: boolean;
   // Edit only: overwrite every staff member's own amount with these defaults.
   // New types are handed to all staff automatically.
   apply_to_all_staff?: boolean;
 }
 
-// A staff member's default amounts for one deduction type.
+// A staff member's default figures for one deduction type. A percentage type
+// carries rates and leaves the amounts at 0 — the peso is only known once a
+// payslip has a salary to take the percentage of.
 export interface PayrollCompensationDeduction {
   deduction_type_id: string;
   name: string | null;
+  calculation_type: PayrollDeductionCalculationType;
   amount: number;
+  rate_percent: number;
   employer_amount: number;
-  // True when the staff member has no amount of their own and inherits the
+  employer_rate_percent: number;
+  percent_basis: PayrollDeductionPercentBasis | null;
+  // True when the staff member has no figure of their own and inherits the
   // deduction type's default.
   from_default?: boolean;
 }
@@ -2335,7 +2359,14 @@ export interface SavePayrollCompensationData {
   hourly_rate?: number | null;
   hours_per_day: number;
   overtime_rate_per_minute?: number | null;
-  deductions?: { deduction_type_id: string; amount: number; employer_amount?: number }[];
+  deductions?: {
+    deduction_type_id: string;
+    amount: number;
+    employer_amount?: number;
+    // Read instead of the amounts when the type is a percentage one.
+    rate_percent?: number;
+    employer_rate_percent?: number;
+  }[];
 }
 
 export type PayrollPeriodStatus = 'draft' | 'finalized';
@@ -2383,6 +2414,7 @@ export interface PayslipSummary {
   penalty_total: number;
   overtime_minutes: number;
   overtime_total: number;
+  basic_pay: number;
   gross_pay: number;
   total_deductions: number;
   net_pay: number;
@@ -2445,6 +2477,9 @@ export interface Payslip {
   penalty_total: number;
   overtime_minutes: number;
   overtime_total: number;
+  // Daily rate × scheduled working days — the salary before lates, undertime
+  // and absences. What a percentage deduction is normally taken from.
+  basic_pay: number;
   gross_pay: number;
   deductions: PayslipDeduction[];
   employer_share_total: number;
@@ -2455,12 +2490,19 @@ export interface Payslip {
 }
 
 // One deduction line on a payslip; name is a snapshot of the type name.
+// A percentage line also snapshots the rate and the salary it was taken from,
+// so the payslip can be reprinted years later and still explain itself.
 export interface PayslipDeduction {
   id?: string;
   deduction_type_id: string | null;
   name: string;
+  calculation_type: PayrollDeductionCalculationType;
   amount: number;
+  rate_percent: number;
   employer_amount: number;
+  employer_rate_percent: number;
+  percent_basis: PayrollDeductionPercentBasis | null;
+  basis_amount: number;
 }
 
 export interface UpdatePayslipData {
@@ -2472,6 +2514,12 @@ export interface UpdatePayslipData {
     name: string;
     amount: number;
     employer_amount?: number;
+    calculation_type?: PayrollDeductionCalculationType;
+    // On a percentage line these are what is saved — the pesos are recomputed
+    // from the salary server-side.
+    rate_percent?: number;
+    employer_rate_percent?: number;
+    percent_basis?: PayrollDeductionPercentBasis;
   }[];
 }
 

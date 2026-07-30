@@ -1,3 +1,5 @@
+import type { PayrollDeductionPercentBasis } from '../../../types'
+
 export const peso = (amount: number | null | undefined) =>
   new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -51,3 +53,22 @@ export const numberOrZero = (value: string): number => {
   const parsed = parseFloat(value)
   return Number.isFinite(parsed) ? parsed : 0
 }
+
+// 5 → "5%", 1.375 → "1.375%"
+export const percent = (rate: number | null | undefined) =>
+  `${(Number(rate) || 0).toLocaleString('en-PH', { maximumFractionDigits: 3 })}%`
+
+// What a percentage deduction is taken from, as it reads in a sentence.
+export const BASIS_LABELS: Record<PayrollDeductionPercentBasis, string> = {
+  basic_pay: 'basic pay',
+  gross_pay: 'salary earned',
+}
+
+export const BASIS_OPTIONS = [
+  { value: 'basic_pay', label: 'Basic pay — before lates, undertime and absences' },
+  { value: 'gross_pay', label: 'Salary earned — after lates, undertime and absences' },
+]
+
+// "5% of basic pay"
+export const rateLabel = (rate: number, basis: PayrollDeductionPercentBasis | null) =>
+  `${percent(rate)} of ${BASIS_LABELS[basis || 'basic_pay']}`

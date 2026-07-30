@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AttendanceLog;
 use App\Models\Institution;
 use App\Models\PayrollCompensation;
+use App\Models\PayrollCompensationDeduction;
 use App\Models\PayrollDeductionType;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
@@ -247,7 +248,11 @@ class PayrollService
 
         $payslip->days()->saveMany($rows);
 
-        foreach ($this->resolveDeductions($compensation, $deductionTypes) as $line) {
+        // The day rows are in, so a percentage deduction already has a salary
+        // to be a percentage of. recomputeTotals reprices them anyway.
+        $basis = $this->deductionBasis($payslip);
+
+        foreach ($this->resolveDeductions($compensation, $deductionTypes, $basis) as $line) {
             $payslip->deductions()->create($line);
         }
 
@@ -259,19 +264,26 @@ class PayrollService
     /**
      * The deduction lines a payslip starts with.
      *
-     * Each active type in the catalog resolves to one amount: the staff
-     * member's own figure when they have a row for it, otherwise the type's
-     * default. That fallback is what lets a deduction added to the catalog
-     * reach payroll on the next generate without being entered per employee.
+     * Each active type in the catalog resolves to one figure: the staff
+     * member's own when they have a row for it, otherwise the type's default.
+     * That fallback is what lets a deduction added to the catalog reach
+     * payroll on the next generate without being entered per employee.
+     *
+     * A percentage type resolves a rate instead of an amount, and the peso is
+     * computed from $basis. A fixed type behaves exactly as it always has.
      *
      * A staff row of 0 against a type that *does* carry a default is an
      * exemption and stays at 0 — somebody set that deliberately in Employee
      * Rates. Lines that resolve to nothing on both sides are skipped.
      *
      * @param  \Illuminate\Support\Collection<int, PayrollDeductionType>  $deductionTypes
-     * @return array<int, array{deduction_type_id: string, name: string, amount: float, employer_amount: float}>
+     * @param  array<string, float>|null  $basis  salary figures keyed by PayrollDeductionType::BASIS_*.
+     *                                            Null when there is no payslip yet (the rates preview),
+     *                                            which leaves percentage lines priced at 0 — the rate is
+     *                                            still on the line for the caller to show.
+     * @return array<int, array<string, mixed>>
      */
-    public function resolveDeductions(PayrollCompensation $compensation, \Illuminate\Support\Collection $deductionTypes): array
+    public function resolveDeductions(PayrollCompensation $compensation, \Illuminate\Support\Collection $deductionTypes, ?array $basis = null): array
     {
         $staffAmounts = $compensation->deductions->keyBy('deduction_type_id');
         $lines = [];
@@ -283,31 +295,147 @@ class PayrollService
 
             $own = $staffAmounts->get($type->id);
 
-            $amount = $own !== null
-                ? (float) $own->amount
-                : (float) $type->default_amount;
+            $line = $type->isPercentage()
+                ? $this->percentageLine($type, $own, $basis)
+                : $this->fixedLine($type, $own);
 
-            $employerAmount = 0.0;
-            if ($type->has_employer_share) {
-                $employerAmount = $own !== null
-                    ? (float) $own->employer_amount
-                    : (float) $type->default_employer_amount;
-            }
-
-            if ($amount <= 0 && $employerAmount <= 0) {
+            if ($line === null) {
                 continue;
             }
 
-            $lines[] = [
-                'deduction_type_id' => $type->id,
-                // Snapshot the name so deleting the type never rewrites history.
-                'name' => $type->name,
-                'amount' => $amount,
-                'employer_amount' => $employerAmount,
-            ];
+            // Snapshot the name so deleting the type never rewrites history.
+            $lines[] = ['deduction_type_id' => $type->id, 'name' => $type->name] + $line;
         }
 
         return $lines;
+    }
+
+    /**
+     * @return array<string, mixed>|null  null when the type applies to nobody
+     */
+    private function fixedLine(PayrollDeductionType $type, ?PayrollCompensationDeduction $own): ?array
+    {
+        $amount = $own !== null
+            ? (float) $own->amount
+            : (float) $type->default_amount;
+
+        $employerAmount = 0.0;
+        if ($type->has_employer_share) {
+            $employerAmount = $own !== null
+                ? (float) $own->employer_amount
+                : (float) $type->default_employer_amount;
+        }
+
+        if ($amount <= 0 && $employerAmount <= 0) {
+            return null;
+        }
+
+        return [
+            'calculation_type' => PayrollDeductionType::CALC_FIXED,
+            'amount' => $amount,
+            'rate_percent' => 0,
+            'employer_amount' => $employerAmount,
+            'employer_rate_percent' => 0,
+            'percent_basis' => null,
+            'basis_amount' => 0,
+        ];
+    }
+
+    /**
+     * @param  array<string, float>|null  $basis
+     * @return array<string, mixed>|null  null when the type applies to nobody
+     */
+    private function percentageLine(PayrollDeductionType $type, ?PayrollCompensationDeduction $own, ?array $basis): ?array
+    {
+        $rate = $own !== null
+            ? (float) $own->rate_percent
+            : (float) $type->rate_percent;
+
+        $employerRate = 0.0;
+        if ($type->has_employer_share) {
+            $employerRate = $own !== null
+                ? (float) $own->employer_rate_percent
+                : (float) $type->employer_rate_percent;
+        }
+
+        if ($rate <= 0 && $employerRate <= 0) {
+            return null;
+        }
+
+        // A rate against a salary of zero is still a real line: the staff
+        // member is on the deduction, they just earned nothing this period.
+        $basisAmount = round((float) ($basis[$type->percent_basis] ?? 0), 2);
+
+        return [
+            'calculation_type' => PayrollDeductionType::CALC_PERCENTAGE,
+            'amount' => round($basisAmount * $rate / 100, 2),
+            'rate_percent' => $rate,
+            'employer_amount' => round($basisAmount * $employerRate / 100, 2),
+            'employer_rate_percent' => $employerRate,
+            'percent_basis' => $type->percent_basis,
+            'basis_amount' => $basisAmount,
+        ];
+    }
+
+    /**
+     * The salary figures a percentage deduction can be taken from.
+     *
+     * @param  \Illuminate\Support\Collection<int, PayslipDay>|null  $days
+     * @return array<string, float>
+     */
+    public function deductionBasis(Payslip $payslip, ?\Illuminate\Support\Collection $days = null): array
+    {
+        $days ??= $payslip->days()->get();
+
+        return [
+            PayrollDeductionType::BASIS_BASIC_PAY => $this->basicPay($payslip, $days),
+            PayrollDeductionType::BASIS_GROSS_PAY => round((float) $days->sum('amount_earned'), 2),
+        ];
+    }
+
+    /**
+     * The period's salary with nothing taken off: the daily rate for every
+     * scheduled working day, whether or not it was actually worked.
+     *
+     * Attendance is deliberately ignored. A contribution charged as a
+     * percentage of salary must not shrink because somebody was late, absent,
+     * or on unpaid leave — that is the whole point of "5% of the gross, no
+     * deductions, no lates". Rest days are the one exclusion: they were never
+     * part of the salary to begin with.
+     *
+     * @param  \Illuminate\Support\Collection<int, PayslipDay>  $days
+     */
+    private function basicPay(Payslip $payslip, \Illuminate\Support\Collection $days): float
+    {
+        $scheduledDays = $days->reject(fn (PayslipDay $day) => (bool) $day->is_rest_day)->count();
+
+        return round($scheduledDays * (float) $payslip->daily_rate, 2);
+    }
+
+    /**
+     * Re-price the payslip's percentage lines against the salary they are
+     * taken from, so a corrected punch or an edited daily rate moves them too.
+     *
+     * Only lines already on the payslip are touched — one a payroll manager
+     * deleted stays deleted.
+     *
+     * @param  array<string, float>  $basis
+     */
+    private function repricePercentageDeductions(Payslip $payslip, array $basis): void
+    {
+        $lines = $payslip->deductions()
+            ->where('calculation_type', PayrollDeductionType::CALC_PERCENTAGE)
+            ->get();
+
+        foreach ($lines as $line) {
+            $basisAmount = round((float) ($basis[$line->percent_basis] ?? $basis[PayrollDeductionType::BASIS_BASIC_PAY]), 2);
+
+            $line->update([
+                'basis_amount' => $basisAmount,
+                'amount' => round($basisAmount * (float) $line->rate_percent / 100, 2),
+                'employer_amount' => round($basisAmount * (float) $line->employer_rate_percent / 100, 2),
+            ]);
+        }
     }
 
     /**
@@ -361,7 +489,13 @@ class PayrollService
     {
         $days = $payslip->days()->get();
 
-        $gross = round((float) $days->sum('amount_earned'), 2);
+        $basis = $this->deductionBasis($payslip, $days);
+        $gross = $basis[PayrollDeductionType::BASIS_GROSS_PAY];
+
+        // Percentage lines follow the salary, so they are re-priced before
+        // the total is summed.
+        $this->repricePercentageDeductions($payslip, $basis);
+
         $totalDeductions = round((float) $payslip->deductions()->sum('amount'), 2);
 
         $payslip->update([
@@ -375,6 +509,7 @@ class PayrollService
             'penalty_total' => round((float) $days->sum('penalty_amount'), 2),
             'overtime_minutes' => (int) $days->sum('overtime_minutes'),
             'overtime_total' => round((float) $days->sum('overtime_amount'), 2),
+            'basic_pay' => $basis[PayrollDeductionType::BASIS_BASIC_PAY],
             'gross_pay' => $gross,
             'total_deductions' => $totalDeductions,
             'net_pay' => round($gross - $totalDeductions, 2),

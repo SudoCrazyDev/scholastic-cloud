@@ -116,6 +116,9 @@ class PayrollCompensationController extends Controller
             ],
             'deductions.*.amount' => 'required|numeric|min:0|max:999999',
             'deductions.*.employer_amount' => 'nullable|numeric|min:0|max:999999',
+            // Only read for a percentage type; percent, not a fraction.
+            'deductions.*.rate_percent' => 'nullable|numeric|min:0|max:100',
+            'deductions.*.employer_rate_percent' => 'nullable|numeric|min:0|max:100',
         ], [
             'user_id.exists' => 'This staff member does not belong to your institution.',
             'deductions.*.deduction_type_id.exists' => 'One of the deductions does not belong to your institution.',
@@ -139,26 +142,42 @@ class PayrollCompensationController extends Controller
             $defaults = $this->deductionDefaults($institutionId);
 
             foreach ($validated['deductions'] ?? [] as $deduction) {
-                $amount = (float) $deduction['amount'];
-                $employerAmount = (float) ($deduction['employer_amount'] ?? 0);
                 $default = $defaults->get($deduction['deduction_type_id']);
+                $isPercentage = $default?->isPercentage() ?? false;
+
+                // A percentage type is carried per staff member as a rate; the
+                // peso is only ever computed on the payslip, from the salary.
+                $figures = $isPercentage
+                    ? [
+                        'amount' => 0,
+                        'rate_percent' => (float) ($deduction['rate_percent'] ?? 0),
+                        'employer_amount' => 0,
+                        'employer_rate_percent' => (float) ($deduction['employer_rate_percent'] ?? 0),
+                    ]
+                    : [
+                        'amount' => (float) $deduction['amount'],
+                        'rate_percent' => 0,
+                        'employer_amount' => (float) ($deduction['employer_amount'] ?? 0),
+                        'employer_rate_percent' => 0,
+                    ];
 
                 // An all-zero row against a type with no default of its own
                 // says nothing — storing it would only stop a default set
                 // later from reaching this staff member. Against a type that
                 // does carry a default, the same row is a deliberate
                 // exemption and is kept.
-                $typeHasDefault = $default !== null
-                    && ((float) $default->default_amount > 0 || (float) $default->default_employer_amount > 0);
+                $typeHasDefault = $default !== null && ($isPercentage
+                    ? ((float) $default->rate_percent > 0 || (float) $default->employer_rate_percent > 0)
+                    : ((float) $default->default_amount > 0 || (float) $default->default_employer_amount > 0));
 
-                if ($amount <= 0 && $employerAmount <= 0 && ! $typeHasDefault) {
+                $saysNothing = collect($figures)->every(fn ($value) => (float) $value <= 0);
+
+                if ($saysNothing && ! $typeHasDefault) {
                     continue;
                 }
 
-                $compensation->deductions()->create([
+                $compensation->deductions()->create($figures + [
                     'deduction_type_id' => $deduction['deduction_type_id'],
-                    'amount' => $amount,
-                    'employer_amount' => $employerAmount,
                 ]);
             }
 
@@ -213,13 +232,19 @@ class PayrollCompensationController extends Controller
 
         // What payroll would actually deduct, so the grid shows the catalog
         // defaults a staff member inherits and not just their own rows.
+        // Percentage lines come back priced at 0 — there is no payslip here to
+        // take a percentage of — so the grid shows their rate instead.
         $ownTypeIds = $compensation->deductions->pluck('deduction_type_id')->flip();
         $effective = collect($this->payrollService->resolveDeductions($compensation, $types->values()))
             ->map(fn (array $line) => [
                 'deduction_type_id' => $line['deduction_type_id'],
                 'name' => $line['name'],
+                'calculation_type' => $line['calculation_type'],
                 'amount' => $line['amount'],
+                'rate_percent' => $line['rate_percent'],
                 'employer_amount' => $line['employer_amount'],
+                'employer_rate_percent' => $line['employer_rate_percent'],
+                'percent_basis' => $line['percent_basis'],
                 'from_default' => ! $ownTypeIds->has($line['deduction_type_id']),
             ]);
 

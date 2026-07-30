@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Models\PayrollDeductionType;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipDay;
@@ -115,6 +116,12 @@ class PayslipController extends Controller
             'deductions.*.name' => 'required|string|max:255',
             'deductions.*.amount' => 'required|numeric|min:0|max:999999',
             'deductions.*.employer_amount' => 'nullable|numeric|min:0|max:999999',
+            'deductions.*.calculation_type' => ['nullable', Rule::in(PayrollDeductionType::CALCULATION_TYPES)],
+            // On a percentage line the rates are what is saved; the pesos are
+            // recomputed from the salary right after.
+            'deductions.*.rate_percent' => 'nullable|numeric|min:0|max:100',
+            'deductions.*.employer_rate_percent' => 'nullable|numeric|min:0|max:100',
+            'deductions.*.percent_basis' => ['nullable', Rule::in(PayrollDeductionType::PERCENT_BASES)],
         ], [
             'deductions.*.deduction_type_id.exists' => 'One of the deductions does not belong to your institution.',
             'deductions.*.name.required' => 'Each deduction needs a name.',
@@ -137,11 +144,25 @@ class PayslipController extends Controller
                 // Deduction lines are fully replaced on every save.
                 $payslip->deductions()->delete();
                 foreach ($deductions as $deduction) {
+                    $isPercentage = ($deduction['calculation_type'] ?? PayrollDeductionType::CALC_FIXED)
+                        === PayrollDeductionType::CALC_PERCENTAGE;
+
                     $payslip->deductions()->create([
                         'deduction_type_id' => $deduction['deduction_type_id'] ?? null,
                         'name' => $deduction['name'],
-                        'amount' => $deduction['amount'],
-                        'employer_amount' => $deduction['employer_amount'] ?? 0,
+                        'calculation_type' => $isPercentage
+                            ? PayrollDeductionType::CALC_PERCENTAGE
+                            : PayrollDeductionType::CALC_FIXED,
+                        // A percentage line's pesos are overwritten by
+                        // recomputeTotals below, from the rates saved here.
+                        'amount' => $isPercentage ? 0 : $deduction['amount'],
+                        'rate_percent' => $isPercentage ? ($deduction['rate_percent'] ?? 0) : 0,
+                        'employer_amount' => $isPercentage ? 0 : ($deduction['employer_amount'] ?? 0),
+                        'employer_rate_percent' => $isPercentage ? ($deduction['employer_rate_percent'] ?? 0) : 0,
+                        'percent_basis' => $isPercentage
+                            ? ($deduction['percent_basis'] ?? PayrollDeductionType::BASIS_BASIC_PAY)
+                            : null,
+                        'basis_amount' => 0,
                     ]);
                 }
             }
@@ -241,6 +262,7 @@ class PayslipController extends Controller
             'penalty_total' => (float) $payslip->penalty_total,
             'overtime_minutes' => (int) $payslip->overtime_minutes,
             'overtime_total' => (float) $payslip->overtime_total,
+            'basic_pay' => (float) $payslip->basic_pay,
             'gross_pay' => (float) $payslip->gross_pay,
             'total_deductions' => (float) $payslip->total_deductions,
             'net_pay' => (float) $payslip->net_pay,
@@ -280,13 +302,19 @@ class PayslipController extends Controller
             'penalty_total' => (float) $payslip->penalty_total,
             'overtime_minutes' => (int) $payslip->overtime_minutes,
             'overtime_total' => (float) $payslip->overtime_total,
+            'basic_pay' => (float) $payslip->basic_pay,
             'gross_pay' => (float) $payslip->gross_pay,
             'deductions' => $payslip->deductions->map(fn (PayslipDeduction $deduction) => [
                 'id' => $deduction->id,
                 'deduction_type_id' => $deduction->deduction_type_id,
                 'name' => $deduction->name,
+                'calculation_type' => $deduction->calculation_type,
                 'amount' => (float) $deduction->amount,
+                'rate_percent' => (float) $deduction->rate_percent,
                 'employer_amount' => (float) $deduction->employer_amount,
+                'employer_rate_percent' => (float) $deduction->employer_rate_percent,
+                'percent_basis' => $deduction->percent_basis,
+                'basis_amount' => (float) $deduction->basis_amount,
             ])->values(),
             'employer_share_total' => round((float) $payslip->deductions->sum('employer_amount'), 2),
             'total_deductions' => (float) $payslip->total_deductions,

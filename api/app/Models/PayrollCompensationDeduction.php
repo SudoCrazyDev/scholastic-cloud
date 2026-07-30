@@ -14,12 +14,16 @@ class PayrollCompensationDeduction extends Model
         'payroll_compensation_id',
         'deduction_type_id',
         'amount',
+        'rate_percent',
         'employer_amount',
+        'employer_rate_percent',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'rate_percent' => 'decimal:3',
         'employer_amount' => 'decimal:2',
+        'employer_rate_percent' => 'decimal:3',
     ];
 
     public function compensation(): BelongsTo

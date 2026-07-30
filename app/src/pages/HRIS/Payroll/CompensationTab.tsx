@@ -10,7 +10,7 @@ import type {
   PayrollStaffCompensation,
   SavePayrollCompensationData,
 } from '../../../types'
-import { errorMessage, numberOrZero, peso } from './helpers'
+import { errorMessage, numberOrZero, peso, rateLabel } from './helpers'
 
 interface CompensationForm {
   designation: string
@@ -18,7 +18,8 @@ interface CompensationForm {
   hourly_rate: string
   hours_per_day: string
   overtime_rate: string
-  // deduction_type_id -> amount (as entered)
+  // deduction_type_id -> the figure as entered: pesos for a fixed type,
+  // percent for a percentage one.
   deductions: Record<string, string>
   employerDeductions: Record<string, string>
 }
@@ -93,14 +94,15 @@ const CompensationTab: React.FC = () => {
     const employerAmounts: Record<string, string> = {}
     for (const type of activeTypes) {
       const existing = c?.deductions.find((d) => d.deduction_type_id === type.id)
-      // The staff member's own amount wins; otherwise they inherit the type's
+      const percentage = type.calculation_type === 'percentage'
+      // The staff member's own figure wins; otherwise they inherit the type's
       // default, which is what payroll itself would apply.
-      deductionAmounts[type.id] = existing
-        ? String(existing.amount)
-        : String(type.default_amount)
-      employerAmounts[type.id] = existing
-        ? String(existing.employer_amount)
-        : String(type.default_employer_amount)
+      deductionAmounts[type.id] = percentage
+        ? String(existing ? existing.rate_percent : type.rate_percent)
+        : String(existing ? existing.amount : type.default_amount)
+      employerAmounts[type.id] = percentage
+        ? String(existing ? existing.employer_rate_percent : type.employer_rate_percent)
+        : String(existing ? existing.employer_amount : type.default_employer_amount)
     }
     setForm({
       designation: c?.designation || '',
@@ -127,13 +129,21 @@ const CompensationTab: React.FC = () => {
         hours_per_day: numberOrZero(form.hours_per_day) || 8,
         overtime_rate_per_minute:
           form.overtime_rate.trim() === '' ? null : numberOrZero(form.overtime_rate),
-        deductions: activeTypes.map((type) => ({
-          deduction_type_id: type.id,
-          amount: numberOrZero(form.deductions[type.id] ?? ''),
-          employer_amount: type.has_employer_share
+        deductions: activeTypes.map((type) => {
+          const percentage = type.calculation_type === 'percentage'
+          const own = numberOrZero(form.deductions[type.id] ?? '')
+          const employer = type.has_employer_share
             ? numberOrZero(form.employerDeductions[type.id] ?? '')
-            : 0,
-        })),
+            : 0
+
+          return {
+            deduction_type_id: type.id,
+            amount: percentage ? 0 : own,
+            employer_amount: percentage ? 0 : employer,
+            rate_percent: percentage ? own : 0,
+            employer_rate_percent: percentage ? employer : 0,
+          }
+        }),
       },
     })
   }
@@ -202,7 +212,15 @@ const CompensationTab: React.FC = () => {
             ) : (
               filteredRows.map((row) => {
                 const c = row.compensation
-                const appliedDeductions = (c?.deductions || []).filter((d) => d.amount > 0)
+                // A percentage line has no peso yet — there is no payroll
+                // period here to take a percentage of — so it counts as
+                // applied on its rate instead.
+                const appliedDeductions = (c?.deductions || []).filter((d) =>
+                  d.calculation_type === 'percentage' ? d.rate_percent > 0 : d.amount > 0
+                )
+                const percentageDeductions = appliedDeductions.filter(
+                  (d) => d.calculation_type === 'percentage'
+                )
                 return (
                   <tr key={row.user_id} className="border-b border-gray-50 hover:bg-gray-50/50">
                     <td className="px-4 py-3">
@@ -246,11 +264,24 @@ const CompensationTab: React.FC = () => {
                             title={appliedDeductions
                               .map(
                                 (d) =>
-                                  `${d.name}: ${peso(d.amount)}${d.from_default ? ' (type default)' : ''}`
+                                  `${d.name}: ${
+                                    d.calculation_type === 'percentage'
+                                      ? rateLabel(d.rate_percent, d.percent_basis)
+                                      : peso(d.amount)
+                                  }${d.from_default ? ' (type default)' : ''}`
                               )
                               .join(', ')}
                           >
                             <span className="tabular-nums font-medium">{peso(c.deductions_total)}</span>
+                            {percentageDeductions.length > 0 && (
+                              <span className="tabular-nums font-medium">
+                                {' '}
+                                +{' '}
+                                {percentageDeductions
+                                  .map((d) => `${d.rate_percent}%`)
+                                  .join(' + ')}
+                              </span>
+                            )}
                             <span className="ml-1 text-xs text-gray-400">
                               ({appliedDeductions.map((d) => d.name).join(', ')})
                             </span>
@@ -381,45 +412,59 @@ const CompensationTab: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {activeTypes.map((type) => (
-                          <tr key={type.id} className="border-b border-gray-50 last:border-0">
-                            <td className="px-3 py-2 font-medium text-gray-700">{type.name}</td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                size="sm"
-                                value={form.deductions[type.id] ?? ''}
-                                onChange={setDeduction(type.id)}
-                                placeholder="0.00"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              {type.has_employer_share ? (
+                        {activeTypes.map((type) => {
+                          const percentage = type.calculation_type === 'percentage'
+                          // Percent and peso want different steps and hints,
+                          // but the same two inputs.
+                          const figureProps = percentage
+                            ? { max: '100', step: '0.001', placeholder: '0' }
+                            : { step: '0.01', placeholder: '0.00' }
+                          return (
+                            <tr key={type.id} className="border-b border-gray-50 last:border-0">
+                              <td className="px-3 py-2 font-medium text-gray-700">
+                                {type.name}
+                                {percentage && (
+                                  <span className="block text-xs font-normal text-gray-400">
+                                    % of {type.percent_basis === 'gross_pay' ? 'salary earned' : 'basic pay'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
                                 <Input
                                   type="number"
                                   min="0"
-                                  step="0.01"
                                   size="sm"
-                                  value={form.employerDeductions[type.id] ?? ''}
-                                  onChange={setEmployerDeduction(type.id)}
-                                  placeholder="0.00"
+                                  value={form.deductions[type.id] ?? ''}
+                                  onChange={setDeduction(type.id)}
+                                  {...figureProps}
                                 />
-                              ) : (
-                                <span className="text-xs text-gray-400">not shared</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="px-3 py-2">
+                                {type.has_employer_share ? (
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    size="sm"
+                                    value={form.employerDeductions[type.id] ?? ''}
+                                    onChange={setEmployerDeduction(type.id)}
+                                    {...figureProps}
+                                  />
+                                ) : (
+                                  <span className="text-xs text-gray-400">not shared</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
                 <p className="mt-1.5 text-xs text-gray-400">
-                  Amounts start from each type's default and apply to this staff member on the next
-                  payroll generate. Set one to 0 to exempt them from that deduction. Employer shares
-                  appear under Other Benefits on the printed record.
+                  Figures start from each type's default and apply to this staff member on the next
+                  payroll generate. A percentage type takes a rate (%) here, not a peso amount — its
+                  amount is worked out per payslip from the salary. Set one to 0 to exempt them from
+                  that deduction. Employer shares appear under Other Benefits on the printed record.
                 </p>
               </div>
 

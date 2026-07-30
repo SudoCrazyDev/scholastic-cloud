@@ -48,15 +48,12 @@ class PayrollDeductionTypeController extends Controller
 
         $validated = $this->validatePayload($request, $institutionId);
 
-        $type = PayrollDeductionType::create([
+        $type = PayrollDeductionType::create($this->attributes(
+            $validated,
+            $validated['is_active'] ?? true,
+            $validated['has_employer_share'] ?? false
+        ) + [
             'institution_id' => $institutionId,
-            'name' => $validated['name'],
-            'default_amount' => $validated['default_amount'] ?? 0,
-            'has_employer_share' => $validated['has_employer_share'] ?? false,
-            'default_employer_amount' => ($validated['has_employer_share'] ?? false)
-                ? ($validated['default_employer_amount'] ?? 0)
-                : 0,
-            'is_active' => $validated['is_active'] ?? true,
             'sort_order' => PayrollDeductionType::where('institution_id', $institutionId)->max('sort_order') + 1,
             'created_by' => $request->user()?->id,
         ]);
@@ -88,15 +85,11 @@ class PayrollDeductionTypeController extends Controller
 
         $validated = $this->validatePayload($request, $institutionId, $type->id);
 
-        $hasEmployerShare = $validated['has_employer_share'] ?? $type->has_employer_share;
-
-        $type->update([
-            'name' => $validated['name'],
-            'default_amount' => $validated['default_amount'] ?? 0,
-            'has_employer_share' => $hasEmployerShare,
-            'default_employer_amount' => $hasEmployerShare ? ($validated['default_employer_amount'] ?? 0) : 0,
-            'is_active' => $validated['is_active'] ?? $type->is_active,
-        ]);
+        $type->update($this->attributes(
+            $validated,
+            $validated['is_active'] ?? $type->is_active,
+            $validated['has_employer_share'] ?? $type->has_employer_share
+        ));
 
         $applied = $this->applyDefaultsToStaff($type, (bool) ($validated['apply_to_all_staff'] ?? false));
 
@@ -136,12 +129,48 @@ class PayrollDeductionTypeController extends Controller
     }
 
     /**
-     * Push a type's default amounts onto every staff member's rates, so a new
-     * deduction never has to be typed into each employee one by one.
+     * The columns a save writes, with the half that does not apply to the
+     * chosen calculation zeroed out: a percentage type carries no peso
+     * defaults, and a fixed one carries no rates. Keeping the unused half at 0
+     * means switching a type between the two can never leave a stale figure
+     * behind for payroll to pick up.
      *
-     * Staff that already carry the deduction keep their own amount — those are
-     * deliberate per-employee figures — unless $overwrite is set, which is the
-     * explicit "apply to all employees" the edit form offers for a rate change.
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function attributes(array $validated, bool $isActive, bool $hasEmployerShare): array
+    {
+        $isPercentage = ($validated['calculation_type'] ?? PayrollDeductionType::CALC_FIXED)
+            === PayrollDeductionType::CALC_PERCENTAGE;
+
+        return [
+            'name' => $validated['name'],
+            'calculation_type' => $isPercentage
+                ? PayrollDeductionType::CALC_PERCENTAGE
+                : PayrollDeductionType::CALC_FIXED,
+            'default_amount' => $isPercentage ? 0 : ($validated['default_amount'] ?? 0),
+            'rate_percent' => $isPercentage ? ($validated['rate_percent'] ?? 0) : 0,
+            'has_employer_share' => $hasEmployerShare,
+            'default_employer_amount' => (! $isPercentage && $hasEmployerShare)
+                ? ($validated['default_employer_amount'] ?? 0)
+                : 0,
+            'employer_rate_percent' => ($isPercentage && $hasEmployerShare)
+                ? ($validated['employer_rate_percent'] ?? 0)
+                : 0,
+            'percent_basis' => $validated['percent_basis'] ?? PayrollDeductionType::BASIS_BASIC_PAY,
+            'is_active' => $isActive,
+        ];
+    }
+
+    /**
+     * Push a type's defaults onto every staff member's rates, so a new
+     * deduction never has to be typed into each employee one by one. A
+     * percentage type hands out its rates; a fixed one its peso amounts.
+     *
+     * Staff that already carry the deduction keep their own figures — those
+     * are deliberate per-employee values — unless $overwrite is set, which is
+     * the explicit "apply to all employees" the edit form offers for a rate
+     * change.
      *
      * Staff without a compensation record are skipped: they generate no
      * payslip yet, and the rates editor already pre-fills these defaults when
@@ -151,11 +180,19 @@ class PayrollDeductionTypeController extends Controller
      */
     private function applyDefaultsToStaff(PayrollDeductionType $type, bool $overwrite): int
     {
-        $amount = (float) $type->default_amount;
-        $employerAmount = $type->has_employer_share ? (float) $type->default_employer_amount : 0.0;
+        $isPercentage = $type->isPercentage();
+
+        $amount = $isPercentage ? 0.0 : (float) $type->default_amount;
+        $employerAmount = (! $isPercentage && $type->has_employer_share)
+            ? (float) $type->default_employer_amount
+            : 0.0;
+        $rate = $isPercentage ? (float) $type->rate_percent : 0.0;
+        $employerRate = ($isPercentage && $type->has_employer_share)
+            ? (float) $type->employer_rate_percent
+            : 0.0;
 
         // Nothing to hand out — and an inactive type is ignored on payslips anyway.
-        if (! $type->is_active || ($amount <= 0 && $employerAmount <= 0)) {
+        if (! $type->is_active || ($amount <= 0 && $employerAmount <= 0 && $rate <= 0 && $employerRate <= 0)) {
             return 0;
         }
 
@@ -169,9 +206,16 @@ class PayrollDeductionTypeController extends Controller
             ->get()
             ->keyBy('payroll_compensation_id');
 
+        $figures = [
+            'amount' => $amount,
+            'rate_percent' => $rate,
+            'employer_amount' => $employerAmount,
+            'employer_rate_percent' => $employerRate,
+        ];
+
         $affected = 0;
 
-        DB::transaction(function () use ($compensations, $existing, $type, $amount, $employerAmount, $overwrite, &$affected) {
+        DB::transaction(function () use ($compensations, $existing, $type, $figures, $overwrite, &$affected) {
             foreach ($compensations as $compensation) {
                 $row = $existing->get($compensation->id);
 
@@ -179,13 +223,11 @@ class PayrollDeductionTypeController extends Controller
                     if (! $overwrite) {
                         continue;
                     }
-                    $row->update(['amount' => $amount, 'employer_amount' => $employerAmount]);
+                    $row->update($figures);
                 } else {
-                    PayrollCompensationDeduction::create([
+                    PayrollCompensationDeduction::create($figures + [
                         'payroll_compensation_id' => $compensation->id,
                         'deduction_type_id' => $type->id,
-                        'amount' => $amount,
-                        'employer_amount' => $employerAmount,
                     ]);
                 }
 
@@ -216,9 +258,14 @@ class PayrollDeductionTypeController extends Controller
                     ->where(fn ($query) => $query->where('institution_id', $institutionId))
                     ->ignore($ignoreId),
             ],
+            'calculation_type' => ['nullable', Rule::in(PayrollDeductionType::CALCULATION_TYPES)],
             'default_amount' => 'nullable|numeric|min:0|max:999999',
+            // Percent, not a fraction: 5 is 5%.
+            'rate_percent' => 'nullable|numeric|min:0|max:100',
             'has_employer_share' => 'nullable|boolean',
             'default_employer_amount' => 'nullable|numeric|min:0|max:999999',
+            'employer_rate_percent' => 'nullable|numeric|min:0|max:100',
+            'percent_basis' => ['nullable', Rule::in(PayrollDeductionType::PERCENT_BASES)],
             'is_active' => 'nullable|boolean',
             // Opt-in on edit: replace every staff member's own amount with the
             // new defaults (a rate change everyone is on, e.g. a new circular).
@@ -233,9 +280,13 @@ class PayrollDeductionTypeController extends Controller
         return [
             'id' => $type->id,
             'name' => $type->name,
+            'calculation_type' => $type->calculation_type,
             'default_amount' => (float) $type->default_amount,
+            'rate_percent' => (float) $type->rate_percent,
             'has_employer_share' => (bool) $type->has_employer_share,
             'default_employer_amount' => (float) $type->default_employer_amount,
+            'employer_rate_percent' => (float) $type->employer_rate_percent,
+            'percent_basis' => $type->percent_basis,
             'is_active' => (bool) $type->is_active,
             'sort_order' => (int) $type->sort_order,
             'updated_at' => $type->updated_at?->toIso8601String(),

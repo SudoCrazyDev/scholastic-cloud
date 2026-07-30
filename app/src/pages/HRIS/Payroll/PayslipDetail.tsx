@@ -6,8 +6,15 @@ import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { Autocomplete } from '../../../components/autocomplete'
 import { payrollService } from '../../../services/payrollService'
-import type { Payslip, PayslipDay, PayrollDeductionType, UpdatePayslipData } from '../../../types'
-import { dayLabel, errorMessage, numberOrZero, peso, time12 } from './helpers'
+import type {
+  Payslip,
+  PayslipDay,
+  PayrollDeductionCalculationType,
+  PayrollDeductionPercentBasis,
+  PayrollDeductionType,
+  UpdatePayslipData,
+} from '../../../types'
+import { dayLabel, errorMessage, numberOrZero, percent, peso, rateLabel, time12 } from './helpers'
 import PayslipPrintModal from './PayslipPrintModal'
 import PayslipSlipPrintModal from './PayslipSlipPrintModal'
 
@@ -27,8 +34,14 @@ interface DeductionRow {
   key: string
   deduction_type_id: string | null
   name: string
+  calculation_type: PayrollDeductionCalculationType
+  // Pesos on a fixed row, percent on a percentage one — the input swaps with
+  // calculation_type, and the server recomputes a percentage row's pesos.
   amount: string
   employer_amount: string
+  percent_basis: PayrollDeductionPercentBasis | null
+  // What the percentage was last taken from, for the "5% of ₱15,000" hint.
+  basis_amount: number
 }
 
 const ratesFromPayslip = (payslip: Payslip): RatesForm => ({
@@ -38,13 +51,19 @@ const ratesFromPayslip = (payslip: Payslip): RatesForm => ({
 })
 
 const deductionsFromPayslip = (payslip: Payslip): DeductionRow[] =>
-  payslip.deductions.map((deduction, index) => ({
-    key: deduction.id || `row-${index}`,
-    deduction_type_id: deduction.deduction_type_id,
-    name: deduction.name,
-    amount: String(deduction.amount),
-    employer_amount: String(deduction.employer_amount),
-  }))
+  payslip.deductions.map((deduction, index) => {
+    const percentage = deduction.calculation_type === 'percentage'
+    return {
+      key: deduction.id || `row-${index}`,
+      deduction_type_id: deduction.deduction_type_id,
+      name: deduction.name,
+      calculation_type: deduction.calculation_type,
+      amount: String(percentage ? deduction.rate_percent : deduction.amount),
+      employer_amount: String(percentage ? deduction.employer_rate_percent : deduction.employer_amount),
+      percent_basis: deduction.percent_basis,
+      basis_amount: deduction.basis_amount,
+    }
+  })
 
 const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalized, onBack }) => {
   const queryClient = useQueryClient()
@@ -137,22 +156,32 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
           key: `new-${Date.now()}-${prev.length}`,
           deduction_type_id: null,
           name: '',
+          calculation_type: 'fixed',
           amount: '',
           employer_amount: '',
+          percent_basis: null,
+          basis_amount: 0,
         },
       ])
       return
     }
     const type = activeTypes.find((t) => t.id === value)
     if (!type) return
+    const percentage = type.calculation_type === 'percentage'
     setDeductionRows((prev) => [
       ...prev,
       {
         key: `new-${Date.now()}-${prev.length}`,
         deduction_type_id: type.id,
         name: type.name,
-        amount: String(type.default_amount || ''),
-        employer_amount: type.has_employer_share ? String(type.default_employer_amount || '') : '',
+        calculation_type: type.calculation_type,
+        amount: String((percentage ? type.rate_percent : type.default_amount) || ''),
+        employer_amount: type.has_employer_share
+          ? String((percentage ? type.employer_rate_percent : type.default_employer_amount) || '')
+          : '',
+        percent_basis: percentage ? type.percent_basis : null,
+        // Filled in by the server on save, once it knows the salary.
+        basis_amount: 0,
       },
     ])
   }
@@ -165,12 +194,20 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
       hourly_rate: numberOrZero(form.hourly_rate),
       deductions: deductionRows
         .filter((row) => row.name.trim() !== '')
-        .map((row) => ({
-          deduction_type_id: row.deduction_type_id,
-          name: row.name.trim(),
-          amount: numberOrZero(row.amount),
-          employer_amount: numberOrZero(row.employer_amount),
-        })),
+        .map((row) => {
+          const percentage = row.calculation_type === 'percentage'
+          return {
+            deduction_type_id: row.deduction_type_id,
+            name: row.name.trim(),
+            calculation_type: row.calculation_type,
+            // The server recomputes a percentage row's pesos from these rates.
+            amount: percentage ? 0 : numberOrZero(row.amount),
+            employer_amount: percentage ? 0 : numberOrZero(row.employer_amount),
+            rate_percent: percentage ? numberOrZero(row.amount) : 0,
+            employer_rate_percent: percentage ? numberOrZero(row.employer_amount) : 0,
+            percent_basis: percentage ? row.percent_basis || 'basic_pay' : undefined,
+          }
+        }),
     })
   }
 
@@ -184,7 +221,14 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
       .map((type) => ({
         id: type.id,
         label: type.name,
-        description: type.default_amount > 0 ? peso(type.default_amount) : undefined,
+        description:
+          type.calculation_type === 'percentage'
+            ? type.rate_percent > 0
+              ? rateLabel(type.rate_percent, type.percent_basis)
+              : undefined
+            : type.default_amount > 0
+              ? peso(type.default_amount)
+              : undefined,
       })),
     { id: 'custom', label: 'Custom deduction…' },
   ]
@@ -460,67 +504,80 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                       ? activeTypes.find((t) => t.id === row.deduction_type_id)
                       : null
                     const employerDisabled = readOnly || (rowType ? !rowType.has_employer_share : false)
+                    const percentage = row.calculation_type === 'percentage'
+                    // Percent and peso share the two inputs; only the step and
+                    // placeholder differ.
+                    const figureProps = percentage
+                      ? { max: '100', step: '0.001', placeholder: '0' }
+                      : { step: '0.01', placeholder: '0.00' }
                     return (
-                      <div key={row.key} className="grid grid-cols-[1fr_5.5rem_5.5rem_1.75rem] items-center gap-2">
-                        <Input
-                          type="text"
-                          size="sm"
-                          value={row.name}
-                          placeholder="Deduction name"
-                          disabled={readOnly || row.deduction_type_id !== null}
-                          onChange={(e) =>
-                            setDeductionRows((prev) =>
-                              prev.map((r, i) => (i === index ? { ...r, name: e.target.value } : r))
-                            )
-                          }
-                        />
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          size="sm"
-                          value={row.amount}
-                          placeholder="0.00"
-                          disabled={readOnly}
-                          onChange={(e) =>
-                            setDeductionRows((prev) =>
-                              prev.map((r, i) => (i === index ? { ...r, amount: e.target.value } : r))
-                            )
-                          }
-                        />
-                        {employerDisabled && !readOnly ? (
-                          <span className="text-center text-xs text-gray-400">—</span>
-                        ) : (
+                      <div key={row.key}>
+                        <div className="grid grid-cols-[1fr_5.5rem_5.5rem_1.75rem] items-center gap-2">
                           <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
                             size="sm"
-                            value={row.employer_amount}
-                            placeholder="0.00"
-                            disabled={employerDisabled}
+                            value={row.name}
+                            placeholder="Deduction name"
+                            disabled={readOnly || row.deduction_type_id !== null}
                             onChange={(e) =>
                               setDeductionRows((prev) =>
-                                prev.map((r, i) =>
-                                  i === index ? { ...r, employer_amount: e.target.value } : r
-                                )
+                                prev.map((r, i) => (i === index ? { ...r, name: e.target.value } : r))
                               )
                             }
                           />
-                        )}
-                        {!readOnly ? (
-                          <button
-                            type="button"
-                            title="Remove deduction"
-                            onClick={() =>
-                              setDeductionRows((prev) => prev.filter((_, i) => i !== index))
+                          <Input
+                            type="number"
+                            min="0"
+                            size="sm"
+                            value={row.amount}
+                            disabled={readOnly}
+                            onChange={(e) =>
+                              setDeductionRows((prev) =>
+                                prev.map((r, i) => (i === index ? { ...r, amount: e.target.value } : r))
+                              )
                             }
-                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <span />
+                            {...figureProps}
+                          />
+                          {employerDisabled && !readOnly ? (
+                            <span className="text-center text-xs text-gray-400">—</span>
+                          ) : (
+                            <Input
+                              type="number"
+                              min="0"
+                              size="sm"
+                              value={row.employer_amount}
+                              disabled={employerDisabled}
+                              onChange={(e) =>
+                                setDeductionRows((prev) =>
+                                  prev.map((r, i) =>
+                                    i === index ? { ...r, employer_amount: e.target.value } : r
+                                  )
+                                )
+                              }
+                              {...figureProps}
+                            />
+                          )}
+                          {!readOnly ? (
+                            <button
+                              type="button"
+                              title="Remove deduction"
+                              onClick={() =>
+                                setDeductionRows((prev) => prev.filter((_, i) => i !== index))
+                              }
+                              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            >
+                              <XMarkIcon className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <span />
+                          )}
+                        </div>
+                        {percentage && (
+                          <p className="mt-0.5 px-0.5 text-[11px] text-gray-400">
+                            {percent(numberOrZero(row.amount))} of{' '}
+                            {row.percent_basis === 'gross_pay' ? 'salary earned' : 'basic pay'} (
+                            {peso(row.basis_amount)}) — recomputed on save
+                          </p>
                         )}
                       </div>
                     )
@@ -561,6 +618,12 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
             <h3 className="mb-3 font-semibold text-gray-900">Summary</h3>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
+                <dt className="text-gray-500" title="Daily rate × scheduled working days, before lates, undertime and absences">
+                  Basic pay (before deductions)
+                </dt>
+                <dd className="tabular-nums text-gray-600">{peso(payslip.basic_pay)}</dd>
+              </div>
+              <div className="flex justify-between">
                 <dt className="text-gray-500">Total salary earned</dt>
                 <dd className="font-medium tabular-nums">{peso(payslip.gross_pay)}</dd>
               </div>
@@ -581,7 +644,17 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
               )}
               {payslip.deductions.map((deduction) => (
                 <div key={deduction.id || deduction.name} className="flex justify-between">
-                  <dt className="text-gray-500">{deduction.name}</dt>
+                  <dt className="text-gray-500">
+                    {deduction.name}
+                    {deduction.calculation_type === 'percentage' && (
+                      <span
+                        className="ml-1 text-xs text-gray-400"
+                        title={`${rateLabel(deduction.rate_percent, deduction.percent_basis)} (${peso(deduction.basis_amount)})`}
+                      >
+                        ({percent(deduction.rate_percent)})
+                      </span>
+                    )}
+                  </dt>
                   <dd className="tabular-nums text-red-600">−{peso(deduction.amount)}</dd>
                 </div>
               ))}
