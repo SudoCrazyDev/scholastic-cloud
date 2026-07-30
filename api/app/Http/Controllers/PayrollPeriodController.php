@@ -8,6 +8,7 @@ use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PayrollPeriodController extends Controller
 {
@@ -22,7 +23,8 @@ class PayrollPeriodController extends Controller
             return $this->noInstitution();
         }
 
-        $periods = PayrollPeriod::withCount('payslips')
+        $periods = PayrollPeriod::with('staffSchedules:id,name')
+            ->withCount('payslips')
             ->withSum('payslips as gross_total', 'gross_pay')
             ->withSum('payslips as net_total', 'net_pay')
             ->where('institution_id', $institutionId)
@@ -53,13 +55,16 @@ class PayrollPeriodController extends Controller
             'name' => $validated['name'],
             'date_from' => $validated['date_from'],
             'date_to' => $validated['date_to'],
+            'schedule_scope' => $validated['schedule_scope'],
             'created_by' => $request->user()?->id,
         ]);
+
+        $period->staffSchedules()->sync($validated['staff_schedule_ids']);
 
         return response()->json([
             'success' => true,
             'message' => 'Payroll period created successfully',
-            'data' => $this->serialize($period->loadCount('payslips')),
+            'data' => $this->serialize($period->load('staffSchedules:id,name')->loadCount('payslips')),
         ], 201);
     }
 
@@ -74,7 +79,8 @@ class PayrollPeriodController extends Controller
             return $this->noInstitution();
         }
 
-        $period = PayrollPeriod::withCount('payslips')
+        $period = PayrollPeriod::with('staffSchedules:id,name')
+            ->withCount('payslips')
             ->withSum('payslips as gross_total', 'gross_pay')
             ->withSum('payslips as net_total', 'net_pay')
             ->where('institution_id', $institutionId)
@@ -116,12 +122,15 @@ class PayrollPeriodController extends Controller
             'name' => $validated['name'],
             'date_from' => $validated['date_from'],
             'date_to' => $validated['date_to'],
+            'schedule_scope' => $validated['schedule_scope'],
         ]);
+
+        $period->staffSchedules()->sync($validated['staff_schedule_ids']);
 
         return response()->json([
             'success' => true,
-            'message' => 'Payroll period updated successfully. Regenerate payslips if the dates changed.',
-            'data' => $this->serialize($period->loadCount('payslips')),
+            'message' => 'Payroll period updated successfully. Regenerate payslips if the dates or covered schedules changed.',
+            'data' => $this->serialize($period->load('staffSchedules:id,name')->loadCount('payslips')),
         ]);
     }
 
@@ -181,7 +190,9 @@ class PayrollPeriodController extends Controller
         if ($result['generated'] === 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'No payslips generated. Set the staff compensation rates first in the Employee Rates tab.',
+                'message' => $period->coversAllSchedules()
+                    ? 'No payslips generated. Set the staff compensation rates first in the Employee Rates tab.'
+                    : 'No payslips generated. No employee on this period\'s staff schedules has a compensation rate yet.',
             ], 422);
         }
 
@@ -261,7 +272,7 @@ class PayrollPeriodController extends Controller
 
     private function validatePayload(Request $request, string $institutionId, ?string $ignoreId = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => [
                 'required',
                 'string',
@@ -272,20 +283,55 @@ class PayrollPeriodController extends Controller
             ],
             'date_from' => 'required|date',
             'date_to' => 'required|date|after_or_equal:date_from',
+            'schedule_scope' => ['nullable', Rule::in([PayrollPeriod::SCOPE_ALL, PayrollPeriod::SCOPE_SCHEDULES])],
+            'staff_schedule_ids' => 'nullable|array',
+            'staff_schedule_ids.*' => [
+                'uuid',
+                'distinct',
+                Rule::exists('staff_schedules', 'id')
+                    ->where(fn ($query) => $query->where('institution_id', $institutionId)),
+            ],
         ], [
             'name.unique' => 'A payroll period with this name already exists.',
             'date_to.after_or_equal' => 'The end date must be on or after the start date.',
+            'staff_schedule_ids.*.exists' => 'One of the selected staff schedules does not belong to this institution.',
         ]);
+
+        $scope = $validated['schedule_scope'] ?? PayrollPeriod::SCOPE_ALL;
+
+        // 'all' ignores any ids that came along, so a scope switch cannot leave
+        // stale targeting rows behind.
+        $scheduleIds = $scope === PayrollPeriod::SCOPE_SCHEDULES
+            ? array_values(array_unique($validated['staff_schedule_ids'] ?? []))
+            : [];
+
+        if ($scope === PayrollPeriod::SCOPE_SCHEDULES && empty($scheduleIds)) {
+            throw ValidationException::withMessages([
+                'staff_schedule_ids' => 'Select at least one staff schedule for this payroll period.',
+            ]);
+        }
+
+        $validated['schedule_scope'] = $scope;
+        $validated['staff_schedule_ids'] = $scheduleIds;
+
+        return $validated;
     }
 
     private function serialize(PayrollPeriod $period): array
     {
+        $period->loadMissing('staffSchedules:id,name');
+
         return [
             'id' => $period->id,
             'institution_id' => $period->institution_id,
             'name' => $period->name,
             'date_from' => $period->date_from?->toDateString(),
             'date_to' => $period->date_to?->toDateString(),
+            'schedule_scope' => $period->schedule_scope ?? PayrollPeriod::SCOPE_ALL,
+            'staff_schedule_ids' => $period->staffSchedules->pluck('id')->values(),
+            'staff_schedules' => $period->staffSchedules
+                ->map(fn ($schedule) => ['id' => $schedule->id, 'name' => $schedule->name])
+                ->values(),
             'status' => $period->status,
             'paid_on' => $period->paid_on?->toDateString(),
             'payslip_count' => (int) ($period->payslips_count ?? 0),

@@ -13,9 +13,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
+import { Select } from '../../../components/select'
 import { ConfirmationModal } from '../../../components'
 import { payrollService } from '../../../services/payrollService'
-import type { CreatePayrollPeriodData, PayrollPeriod, PayslipSummary } from '../../../types'
+import { staffScheduleService } from '../../../services/staffScheduleService'
+import type {
+  CreatePayrollPeriodData,
+  PayrollPeriod,
+  PayrollPeriodScheduleScope,
+  PayslipSummary,
+  StaffSchedule,
+} from '../../../types'
 import { errorMessage, peso, shortDate } from './helpers'
 import PayslipDetail from './PayslipDetail'
 
@@ -23,9 +31,31 @@ interface PeriodForm {
   name: string
   date_from: string
   date_to: string
+  schedule_scope: PayrollPeriodScheduleScope
+  staff_schedule_ids: string[]
 }
 
-const emptyForm = (): PeriodForm => ({ name: '', date_from: '', date_to: '' })
+const emptyForm = (): PeriodForm => ({
+  name: '',
+  date_from: '',
+  date_to: '',
+  schedule_scope: 'all',
+  staff_schedule_ids: [],
+})
+
+const SCOPE_OPTIONS = [
+  { value: 'all', label: 'All staff schedules' },
+  { value: 'schedules', label: 'Only the selected staff schedules' },
+]
+
+// What the list row shows under "Covers".
+const scopeSummary = (period: PayrollPeriod) => {
+  if (period.schedule_scope !== 'schedules') return 'All staff schedules'
+  const names = period.staff_schedules?.map((s) => s.name) ?? []
+  if (names.length === 0) return 'No schedule selected'
+  if (names.length <= 2) return names.join(', ')
+  return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`
+}
 
 const statusBadge = (period: PayrollPeriod) =>
   period.status === 'finalized' ? (
@@ -60,6 +90,19 @@ const PeriodsTab: React.FC = () => {
   })
 
   const periods = useMemo<PayrollPeriod[]>(() => periodsQuery.data?.data || [], [periodsQuery.data])
+
+  // Only fetched once the form is open — the list itself renders the names the
+  // API already serialized onto each period.
+  const schedulesQuery = useQuery({
+    queryKey: ['staff-schedules', 'active'],
+    queryFn: () => staffScheduleService.getSchedules({ is_active: true }),
+    enabled: showForm,
+  })
+
+  const schedules = useMemo<StaffSchedule[]>(
+    () => schedulesQuery.data?.data || [],
+    [schedulesQuery.data]
+  )
 
   // Keep the open period fresh after mutations (generate/finalize/reopen).
   const currentPeriod = useMemo(
@@ -156,6 +199,7 @@ const PeriodsTab: React.FC = () => {
     const ymd = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     setForm({
+      ...emptyForm(),
       name: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
       date_from: ymd(first),
       date_to: ymd(last),
@@ -166,15 +210,41 @@ const PeriodsTab: React.FC = () => {
   }
 
   const openEdit = (period: PayrollPeriod) => {
-    setForm({ name: period.name, date_from: period.date_from, date_to: period.date_to })
+    setForm({
+      name: period.name,
+      date_from: period.date_from,
+      date_to: period.date_to,
+      schedule_scope: period.schedule_scope ?? 'all',
+      staff_schedule_ids: period.staff_schedule_ids ?? [],
+    })
     setEditingId(period.id)
     setFormError(null)
     setShowForm(true)
   }
 
+  const toggleSchedule = (scheduleId: string) => {
+    setForm((prev) => ({
+      ...prev,
+      staff_schedule_ids: prev.staff_schedule_ids.includes(scheduleId)
+        ? prev.staff_schedule_ids.filter((id) => id !== scheduleId)
+        : [...prev.staff_schedule_ids, scheduleId],
+    }))
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    saveMutation.mutate({ id: editingId, data: form })
+    if (form.schedule_scope === 'schedules' && form.staff_schedule_ids.length === 0) {
+      setFormError('Select at least one staff schedule for this payroll period.')
+      return
+    }
+    setFormError(null)
+    saveMutation.mutate({
+      id: editingId,
+      data:
+        form.schedule_scope === 'schedules'
+          ? form
+          : { ...form, staff_schedule_ids: [] },
+    })
   }
 
   // ---- Payslip detail view ----
@@ -211,6 +281,8 @@ const PeriodsTab: React.FC = () => {
               <h2 className="text-lg font-semibold text-gray-900">{currentPeriod.name}</h2>
               <p className="text-sm text-gray-500">
                 {shortDate(currentPeriod.date_from)} – {shortDate(currentPeriod.date_to)}
+                <span className="mx-1.5 text-gray-300">·</span>
+                {scopeSummary(currentPeriod)}
                 <span className="ml-2">{statusBadge(currentPeriod)}</span>
               </p>
             </div>
@@ -354,6 +426,7 @@ const PeriodsTab: React.FC = () => {
             <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Coverage</th>
+              <th className="px-4 py-3">Covers</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Payslips</th>
               <th className="px-4 py-3 text-right">Salary Earned</th>
@@ -364,13 +437,13 @@ const PeriodsTab: React.FC = () => {
           <tbody>
             {periodsQuery.isLoading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
                   Loading periods…
                 </td>
               </tr>
             ) : periods.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
                   No payroll periods yet. Click "New Period" to start.
                 </td>
               </tr>
@@ -384,6 +457,13 @@ const PeriodsTab: React.FC = () => {
                   <td className="px-4 py-3 font-medium text-primary-700">{period.name}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {shortDate(period.date_from)} – {shortDate(period.date_to)}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600" title={
+                    period.schedule_scope === 'schedules'
+                      ? period.staff_schedules?.map((s) => s.name).join(', ')
+                      : undefined
+                  }>
+                    {scopeSummary(period)}
                   </td>
                   <td className="px-4 py-3">{statusBadge(period)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{period.payslip_count}</td>
@@ -472,6 +552,60 @@ const PeriodsTab: React.FC = () => {
                   />
                 </div>
               </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Covers</label>
+                <Select
+                  options={SCOPE_OPTIONS}
+                  value={form.schedule_scope}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      schedule_scope: e.target.value as PayrollPeriodScheduleScope,
+                    }))
+                  }
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {form.schedule_scope === 'schedules'
+                    ? 'Only staff assigned to the schedules you tick below get a payslip in this period.'
+                    : 'Every employee with a compensation rate gets a payslip in this period.'}
+                </p>
+              </div>
+              {form.schedule_scope === 'schedules' && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Staff schedules
+                  </label>
+                  {schedulesQuery.isLoading ? (
+                    <p className="rounded-lg border border-gray-200 px-3 py-6 text-center text-sm text-gray-400">
+                      Loading schedules…
+                    </p>
+                  ) : schedules.length === 0 ? (
+                    <p className="rounded-lg border border-gray-200 px-3 py-6 text-center text-sm text-gray-400">
+                      No active staff schedules yet. Create one in HRIS → Staff Schedules.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
+                      {schedules.map((schedule) => (
+                        <label
+                          key={schedule.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            checked={form.staff_schedule_ids.includes(schedule.id)}
+                            onChange={() => toggleSchedule(schedule.id)}
+                          />
+                          <span className="text-gray-700">{schedule.name}</span>
+                          <span className="ml-auto text-xs text-gray-400">
+                            {schedule.assigned_count ?? 0} staff
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
                 <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                   Cancel

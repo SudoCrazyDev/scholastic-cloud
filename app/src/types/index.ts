@@ -2371,12 +2371,19 @@ export interface SavePayrollCompensationData {
 
 export type PayrollPeriodStatus = 'draft' | 'finalized';
 
+// 'all' pays everyone with a compensation rate; 'schedules' pays only the staff
+// assigned to the schedules listed on the period.
+export type PayrollPeriodScheduleScope = 'all' | 'schedules';
+
 export interface PayrollPeriod {
   id: string;
   institution_id: string;
   name: string;
   date_from: string;
   date_to: string;
+  schedule_scope: PayrollPeriodScheduleScope;
+  staff_schedule_ids: string[];
+  staff_schedules: { id: string; name: string }[];
   status: PayrollPeriodStatus;
   paid_on: string | null;
   payslip_count: number;
@@ -2390,6 +2397,8 @@ export interface CreatePayrollPeriodData {
   name: string;
   date_from: string;
   date_to: string;
+  schedule_scope: PayrollPeriodScheduleScope;
+  staff_schedule_ids: string[];
 }
 
 // Institution-wide penalty/overtime rates (₱ per minute), snapshotted onto

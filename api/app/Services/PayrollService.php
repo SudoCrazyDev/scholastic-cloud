@@ -42,6 +42,21 @@ class PayrollService
         $compensations = PayrollCompensation::with('deductions.deductionType')
             ->where('institution_id', $institutionId)
             ->get();
+
+        // A period scoped to specific staff schedules pays only the employees
+        // assigned to those schedules — anyone unassigned falls outside it.
+        if (! $period->coversAllSchedules()) {
+            $scheduleIds = $period->staffSchedules()->pluck('staff_schedules.id')->all();
+            $coveredUserIds = StaffScheduleAssignment::where('institution_id', $institutionId)
+                ->whereIn('staff_schedule_id', $scheduleIds ?: ['-'])
+                ->pluck('user_id')
+                ->flip();
+
+            $compensations = $compensations
+                ->filter(fn (PayrollCompensation $compensation) => $coveredUserIds->has($compensation->user_id))
+                ->values();
+        }
+
         $userIds = $compensations->pluck('user_id')->all();
 
         // The institution's deduction catalog. A type carrying a default

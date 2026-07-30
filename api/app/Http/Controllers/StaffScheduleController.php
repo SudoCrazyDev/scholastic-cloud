@@ -177,6 +177,15 @@ class StaffScheduleController extends Controller
             ], 409);
         }
 
+        // Deleting it would silently shrink the coverage of any payroll period
+        // that names it, so make the caller drop it from those periods first.
+        if (DB::table('payroll_period_staff_schedules')->where('staff_schedule_id', $schedule->id)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This schedule is used by a payroll period. Remove it from those periods before deleting it.',
+            ], 409);
+        }
+
         $schedule->delete();
 
         return response()->json([
