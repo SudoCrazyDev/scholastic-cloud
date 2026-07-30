@@ -26,7 +26,7 @@ import type {
   PayslipSummary,
   StaffSchedule,
 } from '../../../types'
-import { errorMessage, peso, shortDate } from './helpers'
+import { errorMessage, parseYmd, peso, shortDate } from './helpers'
 import PayrollSheetPDF from './PayrollSheetPDF'
 import PayslipDetail from './PayslipDetail'
 
@@ -50,6 +50,93 @@ const SCOPE_OPTIONS = [
   { value: 'all', label: 'All staff schedules' },
   { value: 'schedules', label: 'Only the selected staff schedules' },
 ]
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const ymd = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+const lastDayOfMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
+
+// Same day of the month, N months on, clamped so Jan 31 lands on Feb 28
+// rather than rolling into March.
+const addMonthsClamped = (date: Date, months: number) => {
+  const target = new Date(date.getFullYear(), date.getMonth() + months, 1)
+  target.setDate(Math.min(date.getDate(), lastDayOfMonth(target.getFullYear(), target.getMonth())))
+  return target
+}
+
+// The 1st through the last day of one month.
+const isWholeMonth = (from: Date, to: Date) =>
+  from.getDate() === 1
+  && from.getFullYear() === to.getFullYear()
+  && from.getMonth() === to.getMonth()
+  && to.getDate() === lastDayOfMonth(to.getFullYear(), to.getMonth())
+
+/**
+ * The dates a new period should open with: the day after the latest existing
+ * period ended, running roughly as long.
+ *
+ * A cut-off shifted off the calendar (Jun 26 – Jul 25, so finance can process
+ * before month end) has to be retyped every month if the form keeps defaulting
+ * to the current calendar month — and a mistyped start date leaves days that no
+ * period covers and nobody is paid for. Starting from the previous end date
+ * makes a gap impossible by construction.
+ *
+ * The end date follows the shape of the period being continued: whole calendar
+ * months roll to the next whole month (so February keeps its own length),
+ * month-anchored cut-offs keep their day of the month, and anything shorter
+ * (semi-monthly, weekly) keeps its exact length.
+ */
+const nextPeriodDates = (periods: PayrollPeriod[]): { from: Date; to: Date } => {
+  const previous = periods.reduce<PayrollPeriod | null>(
+    (latest, period) => (!latest || period.date_to > latest.date_to ? period : latest),
+    null
+  )
+
+  if (!previous) {
+    const now = new Date()
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), 1),
+      to: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+    }
+  }
+
+  const previousFrom = parseYmd(previous.date_from)
+  const previousTo = parseYmd(previous.date_to)
+
+  if (isWholeMonth(previousFrom, previousTo)) {
+    return {
+      from: new Date(previousTo.getFullYear(), previousTo.getMonth() + 1, 1),
+      to: new Date(previousTo.getFullYear(), previousTo.getMonth() + 2, 0),
+    }
+  }
+
+  const from = addDays(previousTo, 1)
+  const spanDays = Math.round((previousTo.getTime() - previousFrom.getTime()) / DAY_MS) + 1
+
+  return {
+    from,
+    to: spanDays >= 26 && spanDays <= 32
+      ? addMonthsClamped(previousTo, 1)
+      : addDays(from, spanDays - 1),
+  }
+}
+
+// Periods are named for the month they are released in, which is the month
+// they end in. Semi-monthly runs put two in the same month and the name is
+// unique per institution, so a taken name falls back to the range.
+const suggestPeriodName = (from: Date, to: Date, taken: string[]) => {
+  const monthly = to.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+  return taken.includes(monthly) ? `${shortDate(ymd(from))} – ${shortDate(ymd(to))}` : monthly
+}
 
 // What the list row shows under "Covers".
 const scopeSummary = (period: PayrollPeriod) => {
@@ -134,10 +221,15 @@ const PeriodsTab: React.FC = () => {
       payload.id
         ? payrollService.updatePeriod(payload.id, payload.data)
         : payrollService.createPeriod(payload.data),
-    onSuccess: (_, payload) => {
+    onSuccess: (result, payload) => {
       invalidate()
       setShowForm(false)
       toast.success(payload.id ? 'Period updated.' : 'Period created.')
+      // Saving still succeeded — but days that no period covers are paid to
+      // nobody, and nothing downstream would ever report it.
+      if (result.warning) {
+        toast(result.warning, { icon: '⚠️', duration: 12000 })
+      }
     },
     onError: (err: unknown) => {
       const message = errorMessage(err, 'Failed to save period.')
@@ -229,16 +321,12 @@ const PeriodsTab: React.FC = () => {
   })
 
   const openCreate = () => {
-    const now = new Date()
-    const first = new Date(now.getFullYear(), now.getMonth(), 1)
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    const ymd = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const { from, to } = nextPeriodDates(periods)
     setForm({
       ...emptyForm(),
-      name: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      date_from: ymd(first),
-      date_to: ymd(last),
+      name: suggestPeriodName(from, to, periods.map((period) => period.name)),
+      date_from: ymd(from),
+      date_to: ymd(to),
     })
     setEditingId(null)
     setFormError(null)

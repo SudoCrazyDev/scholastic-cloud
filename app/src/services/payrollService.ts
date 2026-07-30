@@ -7,6 +7,7 @@ import type {
   PayrollCompensation,
   PayrollDeductionType,
   PayrollPeriod,
+  PayrollPeriodSaveResponse,
   PayrollSettings,
   PayrollSheet,
   PayrollStaffCompensation,
@@ -109,12 +110,12 @@ class PayrollService {
   }
 
   async createPeriod(payload: CreatePayrollPeriodData) {
-    const response = await api.post<ApiResponse<PayrollPeriod>>('/payroll-periods', payload)
+    const response = await api.post<PayrollPeriodSaveResponse>('/payroll-periods', payload)
     return response.data
   }
 
   async updatePeriod(id: string, payload: CreatePayrollPeriodData) {
-    const response = await api.put<ApiResponse<PayrollPeriod>>(`/payroll-periods/${id}`, payload)
+    const response = await api.put<PayrollPeriodSaveResponse>(`/payroll-periods/${id}`, payload)
     return response.data
   }
 

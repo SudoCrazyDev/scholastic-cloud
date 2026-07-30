@@ -2401,6 +2401,12 @@ export interface CreatePayrollPeriodData {
   staff_schedule_ids: string[];
 }
 
+// Saving a period succeeds even when it leaves days uncovered by any payroll —
+// `warning` carries that sentence so the screen can say so without blocking.
+export interface PayrollPeriodSaveResponse extends ApiResponse<PayrollPeriod> {
+  warning?: string | null;
+}
+
 // Institution-wide penalty/overtime rates (₱ per minute), snapshotted onto
 // payslips at generation time. Penalty rates both 0 = penalties disabled
 // (hours-based pay). Overtime pays only manager-approved minutes; 0 = off.
