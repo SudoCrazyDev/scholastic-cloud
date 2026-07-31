@@ -2505,7 +2505,11 @@ export interface PayrollSheetRow {
   // Aligned index-for-index with the sheet's benefit_columns / deduction_columns.
   benefits: number[];
   employer_share_total: number;
-  gross_pay: number;
+  gross_pay: number; // already net of late/undertime
+  // The late/undertime the salary gave up. The sheet adds it back into TOTAL
+  // SALARY EARNED and itemizes it under DEDUCTIONS, so the net still foots.
+  penalty_charged: number;
+  overtime_total: number; // approved overtime pay, already inside gross_pay
   deductions: number[];
   total_deductions: number;
   net_pay: number;

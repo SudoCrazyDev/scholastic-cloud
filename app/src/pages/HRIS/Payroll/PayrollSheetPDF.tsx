@@ -1,6 +1,6 @@
 import React from 'react'
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
-import type { PayrollSheet } from '../../../types'
+import type { PayrollSheet, PayrollSheetRow } from '../../../types'
 import { parseYmd } from './helpers'
 
 interface PayrollSheetPDFProps {
@@ -39,15 +39,19 @@ const BORDER = '#000000'
 // Widths of the columns that are always there, in percent of the table.
 const FIXED = {
   no: 3.5,
-  name: 17,
-  workingDays: 6.5,
-  dailyRate: 6.5,
-  salaryEarned: 8,
-  totalDeduction: 7.5,
-  netCash: 8,
+  name: 16,
+  workingDays: 6,
+  dailyRate: 6,
+  salaryEarned: 7.5,
+  totalDeduction: 7,
+  netCash: 7.5,
+  signature: 9.5,
 }
 
 const FIXED_TOTAL = Object.values(FIXED).reduce((sum, width) => sum + width, 0)
+
+// Only printed for a period that paid approved overtime.
+const OVERTIME_WIDTH = 6
 
 // Landscape A4 less the page's horizontal padding — the width the table spans.
 const TABLE_WIDTH_PT = 841.89 - 44
@@ -64,6 +68,20 @@ const subHeadingFontSize = (labels: string[], columnWidthPct: number): number =>
     .reduce((longest, word) => Math.max(longest, word.length), 1)
   const available = (columnWidthPct / 100) * TABLE_WIDTH_PT - 4
   return Math.max(4.2, Math.min(6.5, available / (longestWord * 0.68)))
+}
+
+/**
+ * Same problem one row down: every deduction line an institution uses takes
+ * width off the sub-columns, and a figure that does not fit spills over its
+ * neighbour instead of shrinking. The widest figure a sub-column prints is a
+ * hundred-thousand total — "###,###.00" — and in Helvetica a digit runs
+ * 0.556em against 0.278em for the comma and the point.
+ */
+const WIDEST_FIGURE_EM = 8 * 0.556 + 2 * 0.278
+
+const subFigureFontSize = (columnWidthPct: number): number => {
+  const available = (columnWidthPct / 100) * TABLE_WIDTH_PT - 4
+  return Math.max(5, Math.min(7.5, available / WIDEST_FIGURE_EM))
 }
 
 const styles = StyleSheet.create({
@@ -140,16 +158,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     textAlign: 'center',
   },
+  // Tall enough for a staff member to sign the row.
   row: {
     flexDirection: 'row',
-    minHeight: 16,
+    minHeight: 22,
   },
   cell: {
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderColor: BORDER,
     paddingVertical: 3,
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
     justifyContent: 'center',
   },
   cellText: {
@@ -181,6 +200,10 @@ const styles = StyleSheet.create({
   certification: {
     marginTop: 10,
     fontSize: 7.5,
+  },
+  note: {
+    marginTop: 8,
+    fontSize: 7,
   },
   assumedNote: {
     marginTop: 8,
@@ -234,19 +257,36 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
   const benefitColumns = sheet.benefit_columns
   const deductionColumns = sheet.deduction_columns
 
+  // Late and undertime never come off a deduction line — they are taken out of
+  // the salary itself. The sheet itemizes them anyway, in the last DEDUCTIONS
+  // column, and only for a period that charged one.
+  const penaltyColumn = rows.some((row) => row.penalty_charged > 0)
+
+  // Approved overtime is already inside gross pay; the column just breaks it out.
+  const overtimeColumn = rows.some((row) => row.overtime_total > 0)
+
   // OTHER BENEFITS always ends in a TOTAL column. DEDUCTIONS falls back to a
   // single placeholder column when the period has no deduction lines at all.
   const benefitSubs = benefitColumns.length + 1
-  const deductionSubs = Math.max(deductionColumns.length, 1)
-  const subWidth = (100 - FIXED_TOTAL) / (benefitSubs + deductionSubs)
+  const deductionSubs = Math.max(deductionColumns.length + (penaltyColumn ? 1 : 0), 1)
+  const fixedTotal = FIXED_TOTAL + (overtimeColumn ? OVERTIME_WIDTH : 0)
+  const subWidth = (100 - fixedTotal) / (benefitSubs + deductionSubs)
 
   // One size for every sub-heading, so the two groups stay visually level.
   const subHeading = {
     fontSize: subHeadingFontSize(
-      [...benefitColumns.map((c) => c.label), 'TOTAL', ...deductionColumns.map((c) => c.label)],
+      [
+        ...benefitColumns.map((c) => c.label),
+        'TOTAL',
+        ...deductionColumns.map((c) => c.label),
+        ...(penaltyColumn ? ['LATE / UNDERTIME'] : []),
+      ],
       subWidth
     ),
   }
+
+  // ...and one size for every figure beneath them.
+  const subFigure = { fontSize: subFigureFontSize(subWidth) }
 
   const pct = (value: number) => `${value}%` as const
 
@@ -255,20 +295,30 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
   // least one row earned it.
   const assumedRows = rows.filter((row) => row.assumed_days > 0).length
 
+  // TOTAL SALARY EARNED is the salary before late and undertime, because the
+  // penalty is itemized under DEDUCTIONS instead of being quietly absorbed:
+  // salary − (contributions + penalty) is still the same net pay.
+  const salaryEarned = (row: PayrollSheetRow) => row.gross_pay + row.penalty_charged
+  const totalDeduction = (row: PayrollSheetRow) => row.total_deductions + row.penalty_charged
+
   const totals = rows.reduce(
     (acc, row) => ({
       benefits: acc.benefits.map((amount, i) => amount + (row.benefits[i] ?? 0)),
       employerShare: acc.employerShare + row.employer_share_total,
-      gross: acc.gross + row.gross_pay,
+      overtime: acc.overtime + row.overtime_total,
+      salary: acc.salary + salaryEarned(row),
       deductions: acc.deductions.map((amount, i) => amount + (row.deductions[i] ?? 0)),
-      totalDeductions: acc.totalDeductions + row.total_deductions,
+      penalty: acc.penalty + row.penalty_charged,
+      totalDeductions: acc.totalDeductions + totalDeduction(row),
       net: acc.net + row.net_pay,
     }),
     {
       benefits: benefitColumns.map(() => 0),
       employerShare: 0,
-      gross: 0,
+      overtime: 0,
+      salary: 0,
       deductions: deductionColumns.map(() => 0),
+      penalty: 0,
       totalDeductions: 0,
       net: 0,
     }
@@ -306,6 +356,12 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
         </View>
       </View>
 
+      {overtimeColumn && (
+        <View style={[styles.headerCell, { width: pct(OVERTIME_WIDTH) }]}>
+          <Text style={styles.headerText}>OVERTIME PAY</Text>
+        </View>
+      )}
+
       <View style={[styles.headerCell, { width: pct(FIXED.salaryEarned) }]}>
         <Text style={styles.headerText}>TOTAL SALARY EARNED</Text>
       </View>
@@ -315,7 +371,7 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
           <Text style={styles.headerText}>DEDUCTIONS</Text>
         </View>
         <View style={styles.headerGroupSubs}>
-          {deductionColumns.length === 0 ? (
+          {deductionColumns.length === 0 && !penaltyColumn ? (
             <View style={[styles.headerCell, { width: '100%' }]}>
               <Text style={styles.headerText}>—</Text>
             </View>
@@ -326,6 +382,11 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
               </View>
             ))
           )}
+          {penaltyColumn && (
+            <View style={[styles.headerCell, { width: pct(100 / deductionSubs) }]}>
+              <Text style={[styles.headerText, subHeading]}>LATE / UNDERTIME</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -334,6 +395,10 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
       </View>
       <View style={[styles.headerCell, { width: pct(FIXED.netCash) }]}>
         <Text style={styles.headerText}>NET CASH EARNED</Text>
+      </View>
+      {/* Signed on collection — the sheet doubles as the payout receipt. */}
+      <View style={[styles.headerCell, { width: pct(FIXED.signature) }]}>
+        <Text style={styles.headerText}>TEACHER SIGNATURE</Text>
       </View>
     </View>
   )
@@ -383,35 +448,48 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
 
                 {benefitColumns.map((column, index) => (
                   <View key={column.key} style={[styles.cell, { width: pct(subWidth) }]}>
-                    <Text style={styles.num}>{money(row.benefits[index] ?? 0)}</Text>
+                    <Text style={[styles.num, subFigure]}>{money(row.benefits[index] ?? 0)}</Text>
                   </View>
                 ))}
                 <View style={[styles.cell, { width: pct(subWidth) }]}>
-                  <Text style={styles.num}>{moneyAlways(row.employer_share_total)}</Text>
+                  <Text style={[styles.num, subFigure]}>{moneyAlways(row.employer_share_total)}</Text>
                 </View>
+
+                {overtimeColumn && (
+                  <View style={[styles.cell, { width: pct(OVERTIME_WIDTH) }]}>
+                    <Text style={styles.num}>{money(row.overtime_total)}</Text>
+                  </View>
+                )}
 
                 <View style={[styles.cell, { width: pct(FIXED.salaryEarned) }]}>
-                  <Text style={styles.num}>{moneyAlways(row.gross_pay)}</Text>
+                  <Text style={styles.num}>{moneyAlways(salaryEarned(row))}</Text>
                 </View>
 
-                {deductionColumns.length === 0 ? (
+                {deductionColumns.length === 0 && !penaltyColumn ? (
                   <View style={[styles.cell, { width: pct(subWidth) }]}>
                     <Text style={styles.center}>—</Text>
                   </View>
                 ) : (
                   deductionColumns.map((column, index) => (
                     <View key={column.key} style={[styles.cell, { width: pct(subWidth) }]}>
-                      <Text style={styles.num}>{money(row.deductions[index] ?? 0)}</Text>
+                      <Text style={[styles.num, subFigure]}>{money(row.deductions[index] ?? 0)}</Text>
                     </View>
                   ))
                 )}
+                {penaltyColumn && (
+                  <View style={[styles.cell, { width: pct(subWidth) }]}>
+                    <Text style={[styles.num, subFigure]}>{money(row.penalty_charged)}</Text>
+                  </View>
+                )}
 
                 <View style={[styles.cell, { width: pct(FIXED.totalDeduction) }]}>
-                  <Text style={styles.num}>{moneyAlways(row.total_deductions)}</Text>
+                  <Text style={styles.num}>{moneyAlways(totalDeduction(row))}</Text>
                 </View>
                 <View style={[styles.cell, { width: pct(FIXED.netCash) }]}>
                   <Text style={[styles.num, styles.bold]}>{moneyAlways(row.net_pay)}</Text>
                 </View>
+                {/* Left blank on purpose — this is where the staff member signs. */}
+                <View style={[styles.cell, { width: pct(FIXED.signature) }]} />
               </View>
             ))
           )}
@@ -423,25 +501,35 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
               </View>
               {benefitColumns.map((column, index) => (
                 <View key={column.key} style={[styles.cell, { width: pct(subWidth) }]}>
-                  <Text style={[styles.num, styles.bold]}>{money(totals.benefits[index] ?? 0)}</Text>
+                  <Text style={[styles.num, styles.bold, subFigure]}>{money(totals.benefits[index] ?? 0)}</Text>
                 </View>
               ))}
               <View style={[styles.cell, { width: pct(subWidth) }]}>
-                <Text style={[styles.num, styles.bold]}>{moneyAlways(totals.employerShare)}</Text>
+                <Text style={[styles.num, styles.bold, subFigure]}>{moneyAlways(totals.employerShare)}</Text>
               </View>
+              {overtimeColumn && (
+                <View style={[styles.cell, { width: pct(OVERTIME_WIDTH) }]}>
+                  <Text style={[styles.num, styles.bold]}>{moneyAlways(totals.overtime)}</Text>
+                </View>
+              )}
               <View style={[styles.cell, { width: pct(FIXED.salaryEarned) }]}>
-                <Text style={[styles.num, styles.bold]}>{moneyAlways(totals.gross)}</Text>
+                <Text style={[styles.num, styles.bold]}>{moneyAlways(totals.salary)}</Text>
               </View>
-              {deductionColumns.length === 0 ? (
+              {deductionColumns.length === 0 && !penaltyColumn ? (
                 <View style={[styles.cell, { width: pct(subWidth) }]}>
                   <Text style={styles.center}>—</Text>
                 </View>
               ) : (
                 deductionColumns.map((column, index) => (
                   <View key={column.key} style={[styles.cell, { width: pct(subWidth) }]}>
-                    <Text style={[styles.num, styles.bold]}>{money(totals.deductions[index] ?? 0)}</Text>
+                    <Text style={[styles.num, styles.bold, subFigure]}>{money(totals.deductions[index] ?? 0)}</Text>
                   </View>
                 ))
+              )}
+              {penaltyColumn && (
+                <View style={[styles.cell, { width: pct(subWidth) }]}>
+                  <Text style={[styles.num, styles.bold, subFigure]}>{money(totals.penalty)}</Text>
+                </View>
               )}
               <View style={[styles.cell, { width: pct(FIXED.totalDeduction) }]}>
                 <Text style={[styles.num, styles.bold]}>{moneyAlways(totals.totalDeductions)}</Text>
@@ -449,9 +537,18 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
               <View style={[styles.cell, { width: pct(FIXED.netCash) }]}>
                 <Text style={[styles.num, styles.bold]}>{moneyAlways(totals.net)}</Text>
               </View>
+              <View style={[styles.cell, { width: pct(FIXED.signature) }]} />
             </View>
           ) : null}
         </View>
+
+        {penaltyColumn && (
+          <Text style={styles.note}>
+            Late and undertime are charged under DEDUCTIONS, so TOTAL SALARY EARNED is the salary
+            before those penalties
+            {overtimeColumn ? ', overtime pay included' : ''}.
+          </Text>
+        )}
 
         {assumedRows > 0 && (
           <Text style={styles.assumedNote}>

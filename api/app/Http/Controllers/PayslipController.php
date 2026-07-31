@@ -100,8 +100,10 @@ class PayslipController extends Controller
             return response()->json(['success' => false, 'message' => 'Payroll period not found'], 404);
         }
 
-        $payslips = $period->payslips()->with(['user', 'deductions'])->get()
-            ->sortBy(fn (Payslip $payslip) => mb_strtolower((string) $this->staffName($payslip->user)))
+        // Sorted by the name the sheet prints — surname first, so the column
+        // reads down alphabetically.
+        $payslips = $period->payslips()->with(['user', 'deductions', 'days'])->get()
+            ->sortBy(fn (Payslip $payslip) => mb_strtolower((string) $this->sheetStaffName($payslip->user)))
             ->values();
 
         // Column order follows the institution's deduction catalog so the sheet
@@ -166,7 +168,7 @@ class PayslipController extends Controller
             return [
                 'no' => $index + 1,
                 'payslip_id' => $payslip->id,
-                'staff_name' => $this->staffName($payslip->user),
+                'staff_name' => $this->sheetStaffName($payslip->user),
                 'designation' => $payslip->designation,
                 'days_worked' => (float) $payslip->days_worked,
                 // Marked on the printed sheet: this is the copy that leaves the
@@ -180,6 +182,12 @@ class PayslipController extends Controller
                     ->values(),
                 'employer_share_total' => round((float) $payslip->deductions->sum('employer_amount'), 2),
                 'gross_pay' => (float) $payslip->gross_pay,
+                // Late and undertime are already netted out of gross_pay. The
+                // sheet itemizes them under DEDUCTIONS instead, so it needs the
+                // figure back — and the figure the salary actually carried,
+                // which is a penalty clipped to the day it was charged on.
+                'penalty_charged' => $this->penaltyCharged($payslip),
+                'overtime_total' => (float) $payslip->overtime_total,
                 'deductions' => $deductionColumns
                     ->map(fn (array $col) => round((float) ($byKey[$col['key']]['amount'] ?? 0), 2))
                     ->values(),
@@ -218,6 +226,47 @@ class PayslipController extends Controller
     private function sheetLineKey(PayslipDeduction $deduction): string
     {
         return $deduction->deduction_type_id ?: 'name:'.mb_strtolower(trim($deduction->name));
+    }
+
+    /**
+     * How much late and undertime the salary actually gave up.
+     *
+     * A day's penalty can never eat more than that day's rate — pricing clips
+     * it there — while `penalty_total` keeps the raw figure. The sheet charges
+     * the clipped one so TOTAL SALARY EARNED less TOTAL DEDUCTION still comes
+     * out at NET CASH EARNED.
+     */
+    private function penaltyCharged(Payslip $payslip): float
+    {
+        $dailyRate = (float) $payslip->daily_rate;
+
+        return round((float) $payslip->days->sum(
+            fn (PayslipDay $day) => min((float) $day->penalty_amount, $dailyRate)
+        ), 2);
+    }
+
+    /**
+     * "DELA CRUZ, JUAN P." — the printed sheet lists staff surname first.
+     * Falls back to the plain name for anyone with no surname on file.
+     */
+    private function sheetStaffName(?User $user): ?string
+    {
+        if (! $user) {
+            return null;
+        }
+
+        // An extension belongs to the surname: "DELA CRUZ JR., JUAN P."
+        $surname = trim(implode(' ', array_filter([$user->last_name, $user->ext_name])));
+        if ($surname === '') {
+            return $this->staffName($user);
+        }
+
+        // A middle name is printed as an initial, whether it is stored as one
+        // ("P") or spelled out ("Perez").
+        $initial = mb_substr(trim((string) $user->middle_name), 0, 1);
+        $given = trim(trim((string) $user->first_name).($initial !== '' ? ' '.mb_strtoupper($initial).'.' : ''));
+
+        return $given === '' ? $surname : $surname.', '.$given;
     }
 
     /**
