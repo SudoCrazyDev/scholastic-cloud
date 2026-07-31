@@ -23,11 +23,15 @@ class StaffAttendanceRequest extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    /** Approved, then withdrawn by an approver — no longer affects pay. */
+    public const STATUS_VOIDED = 'voided';
+
     public const STATUSES = [
         self::STATUS_PENDING,
         self::STATUS_APPROVED,
         self::STATUS_DISAPPROVED,
         self::STATUS_CANCELLED,
+        self::STATUS_VOIDED,
     ];
 
     /** Arrived after the grace period for an approved reason (e.g. an off-site event in the morning). */
@@ -66,6 +70,9 @@ class StaffAttendanceRequest extends Model
         'requested_by',
         'reviewed_by',
         'reviewed_at',
+        'voided_by',
+        'voided_at',
+        'void_note',
     ];
 
     protected $casts = [
@@ -75,6 +82,7 @@ class StaffAttendanceRequest extends Model
         'waive_undertime' => 'boolean',
         'pay_full_day' => 'boolean',
         'reviewed_at' => 'datetime',
+        'voided_at' => 'datetime',
     ];
 
     /**
@@ -121,6 +129,16 @@ class StaffAttendanceRequest extends Model
         return $this->status === self::STATUS_PENDING;
     }
 
+    public function isApproved(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
+
+    public function isVoided(): bool
+    {
+        return $this->status === self::STATUS_VOIDED;
+    }
+
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
@@ -140,5 +158,11 @@ class StaffAttendanceRequest extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /** The approver who took the approval back. */
+    public function voider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'voided_by');
     }
 }

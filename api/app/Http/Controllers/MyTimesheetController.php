@@ -110,8 +110,8 @@ class MyTimesheetController extends Controller
      * The staff member's live requests keyed by every date they cover, so a
      * day already filed against offers no second button.
      *
-     * Disapproved and cancelled rows are left out on purpose: those days are
-     * open again and may be filed for a second time.
+     * Disapproved, cancelled and voided rows are left out on purpose: those
+     * days are open again and may be filed for a second time.
      *
      * @return array<string, array{id: string, kind: string, status: string}>
      */

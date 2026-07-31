@@ -640,7 +640,13 @@ export type AttendanceRequestKind =
   | 'official_business'
   | 'forgot_punch';
 
-export type AttendanceRequestStatus = 'pending' | 'approved' | 'disapproved' | 'cancelled';
+export type AttendanceRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'disapproved'
+  | 'cancelled'
+  // Approved, then taken back by an approver — no longer affects pay.
+  | 'voided';
 
 export interface StaffAttendanceRequest {
   id: string;
@@ -661,6 +667,9 @@ export interface StaffAttendanceRequest {
   requested_by_name: string | null;
   reviewed_by_name: string | null;
   reviewed_at: string | null;
+  void_note: string | null;
+  voided_by_name: string | null;
+  voided_at: string | null;
   created_at: string | null;
 }
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { CalendarClock, CheckCircle2, XCircle } from 'lucide-react'
+import { Ban, CalendarClock, CheckCircle2, XCircle } from 'lucide-react'
 import { PlusIcon } from '@heroicons/react/24/outline'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
@@ -21,6 +21,7 @@ const STATUS_STYLES: Record<AttendanceRequestStatus, string> = {
   approved: 'bg-green-100 text-green-700',
   disapproved: 'bg-red-100 text-red-700',
   cancelled: 'bg-gray-100 text-gray-500',
+  voided: 'bg-gray-200 text-gray-600 line-through',
 }
 
 const dateRange = (request: StaffAttendanceRequest) =>
@@ -30,6 +31,12 @@ const dateRange = (request: StaffAttendanceRequest) =>
 
 /** Compact summary of what an approved request actually does to pay. */
 const EffectChips: React.FC<{ request: StaffAttendanceRequest }> = ({ request }) => {
+  // The waive flags survive a void, but payroll stops reading them — so say so
+  // rather than showing chips that look like they are still in force.
+  if (request.status === 'voided') {
+    return <span className="text-xs text-gray-400">No longer applied</span>
+  }
+
   const chips: string[] = []
   if (request.waive_late) chips.push('Late waived')
   if (request.waive_undertime) chips.push('Undertime waived')
@@ -60,6 +67,8 @@ const AttendanceRequests: React.FC = () => {
   const [showForm, setShowForm] = useState(false)
   const [reviewing, setReviewing] = useState<StaffAttendanceRequest | null>(null)
   const [reviewNote, setReviewNote] = useState('')
+  const [voiding, setVoiding] = useState<StaffAttendanceRequest | null>(null)
+  const [voidNote, setVoidNote] = useState('')
   const [reviewFlags, setReviewFlags] = useState({
     waive_late: false,
     waive_undertime: false,
@@ -118,6 +127,22 @@ const AttendanceRequests: React.FC = () => {
     },
     onError: (err: unknown) => toast.error(errorMessage(err, 'Failed to cancel the request.')),
   })
+
+  const voidMutation = useMutation({
+    mutationFn: (payload: { id: string; note: string }) =>
+      staffAttendanceRequestService.void(payload.id, payload.note),
+    onSuccess: (response) => {
+      invalidate()
+      setVoiding(null)
+      toast.success(response.message || 'Approval voided.')
+    },
+    onError: (err: unknown) => toast.error(errorMessage(err, 'Failed to void the approval.')),
+  })
+
+  const openVoid = (request: StaffAttendanceRequest) => {
+    setVoidNote('')
+    setVoiding(request)
+  }
 
   const openReview = (request: StaffAttendanceRequest) => {
     setReviewFlags({
@@ -185,6 +210,7 @@ const AttendanceRequests: React.FC = () => {
               { value: 'approved', label: 'Approved' },
               { value: 'disapproved', label: 'Disapproved' },
               { value: 'cancelled', label: 'Cancelled' },
+              { value: 'voided', label: 'Voided' },
             ]}
           />
         </div>
@@ -239,6 +265,11 @@ const AttendanceRequests: React.FC = () => {
                       Reviewer: {request.review_note}
                     </div>
                   )}
+                  {request.void_note && (
+                    <div className="mt-1 text-xs italic text-red-400">
+                      Voided: {request.void_note}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <EffectChips request={request} />
@@ -249,14 +280,23 @@ const AttendanceRequests: React.FC = () => {
                   >
                     {request.status}
                   </span>
-                  {request.reviewed_by_name && (
-                    <div className="mt-1 text-[11px] text-gray-400">by {request.reviewed_by_name}</div>
+                  {request.status === 'voided' && request.voided_by_name ? (
+                    <div className="mt-1 text-[11px] text-gray-400">by {request.voided_by_name}</div>
+                  ) : (
+                    request.reviewed_by_name && (
+                      <div className="mt-1 text-[11px] text-gray-400">by {request.reviewed_by_name}</div>
+                    )
                   )}
                 </td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   {request.status === 'pending' && canApprove && tab === 'review' && (
                     <Button size="sm" variant="outline" onClick={() => openReview(request)}>
                       Review
+                    </Button>
+                  )}
+                  {request.status === 'approved' && canApprove && (
+                    <Button size="sm" variant="ghost" onClick={() => openVoid(request)}>
+                      Void
                     </Button>
                   )}
                   {request.status === 'pending' && tab === 'mine' && (
@@ -369,6 +409,69 @@ const AttendanceRequests: React.FC = () => {
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   {approveMutation.isPending ? 'Approving…' : 'Approve'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {voiding && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setVoiding(null)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Void approval — {voiding.staff_name || 'Staff'}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {KIND_LABELS[voiding.kind]} · {dateRange(voiding)}
+              </p>
+            </div>
+            <div className="space-y-4 p-6">
+              <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">{voiding.reason}</div>
+
+              <p className="text-sm text-gray-600">
+                The request stays on record but stops counting towards pay, so this day is charged
+                normally again. {voiding.staff_name || 'The staff member'} may file a corrected
+                request for these dates.
+              </p>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Reason for voiding (required)
+                </label>
+                <textarea
+                  rows={3}
+                  value={voidNote}
+                  onChange={(e) => setVoidNote(e.target.value)}
+                  placeholder="Why this approval is being taken back"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+
+              <p className="text-xs text-gray-400">
+                Voiding does not change an existing payslip on its own — regenerate the payroll
+                period to apply it.
+              </p>
+
+              <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setVoiding(null)}>
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  color="danger"
+                  disabled={voidMutation.isPending || !voidNote.trim()}
+                  onClick={() => voidMutation.mutate({ id: voiding.id, note: voidNote.trim() })}
+                >
+                  <Ban className="h-4 w-4" />
+                  {voidMutation.isPending ? 'Voiding…' : 'Void approval'}
                 </Button>
               </div>
             </div>

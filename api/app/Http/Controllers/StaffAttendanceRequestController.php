@@ -18,7 +18,8 @@ use Illuminate\Validation\ValidationException;
  * Any staff member may file for themselves; a principal /
  * institution-administrator reviews. Approved rows are what
  * {@see \App\Services\PayrollService} reads when pricing a day — a pending
- * request changes nothing about pay.
+ * request changes nothing about pay, and neither does a voided one once an
+ * approver has taken the approval back.
  */
 class StaffAttendanceRequestController extends Controller
 {
@@ -44,6 +45,7 @@ class StaffAttendanceRequestController extends Controller
             'staff:id,first_name,middle_name,last_name,email',
             'requester:id,first_name,last_name',
             'reviewer:id,first_name,last_name',
+            'voider:id,first_name,last_name',
         ])->where('institution_id', $institutionId);
 
         if (! $this->canApprove($request) || $request->get('scope') === 'mine') {
@@ -313,6 +315,63 @@ class StaffAttendanceRequestController extends Controller
     }
 
     /**
+     * Take back an approval that should not have been granted.
+     *
+     * Disapproving is only open while a request is pending, so this is the only
+     * way out of an approval made in error. The row is kept — who approved it
+     * and who voided it both stay on record — but payroll stops reading it, so
+     * the day is charged normally again once the period is regenerated. The
+     * dates are freed for a corrected request to be filed.
+     */
+    public function void(Request $request, string $id): JsonResponse
+    {
+        if (! $this->canApprove($request)) {
+            return $this->approverForbidden();
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (! $institutionId) {
+            return $this->noInstitution();
+        }
+
+        $attendanceRequest = StaffAttendanceRequest::where('institution_id', $institutionId)->find($id);
+        if (! $attendanceRequest) {
+            return $this->notFound();
+        }
+
+        if ($attendanceRequest->isVoided()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This request is already voided.',
+            ], 422);
+        }
+
+        if (! $attendanceRequest->isApproved()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only approved requests can be voided.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'void_note' => 'required|string|max:2000',
+        ]);
+
+        $attendanceRequest->update([
+            'status' => StaffAttendanceRequest::STATUS_VOIDED,
+            'void_note' => $validated['void_note'],
+            'voided_by' => $request->user()?->id,
+            'voided_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Approval voided.'.$this->regenerateHint($institutionId, $attendanceRequest),
+            'data' => $this->serialize($this->loadRelations($attendanceRequest)),
+        ]);
+    }
+
+    /**
      * An approval only reaches a payslip when the period is regenerated, so
      * say so rather than letting the admin assume pay already changed.
      */
@@ -392,6 +451,7 @@ class StaffAttendanceRequestController extends Controller
             'staff:id,first_name,middle_name,last_name,email',
             'requester:id,first_name,last_name',
             'reviewer:id,first_name,last_name',
+            'voider:id,first_name,last_name',
         ]) ?? $attendanceRequest;
     }
 
@@ -416,6 +476,9 @@ class StaffAttendanceRequestController extends Controller
             'requested_by_name' => $this->personName($row->requester),
             'reviewed_by_name' => $this->personName($row->reviewer),
             'reviewed_at' => $row->reviewed_at?->toIso8601String(),
+            'void_note' => $row->void_note,
+            'voided_by_name' => $this->personName($row->voider),
+            'voided_at' => $row->voided_at?->toIso8601String(),
             'created_at' => $row->created_at?->toIso8601String(),
         ];
     }

@@ -50,6 +50,18 @@ class StaffAttendanceRequestService {
     const response = await api.post<ApiResponse<StaffAttendanceRequest>>(`${this.baseUrl}/${id}/cancel`, {})
     return response.data
   }
+
+  /**
+   * Approver-only: take back an approval. The row stays on record but stops
+   * counting towards pay, so the payroll period needs regenerating.
+   */
+  async void(id: string, void_note: string) {
+    const response = await api.post<ApiResponse<StaffAttendanceRequest>>(
+      `${this.baseUrl}/${id}/void`,
+      { void_note }
+    )
+    return response.data
+  }
 }
 
 export const staffAttendanceRequestService = new StaffAttendanceRequestService()

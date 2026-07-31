@@ -472,6 +472,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('staff-attendance-requests/{id}/approve', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'approve']);
     Route::post('staff-attendance-requests/{id}/disapprove', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'disapprove']);
     Route::post('staff-attendance-requests/{id}/cancel', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'cancel']);
+    Route::post('staff-attendance-requests/{id}/void', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'void']);
 
     // HRIS — Payroll (compensation settings, deduction types, periods, payslips)
     Route::apiResource('payroll-deduction-types', \App\Http\Controllers\PayrollDeductionTypeController::class)
