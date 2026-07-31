@@ -14,6 +14,32 @@ function LabeledRow({ label, value, bold }: { label: string; value: string; bold
   )
 }
 
+const plural = (count: number, unit: string) => `${count} ${unit}${count === 1 ? '' : 's'}`
+
+/**
+ * Late, undertime and absences as deduction lines.
+ *
+ * The salary the slip prints is the one before them, so they belong in the
+ * itemized list alongside the contributions — that is the only place a staff
+ * member can see the days and minutes the pay was short by. A charge of zero is
+ * left off: nothing was taken, so there is nothing to explain.
+ */
+const attendanceLines = (data: PayslipSheetData): { name: string; amount: number }[] => {
+  const lines: { name: string; amount: number }[] = []
+
+  if (data.lateAmount > 0) {
+    lines.push({ name: `Late (${data.lateMinutes} min)`, amount: data.lateAmount })
+  }
+  if (data.undertimeAmount > 0) {
+    lines.push({ name: `Undertime (${data.undertimeMinutes} min)`, amount: data.undertimeAmount })
+  }
+  if (data.absenceAmount > 0) {
+    lines.push({ name: `Absences (${plural(data.absentDays, 'day')})`, amount: data.absenceAmount })
+  }
+
+  return lines
+}
+
 function ElementView({ element, data }: { element: PayslipTemplateElement; data: PayslipSheetData }) {
   switch (element.type) {
     case 'institution_logo':
@@ -44,22 +70,26 @@ function ElementView({ element, data }: { element: PayslipTemplateElement; data:
       return <LabeledRow label="Total Working Days:" value={String(data.totalWorkingDays)} />
     case 'total_hours':
       return <LabeledRow label="Total Hours Worked:" value={String(data.totalHours)} />
+    // The salary before late, undertime and absences: those are charged under
+    // deductions, so subtracting them here as well would take them twice.
     case 'total_salary_earned':
       return <LabeledRow label="TOTAL SALARY EARNED:" value={money(data.grossPay)} bold />
-    case 'deductions_list':
+    case 'deductions_list': {
+      const lines = [...data.deductions, ...attendanceLines(data)]
+
       return (
         <div>
           <div className="pslip-row">
             <span className="pslip-label">Deductions:</span>
             <span className="pslip-value" />
           </div>
-          {data.deductions.length === 0 ? (
+          {lines.length === 0 ? (
             <div className="pslip-row pslip-indent">
               <span className="pslip-label">None</span>
               <span className="pslip-value" />
             </div>
           ) : (
-            data.deductions.map((deduction, index) => (
+            lines.map((deduction, index) => (
               <div key={index} className="pslip-row pslip-indent">
                 <span className="pslip-label">{deduction.name}</span>
                 <span className="pslip-value">{money(deduction.amount)}</span>
@@ -71,6 +101,23 @@ function ElementView({ element, data }: { element: PayslipTemplateElement; data:
             <span className="pslip-value">{money(data.totalDeductions)}</span>
           </div>
         </div>
+      )
+    }
+    case 'late_deduction':
+      return <LabeledRow label={`Late (${data.lateMinutes} min):`} value={money(data.lateAmount)} />
+    case 'undertime_deduction':
+      return (
+        <LabeledRow
+          label={`Undertime (${data.undertimeMinutes} min):`}
+          value={money(data.undertimeAmount)}
+        />
+      )
+    case 'absences_deduction':
+      return (
+        <LabeledRow
+          label={`Absences (${plural(data.absentDays, 'day')}):`}
+          value={money(data.absenceAmount)}
+        />
       )
     case 'total_deductions':
       return <LabeledRow label="TOTAL DEDUCTIONS:" value={money(data.totalDeductions)} bold />

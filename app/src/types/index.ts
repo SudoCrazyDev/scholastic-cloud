@@ -2603,9 +2603,21 @@ export interface Payslip {
   deductions: PayslipDeduction[];
   employer_share_total: number;
   total_deductions: number;
+  attendance_charges: PayslipAttendanceCharges;
   net_pay: number;
   days: PayslipDay[];
   updated_at?: string;
+}
+
+// What late, undertime and absences cost — the figures the salary actually gave
+// up, clipped the way pricing clipped them. They are already out of gross_pay;
+// a printed pay slip adds them back into the salary and charges them under
+// DEDUCTIONS so the staff member can see why the pay is short.
+export interface PayslipAttendanceCharges {
+  late: number;
+  undertime: number;
+  absent_days: number;
+  absences: number;
 }
 
 // One deduction line on a payslip; name is a snapshot of the type name.
@@ -2667,6 +2679,11 @@ export type PayslipTemplateElementType =
   | 'total_hours'
   | 'total_salary_earned'
   | 'deductions_list'
+  // The attendance charges the itemized list already carries, for a layout that
+  // would rather place them on their own rows.
+  | 'late_deduction'
+  | 'undertime_deduction'
+  | 'absences_deduction'
   | 'total_deductions'
   | 'employer_benefits_list'
   | 'net_pay'

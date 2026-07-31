@@ -246,6 +246,83 @@ class PayslipController extends Controller
     }
 
     /**
+     * What attendance cost this payslip, itemized the way a pay slip prints it.
+     *
+     * Late, undertime and absences never come off a deduction line — they are
+     * taken out of the salary itself, so a slip showing only the surviving
+     * salary leaves a staff member no way to see why it is short. The printed
+     * slip charges them under DEDUCTIONS and adds them back into TOTAL SALARY
+     * EARNED instead, which only stays honest if these are the figures the
+     * salary actually gave up:
+     *
+     * - A day's penalty is clipped at that day's rate, exactly as pricing
+     *   clipped it, and the clip is shared between late and undertime in
+     *   proportion to what each side charged.
+     * - An absence is a day that earned nothing and was charged no penalty:
+     *   no punches at all, or a single punch payroll cannot bracket a day
+     *   with. Requiring both keeps a day whose penalty ate the whole rate from
+     *   being charged twice — once as the penalty, again as an absence.
+     *
+     * @return array{late: float, undertime: float, absent_days: int, absences: float}
+     */
+    private function attendanceCharges(Payslip $payslip): array
+    {
+        $dailyRate = (float) $payslip->daily_rate;
+        $lateRate = (float) $payslip->late_penalty_per_minute;
+        $undertimeRate = (float) $payslip->undertime_penalty_per_minute;
+
+        $late = 0.0;
+        $undertime = 0.0;
+        $absentDays = 0;
+
+        foreach ($payslip->days as $day) {
+            $penalty = (float) $day->penalty_amount;
+
+            if ($penalty > 0) {
+                // The two sides add up to the penalty, so sharing out the clip
+                // this way neither loses nor invents pesos.
+                $scale = min($penalty, $dailyRate) / $penalty;
+                $late += (int) $day->late_minutes * $lateRate * $scale;
+                $undertime += (int) $day->undertime_minutes * $undertimeRate * $scale;
+
+                continue;
+            }
+
+            if ($this->isAbsence($day)) {
+                $absentDays++;
+            }
+        }
+
+        return [
+            'late' => round($late, 2),
+            'undertime' => round($undertime, 2),
+            'absent_days' => $absentDays,
+            'absences' => round($absentDays * $dailyRate, 2),
+        ];
+    }
+
+    /**
+     * A scheduled working day the staff member earned nothing for.
+     *
+     * A rest day was never part of the salary, a holiday nobody is expected to
+     * report on, and a day signed off as fully paid pays without punches. A day
+     * still resting on assumed punches is not an absence either — payroll was
+     * generated before it had the chance to record anything.
+     */
+    private function isAbsence(PayslipDay $day): bool
+    {
+        if ($day->is_rest_day || $day->is_holiday || $day->isAssumed()) {
+            return false;
+        }
+
+        if ($day->pay_policy === PayslipDay::PAY_FULL_DAY) {
+            return false;
+        }
+
+        return (float) $day->amount_earned <= 0;
+    }
+
+    /**
      * "DELA CRUZ, JUAN P." — the printed sheet lists staff surname first.
      * Falls back to the plain name for anyone with no surname on file.
      */
@@ -550,6 +627,9 @@ class PayslipController extends Controller
             ])->values(),
             'employer_share_total' => round((float) $payslip->deductions->sum('employer_amount'), 2),
             'total_deductions' => (float) $payslip->total_deductions,
+            // Already netted out of gross_pay — the printed slip itemizes them
+            // under DEDUCTIONS rather than absorbing them silently.
+            'attendance_charges' => $this->attendanceCharges($payslip),
             'net_pay' => (float) $payslip->net_pay,
             'days' => $payslip->days->map(fn (PayslipDay $day) => [
                 'id' => $day->id,

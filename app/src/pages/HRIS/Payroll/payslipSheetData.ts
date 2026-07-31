@@ -16,8 +16,17 @@ export interface PayslipSheetData {
   hourlyRate: number
   totalWorkingDays: number
   totalHours: number
+  // The salary before late, undertime and absences — those are charged under
+  // deductions instead, so the slip can say what it took off and why.
   grossPay: number
   deductions: { name: string; amount: number }[]
+  lateMinutes: number
+  lateAmount: number
+  undertimeMinutes: number
+  undertimeAmount: number
+  absentDays: number
+  absenceAmount: number
+  // Deduction lines plus the three attendance charges above.
   totalDeductions: number
   employerBenefits: { name: string; amount: number }[]
   employerShareTotal: number
@@ -39,6 +48,11 @@ export const PAYSLIP_ELEMENT_PALETTE: { type: PayslipTemplateElementType; label:
   { type: 'total_hours', label: 'Total Hours Worked' },
   { type: 'total_salary_earned', label: 'Total Salary Earned' },
   { type: 'deductions_list', label: 'Deductions (itemized)' },
+  // Already inside the itemized list — these are for a layout that gives them
+  // their own rows.
+  { type: 'late_deduction', label: 'Late (deduction)' },
+  { type: 'undertime_deduction', label: 'Undertime (deduction)' },
+  { type: 'absences_deduction', label: 'Absences (deduction)' },
   { type: 'total_deductions', label: 'Total Deductions' },
   { type: 'employer_benefits_list', label: "Employer's Share (itemized)" },
   { type: 'net_pay', label: 'Net Pay' },
@@ -78,8 +92,10 @@ export const SAMPLE_SHEET_DATA: PayslipSheetData = {
   coveredPeriod: 'June 1 – June 30, 2026',
   dailyRate: 750,
   hourlyRate: 93.75,
-  totalWorkingDays: 21,
-  totalHours: 168,
+  // 21 scheduled days with one absence, so the preview shows every deduction
+  // line a real slip can carry.
+  totalWorkingDays: 20,
+  totalHours: 160,
   grossPay: 15750,
   deductions: [
     { name: 'Vale', amount: 500 },
@@ -87,21 +103,36 @@ export const SAMPLE_SHEET_DATA: PayslipSheetData = {
     { name: 'PhilHealth', amount: 281.25 },
     { name: 'HDMF', amount: 200 },
   ],
-  totalDeductions: 1521.25,
+  lateMinutes: 35,
+  lateAmount: 70,
+  undertimeMinutes: 10,
+  undertimeAmount: 20,
+  absentDays: 1,
+  absenceAmount: 750,
+  totalDeductions: 2361.25,
   employerBenefits: [
     { name: 'S.S.S.', amount: 1060 },
     { name: 'PhilHealth', amount: 281.25 },
     { name: 'HDMF', amount: 200 },
   ],
   employerShareTotal: 1541.25,
-  netPay: 14228.75,
+  netPay: 13388.75,
 }
+
+/** Adding pesos in floating point leaves 1521.2500000000002 behind. */
+const round2 = (amount: number) => Math.round(amount * 100) / 100
 
 export const sheetDataFromPayslip = (payslip: Payslip): PayslipSheetData => {
   const period = payslip.period
   const range = period
     ? `${parseYmd(period.date_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${parseYmd(period.date_to).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
     : ''
+
+  // Late, undertime and absences are already out of gross_pay. The slip charges
+  // them under deductions instead, so the salary has to carry them again —
+  // salary − (contributions + attendance) is still the same net pay.
+  const charges = payslip.attendance_charges
+  const attendanceTotal = charges.late + charges.undertime + charges.absences
 
   return {
     institutionName: payslip.institution_name || '',
@@ -115,9 +146,15 @@ export const sheetDataFromPayslip = (payslip: Payslip): PayslipSheetData => {
     hourlyRate: payslip.hourly_rate,
     totalWorkingDays: payslip.days_worked,
     totalHours: payslip.hours_worked,
-    grossPay: payslip.gross_pay,
+    grossPay: round2(payslip.gross_pay + attendanceTotal),
     deductions: payslip.deductions.map((d) => ({ name: d.name, amount: d.amount })),
-    totalDeductions: payslip.total_deductions,
+    lateMinutes: payslip.late_minutes,
+    lateAmount: charges.late,
+    undertimeMinutes: payslip.undertime_minutes,
+    undertimeAmount: charges.undertime,
+    absentDays: charges.absent_days,
+    absenceAmount: charges.absences,
+    totalDeductions: round2(payslip.total_deductions + attendanceTotal),
     employerBenefits: payslip.deductions
       .filter((d) => d.employer_amount > 0)
       .map((d) => ({ name: d.name, amount: d.employer_amount })),
