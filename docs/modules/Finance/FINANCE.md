@@ -234,9 +234,9 @@ and dashboard queries afterwards. Backend role gate: `REVIEWER_ROLES` in
 
 ### Void Requests (`/finance/void-requests`)
 Visible only when `canRequestVoid` (frontend) — `finance` role or an approver role. Lists
-`GET /payment-void-requests?status=` with a status filter. Approvers get Approve / Disapprove
-(review note required for disapprove). Approving voids the underlying payment(s); the view
-invalidates ledger/NOA queries afterwards.
+`GET /payment-void-requests?status=` with a status filter. Approvers — `finance` included — get
+Approve / Disapprove (review note required for disapprove). Approving voids the underlying
+payment(s); the view invalidates ledger/NOA queries afterwards.
 
 ### Setup → School Fees (`/finance/school-fees`)
 CRUD on the fee catalog (`name`, `description`, `is_active`) via `/school-fees`.
@@ -318,13 +318,16 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
   `finance` (the Finance, Payment Plans, and Announcements links). The routes themselves are not role-guarded in
   the frontend router — the sidebar is the gate.
 - **Void workflow** (mirrored front + back):
-  - `VOID_APPROVER_ROLES` in `Finance.tsx` = `institution-administrator`, `principal`,
-    `super-administrator` → can approve/disapprove, and their own requests auto-approve.
+  - `VOID_APPROVER_ROLES` in `Finance.tsx` = `finance`, `institution-administrator`, `principal`,
+    `super-administrator` → can approve/disapprove a queued request.
+  - `VOID_SELF_APPROVER_ROLES` = the same list minus `finance` → their own requests auto-approve
+    and void immediately. A void `finance` raises from the Ledger still lands in the queue, so the
+    request and its approval remain two records even though finance can action both.
   - `canRequestVoid` = `finance` role or approver → sees the Void Requests tab and the per-row
     void buttons in the Ledger.
   - Backend enforcement lives in `PaymentVoidRequestController` (`REQUESTER_ROLES`,
-    `APPROVER_ROLES`); other finance controllers rely on institution scoping only, **not** roles —
-    keep that in mind before exposing new endpoints.
+    `APPROVER_ROLES`, `SELF_APPROVING_ROLES`); other finance controllers rely on institution
+    scoping only, **not** roles — keep that in mind before exposing new endpoints.
 
 ---
 

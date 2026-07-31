@@ -49,7 +49,10 @@ import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
 import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
 
-const VOID_APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator']
+const VOID_APPROVER_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator']
+// Finance reviews the queue but does not skip it: a void raised from the ledger still
+// becomes a pending request, which only these roles bypass.
+const VOID_SELF_APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator']
 
 type FinanceView =
   | 'dashboard'
@@ -155,6 +158,7 @@ const Finance: React.FC = () => {
   const { user } = useAuth()
   const roleSlug: string | undefined = user?.role?.slug
   const isVoidApprover = Boolean(roleSlug && VOID_APPROVER_ROLES.includes(roleSlug))
+  const voidsImmediately = Boolean(roleSlug && VOID_SELF_APPROVER_ROLES.includes(roleSlug))
   const canRequestVoid = roleSlug === 'finance' || isVoidApprover
   // Students may make their first plan selection in the portal; every later change
   // is staff-only, and the API rejects a student attempting one either way.
@@ -3466,7 +3470,7 @@ const Finance: React.FC = () => {
               <h2 className="text-lg font-semibold text-gray-900">Payment Void Requests</h2>
               <p className="text-sm text-gray-500">
                 {isVoidApprover
-                  ? 'Review and approve or disapprove void requests submitted by finance.'
+                  ? 'Review and approve or disapprove submitted void requests.'
                   : 'Track the status of payment void requests you have submitted.'}
               </p>
             </div>
@@ -3605,9 +3609,9 @@ const Finance: React.FC = () => {
               <div className="px-5 py-4 border-b border-gray-100">
                 <h3 className="text-base font-semibold text-gray-900">Void Payment</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  {isVoidApprover
+                  {voidsImmediately
                     ? 'This will void the payment immediately. A note is required.'
-                    : 'This submits a void request for admin approval. A note is required.'}
+                    : 'This submits a void request to the approval queue. A note is required.'}
                 </p>
               </div>
               <div className="px-5 py-4 space-y-3">
@@ -3655,7 +3659,7 @@ const Finance: React.FC = () => {
                   loading={createVoidMutation.isPending}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
-                  {isVoidApprover ? 'Void Payment' : 'Submit Request'}
+                  {voidsImmediately ? 'Void Payment' : 'Submit Request'}
                 </Button>
               </div>
             </form>

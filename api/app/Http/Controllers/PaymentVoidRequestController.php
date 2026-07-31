@@ -16,8 +16,11 @@ class PaymentVoidRequestController extends Controller
     /** Roles that may request a void (creates a pending request). */
     private const REQUESTER_ROLES = ['finance'];
 
-    /** Roles that may approve/disapprove — and whose own voids auto-approve. */
-    private const APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator'];
+    /** Roles that may approve/disapprove a queued request. */
+    private const APPROVER_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator'];
+
+    /** Roles whose own voids skip the queue and apply immediately. */
+    private const SELF_APPROVING_ROLES = ['institution-administrator', 'principal', 'super-administrator'];
 
     private function roleSlug(Request $request): ?string
     {
@@ -34,6 +37,13 @@ class PaymentVoidRequestController extends Controller
         $slug = $this->roleSlug($request);
 
         return $slug !== null && in_array($slug, self::APPROVER_ROLES, true);
+    }
+
+    private function canSelfApprove(Request $request): bool
+    {
+        $slug = $this->roleSlug($request);
+
+        return $slug !== null && in_array($slug, self::SELF_APPROVING_ROLES, true);
     }
 
     private function canRequest(Request $request): bool
@@ -96,8 +106,10 @@ class PaymentVoidRequestController extends Controller
     /**
      * Create a void request for a recorded payment (anchored on its receipt).
      *
-     * Finance → pending request. Admin (approver) → created already approved and
-     * the payment is voided immediately. A note is required in both cases.
+     * Finance → pending request, even though finance may approve the queue itself,
+     * so the request and its approval stay two separate records. Admin → created
+     * already approved and the payment is voided immediately. A note is required
+     * in both cases.
      */
     public function store(Request $request): JsonResponse
     {
@@ -149,7 +161,7 @@ class PaymentVoidRequestController extends Controller
         $first = $payments->first();
         $transactionId = $payments->firstWhere('payment_transaction_id', '!=', null)?->payment_transaction_id;
         $amount = (float) $payments->sum('amount');
-        $isApprover = $this->canApprove($request);
+        $isApprover = $this->canSelfApprove($request);
         $userId = $request->user()?->id;
 
         $voidRequest = DB::transaction(function () use (
