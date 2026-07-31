@@ -211,6 +211,16 @@ const PeriodsTab: React.FC = () => {
     [payslipsQuery.data]
   )
 
+  // Payslips priced from punches that had not been made when payroll ran.
+  // Finalizing pays those out, so the confirm dialog names them.
+  const assumed = useMemo(() => {
+    const dates = payslipsQuery.data?.assumed_dates ?? []
+    return {
+      dates,
+      payslipCount: payslips.filter((payslip) => payslip.assumed_days > 0).length,
+    }
+  }, [payslipsQuery.data, payslips])
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['payroll-periods'] })
     queryClient.invalidateQueries({ queryKey: ['payroll-payslips'] })
@@ -256,6 +266,11 @@ const PeriodsTab: React.FC = () => {
     onSuccess: (result) => {
       invalidate()
       toast.success(result.message || 'Payslips generated.')
+      // Attendance that stopped arriving mid-period looks exactly like a month
+      // of absences, and would otherwise be paid as one.
+      if (result.warning) {
+        toast(result.warning, { icon: '⚠️', duration: 14000 })
+      }
     },
     onError: (err: unknown) => {
       toast.error(errorMessage(err, 'Failed to generate payslips.'))
@@ -507,7 +522,17 @@ const PeriodsTab: React.FC = () => {
                     <td className="px-4 py-3 font-medium text-primary-700">{payslip.staff_name}</td>
                     <td className="px-4 py-3 text-gray-600">{payslip.designation || '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{peso(payslip.daily_rate)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{payslip.days_worked}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {payslip.days_worked}
+                      {payslip.assumed_days > 0 && (
+                        <span
+                          className="ml-1.5 text-[10px] font-medium uppercase tracking-wide text-amber-600"
+                          title={`${payslip.assumed_days} day(s) priced from the staff schedule — those punches had not been made when payroll was generated`}
+                        >
+                          {payslip.assumed_days} est
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">{payslip.hours_worked}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{peso(payslip.gross_pay)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-red-600">
@@ -791,6 +816,20 @@ const PeriodsTab: React.FC = () => {
               Finalizing locks all payslips in this period against edits and regeneration. You can
               reopen it later if a correction is needed.
             </p>
+            {assumed.payslipCount > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                <p className="font-medium">
+                  {assumed.payslipCount} payslip{assumed.payslipCount === 1 ? '' : 's'} rest on
+                  assumed punches
+                </p>
+                <p className="mt-1 text-xs">
+                  {assumed.dates.map((date) => shortDate(date)).join(', ')}{' '}
+                  {assumed.dates.length === 1 ? 'was' : 'were'} priced from the staff schedules
+                  because those punches had not been made when payroll was generated. Regenerate
+                  first if the real attendance has since arrived.
+                </p>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Paid on</label>
               <Input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />

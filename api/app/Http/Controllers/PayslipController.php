@@ -10,6 +10,7 @@ use App\Models\PayslipDay;
 use App\Models\PayslipDeduction;
 use App\Models\User;
 use App\Services\PayrollService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,8 +44,35 @@ class PayslipController extends Controller
 
         return response()->json([
             'success' => true,
+            // The dates these payslips are resting on assumed punches for.
+            // Finalizing pays them out, so the screen names them first.
+            'assumed_dates' => $this->assumedDates($payslips),
             'data' => $payslips->map(fn (Payslip $payslip) => $this->serializeSummary($payslip))->values(),
         ]);
+    }
+
+    /**
+     * Every date in these payslips that carries an assumed punch, oldest first.
+     *
+     * @param  \Illuminate\Support\Collection<int, Payslip>  $payslips
+     * @return array<int, string>
+     */
+    private function assumedDates(\Illuminate\Support\Collection $payslips): array
+    {
+        $ids = $payslips->where('assumed_days', '>', 0)->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return PayslipDay::whereIn('payslip_id', $ids)
+            ->where(fn ($query) => $query->where('assumed_time_in', true)->orWhere('assumed_time_out', true))
+            ->orderBy('work_date')
+            ->pluck('work_date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
@@ -141,6 +169,10 @@ class PayslipController extends Controller
                 'staff_name' => $this->staffName($payslip->user),
                 'designation' => $payslip->designation,
                 'days_worked' => (float) $payslip->days_worked,
+                // Marked on the printed sheet: this is the copy that leaves the
+                // system, and a figure resting on punches nobody made yet must
+                // not read as a biometric total.
+                'assumed_days' => (int) $payslip->assumed_days,
                 'hours_worked' => (float) $payslip->hours_worked,
                 'daily_rate' => (float) $payslip->daily_rate,
                 'benefits' => $benefitColumns
@@ -370,7 +402,15 @@ class PayslipController extends Controller
             ]);
         }
 
-        $update = ['time_in' => $timeIn, 'time_out' => $timeOut];
+        // A payroll manager typing a time replaces whatever was assumed from
+        // the schedule, so the day stops being flagged as an assumption — it is
+        // somebody's entry now, and the sheet should not keep hedging about it.
+        $update = [
+            'time_in' => $timeIn,
+            'time_out' => $timeOut,
+            'assumed_time_in' => false,
+            'assumed_time_out' => false,
+        ];
         if (array_key_exists('overtime_minutes', $validated)) {
             // Approved overtime — the only minutes that are actually paid.
             $update['overtime_minutes'] = (int) ($validated['overtime_minutes'] ?? 0);
@@ -397,6 +437,7 @@ class PayslipController extends Controller
             'designation' => $payslip->designation,
             'daily_rate' => (float) $payslip->daily_rate,
             'days_worked' => (float) $payslip->days_worked,
+            'assumed_days' => (int) $payslip->assumed_days,
             'hours_worked' => (float) $payslip->hours_worked,
             'late_minutes' => (int) $payslip->late_minutes,
             'undertime_minutes' => (int) $payslip->undertime_minutes,
@@ -437,6 +478,7 @@ class PayslipController extends Controller
             'undertime_penalty_per_minute' => (float) $payslip->undertime_penalty_per_minute,
             'overtime_rate_per_minute' => (float) $payslip->overtime_rate_per_minute,
             'days_worked' => (float) $payslip->days_worked,
+            'assumed_days' => (int) $payslip->assumed_days,
             'hours_worked' => (float) $payslip->hours_worked,
             'late_minutes' => (int) $payslip->late_minutes,
             'undertime_minutes' => (int) $payslip->undertime_minutes,
@@ -465,6 +507,8 @@ class PayslipController extends Controller
                 'work_date' => $day->work_date?->toDateString(),
                 'time_in' => $this->formatTime($day->time_in),
                 'time_out' => $this->formatTime($day->time_out),
+                'assumed_time_in' => (bool) $day->assumed_time_in,
+                'assumed_time_out' => (bool) $day->assumed_time_out,
                 'required_hours' => (float) $day->required_hours,
                 'hours_worked' => (float) $day->hours_worked,
                 'late_minutes' => (int) $day->late_minutes,

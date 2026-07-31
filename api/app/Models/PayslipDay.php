@@ -24,6 +24,8 @@ class PayslipDay extends Model
         'work_date',
         'time_in',
         'time_out',
+        'assumed_time_in',
+        'assumed_time_out',
         'lunch_start',
         'lunch_end',
         'schedule_start',
@@ -48,6 +50,8 @@ class PayslipDay extends Model
 
     protected $casts = [
         'work_date' => 'date',
+        'assumed_time_in' => 'boolean',
+        'assumed_time_out' => 'boolean',
         'grace_minutes' => 'integer',
         'waive_late' => 'boolean',
         'waive_undertime' => 'boolean',
@@ -67,5 +71,14 @@ class PayslipDay extends Model
     public function payslip(): BelongsTo
     {
         return $this->belongsTo(Payslip::class);
+    }
+
+    /**
+     * Whether either side of this day was filled in from the schedule rather
+     * than read off a biometric device.
+     */
+    public function isAssumed(): bool
+    {
+        return (bool) $this->assumed_time_in || (bool) $this->assumed_time_out;
     }
 }

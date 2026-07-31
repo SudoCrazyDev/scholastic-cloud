@@ -182,6 +182,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 7.5,
   },
+  assumedNote: {
+    marginTop: 8,
+    fontSize: 7,
+    color: '#8a6100',
+  },
   signatures: {
     flexDirection: 'row',
     marginTop: 22,
@@ -244,6 +249,11 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
   }
 
   const pct = (value: number) => `${value}%` as const
+
+  // Rows carrying a day that was priced from the schedule rather than punched.
+  // They get an asterisk, and the footnote below the table only prints when at
+  // least one row earned it.
+  const assumedRows = rows.filter((row) => row.assumed_days > 0).length
 
   const totals = rows.reduce(
     (acc, row) => ({
@@ -360,7 +370,12 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
                   <Text style={styles.cellText}>{(row.staff_name || '').toUpperCase()}</Text>
                 </View>
                 <View style={[styles.cell, { width: pct(FIXED.workingDays) }]}>
-                  <Text style={styles.center}>{days(row.days_worked)}</Text>
+                  {/* An asterisk where part of the total was assumed rather
+                      than punched — explained in the footnote below the table. */}
+                  <Text style={styles.center}>
+                    {days(row.days_worked)}
+                    {row.assumed_days > 0 ? '*' : ''}
+                  </Text>
                 </View>
                 <View style={[styles.cell, { width: pct(FIXED.dailyRate) }]}>
                   <Text style={styles.num}>{moneyAlways(row.daily_rate)}</Text>
@@ -437,6 +452,14 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
             </View>
           ) : null}
         </View>
+
+        {assumedRows > 0 && (
+          <Text style={styles.assumedNote}>
+            * Includes {assumedRows === 1 ? 'a day' : 'days'} priced from the staff schedule.
+            Payroll was prepared before the period closed, so those punches had not yet been
+            recorded on the biometric device.
+          </Text>
+        )}
 
         <Text style={styles.certification}>
           I certify that the above summary of working time and salaries is true and correct.

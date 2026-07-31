@@ -20,6 +20,24 @@ use Illuminate\Support\Facades\DB;
 class PayrollService
 {
     /**
+     * Punches are stored as local wall-clock times, and config/app.php pins the
+     * application to UTC — so "today" for payroll has to be asked for in the
+     * school's own timezone or the boundary between recorded and assumed
+     * attendance slips by eight hours every evening.
+     */
+    public const TIMEZONE = 'Asia/Manila';
+
+    /**
+     * The first date whose attendance cannot be trusted to be complete: today.
+     * Yesterday's punches are all in; today's punch-outs have not happened yet,
+     * and tomorrow's nothing has.
+     */
+    public function assumeFrom(): Carbon
+    {
+        return Carbon::now(self::TIMEZONE)->startOfDay();
+    }
+
+    /**
      * (Re)build every payslip for a period from the biometric attendance logs.
      * Payslips are generated for staff that have a compensation record.
      * Existing payslips for the period are replaced.
@@ -103,7 +121,12 @@ class PayrollService
 
         $generated = 0;
 
-        DB::transaction(function () use ($period, $compensations, $deductionTypes, $assignments, $punches, $holidayDates, $dayPolicies, $staffExceptions, $lateRate, $undertimeRate, $defaultOvertimeRate, &$generated) {
+        // Everything from today on is still to happen, so its punches are
+        // assumed rather than read. Fixed once for the whole run so a
+        // generation crossing midnight cannot price two payslips differently.
+        $assumeFrom = $this->assumeFrom();
+
+        DB::transaction(function () use ($period, $compensations, $deductionTypes, $assignments, $punches, $holidayDates, $dayPolicies, $staffExceptions, $lateRate, $undertimeRate, $defaultOvertimeRate, $assumeFrom, &$generated) {
             $period->payslips()->delete();
 
             foreach ($compensations as $compensation) {
@@ -120,13 +143,32 @@ class PayrollService
                     $staffExceptions[$compensation->user_id] ?? [],
                     $lateRate,
                     $undertimeRate,
-                    $overtimeRate
+                    $overtimeRate,
+                    $assumeFrom
                 );
                 $generated++;
             }
         });
 
         return ['generated' => $generated];
+    }
+
+    /**
+     * The last date the biometric devices recorded anything for this
+     * institution, or null when they never have.
+     *
+     * Attendance that stopped arriving days ago is indistinguishable from
+     * everybody being absent, and absences are exactly what payroll does not
+     * pay for — so the caller can say so rather than quietly issuing a month of
+     * short payslips.
+     */
+    public function lastAttendanceDate(string $institutionId, Carbon $before): ?Carbon
+    {
+        $latest = AttendanceLog::where('institution_id', $institutionId)
+            ->where('punched_at', '<=', $before)
+            ->max('punched_at');
+
+        return $latest ? Carbon::parse($latest)->startOfDay() : null;
     }
 
     /**
@@ -145,7 +187,8 @@ class PayrollService
         array $userExceptions,
         float $lateRate,
         float $undertimeRate,
-        float $overtimeRate
+        float $overtimeRate,
+        Carbon $assumeFrom
     ): Payslip {
         $hourlyRate = $compensation->effectiveHourlyRate();
         $scheduleDays = $assignment?->staffSchedule?->days;
@@ -213,6 +256,27 @@ class PayrollService
                 : (float) $compensation->hours_per_day;
 
             $isHoliday = $holidayDates->has($dateKey);
+
+            // Payroll is run before the period is over, so today's punch-out
+            // and every punch on a later date do not exist yet. Pricing them as
+            // recorded would pay nothing for days the staff member is going to
+            // work, so they are filled in from the schedule and flagged.
+            //
+            // Only from today forward: a day already past with no punches is an
+            // absence, and assuming it would quietly pay for one.
+            $assumed = $this->assumeUnrecordedPunches(
+                $timeIn,
+                $timeOut,
+                $scheduleStart,
+                $scheduleEnd,
+                $exception['pay_policy'],
+                $date->gte($assumeFrom) && ! $isRestDay && ! $isHoliday
+            );
+
+            $timeIn = $assumed['time_in'];
+            $timeOut = $assumed['time_out'];
+            $payPolicy = $assumed['pay_policy'];
+
             $hours = $this->workedHours($timeIn, $timeOut, $lunchStart, $lunchEnd);
             $priced = $this->priceDay(
                 $timeIn,
@@ -231,13 +295,15 @@ class PayrollService
                 $overtimeRate,
                 $exception['waive_late'],
                 $exception['waive_undertime'],
-                $exception['pay_policy']
+                $payPolicy
             );
 
             $rows[] = new PayslipDay([
                 'work_date' => $dateKey,
                 'time_in' => $timeIn,
                 'time_out' => $timeOut,
+                'assumed_time_in' => $assumed['assumed_time_in'],
+                'assumed_time_out' => $assumed['assumed_time_out'],
                 'lunch_start' => $lunchStart,
                 'lunch_end' => $lunchEnd,
                 'schedule_start' => $scheduleStart,
@@ -245,7 +311,7 @@ class PayrollService
                 'grace_minutes' => (int) ($scheduleDay->grace_minutes ?? 0),
                 'waive_late' => $exception['waive_late'],
                 'waive_undertime' => $exception['waive_undertime'],
-                'pay_policy' => $exception['pay_policy'],
+                'pay_policy' => $payPolicy,
                 'exception_label' => $exception['label'],
                 'required_hours' => round($requiredHours, 2),
                 'hours_worked' => $hours,
@@ -274,6 +340,73 @@ class PayrollService
         $this->recomputeTotals($payslip);
 
         return $payslip;
+    }
+
+    /**
+     * Fill in the punches a day has not had the chance to record yet.
+     *
+     * A real punch always wins. Someone who arrived late this morning keeps the
+     * late arrival and its penalty — only the punch-out they have not made yet
+     * is assumed, at the scheduled end. A day nobody has started is assumed on
+     * both sides, which prices it as a full day with no late and no undertime.
+     *
+     * $eligible is the caller's decision that this date is genuinely still to
+     * come and is a working day at all; rest days and holidays are not assumed
+     * into worked days.
+     *
+     * @param  string  $payPolicy  the policy the day's exceptions already resolved to
+     * @return array{time_in: ?string, time_out: ?string, assumed_time_in: bool, assumed_time_out: bool, pay_policy: string}
+     */
+    private function assumeUnrecordedPunches(
+        ?string $timeIn,
+        ?string $timeOut,
+        ?string $scheduleStart,
+        ?string $scheduleEnd,
+        string $payPolicy,
+        bool $eligible
+    ): array {
+        $unchanged = [
+            'time_in' => $timeIn,
+            'time_out' => $timeOut,
+            'assumed_time_in' => false,
+            'assumed_time_out' => false,
+            'pay_policy' => $payPolicy,
+        ];
+
+        // An approved unpaid leave filed ahead of time stays unpaid — assuming
+        // punches over it would pay for the very day somebody signed off as
+        // no-pay.
+        if (! $eligible || $payPolicy === PayslipDay::PAY_NO_PAY) {
+            return $unchanged;
+        }
+
+        // Both punches already in: nothing was missing, so nothing is assumed.
+        if ($timeIn !== null && $timeOut !== null) {
+            return $unchanged;
+        }
+
+        // No schedule to read times off — staff paid against hours_per_day
+        // rather than a shift. The day is still owed, so it is paid the daily
+        // rate outright and the missing sides are flagged just the same.
+        if ($scheduleStart === null || $scheduleEnd === null) {
+            return [
+                'time_in' => $timeIn,
+                'time_out' => $timeOut,
+                'assumed_time_in' => $timeIn === null,
+                'assumed_time_out' => $timeOut === null,
+                'pay_policy' => PayslipDay::PAY_FULL_DAY,
+            ];
+        }
+
+        return [
+            'time_in' => $timeIn ?? $scheduleStart,
+            // The effective end, so an announced half-day dismissal is what
+            // gets assumed rather than the ordinary shift end.
+            'time_out' => $timeOut ?? $scheduleEnd,
+            'assumed_time_in' => $timeIn === null,
+            'assumed_time_out' => $timeOut === null,
+            'pay_policy' => $payPolicy,
+        ];
     }
 
     /**
@@ -326,7 +459,7 @@ class PayrollService
     }
 
     /**
-     * @return array<string, mixed>|null  null when the type applies to nobody
+     * @return array<string, mixed>|null null when the type applies to nobody
      */
     private function fixedLine(PayrollDeductionType $type, ?PayrollCompensationDeduction $own): ?array
     {
@@ -358,7 +491,7 @@ class PayrollService
 
     /**
      * @param  array<string, float>|null  $basis
-     * @return array<string, mixed>|null  null when the type applies to nobody
+     * @return array<string, mixed>|null null when the type applies to nobody
      */
     private function percentageLine(PayrollDeductionType $type, ?PayrollCompensationDeduction $own, ?array $basis): ?array
     {
@@ -518,6 +651,9 @@ class PayrollService
             // (approved official business, a paid suspension).
             'days_worked' => $days->filter(fn ($day) => (float) $day->hours_worked > 0
                 || $day->pay_policy === PayslipDay::PAY_FULL_DAY)->count(),
+            // How much of this payslip rests on punches that had not been made
+            // when it was generated.
+            'assumed_days' => $days->filter(fn (PayslipDay $day) => $day->isAssumed())->count(),
             'hours_worked' => round((float) $days->sum('hours_worked'), 2),
             'late_minutes' => (int) $days->sum('late_minutes'),
             'undertime_minutes' => (int) $days->sum('undertime_minutes'),

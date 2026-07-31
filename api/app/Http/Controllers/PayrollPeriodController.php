@@ -203,8 +203,49 @@ class PayrollPeriodController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Generated {$result['generated']} payslip(s) from attendance logs.",
+            'warning' => $this->staleAttendanceWarning($period, $payrollService),
             'data' => $this->serialize($period->fresh()->loadCount('payslips')),
         ]);
+    }
+
+    /**
+     * Whether the biometric devices went quiet partway through this period.
+     *
+     * Only today and later are assumed; everything before is taken as recorded,
+     * so a device that stopped syncing on the 27th makes the 28th and 29th look
+     * like the entire staff was absent. That underpays everybody and looks
+     * exactly like a normal payroll run, which is why it is said out loud.
+     */
+    private function staleAttendanceWarning(PayrollPeriod $period, PayrollService $payrollService): ?string
+    {
+        $assumeFrom = $payrollService->assumeFrom();
+        $periodEnd = $period->date_to->copy()->endOfDay();
+
+        // Nothing before today in this period, so there is no recorded stretch
+        // to have a hole in.
+        if ($period->date_from->gte($assumeFrom)) {
+            return null;
+        }
+
+        $lastRecorded = $payrollService->lastAttendanceDate($period->institution_id, $periodEnd);
+
+        if ($lastRecorded === null) {
+            return 'No biometric attendance has been recorded for this period at all. Every day before today is priced as an absence — check that the attendance devices are syncing.';
+        }
+
+        // The last day that should have punches by now: yesterday, or the end
+        // of the period when it closed before today.
+        $expected = $assumeFrom->copy()->subDay()->min($period->date_to->copy()->startOfDay());
+
+        if ($lastRecorded->gte($expected)) {
+            return null;
+        }
+
+        return sprintf(
+            'No attendance has been recorded since %s, but this payroll counts every day up to %s as reported. Those days are priced as absences — check that the attendance devices are syncing before finalizing.',
+            $lastRecorded->format('M j, Y'),
+            $expected->format('M j, Y'),
+        );
     }
 
     public function finalize(Request $request, string $id): JsonResponse

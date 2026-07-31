@@ -3,7 +3,6 @@ import type {
   ApiResponse,
   CreatePayrollPeriodData,
   Payslip,
-  PayslipSummary,
   PayrollCompensation,
   PayrollDeductionType,
   PayrollPeriod,
@@ -11,6 +10,7 @@ import type {
   PayrollSettings,
   PayrollSheet,
   PayrollStaffCompensation,
+  PayslipListResponse,
   PayslipTemplate,
   SavePayrollCompensationData,
   SavePayrollDeductionTypeData,
@@ -125,7 +125,9 @@ class PayrollService {
   }
 
   async generatePayslips(id: string) {
-    const response = await api.post<ApiResponse<PayrollPeriod>>(`/payroll-periods/${id}/generate`)
+    const response = await api.post<PayrollPeriodSaveResponse>(
+      `/payroll-periods/${id}/generate`
+    )
     return response.data
   }
 
@@ -145,9 +147,7 @@ class PayrollService {
   // --- Payslips ---
 
   async getPayslips(periodId: string) {
-    const response = await api.get<ApiResponse<PayslipSummary[]>>(
-      `/payroll-periods/${periodId}/payslips`
-    )
+    const response = await api.get<PayslipListResponse>(`/payroll-periods/${periodId}/payslips`)
     return response.data
   }
 

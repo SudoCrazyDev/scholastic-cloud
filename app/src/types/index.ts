@@ -2423,6 +2423,7 @@ export interface PayslipSummary {
   designation: string | null;
   daily_rate: number;
   days_worked: number;
+  assumed_days: number; // days priced from punches that had not been made yet
   hours_worked: number;
   late_minutes: number;
   undertime_minutes: number;
@@ -2433,6 +2434,12 @@ export interface PayslipSummary {
   gross_pay: number;
   total_deductions: number;
   net_pay: number;
+}
+
+// The payslips of one period, plus every date across them that rests on an
+// assumed punch — finalizing pays those out, so the screen says so first.
+export interface PayslipListResponse extends ApiResponse<PayslipSummary[]> {
+  assumed_dates?: string[];
 }
 
 // =====================
@@ -2452,6 +2459,7 @@ export interface PayrollSheetRow {
   staff_name: string | null;
   designation: string | null;
   days_worked: number;
+  assumed_days: number; // > 0 puts an asterisk on the row's working days
   hours_worked: number;
   daily_rate: number;
   // Aligned index-for-index with the sheet's benefit_columns / deduction_columns.
@@ -2491,6 +2499,10 @@ export interface PayslipDay {
   work_date: string;
   time_in: string | null;
   time_out: string | null;
+  // Filled in from the schedule because payroll was generated before the punch
+  // could be made, rather than read off a biometric device.
+  assumed_time_in: boolean;
+  assumed_time_out: boolean;
   required_hours: number;
   hours_worked: number;
   late_minutes: number;
@@ -2533,6 +2545,7 @@ export interface Payslip {
   undertime_penalty_per_minute: number;
   overtime_rate_per_minute: number;
   days_worked: number;
+  assumed_days: number;
   hours_worked: number;
   late_minutes: number;
   undertime_minutes: number;

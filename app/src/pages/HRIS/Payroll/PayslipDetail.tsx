@@ -18,6 +18,28 @@ import { dayLabel, errorMessage, numberOrZero, percent, peso, rateLabel, time12 
 import PayslipPrintModal from './PayslipPrintModal'
 import PayslipSlipPrintModal from './PayslipSlipPrintModal'
 
+/**
+ * A punch time, dimmed and marked when it was assumed from the schedule rather
+ * than read off a device — payroll generated before the period ended has to
+ * fill in punches that had not been made yet, and the sheet must never let one
+ * of those pass for a biometric reading.
+ */
+const assumedTime = (label: string, assumed: boolean) => {
+  if (!assumed) return label || '—'
+
+  return (
+    <span
+      className="text-amber-700"
+      title="Assumed from the staff schedule — this punch had not been made when payroll was generated"
+    >
+      {label || '—'}
+      <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-amber-600">
+        est
+      </span>
+    </span>
+  )
+}
+
 interface PayslipDetailProps {
   payslipId: string
   periodFinalized: boolean
@@ -274,6 +296,17 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
             <p className="text-sm text-gray-500">
               From the biometric attendance logs. {!readOnly && 'Click a row to correct a day.'}
             </p>
+            {payslip.assumed_days > 0 && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <span className="font-medium">
+                  {payslip.assumed_days} day{payslip.assumed_days === 1 ? '' : 's'} marked{' '}
+                  <span className="uppercase tracking-wide">est</span>
+                </span>{' '}
+                {payslip.assumed_days === 1 ? 'was' : 'were'} priced from the staff schedule because
+                payroll was generated before {payslip.assumed_days === 1 ? 'that punch' : 'those punches'}{' '}
+                could be made. Regenerate once the real punches arrive, or correct the day by hand.
+              </p>
+            )}
           </div>
           <div className="max-h-[32rem] overflow-y-auto overflow-x-auto">
             <table className="w-full text-sm">
@@ -364,8 +397,12 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-2 tabular-nums">{time12(day.time_in) || '—'}</td>
-                      <td className="px-4 py-2 tabular-nums">{time12(day.time_out) || '—'}</td>
+                      <td className="px-4 py-2 tabular-nums">
+                        {assumedTime(time12(day.time_in), day.assumed_time_in)}
+                      </td>
+                      <td className="px-4 py-2 tabular-nums">
+                        {assumedTime(time12(day.time_out), day.assumed_time_out)}
+                      </td>
                       <td className="px-4 py-2 text-right tabular-nums">
                         {day.hours_worked > 0 ? day.hours_worked : '—'}
                       </td>
