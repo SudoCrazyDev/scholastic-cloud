@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\StudentAdditionalFee;
+use App\Models\StudentPayment;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 
@@ -16,13 +17,17 @@ use Illuminate\Support\Collection;
  * behaves like any other charge: it sits in the ledger, the notice of account, and
  * the cashiering breakdown, and it survives payment of the installment itself.
  *
+ * The charge is a snapshot of the installment as it stood when it was booked, so it is
+ * kept in step with that installment on later loads — see rebase() for the limits.
+ *
  * Finance can waive one by deleting the row, or adjust it by editing the amount,
  * through the existing additional-fee endpoints.
  */
 class LateFeeService
 {
     /**
-     * Charge any newly-overdue installments and return every late-fee row for the year.
+     * Charge any newly-overdue installments, re-base the standing ones, and return every
+     * late-fee row for the year.
      *
      * @param  array  $installments  Schedule from PaymentPlanService::buildInstallments(),
      *                               built from principal charges only (no late fees).
@@ -37,10 +42,21 @@ class LateFeeService
         // Waived fees are soft-deleted rather than erased, and they still count as
         // handled — otherwise the next ledger load would undo the waiver.
         $handled = $this->chargedFor($institutionId, $studentId, $academicYear, withWaived: true);
+        $collected = $this->collectedAgainst($handled);
 
         foreach ($installments as $installment) {
             $sequence = (int) ($installment['sequence'] ?? 0);
-            if ($sequence < 1 || $handled->has($sequence)) {
+            if ($sequence < 1) {
+                continue;
+            }
+
+            $existing = $handled->get($sequence);
+            if ($existing) {
+                // A waived fee is settled business; only a standing one tracks its installment.
+                if (! $existing->trashed()) {
+                    $this->rebase($existing, $installment, $collected[$existing->id] ?? 0.0);
+                }
+
                 continue;
             }
 
@@ -96,6 +112,87 @@ class LateFeeService
             && $amount > 0;
     }
 
+    /**
+     * Keep a standing late fee in step with the installment it was charged against.
+     *
+     * The fee is booked the first time the ledger is loaded past the grace window, which
+     * freezes the installment amount as it stood at that instant. Anything entered
+     * afterwards that moves that amount — a backdated downpayment, a voided payment, a
+     * discount, a new charge — used to strand the surcharge on a figure the schedule no
+     * longer shows.
+     *
+     * What money has already been received pins it down. The fee never drops below what
+     * was collected against it, so re-basing cannot conjure a credit out of a receipt; and
+     * a fee collected in full is never raised, so nobody is billed again for something
+     * they already settled. A fee whose amount no longer matches its own base was set by
+     * hand, and an override exists to be honoured. An installment that shrinks to nothing
+     * leaves the fee standing for finance to waive rather than silently zeroing a charge.
+     */
+    private function rebase(StudentAdditionalFee $fee, array $installment, float $collected): void
+    {
+        $percentage = (float) $fee->late_fee_percentage;
+        $base = round((float) ($installment['amount'] ?? 0), 2);
+        if ($percentage <= 0 || $base <= 0) {
+            return;
+        }
+
+        $storedBase = round((float) $fee->base_amount, 2);
+        if (abs($base - $storedBase) < 0.005) {
+            return;
+        }
+
+        $current = (float) $fee->amount;
+        if (abs($current - round($storedBase * $percentage / 100, 2)) >= 0.005) {
+            return;
+        }
+
+        $amount = round($base * $percentage / 100, 2);
+        $collected = round($collected, 2);
+        if ($amount <= 0 || $amount < $collected - 0.005) {
+            return;
+        }
+
+        if ($collected >= $current - 0.005 && $amount > $current + 0.005) {
+            return;
+        }
+
+        $fee->update([
+            'base_amount' => $base,
+            'amount' => $amount,
+            'description' => $this->describe($base, $percentage, $installment),
+        ]);
+    }
+
+    /**
+     * Money already received against each late-fee row, keyed by fee id. Voided payments
+     * do not count — that collection was undone.
+     *
+     * @param  Collection<int, StudentAdditionalFee>  $fees
+     * @return array<string, float>
+     */
+    private function collectedAgainst(Collection $fees): array
+    {
+        $ids = $fees->pluck('id')->filter()->all();
+        if (empty($ids)) {
+            return [];
+        }
+
+        return StudentPayment::whereIn('student_additional_fee_id', $ids)
+            ->whereNull('voided_at')
+            ->groupBy('student_additional_fee_id')
+            ->selectRaw('student_additional_fee_id, SUM(amount) as total')
+            ->pluck('total', 'student_additional_fee_id')
+            ->map(fn ($total) => (float) $total)
+            ->all();
+    }
+
+    private function describe(float $base, float $percentage, array $installment): string
+    {
+        return $this->formatPercentage($percentage) . '% of ' . number_format($base, 2)
+            . ' · installment #' . ($installment['sequence'] ?? '')
+            . ' overdue since ' . ($installment['overdue_date'] ?? $installment['due_date'] ?? '');
+    }
+
     private function createFee(
         string $institutionId,
         string $studentId,
@@ -111,7 +208,6 @@ class LateFeeService
         }
 
         $label = $installment['label'] ?? ('Installment #' . $installment['sequence']);
-        $pct = $this->formatPercentage($percentage);
 
         try {
             return StudentAdditionalFee::create([
@@ -119,9 +215,7 @@ class LateFeeService
                 'student_id' => $studentId,
                 'academic_year' => $academicYear,
                 'name' => 'Late Fee — ' . $label,
-                'description' => $pct . '% of ' . number_format($base, 2)
-                    . ' · installment #' . $installment['sequence']
-                    . ' overdue since ' . ($installment['overdue_date'] ?? $installment['due_date'] ?? ''),
+                'description' => $this->describe($base, $percentage, $installment),
                 'source' => StudentAdditionalFee::SOURCE_LATE_FEE,
                 'installment_sequence' => (int) $installment['sequence'],
                 'late_fee_percentage' => $percentage,

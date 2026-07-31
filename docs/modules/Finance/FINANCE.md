@@ -93,12 +93,25 @@ views' requests.
 - **Late fees** (`LateFeeService`) — the first time a ledger or NOA load sees an installment past
   `due_date + grace_period_days` while it still owes money, the plan's `late_fee_percentage` of the
   installment's net amount is **booked as a real charge**: a `student_additional_fees` row with
-  `source: 'late_fee'`, the originating `installment_sequence`, and the frozen
-  `late_fee_percentage` / `base_amount`. Consequences worth knowing:
+  `source: 'late_fee'`, the originating `installment_sequence`, the frozen `late_fee_percentage`,
+  and the `base_amount` it was charged on. Consequences worth knowing:
   - Unique per `(institution, student, academic_year, installment_sequence)`, so repeat loads
     never double-charge. There is no cron — the charge is booked on read.
   - It **survives payment** of the installment (the old behavior recomputed it live, so it
     vanished when the installment was settled and could never be collected).
+  - **Re-based on later loads.** Because the charge is booked on read, its `base_amount` is
+    whatever the installment happened to be the first time someone opened the page past the
+    grace window — including mid-data-entry. Anything keyed in afterwards that moves the
+    installment (a backdated downpayment, a void, a discount, a new charge) would otherwise
+    strand the surcharge on a figure the schedule no longer shows. `LateFeeService::rebase()`
+    re-derives `base_amount`/`amount`/`description` from the current installment, bounded by
+    what has been collected against the fee: it never drops **below** money already received
+    (that would conjure a credit out of a receipt) and never raises one **collected in full**
+    (nobody is re-billed for something they settled). The percentage itself never moves, so
+    editing a plan's `late_fee_percentage` is not retroactive.
+  - A fee whose `amount` no longer equals `base_amount × late_fee_percentage` was **edited by
+    hand**, and re-basing leaves it alone. If an installment shrinks to zero the fee stands for
+    finance to waive rather than being silently zeroed.
   - Excluded from the principal the installment schedule is divided from, and payments allocated
     to a late fee do not fill installment principal.
   - **Waiving** = deleting the row (`DELETE /student-additional-fees/{id}`). The soft-deleted row
@@ -110,10 +123,9 @@ views' requests.
     through the app, since `LateFeeService` counts trashed rows as already handled. The ledger
     lists waived charges (greyed, struck through, with the reason) when the fee list is fetched
     with `with_waived=1`, which is where the restore action lives.
-  - A restored fee keeps its **frozen** `base_amount` / `late_fee_percentage`, so if the
-    underlying charges changed since it was booked the restored amount is the old one. To re-book
-    at the current base, hard-delete the trashed row instead and let the next ledger load charge
-    it fresh.
+  - A restored fee comes back at the amount originally booked, then re-bases on the next load
+    like any other standing fee — so if the charges moved while it was waived it catches up on
+    its own. A **waived** fee is never re-based; the waiver is settled business.
   - Covered by `tests/Feature/LateFeeChargeTest.php`.
 - **Plans with no late fee** — `payment_plan_installments.late_fee_percentage` defaults to `0`, and
   a plan left that way silently never surcharges anyone. `/payment-plans` now flags it: an amber
@@ -304,7 +316,7 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 | `student_discounts` | Per-student discount: `discount_type` fixed/percentage, nullable `school_fee_id`, void columns |
 | `default_discounts` | Reusable templates. unique(institution_id, name) |
 | `grade_level_discounts` | Bulk per-grade discounts |
-| `student_additional_fees` | Per-student charges (name, amount). `source` `manual`/`late_fee`; late fees carry `installment_sequence`, `late_fee_percentage`, `base_amount`, unique per (institution, student, year, sequence). Soft-deleted (a deleted late fee = waived) |
+| `student_additional_fees` | Per-student charges (name, amount). `source` `manual`/`late_fee`; late fees carry `installment_sequence`, `late_fee_percentage` (frozen), `base_amount` (re-based to the current installment), unique per (institution, student, year, sequence). Soft-deleted (a deleted late fee = waived) |
 | `payment_void_requests` | `receipt_number`, `status` pending/approved/disapproved, request/review notes, requested_by/reviewed_by |
 | `payment_receipt_submissions` | Student-uploaded receipt: `installment_sequence/label`, R2 `file_path`, `status` pending/approved/rejected, `review_note`, `amount` (verified), `student_payment_id` (set on approval) |
 | `payment_plans` / `payment_plan_installments` | Plans + installment rows (sequence, label, due_month/day, share_percentage, grace, late fee) |

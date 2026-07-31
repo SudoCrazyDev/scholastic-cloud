@@ -10,6 +10,7 @@ use App\Models\SchoolFee;
 use App\Models\SchoolFeeDefault;
 use App\Models\Student;
 use App\Models\StudentAdditionalFee;
+use App\Models\StudentDiscount;
 use App\Models\StudentInstitution;
 use App\Models\StudentPayment;
 use App\Models\StudentPaymentPlan;
@@ -183,6 +184,34 @@ class LateFeeChargeTest extends TestCase
         $this->assertEquals(0.0, $installments->firstWhere('sequence', 2)['late_fee_amount']);
     }
 
+    /**
+     * Shrinks the first installment from 5,000 to 4,000 by discounting the year's charges,
+     * the way a backdated downpayment or a subsidy keyed in after the fact would.
+     */
+    private function discountTheYear(float $value = 2000): void
+    {
+        StudentDiscount::create([
+            'institution_id' => $this->institution->id,
+            'student_id' => $this->student->id,
+            'academic_year' => self::YEAR,
+            'discount_type' => 'fixed',
+            'value' => $value,
+            'description' => 'ESC subsidy',
+        ]);
+    }
+
+    private function payTheLateFee(StudentAdditionalFee $fee, float $amount): void
+    {
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->postJson('/api/student-payments', [
+                'student_id' => $this->student->id,
+                'academic_year' => self::YEAR,
+                'items' => [
+                    ['additional_fee_id' => $fee->id, 'amount' => $amount],
+                ],
+            ])->assertCreated();
+    }
+
     public function test_reloading_the_ledger_does_not_duplicate_the_charge(): void
     {
         $this->ledger();
@@ -248,6 +277,116 @@ class LateFeeChargeTest extends TestCase
 
         // Collecting the fee must not be mistaken for paying down the installments.
         $this->assertEquals(0.0, collect($data['installments'])->firstWhere('sequence', 1)['paid_amount']);
+    }
+
+    public function test_late_fee_follows_the_installment_when_the_charges_move(): void
+    {
+        $this->ledger();
+        $this->assertEquals(5000.0, (float) StudentAdditionalFee::lateFees()->sole()->base_amount);
+
+        // Booked against 5,000; the installment is 4,000 once the discount lands.
+        $this->discountTheYear();
+        $data = $this->ledger();
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(4000.0, (float) $fee->base_amount);
+        $this->assertEquals(120.0, (float) $fee->amount);
+        $this->assertStringContainsString('3% of 4,000.00', $fee->description);
+
+        $this->assertEquals(120.0, $data['totals']['late_fees']);
+        $this->assertEquals(10120.0, $data['totals']['charges']);
+        $this->assertEquals(8120.0, $data['totals']['balance']);
+
+        $first = collect($data['installments'])->firstWhere('sequence', 1);
+        $this->assertEquals(4000.0, $first['amount']);
+        $this->assertEquals(120.0, $first['late_fee_amount'], 'The surcharge must not outlive its base.');
+    }
+
+    public function test_re_basing_settles_a_late_fee_that_was_already_paid_down_to_the_new_amount(): void
+    {
+        // The prod case: finance collects what the fee should have been, then the
+        // downpayment that shrinks the installment is keyed in behind it.
+        $this->ledger();
+        $this->payTheLateFee(StudentAdditionalFee::lateFees()->sole(), 120);
+
+        $this->discountTheYear();
+        $data = $this->ledger();
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(120.0, (float) $fee->amount);
+
+        $breakdown = collect($data['fee_breakdown'])->firstWhere('fee_id', $fee->id);
+        $this->assertEquals(120.0, $breakdown['paid']);
+        $this->assertEquals(0.0, $breakdown['outstanding'], 'The collection should now close the fee.');
+    }
+
+    public function test_a_late_fee_never_drops_below_what_was_collected_against_it(): void
+    {
+        $this->ledger();
+        $this->payTheLateFee(StudentAdditionalFee::lateFees()->sole(), 150);
+
+        // Re-basing to 120 would leave 30 collected against nothing.
+        $this->discountTheYear();
+        $this->ledger();
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(150.0, (float) $fee->amount);
+        $this->assertEquals(5000.0, (float) $fee->base_amount);
+    }
+
+    public function test_a_late_fee_collected_in_full_is_not_raised_when_the_charges_grow(): void
+    {
+        $this->ledger();
+        $this->payTheLateFee(StudentAdditionalFee::lateFees()->sole(), 150);
+
+        // 2,000 more in charges would push the installment to 6,000 and the fee to 180.
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->postJson('/api/student-additional-fees', [
+                'student_id' => $this->student->id,
+                'academic_year' => self::YEAR,
+                'name' => 'Field trip',
+                'amount' => 2000,
+            ])->assertCreated();
+
+        $this->ledger();
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(150.0, (float) $fee->amount, 'A settled fee must not be re-billed.');
+    }
+
+    public function test_a_hand_edited_late_fee_keeps_the_amount_finance_set(): void
+    {
+        $this->ledger();
+        $lateFee = StudentAdditionalFee::lateFees()->sole();
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->putJson("/api/student-additional-fees/{$lateFee->id}", ['amount' => 75])
+            ->assertOk();
+
+        $this->discountTheYear();
+        $this->ledger();
+
+        $this->assertEquals(75.0, (float) StudentAdditionalFee::lateFees()->sole()->amount);
+    }
+
+    public function test_a_waived_late_fee_is_not_re_based_back_onto_the_balance(): void
+    {
+        $this->ledger();
+        $lateFee = StudentAdditionalFee::lateFees()->sole();
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->deleteJson("/api/student-additional-fees/{$lateFee->id}", ['note' => 'Approved by finance head'])
+            ->assertOk();
+
+        $this->discountTheYear();
+        $data = $this->ledger();
+
+        $this->assertEquals(0.0, $data['totals']['late_fees']);
+        $this->assertSame(0, StudentAdditionalFee::lateFees()->count());
+        $this->assertEquals(
+            5000.0,
+            (float) StudentAdditionalFee::lateFees()->withTrashed()->sole()->base_amount
+        );
     }
 
     public function test_notice_of_account_agrees_with_the_ledger(): void
