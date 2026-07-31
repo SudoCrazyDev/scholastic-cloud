@@ -4,45 +4,17 @@ import { PlusIcon } from '@heroicons/react/24/outline'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../components/button'
-import { Input } from '../../components/input'
 import { Select } from '../../components/select'
+import FileAttendanceRequestModal from '../../components/attendance/FileAttendanceRequestModal'
+import { KIND_LABELS } from '../../components/attendance/attendanceRequestKinds'
 import { useAuth } from '../../hooks/useAuth'
 import { staffAttendanceRequestService } from '../../services/staffAttendanceRequestService'
-import { staffService } from '../../services/staffService'
-import type {
-  AttendanceRequestKind,
-  AttendanceRequestStatus,
-  CreateAttendanceRequestData,
-  StaffAttendanceRequest,
-} from '../../types'
+import type { AttendanceRequestStatus, StaffAttendanceRequest } from '../../types'
 import { errorMessage, shortDate } from './Payroll/helpers'
 
 const APPROVER_ROLES = ['principal', 'institution-administrator', 'super-administrator']
 
 type Tab = 'mine' | 'review'
-
-const KIND_LABELS: Record<AttendanceRequestKind, string> = {
-  late_arrival: 'Late arrival (excused)',
-  early_out: 'Early out',
-  official_business: 'Official business',
-  forgot_punch: 'Missed punch',
-}
-
-/**
- * What each kind does to pay, shown while filing so the staff member knows
- * what they are asking for. Mirrors
- * StaffAttendanceRequest::defaultFlagsForKind on the API.
- */
-const KIND_HELP: Record<AttendanceRequestKind, string> = {
-  late_arrival:
-    'Arrived after the grace period for an approved reason — e.g. attending a school event in the morning and reporting in the afternoon. Waives the late penalty; you are still expected to stay until the scheduled end.',
-  early_out:
-    'Left before the scheduled end with permission (emergency, medical). Waives the undertime penalty; arriving late is still counted.',
-  official_business:
-    'Away on school business for all or part of the day, so the biometric may have no punch at all. Waives both penalties and pays the full day.',
-  forgot_punch:
-    'Present the whole day but the biometric punch is missing. Waives both penalties and pays the full day — add the actual times below.',
-}
 
 const STATUS_STYLES: Record<AttendanceRequestStatus, string> = {
   pending: 'bg-amber-100 text-amber-700',
@@ -50,31 +22,6 @@ const STATUS_STYLES: Record<AttendanceRequestStatus, string> = {
   disapproved: 'bg-red-100 text-red-700',
   cancelled: 'bg-gray-100 text-gray-500',
 }
-
-const todayYmd = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-interface RequestForm {
-  user_id: string
-  date_from: string
-  date_to: string
-  kind: AttendanceRequestKind
-  reason: string
-  credited_time_in: string
-  credited_time_out: string
-}
-
-const emptyForm = (): RequestForm => ({
-  user_id: '',
-  date_from: todayYmd(),
-  date_to: todayYmd(),
-  kind: 'early_out',
-  reason: '',
-  credited_time_in: '',
-  credited_time_out: '',
-})
 
 const dateRange = (request: StaffAttendanceRequest) =>
   request.date_from === request.date_to
@@ -111,8 +58,6 @@ const AttendanceRequests: React.FC = () => {
 
   const [tab, setTab] = useState<Tab>(canApprove ? 'review' : 'mine')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState<RequestForm>(emptyForm())
-  const [formError, setFormError] = useState<string | null>(null)
   const [reviewing, setReviewing] = useState<StaffAttendanceRequest | null>(null)
   const [reviewNote, setReviewNote] = useState('')
   const [reviewFlags, setReviewFlags] = useState({
@@ -131,13 +76,6 @@ const AttendanceRequests: React.FC = () => {
       }),
   })
 
-  // Only approvers can file on someone else's behalf, so only they need the list.
-  const staffQuery = useQuery({
-    queryKey: ['staffs', 'for-attendance-requests'],
-    queryFn: () => staffService.getStaffs({ limit: 200 }),
-    enabled: canApprove && showForm,
-  })
-
   const requests = useMemo(() => {
     const rows = requestsQuery.data?.data || []
     return tab === 'review' ? rows.filter((row) => row.status === 'pending' || statusFilter) : rows
@@ -146,17 +84,6 @@ const AttendanceRequests: React.FC = () => {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['staff-attendance-requests'] })
   }
-
-  const createMutation = useMutation({
-    mutationFn: (data: CreateAttendanceRequestData) => staffAttendanceRequestService.create(data),
-    onSuccess: (response) => {
-      invalidate()
-      setShowForm(false)
-      setForm(emptyForm())
-      toast.success(response.message || 'Request submitted.')
-    },
-    onError: (err: unknown) => setFormError(errorMessage(err, 'Failed to submit the request.')),
-  })
 
   const approveMutation = useMutation({
     mutationFn: (payload: { id: string }) =>
@@ -202,32 +129,6 @@ const AttendanceRequests: React.FC = () => {
     setReviewing(request)
   }
 
-  const submitForm = (event: React.FormEvent) => {
-    event.preventDefault()
-    setFormError(null)
-
-    if (!form.reason.trim()) {
-      setFormError('A reason is required.')
-      return
-    }
-    if (form.date_to < form.date_from) {
-      setFormError('The end date cannot be before the start date.')
-      return
-    }
-
-    createMutation.mutate({
-      user_id: canApprove && form.user_id ? form.user_id : null,
-      date_from: form.date_from,
-      date_to: form.date_to,
-      kind: form.kind,
-      reason: form.reason.trim(),
-      credited_time_in: form.credited_time_in || null,
-      credited_time_out: form.credited_time_out || null,
-    })
-  }
-
-  const showCreditedTimes = form.kind === 'forgot_punch' || form.kind === 'official_business'
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -240,13 +141,7 @@ const AttendanceRequests: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button
-          onClick={() => {
-            setForm(emptyForm())
-            setFormError(null)
-            setShowForm(true)
-          }}
-        >
+        <Button onClick={() => setShowForm(true)}>
           <PlusIcon className="h-4 w-4" />
           File a request
         </Button>
@@ -382,142 +277,10 @@ const AttendanceRequests: React.FC = () => {
       </div>
 
       {showForm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">File an attendance request</h3>
-              <p className="text-sm text-gray-500">
-                Approved requests stop payroll from deducting for the day.
-              </p>
-            </div>
-            <form onSubmit={submitForm} className="space-y-4 p-6">
-              {canApprove && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Staff member</label>
-                  <Select
-                    value={form.user_id}
-                    onChange={(e) => setForm((prev) => ({ ...prev, user_id: e.target.value }))}
-                    className="w-full"
-                    options={[
-                      { value: '', label: 'Myself' },
-                      ...(staffQuery.data?.data || []).map((staff) => ({
-                        value: staff.id,
-                        label:
-                          [staff.first_name, staff.last_name].filter(Boolean).join(' ') || staff.email,
-                      })),
-                    ]}
-                  />
-                  <p className="mt-1 text-xs text-gray-400">
-                    Filing as an approver records the request already approved.
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
-                <Select
-                  value={form.kind}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, kind: e.target.value as AttendanceRequestKind }))
-                  }
-                  className="w-full"
-                  options={(Object.keys(KIND_LABELS) as AttendanceRequestKind[]).map((kind) => ({
-                    value: kind,
-                    label: KIND_LABELS[kind],
-                  }))}
-                />
-                <p className="mt-1 text-xs text-gray-500">{KIND_HELP[form.kind]}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">From</label>
-                  <Input
-                    type="date"
-                    value={form.date_from}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        date_from: e.target.value,
-                        // Keep a single-day request single-day as the user types.
-                        date_to: prev.date_to < e.target.value ? e.target.value : prev.date_to,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">To</label>
-                  <Input
-                    type="date"
-                    value={form.date_to}
-                    min={form.date_from}
-                    onChange={(e) => setForm((prev) => ({ ...prev, date_to: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              {showCreditedTimes && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">
-                      Actual time in (optional)
-                    </label>
-                    <Input
-                      type="time"
-                      value={form.credited_time_in}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, credited_time_in: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">
-                      Actual time out (optional)
-                    </label>
-                    <Input
-                      type="time"
-                      value={form.credited_time_out}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, credited_time_out: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <p className="col-span-2 -mt-2 text-xs text-gray-400">
-                    Used only where the biometric has no punch. A real punch is never overwritten.
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Reason</label>
-                <textarea
-                  rows={3}
-                  value={form.reason}
-                  onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))}
-                  placeholder="e.g. Family emergency — left at 2:00 PM with the principal's permission."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                />
-              </div>
-
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-              <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
-                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Submitting…' : 'Submit request'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <FileAttendanceRequestModal
+          allowOtherStaff={canApprove}
+          onClose={() => setShowForm(false)}
+        />
       )}
 
       {reviewing && (

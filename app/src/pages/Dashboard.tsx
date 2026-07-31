@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Megaphone, Pin, ChevronRight } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { announcementService } from '../services/announcementService';
+import MyTimeLog from '../components/attendance/MyTimeLog';
 
 const formatAnnouncementDate = (value: string | null): string => {
   if (!value) return '';
@@ -81,6 +82,9 @@ const Dashboard: React.FC = () => {
     return <Navigate to="/finance" replace />;
   }
 
+  // Students are not on payroll, so they have no punches to reconcile.
+  const isStaff = user?.role?.slug !== 'student';
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -127,6 +131,13 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* My biometric punches — staff only */}
+      {isStaff && (
+        <motion.div variants={itemVariants}>
+          <MyTimeLog />
+        </motion.div>
+      )}
 
       {/* Recent Announcements */}
       <motion.div variants={itemVariants}>

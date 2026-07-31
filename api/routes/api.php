@@ -463,6 +463,9 @@ Route::middleware('auth.token')->group(function () {
     Route::apiResource('staff-calendar-events', \App\Http\Controllers\StaffCalendarEventController::class)
         ->only(['index', 'store', 'update', 'destroy']);
 
+    // HRIS — The signed-in staff member's own punches (dashboard timesheet)
+    Route::get('my-timesheet', [\App\Http\Controllers\MyTimesheetController::class, 'index']);
+
     // HRIS — Attendance exception requests (early out, official business, …)
     Route::get('staff-attendance-requests', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'index']);
     Route::post('staff-attendance-requests', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'store']);

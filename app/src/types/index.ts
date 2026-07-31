@@ -687,6 +687,46 @@ export interface ApproveAttendanceRequestData {
   review_note?: string | null;
 }
 
+// --- My timesheet (the signed-in staff member's own punches) ---
+
+// What is wrong with a day, as payroll would read it. Null when nothing is.
+export type TimesheetIssue = 'no_punch' | 'missing_out' | 'late' | 'undertime';
+
+export interface TimesheetDay {
+  date: string; // YYYY-MM-DD
+  weekday: string; // "Mon"
+  is_rest_day: boolean;
+  is_holiday: boolean;
+  is_today: boolean;
+  schedule_start: string | null; // "HH:MM"
+  schedule_end: string | null;
+  grace_minutes: number;
+  time_in: string | null; // "HH:MM"
+  time_out: string | null;
+  // The time came from an approved request rather than the biometric device.
+  credited_time_in: boolean;
+  credited_time_out: boolean;
+  punch_count: number;
+  hours_worked: number;
+  late_minutes: number;
+  undertime_minutes: number;
+  pay_policy: 'normal' | 'full_day' | 'no_pay';
+  exception_label: string | null;
+  issue: TimesheetIssue | null;
+  // A live request of the staff member's own already covering this date.
+  request: { id: string; kind: AttendanceRequestKind; status: AttendanceRequestStatus } | null;
+}
+
+export interface MyTimesheet {
+  from: string;
+  to: string;
+  today: string;
+  // When the biometric devices last reported anything, so a gap in the logs
+  // is not mistaken for a week of absences.
+  last_attendance_date: string | null;
+  days: TimesheetDay[];
+}
+
 export interface StudentInstallment {
   sequence: number;
   label: string;

@@ -172,6 +172,182 @@ class PayrollService
     }
 
     /**
+     * One row per date of what payroll currently sees for a single staff
+     * member: the schedule they are on, the punches actually on record, and
+     * any exception already covering the day.
+     *
+     * Nothing is priced and nothing is assumed — the point is to hand the
+     * staff member the raw state so they can spot the punch the device never
+     * got, while payroll still reads the logs itself. Today is reported but
+     * never flagged: the day is still running, and so is its punch-out.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function timesheetFor(string $institutionId, string $userId, Carbon $from, Carbon $to): array
+    {
+        // Re-read both ends as school-local dates. The caller may have parsed
+        // them in the app's UTC, and a UTC midnight sorts after a Manila one —
+        // enough to drop today off the end of the range.
+        $from = Carbon::parse($from->toDateString(), self::TIMEZONE)->startOfDay();
+        $to = Carbon::parse($to->toDateString(), self::TIMEZONE)->startOfDay();
+
+        $scheduleDays = StaffScheduleAssignment::with('staffSchedule.days')
+            ->where('institution_id', $institutionId)
+            ->where('user_id', $userId)
+            ->first()
+            ?->staffSchedule
+            ?->days;
+
+        $calendarEntries = StaffCalendarEvent::where('institution_id', $institutionId)
+            ->whereBetween('event_date', [$from->toDateString(), $to->toDateString()])
+            ->get();
+
+        $holidayDates = $calendarEntries
+            ->where('type', 'holiday')
+            ->pluck('event_date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->flip();
+
+        $dayPolicies = $this->buildDayPolicies($calendarEntries);
+        $userExceptions = $this->buildStaffExceptions($institutionId, [$userId], $from, $to)[$userId] ?? [];
+
+        $punches = [];
+        AttendanceLog::where('institution_id', $institutionId)
+            ->where('user_id', $userId)
+            ->whereBetween('punched_at', [$from, $to->copy()->endOfDay()])
+            ->orderBy('punched_at')
+            ->get(['punched_at'])
+            ->each(function (AttendanceLog $log) use (&$punches) {
+                $punches[$log->punched_at->toDateString()][] = $log->punched_at;
+            });
+
+        $today = $this->assumeFrom();
+        $rows = [];
+
+        foreach (CarbonPeriod::create($from, $to) as $date) {
+            $dateKey = $date->toDateString();
+            $weekday = strtolower($date->format('l'));
+            $scheduleDay = $scheduleDays?->firstWhere('day_of_week', $weekday);
+
+            $isRestDay = $scheduleDays !== null && $scheduleDays->isNotEmpty()
+                ? $scheduleDay === null
+                : $date->isWeekend();
+
+            $exception = $this->mergeException(
+                $dayPolicies[$dateKey] ?? null,
+                $userExceptions[$dateKey] ?? null,
+                $isRestDay
+            );
+
+            $dayPunches = $punches[$dateKey] ?? [];
+            $timeIn = count($dayPunches) >= 1 ? $dayPunches[0]->format('H:i:s') : null;
+            $timeOut = count($dayPunches) >= 2 ? end($dayPunches)->format('H:i:s') : null;
+
+            // The same fallback payroll applies: an approved request may stand
+            // in for a punch that was never made, but never overwrites one.
+            $creditedIn = $timeIn === null && $exception['credited_time_in'] !== null;
+            $creditedOut = $timeOut === null && $exception['credited_time_out'] !== null;
+            $timeIn ??= $exception['credited_time_in'];
+            $timeOut ??= $exception['credited_time_out'];
+
+            $scheduleStart = $scheduleDay?->start_time;
+            $scheduleEnd = $this->effectiveScheduleEnd($scheduleStart, $scheduleDay?->end_time, $exception['dismissal_time']);
+            $graceMinutes = (int) ($scheduleDay->grace_minutes ?? 0);
+
+            $isHoliday = $holidayDates->has($dateKey);
+            $isToday = $date->isSameDay($today);
+
+            $lateMinutes = 0;
+            $undertimeMinutes = 0;
+            if ($scheduleStart && $scheduleEnd && $timeIn && $timeOut) {
+                $lateMinutes = $exception['waive_late']
+                    ? 0
+                    : intdiv(max(0, $this->toSeconds($timeIn) - ($this->toSeconds($scheduleStart) + $graceMinutes * 60)), 60);
+                $undertimeMinutes = $exception['waive_undertime']
+                    ? 0
+                    : intdiv(max(0, $this->toSeconds($scheduleEnd) - $this->toSeconds($timeOut)), 60);
+            }
+
+            $rows[] = [
+                'date' => $dateKey,
+                'weekday' => $date->format('D'),
+                'is_rest_day' => $isRestDay,
+                'is_holiday' => $isHoliday,
+                'is_today' => $isToday,
+                'schedule_start' => $this->shortTime($scheduleStart),
+                'schedule_end' => $this->shortTime($scheduleEnd),
+                'grace_minutes' => $graceMinutes,
+                'time_in' => $this->shortTime($timeIn),
+                'time_out' => $this->shortTime($timeOut),
+                'credited_time_in' => $creditedIn,
+                'credited_time_out' => $creditedOut,
+                'punch_count' => count($dayPunches),
+                'hours_worked' => $this->workedHours($timeIn, $timeOut, $scheduleDay?->lunch_start, $scheduleDay?->lunch_end),
+                'late_minutes' => $lateMinutes,
+                'undertime_minutes' => $undertimeMinutes,
+                'pay_policy' => $exception['pay_policy'],
+                'exception_label' => $exception['label'],
+                'issue' => $this->timesheetIssue(
+                    $timeIn,
+                    $timeOut,
+                    $lateMinutes,
+                    $undertimeMinutes,
+                    $exception['pay_policy'],
+                    $isRestDay || $isHoliday || $isToday || $date->gt($today)
+                ),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * What is wrong with a day, worst first, or null when nothing is.
+     *
+     * A missing punch outranks a late arrival: it costs the whole day rather
+     * than a few minutes, and it is the one a staff member most needs to see.
+     *
+     * @param  bool  $exempt  the day is not one attendance is expected on, or is not over yet
+     * @return null|'no_punch'|'missing_out'|'late'|'undertime'
+     */
+    private function timesheetIssue(
+        ?string $timeIn,
+        ?string $timeOut,
+        int $lateMinutes,
+        int $undertimeMinutes,
+        string $payPolicy,
+        bool $exempt
+    ): ?string {
+        // A no-pay day was signed off as such, and a fully-paid one already
+        // pays without punches — neither is a problem to report.
+        if ($exempt || $payPolicy !== PayslipDay::PAY_NORMAL) {
+            return null;
+        }
+
+        if ($timeIn === null && $timeOut === null) {
+            return 'no_punch';
+        }
+
+        // One punch, or two that cannot bracket a day: payroll reads zero
+        // hours from this and pays nothing for it.
+        if ($timeIn === null || $timeOut === null || $timeOut <= $timeIn) {
+            return 'missing_out';
+        }
+
+        if ($lateMinutes > 0) {
+            return 'late';
+        }
+
+        return $undertimeMinutes > 0 ? 'undertime' : null;
+    }
+
+    /** "HH:MM:SS" as the UI wants it, "HH:MM". */
+    private function shortTime(?string $time): ?string
+    {
+        return ($time === null || $time === '') ? null : substr($time, 0, 5);
+    }
+
+    /**
      * @param  \Illuminate\Support\Collection<int, PayrollDeductionType>  $deductionTypes  the institution's active catalog
      * @param  array<string, array>  $dayPolicies  institution-wide policy keyed by Y-m-d
      * @param  array<string, array>  $userExceptions  this staff member's approved exceptions keyed by Y-m-d
