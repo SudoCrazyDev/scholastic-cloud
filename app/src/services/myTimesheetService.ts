@@ -4,7 +4,7 @@ import type { ApiResponse, MyTimesheet } from '../types'
 class MyTimesheetService {
   /**
    * The signed-in staff member's own punches, day by day. Defaults to the
-   * last two weeks up to today; the API never returns a future date.
+   * month so far; the API never returns a future date.
    */
   async get(params?: { from?: string; to?: string }) {
     const query = new URLSearchParams()

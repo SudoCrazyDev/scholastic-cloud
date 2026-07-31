@@ -19,8 +19,12 @@ use Illuminate\Http\Request;
  */
 class MyTimesheetController extends Controller
 {
-    /** How many days back the dashboard shows when the caller asks for nothing. */
-    private const DEFAULT_DAYS = 14;
+    /**
+     * The fewest days the dashboard falls back to on the 1st of a month, when
+     * the month so far is a day long but last month's missed punches can still
+     * be filed against.
+     */
+    private const MINIMUM_DAYS = 14;
 
     /** A generous cap: enough for any payroll period, short of a year of rows. */
     private const MAX_DAYS = 62;
@@ -62,9 +66,12 @@ class MyTimesheetController extends Controller
             ? Carbon::parse($validated['to'], PayrollService::TIMEZONE)->startOfDay()->min($today)
             : $today;
 
+        // The whole month so far, so the staff member sees every day of the
+        // period they are about to be paid for rather than a rolling window
+        // that has already dropped the first half of it.
         $from = isset($validated['from']) && $validated['from']
             ? Carbon::parse($validated['from'], PayrollService::TIMEZONE)->startOfDay()
-            : $to->copy()->subDays(self::DEFAULT_DAYS - 1);
+            : $to->copy()->startOfMonth()->min($to->copy()->subDays(self::MINIMUM_DAYS - 1));
 
         if ($from->gt($to)) {
             $from = $to->copy();

@@ -299,6 +299,34 @@ class MyTimesheetTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_it_shows_the_whole_month_so_far_by_default(): void
+    {
+        $body = $this->withHeader('Authorization', 'Bearer staff-token')
+            ->getJson('/api/my-timesheet')
+            ->assertOk()
+            ->json('data');
+
+        // Every day of the period being paid for, not a rolling two weeks that
+        // has already dropped the 1st.
+        $this->assertSame('2026-07-01', $body['from']);
+        $this->assertSame('2026-07-29', $body['to']);
+        $this->assertSame('2026-07-01', collect($body['days'])->first()['date']);
+    }
+
+    public function test_early_in_a_month_it_still_reaches_back_two_weeks(): void
+    {
+        // Sat 1 Aug: the month so far is one day, but July's missed punches
+        // can still be filed against.
+        $this->travelTo('2026-08-01 10:00:00');
+
+        $from = $this->withHeader('Authorization', 'Bearer staff-token')
+            ->getJson('/api/my-timesheet')
+            ->assertOk()
+            ->json('data.from');
+
+        $this->assertSame('2026-07-19', $from);
+    }
+
     public function test_the_window_never_runs_past_today(): void
     {
         $body = $this->withHeader('Authorization', 'Bearer staff-token')

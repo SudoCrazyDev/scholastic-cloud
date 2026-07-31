@@ -73,7 +73,7 @@ const TimeCell: React.FC<{ time: string | null; credited: boolean }> = ({ time, 
 }
 
 /**
- * The staff member's own punches for the last two weeks, so a punch the
+ * The staff member's own punches for the month so far, so a punch the
  * biometric never recorded is found while there is still time to file for it
  * — and filed straight from the row it was found on.
  */
@@ -117,7 +117,7 @@ const MyTimeLog: React.FC = () => {
           <p className="mt-0.5 text-xs text-gray-500">
             {issueCount > 0
               ? `${issueCount} day${issueCount === 1 ? '' : 's'} payroll would not pay in full — file a request to fix it.`
-              : 'Your biometric punches for the last two weeks.'}
+              : 'Your biometric punches for the month so far.'}
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -153,7 +153,7 @@ const MyTimeLog: React.FC = () => {
       ) : days.length === 0 ? (
         <div className="p-8 text-center">
           <Clock className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-          <p className="text-sm text-gray-500">No punches recorded in the last two weeks.</p>
+          <p className="text-sm text-gray-500">No punches recorded this month.</p>
         </div>
       ) : (
         <>
