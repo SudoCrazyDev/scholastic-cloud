@@ -43,6 +43,7 @@ import {
   Banknote,
   Smartphone,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 
@@ -169,6 +170,17 @@ const menuGroups: MenuGroup[] = [
         icon: <AssignedSubjectsIcon className="w-5 h-5" />,
         path: '/assigned-subjects',
         module: 'subjects',
+      },
+      {
+        // Sending a message is a write, and EnsureModuleAccess upgrades write
+        // verbs to `manage` — so `view` alone would show a link to a screen
+        // that could read old threads and not answer anything.
+        id: 'tala',
+        label: 'Tala',
+        icon: <Sparkles className="w-5 h-5" />,
+        path: '/tala',
+        module: 'tala',
+        ability: 'manage',
       },
     ],
   },

@@ -18,6 +18,7 @@ import Students from './pages/Students/Students';
 import StudentDetail from './pages/Students/StudentDetail';
 import { MyClassSections, ClassSectionDetail } from './pages/MyClassSections';
 import AssignedSubjects from './pages/AssignedSubjects/AssignedSubjects';
+import { TalaChat } from './pages/Tala';
 import SubjectDetail from './pages/AssignedSubjects/SubjectDetail';
 import { TeacherAttendance } from './pages/TeacherAttendance';
 import TeacherAttendanceDemo from './pages/TeacherAttendanceDemo';
@@ -116,6 +117,8 @@ function App() {
               <Route path="my-class-sections" element={<RequireModule module="subjects"><MyClassSections /></RequireModule>} />
               <Route path="my-class-sections/:id" element={<RequireModule module="subjects"><ClassSectionDetail /></RequireModule>} />
               <Route path="assigned-subjects" element={<RequireModule module="subjects"><AssignedSubjects /></RequireModule>} />
+              {/* `manage`, not `view`: chatting writes, and the API gates it that way. */}
+              <Route path="tala" element={<RequireModule module="tala" ability="manage"><TalaChat /></RequireModule>} />
               <Route path="assigned-subjects/:id" element={<RequireModule module="subjects"><SubjectDetail /></RequireModule>} />
               <Route
                 path="my-assessments"

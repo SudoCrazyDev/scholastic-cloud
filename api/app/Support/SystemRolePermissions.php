@@ -32,6 +32,11 @@ class SystemRolePermissions
         //
         // `roles` is the one addition: an institution has to be able to open
         // the role builder for this feature to mean anything.
+        //
+        // `tala` is the second. The school-wide AI key every teacher chats
+        // through is set under `tala.configure` (in SPECIAL below), which has
+        // to sit with the two roles that run a school. `tala` itself is here so
+        // they can use the assistant as well as pay for it.
         'institution-administrator' => [
             'announcements', 'class-sections', 'subjects', 'timetable',
             'grading-scales', 'consolidated-grades', 'proficiency', 'school-days',
@@ -41,7 +46,7 @@ class SystemRolePermissions
             'attendance-logs', 'attendance-requests', 'payroll', 'biometric-devices',
             'zk-users', 'sms-gateways', 'sms-messages', 'sms-settings',
             'roles', 'departments', 'settings', 'certificate-builder', 'form-builder',
-            'id-card-builder', 'receipt-templates',
+            'id-card-builder', 'receipt-templates', 'tala',
         ],
 
         'principal' => [
@@ -53,7 +58,7 @@ class SystemRolePermissions
             'attendance-logs', 'attendance-requests', 'payroll', 'biometric-devices',
             'zk-users', 'sms-gateways', 'sms-messages', 'sms-settings',
             'roles', 'departments', 'settings', 'certificate-builder', 'form-builder',
-            'id-card-builder', 'receipt-templates',
+            'id-card-builder', 'receipt-templates', 'tala',
         ],
 
         // Finance ran the money screens, the announcement board and the three
@@ -66,9 +71,16 @@ class SystemRolePermissions
 
         // A teacher works their own subjects: lessons, class record, grades and
         // attendance, plus the builders under Tools.
+        //
+        // `tala` needs the `manage` half, not just `view`: sending a message
+        // writes a row, and EnsureModuleAccess upgrades every write verb to
+        // `manage`. `view` alone would let a teacher read old threads and
+        // nothing else. Teaching is the only role Tala ships to — widening it
+        // is one entry in this list, or a checkbox in a school's role builder.
         'subject-teacher' => [
             'announcements', 'subjects', 'consolidated-grades', 'proficiency',
             'student-attendance', 'certificate-builder', 'form-builder', 'id-card-builder',
+            'tala',
         ],
 
         'department-head' => [
@@ -125,12 +137,12 @@ class SystemRolePermissions
         'institution-administrator' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
             'attendance-requests.approve', 'student-attendance.approve',
-            'consolidated-grades.approve', 'payroll.release',
+            'consolidated-grades.approve', 'payroll.release', 'tala.configure',
         ],
         'principal' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
             'attendance-requests.approve', 'student-attendance.approve',
-            'consolidated-grades.approve', 'payroll.release',
+            'consolidated-grades.approve', 'payroll.release', 'tala.configure',
         ],
         // Finance both raises and reviews void requests, but does not skip the
         // queue — a void it raises from the ledger still becomes a pending

@@ -17,6 +17,12 @@ modules should consume its data.
   announcements channel (`/finance-announcements`, below Payment Plans in the sidebar). A thin
   surface over the Announcements module: posts get `category='finance'` and are **always for all
   students** (server-forced `audience=students`, `scope=institution`).
+- [Tala](Tala/TALA.md) — AI teaching assistant. A streaming chat module (`/tala`) shipped to
+  **subject teachers**, running on a key the tenant supplies — the school's key, or a teacher's own
+  as the fallback. Claude or OpenAI, model picked from an allowlist. Has one read-only **tool**
+  (`list_assigned_subjects`). **Read [Guardrails](Tala/TALA.md#guardrails) before adding a tool** —
+  scope comes from the authenticated request, never from the model, and the institution-wide
+  widening that `getMySubjects()` grants principals is deliberately not reproduced.
 - [Staff Schedules](HRIS/StaffSchedules/STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates
   (weekly hours + lunch + per-day grace period), assigned to staff (one per staff), plus an
   institution calendar of holidays & events. Consumed by Payroll for lateness/undertime/overtime.

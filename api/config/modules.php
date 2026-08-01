@@ -66,6 +66,22 @@ return [
             ],
         ],
 
+        'assistant' => [
+            'label' => 'Assistant',
+            'modules' => [
+                'tala' => [
+                    'label' => 'Tala',
+                    'description' => 'The AI teaching assistant. View reads past conversations; manage is what lets a role actually chat and set its own API key.',
+                    'special' => [
+                        'configure' => [
+                            'label' => 'Set the institution AI key',
+                            'description' => 'Supply the API key the whole school chats through, and cap how much each teacher may use.',
+                        ],
+                    ],
+                ],
+            ],
+        ],
+
         'academics' => [
             'label' => 'Academics',
             'modules' => [

@@ -340,6 +340,31 @@ Route::middleware('auth.token')->group(function () {
     Route::post('ai/subjects/{subjectId}/quarters/{quarter}/lesson-plans/generate', [App\Http\Controllers\AiPlannerController::class, 'generateLessonPlans'])->middleware('module:subjects,manage');
     Route::post('ai/subjects/{subjectId}/quarters/{quarter}/assessments/generate', [App\Http\Controllers\AiPlannerController::class, 'generateAssessments'])->middleware('module:subjects,manage');
     Route::get('ai/generation-tasks/{taskId}/status', [App\Http\Controllers\AiPlannerController::class, 'checkGenerationStatus'])->middleware('module:subjects,view');
+
+    /*
+     * Tala — the AI teaching assistant.
+     *
+     * Separate from the `ai/*` planner routes above: those run on the one
+     * platform-wide key in config/ai.php, Tala runs on a key the tenant
+     * supplies. The abilities split three ways — `view` reads past threads,
+     * `manage` is what lets a teacher actually chat (a message is a write, and
+     * EnsureModuleAccess upgrades write verbs to `manage` regardless), and
+     * `configure` is the school-wide key an administrator sets.
+     */
+    Route::get('tala/config', [App\Http\Controllers\TalaCredentialController::class, 'config'])->middleware('module:tala,view');
+    Route::put('tala/credentials', [App\Http\Controllers\TalaCredentialController::class, 'storeOwn'])->middleware('module:tala,manage');
+    Route::delete('tala/credentials/{provider}', [App\Http\Controllers\TalaCredentialController::class, 'destroyOwn'])->middleware('module:tala,manage');
+
+    Route::get('tala/institution-credentials', [App\Http\Controllers\TalaCredentialController::class, 'indexInstitution'])->middleware('module:tala,configure');
+    Route::put('tala/institution-credentials', [App\Http\Controllers\TalaCredentialController::class, 'storeInstitution'])->middleware('module:tala,configure');
+    Route::delete('tala/institution-credentials/{provider}', [App\Http\Controllers\TalaCredentialController::class, 'destroyInstitution'])->middleware('module:tala,configure');
+
+    Route::get('tala/conversations', [App\Http\Controllers\TalaConversationController::class, 'index'])->middleware('module:tala,view');
+    Route::post('tala/conversations', [App\Http\Controllers\TalaConversationController::class, 'store'])->middleware('module:tala,manage');
+    Route::get('tala/conversations/{id}', [App\Http\Controllers\TalaConversationController::class, 'show'])->middleware('module:tala,view');
+    Route::patch('tala/conversations/{id}', [App\Http\Controllers\TalaConversationController::class, 'update'])->middleware('module:tala,manage');
+    Route::delete('tala/conversations/{id}', [App\Http\Controllers\TalaConversationController::class, 'destroy'])->middleware('module:tala,manage');
+    Route::post('tala/conversations/{id}/messages', [App\Http\Controllers\TalaChatController::class, 'send'])->middleware('module:tala,manage');
     // SubjectEcr routes
     Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class)->middleware('module:subjects,view');
     Route::post('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'uploadImage'])->middleware('module:subjects,manage');

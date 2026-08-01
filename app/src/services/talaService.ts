@@ -1,0 +1,297 @@
+import { api } from '../lib/api'
+import type { ApiResponse } from '../types'
+
+/*
+ * Tala — the AI teaching assistant.
+ *
+ * Everything except sending a message goes through the shared axios client.
+ * Sending a message does not: the reply streams back as Server-Sent Events,
+ * and axios buffers a response body until it is complete, which would turn the
+ * stream into a long pause followed by the whole answer at once. That one call
+ * uses fetch and reads the body incrementally.
+ */
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333/api'
+
+export type TalaProviderKey = 'anthropic' | 'openai'
+
+export type TalaCredentialSource = 'institution' | 'user'
+
+export interface TalaModelOption {
+  key: string
+  label: string
+  description: string | null
+}
+
+export interface TalaProviderOption {
+  key: TalaProviderKey
+  label: string
+  key_hint: string | null
+  console_url: string | null
+  default_model: string
+  models: TalaModelOption[]
+}
+
+export interface TalaCredentialSummary {
+  id: string
+  source: TalaCredentialSource
+  provider: TalaProviderKey
+  provider_label: string
+  model: string
+  masked_key: string | null
+  shared_with_staff: boolean | null
+  monthly_message_limit: number | null
+  is_active: boolean
+  last_used_at: string | null
+  updated_at: string | null
+}
+
+export interface TalaUsage {
+  used: number
+  limit: number | null
+  remaining: number | null
+  exceeded: boolean
+}
+
+export interface TalaConfig {
+  /** False when neither the school nor the teacher has supplied a usable key. */
+  ready: boolean
+  active_source: TalaCredentialSource | null
+  active_provider: TalaProviderKey | null
+  active_model: string | null
+  /** The teacher has a key, but the school's key is taking precedence. */
+  own_key_overridden: boolean
+  own_keys: TalaCredentialSummary[]
+  institution_configured: boolean
+  institution_shared: boolean
+  providers: TalaProviderOption[]
+  can_configure_institution: boolean
+  usage: TalaUsage
+}
+
+export interface TalaConversationSummary {
+  id: string
+  title: string | null
+  provider: TalaProviderKey | null
+  model: string | null
+  last_message_at: string | null
+  created_at: string
+}
+
+export interface TalaMessage {
+  id: string
+  role: 'user' | 'assistant' | 'tool'
+  content: string
+  provider: TalaProviderKey | null
+  model: string | null
+  error_message: string | null
+  created_at: string
+}
+
+export interface TalaConversationDetail {
+  conversation: TalaConversationSummary
+  messages: TalaMessage[]
+}
+
+/**
+ * A failure that happened before the model was reached — no key configured,
+ * monthly allowance spent, message too long. These answer with JSON and a
+ * status code rather than opening a stream, so the chat can react to the cause
+ * instead of showing a generic error.
+ */
+export class TalaRequestError extends Error {
+  // Declared and assigned rather than written as constructor parameter
+  // properties: the build runs with `erasableSyntaxOnly`, which rejects any TS
+  // syntax that emits runtime code.
+  readonly code: string | null
+  readonly status: number
+  readonly usage: TalaUsage | undefined
+
+  constructor(message: string, code: string | null, status: number, usage?: TalaUsage) {
+    super(message)
+    this.name = 'TalaRequestError'
+    this.code = code
+    this.status = status
+    this.usage = usage
+  }
+}
+
+export interface StreamHandlers {
+  onDelta: (text: string) => void
+  /** A lookup Tala ran on the teacher's behalf, so the UI can say what it is doing. */
+  onTool?: (event: { name: string; status: 'running' | 'done' | 'failed'; summary?: string }) => void
+  onDone?: (event: { message_id: string; tokens_in: number | null; tokens_out: number | null }) => void
+  /** The model was reached but the turn failed part-way. */
+  onError?: (event: { message_id?: string; message: string }) => void
+}
+
+export const talaService = {
+  async getConfig(): Promise<TalaConfig> {
+    const res = await api.get<ApiResponse<TalaConfig>>('/tala/config')
+    return res.data.data
+  },
+
+  async saveOwnKey(payload: {
+    provider: TalaProviderKey
+    api_key: string
+    model?: string | null
+  }): Promise<TalaCredentialSummary> {
+    const res = await api.put<ApiResponse<TalaCredentialSummary>>('/tala/credentials', payload)
+    return res.data.data
+  },
+
+  async deleteOwnKey(provider: TalaProviderKey): Promise<void> {
+    await api.delete(`/tala/credentials/${provider}`)
+  },
+
+  async getInstitutionKeys(): Promise<TalaCredentialSummary[]> {
+    const res = await api.get<ApiResponse<TalaCredentialSummary[]>>('/tala/institution-credentials')
+    return res.data.data
+  },
+
+  async saveInstitutionKey(payload: {
+    provider: TalaProviderKey
+    api_key: string
+    model?: string | null
+    shared_with_staff?: boolean
+    monthly_message_limit?: number | null
+  }): Promise<TalaCredentialSummary> {
+    const res = await api.put<ApiResponse<TalaCredentialSummary>>('/tala/institution-credentials', payload)
+    return res.data.data
+  },
+
+  async deleteInstitutionKey(provider: TalaProviderKey): Promise<void> {
+    await api.delete(`/tala/institution-credentials/${provider}`)
+  },
+
+  async listConversations(): Promise<TalaConversationSummary[]> {
+    const res = await api.get<ApiResponse<TalaConversationSummary[]>>('/tala/conversations')
+    return res.data.data
+  },
+
+  async createConversation(): Promise<TalaConversationSummary> {
+    const res = await api.post<ApiResponse<TalaConversationSummary>>('/tala/conversations', {})
+    return res.data.data
+  },
+
+  async getConversation(id: string): Promise<TalaConversationDetail> {
+    const res = await api.get<ApiResponse<TalaConversationDetail>>(`/tala/conversations/${id}`)
+    return res.data.data
+  },
+
+  async renameConversation(id: string, title: string): Promise<void> {
+    await api.patch(`/tala/conversations/${id}`, { title })
+  },
+
+  async deleteConversation(id: string): Promise<void> {
+    await api.delete(`/tala/conversations/${id}`)
+  },
+
+  /**
+   * Send a message and stream the reply.
+   *
+   * Resolves when the turn is over — success or failure. Throws only for
+   * failures that happened before the stream opened; anything that goes wrong
+   * mid-reply arrives through `onError`, because by then the teacher is already
+   * looking at a partial answer that should stay on screen.
+   */
+  async streamMessage(
+    conversationId: string,
+    message: string,
+    handlers: StreamHandlers,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const token = localStorage.getItem('auth_token')
+
+    const response = await fetch(`${API_BASE_URL}/tala/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ message }),
+      signal,
+    })
+
+    const contentType = response.headers.get('content-type') ?? ''
+
+    // The API answers pre-stream refusals as ordinary JSON, so the content type
+    // is what distinguishes "never started" from "started and then broke".
+    if (!response.ok || !contentType.includes('text/event-stream')) {
+      const body = await response.json().catch(() => null)
+
+      throw new TalaRequestError(
+        body?.message ?? 'Tala could not answer that. Try again.',
+        body?.error ?? null,
+        response.status,
+        body?.usage
+      )
+    }
+
+    if (!response.body) {
+      throw new TalaRequestError('Your browser could not read the reply stream.', null, response.status)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+
+      // Normalise line endings so the frame split below holds regardless of
+      // what the server or an intermediary used.
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+
+      let boundary = buffer.indexOf('\n\n')
+
+      while (boundary !== -1) {
+        dispatchFrame(buffer.slice(0, boundary), handlers)
+        buffer = buffer.slice(boundary + 2)
+        boundary = buffer.indexOf('\n\n')
+      }
+    }
+  },
+}
+
+/**
+ * Turn one SSE frame into a handler call.
+ *
+ * Payloads are JSON-encoded on the server precisely so a reply containing
+ * newlines cannot break the framing.
+ */
+function dispatchFrame(frame: string, handlers: StreamHandlers): void {
+  let event = 'message'
+  let data = ''
+
+  for (const line of frame.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim()
+    else if (line.startsWith('data:')) data += line.slice(5).trim()
+  }
+
+  if (!data) return
+
+  let payload: any
+  try {
+    payload = JSON.parse(data)
+  } catch {
+    return
+  }
+
+  switch (event) {
+    case 'delta':
+      if (typeof payload.text === 'string') handlers.onDelta(payload.text)
+      break
+    case 'tool':
+      handlers.onTool?.(payload)
+      break
+    case 'done':
+      handlers.onDone?.(payload)
+      break
+    case 'error':
+      handlers.onError?.(payload)
+      break
+  }
+}
