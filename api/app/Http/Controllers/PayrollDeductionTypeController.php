@@ -312,8 +312,11 @@ class PayrollDeductionTypeController extends Controller
     }
 
     /**
-     * Payroll is restricted to the roles that see it in the sidebar —
-     * salaries are too sensitive for the usual "any staff" HRIS access.
+     * Payroll is restricted to roles granted the module — salaries are too
+     * sensitive for the usual "any staff" HRIS access. Read off permissions
+     * rather than a fixed slug list, so a school can build its own payroll
+     * role, and so a super-administrator's wildcard reaches it like anything
+     * else.
      */
     private function isPayrollManager(Request $request): bool
     {
@@ -322,9 +325,7 @@ class PayrollDeductionTypeController extends Controller
             return false;
         }
 
-        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
-
-        return in_array((string) ($role->slug ?? ''), ['principal', 'institution-administrator'], true);
+        return $user->hasModuleAccess('payroll', 'manage');
     }
 
     private function payrollForbidden(): JsonResponse

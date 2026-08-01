@@ -95,9 +95,7 @@ class PayrollSettingController extends Controller
             return false;
         }
 
-        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
-
-        return in_array((string) ($role->slug ?? ''), ['principal', 'institution-administrator'], true);
+        return $user->hasModuleAccess('payroll', 'manage');
     }
 
     private function payrollForbidden(): JsonResponse
