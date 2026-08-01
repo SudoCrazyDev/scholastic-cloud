@@ -43,13 +43,43 @@ export const useAuthState = () => {
     const storedUser = localStorage.getItem('auth_user');
     const hasOriginal = !!localStorage.getItem(IMPERSONATION_ORIGINAL_TOKEN);
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-      setIsImpersonating(hasOriginal);
+    if (!storedToken || !storedUser) {
+      setIsLoading(false);
+      return;
     }
 
-    setIsLoading(false);
+    const cachedUser = JSON.parse(storedUser);
+    setToken(storedToken);
+    setUser(cachedUser);
+    setIsImpersonating(hasOriginal);
+
+    // A session started before module permissions existed has a cached user
+    // with no `permissions`, which every gate reads as "no access" — the
+    // sidebar would draw empty until the person signed out and back in. The
+    // same applies after an administrator changes a role: the cached copy is
+    // stale until something refetches it.
+    //
+    // Rendering waits for the profile only when the cached user has no
+    // permissions to render from; otherwise the refresh happens behind the
+    // already-visible UI.
+    const canRenderFromCache = Array.isArray(cachedUser?.permissions);
+
+    if (canRenderFromCache) {
+      setIsLoading(false);
+    }
+
+    authService
+      .getProfile()
+      .then((userData) => {
+        setUser(userData);
+        localStorage.setItem('auth_user', JSON.stringify(userData));
+      })
+      .catch((error) => {
+        // Keep the cached user: an expired or revoked token surfaces as a 401
+        // on the next real request, which is where sign-out belongs.
+        console.error('Failed to refresh user profile on load:', error);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const login = async (loginData: LoginResponse) => {

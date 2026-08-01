@@ -139,7 +139,34 @@ class SystemRolePermissions
     ];
 
     /**
-     * Every slug this class knows how to configure.
+     * Slugs that mean the same role under a different name.
+     *
+     * Roles were created per-tenant long before this file existed, so the same
+     * job goes by more than one slug across schools — a role titled "Teacher"
+     * slugs to `teacher`, not `subject-teacher`. Both spellings already appear
+     * in the codebase's own role checks. Without this mapping such a role would
+     * seed with no permissions and its holders would find every module gone.
+     *
+     * @var array<string, string>
+     */
+    public const ALIASES = [
+        'institution-admin' => 'institution-administrator',
+        'super-admin' => 'super-administrator',
+        'teacher' => 'subject-teacher',
+        'subject_teacher' => 'subject-teacher',
+        'assistant-principal-head' => 'assistant-principal',
+    ];
+
+    /**
+     * Resolve an alias to the slug whose permission set should be used.
+     */
+    public static function canonical(string $slug): string
+    {
+        return self::ALIASES[$slug] ?? $slug;
+    }
+
+    /**
+     * Every slug this class knows how to configure, aliases included.
      *
      * @return array<string>
      */
@@ -150,12 +177,13 @@ class SystemRolePermissions
             array_keys(self::MANAGE),
             array_keys(self::VIEW),
             array_keys(self::SPECIAL),
+            array_keys(self::ALIASES),
         )));
     }
 
     public static function knows(string $slug): bool
     {
-        return in_array($slug, self::slugs(), true);
+        return in_array(self::canonical($slug), self::slugs(), true);
     }
 
     /**
@@ -165,6 +193,8 @@ class SystemRolePermissions
      */
     public static function for(string $slug): array
     {
+        $slug = self::canonical($slug);
+
         // Super-administrator holds the wildcard rather than an enumerated set,
         // so modules added to the catalog later are covered without a reseed.
         if ($slug === 'super-administrator') {
