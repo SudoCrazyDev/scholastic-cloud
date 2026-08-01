@@ -104,6 +104,43 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Lesson attachments
+    |--------------------------------------------------------------------------
+    |
+    | Reading the files a teacher uploaded to a lesson — a scanned worksheet, a
+    | diagram, a handout — so Tala can build an assessment from the material
+    | rather than from its title.
+    |
+    | These caps exist because an attachment is the most expensive thing a turn
+    | can contain. A PDF page costs roughly as much as a page of text plus an
+    | image of it, so a 20-page handout can be tens of thousands of tokens on a
+    | school's own key. The tool is called deliberately rather than on every
+    | lesson read, and what it loads is bounded here.
+    |
+    | The one relief: attachments are not replayed on later turns.
+    | TalaConversation::historyForModel() replays only user and assistant text,
+    | so a file is paid for once, on the turn that asked for it.
+    |
+    | Sizes are raw bytes before base64, which inflates by about a third — the
+    | total is set well under Anthropic's 32 MB request ceiling to leave room.
+    |
+    */
+    'attachments' => [
+        'max_files_per_turn' => (int) env('TALA_ATTACHMENT_MAX_FILES', 4),
+        'max_image_bytes' => (int) env('TALA_ATTACHMENT_MAX_IMAGE_BYTES', 4 * 1024 * 1024),
+        'max_pdf_bytes' => (int) env('TALA_ATTACHMENT_MAX_PDF_BYTES', 10 * 1024 * 1024),
+        'max_total_bytes' => (int) env('TALA_ATTACHMENT_MAX_TOTAL_BYTES', 12 * 1024 * 1024),
+
+        /*
+        | Anthropic rejects an image whose long edge is over 8000px. There is no
+        | GD or Imagick on these servers, so an oversized image cannot be
+        | downscaled — it is refused with a message the teacher can act on.
+        */
+        'max_image_edge' => (int) env('TALA_ATTACHMENT_MAX_IMAGE_EDGE', 8000),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Spend guard
     |--------------------------------------------------------------------------
     |

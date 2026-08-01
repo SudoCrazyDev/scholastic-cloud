@@ -29,7 +29,32 @@ class ToolContext
          * read tools neither need it nor should depend on it.
          */
         public readonly ?string $conversationId = null,
+        /**
+         * File media types the model answering this turn can actually read,
+         * from ChatProvider::supportsAttachment(). Empty means "this school's
+         * model reads no files", which is a legitimate state and not an error —
+         * a tool checks it before pulling anything out of storage so an
+         * unreadable upload costs a line of explanation rather than a failed
+         * request halfway through an answer.
+         *
+         * @var array<int, string>
+         */
+        public readonly array $attachmentTypes = [],
+        /**
+         * What the tools have already done this turn. Mutable, unlike everything
+         * else here — it is how one tool can require that another ran first. See
+         * ToolMemory.
+         */
+        public readonly ToolMemory $memory = new ToolMemory,
     ) {}
+
+    /**
+     * @return array<int, string>
+     */
+    public function attachmentTypes(): array
+    {
+        return $this->attachmentTypes;
+    }
 
     public function userId(): string
     {

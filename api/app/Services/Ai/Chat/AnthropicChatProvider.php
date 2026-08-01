@@ -223,8 +223,13 @@ class AnthropicChatProvider implements ChatProvider
         );
     }
 
-    public function withToolResults(array $messages, ChatResult $result, array $results, array $errors = []): array
-    {
+    public function withToolResults(
+        array $messages,
+        ChatResult $result,
+        array $results,
+        array $errors = [],
+        array $attachments = [],
+    ): array {
         $toolResults = [];
 
         foreach ($result->toolCalls as $call) {
@@ -236,12 +241,58 @@ class AnthropicChatProvider implements ChatProvider
             ], fn ($value) => $value !== null);
         }
 
+        /*
+         * Files a tool loaded go in the same user turn as the results, after
+         * them. The API requires `tool_result` blocks at the start of the
+         * content array, which this satisfies, and keeping it to one turn avoids
+         * relying on two consecutive user messages being accepted.
+         *
+         * They are not put *inside* a tool_result block: what that supports
+         * varies, whereas an image or document block in an ordinary user turn is
+         * the oldest, plainest thing the API does.
+         */
+        foreach ($attachments as $attachment) {
+            $toolResults[] = [
+                'type' => 'text',
+                'text' => 'Attached from the lesson: '.$attachment->describe(),
+            ];
+
+            $toolResults[] = $attachment->isImage()
+                ? [
+                    'type' => 'image',
+                    'source' => [
+                        'type' => 'base64',
+                        'media_type' => $attachment->mediaType,
+                        'data' => $attachment->base64(),
+                    ],
+                ]
+                : [
+                    'type' => 'document',
+                    'source' => [
+                        'type' => 'base64',
+                        'media_type' => $attachment->mediaType,
+                        'data' => $attachment->base64(),
+                    ],
+                ];
+        }
+
         // The assistant turn goes back exactly as it arrived — thinking blocks,
         // signatures and all — followed by the results as a user turn.
         $messages[] = ['role' => 'assistant', 'content' => $result->assistantBlocks];
         $messages[] = ['role' => 'user', 'content' => $toolResults];
 
         return $messages;
+    }
+
+    /**
+     * Claude reads images and PDFs natively.
+     */
+    public function supportsAttachment(string $mediaType): bool
+    {
+        return in_array($mediaType, [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'application/pdf',
+        ], true);
     }
 
     /**

@@ -247,6 +247,10 @@ const FACT_ORDER = [
   'questions',
   'total_points',
   'student_attempts',
+  // Provenance last, and shown as its own row: a teacher checking a quiz should
+  // be able to see which lesson it came from and which of its files were read.
+  'based_on_lesson',
+  'read_from_lesson',
 ]
 
 const FACT_LABELS: Record<string, string> = {
@@ -259,6 +263,9 @@ const FACT_LABELS: Record<string, string> = {
   questions: 'Questions',
   total_points: 'Total points',
   student_attempts: 'Submissions',
+  based_on_lesson: 'From lesson',
+  read_from_lesson: 'Read from',
+  questions_kept: 'Unchanged',
 }
 
 const Changes: React.FC<{

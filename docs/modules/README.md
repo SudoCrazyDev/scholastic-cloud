@@ -19,8 +19,10 @@ modules should consume its data.
   students** (server-forced `audience=students`, `scope=institution`).
 - [Tala](Tala/TALA.md) — AI teaching assistant. A streaming chat module (`/tala`) shipped to
   **subject teachers**, running on a key the tenant supplies — the school's key, or a teacher's own
-  as the fallback. Claude or OpenAI, model picked from an allowlist. Five read **tools**
-  (`list_assigned_subjects`, `list_lessons`, `get_lesson`, `list_assessments`, `get_assessment`) plus
+  as the fallback. Claude or OpenAI, model picked from an allowlist. Six read **tools**
+  (`list_assigned_subjects`, `list_lessons`, `get_lesson`, `read_lesson_material` — which opens a
+  lesson's uploaded **images and PDFs**, bytes sent server-side so no signed media URL ever reaches
+  the provider — `list_assessments`, `get_assessment`) plus
   `propose_assessment`, which drafts a quiz/assignment/exam for the teacher to approve — **the model
   has no write access; an approval card and an authenticated endpoint do the writing**, and it needs
   `subjects.manage` as well. **Read [Guardrails](Tala/TALA.md#guardrails) before adding a tool**:

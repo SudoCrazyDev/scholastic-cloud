@@ -10,6 +10,7 @@ use App\Models\TalaAssessmentProposal;
 use App\Services\Tala\Assessments\AssessmentPresenter;
 use App\Services\Tala\Assessments\AssessmentSpec;
 use App\Services\Tala\Assessments\AssessmentTypes;
+use App\Services\Tala\Attachments\AttachmentReader;
 use App\Services\Tala\SectionLabel;
 use App\Support\AcademicYear;
 use App\Support\GradingPeriods;
@@ -40,6 +41,8 @@ use App\Support\GradingPeriods;
  */
 class ProposeAssessmentTool implements TalaTool
 {
+    public function __construct(private readonly AttachmentReader $reader = new AttachmentReader) {}
+
     public function name(): string
     {
         return 'propose_assessment';
@@ -72,6 +75,14 @@ class ProposeAssessmentTool implements TalaTool
             the teacher wants** ({$types}) and which subject and grading period it belongs
             to. Ask them; do not pick for them. Show them the questions in your reply as well
             as on the card, so they can read them without opening anything.
+
+            **Building an assessment from a lesson.** When the questions are meant to come from
+            one of their lessons, pass `based_on_lesson` with its title. Read the lesson first —
+            `get_lesson` for what is written in it, and `read_lesson_material` for any images or
+            PDFs uploaded to it. If that lesson has readable files you have not opened this
+            turn, this tool will refuse and tell you to open them: questions written from a
+            filename are not questions from the lesson, and a teacher cannot tell the
+            difference by looking at them.
 
             Question types you may write:
             {$questionTypes}
@@ -124,6 +135,10 @@ class ProposeAssessmentTool implements TalaTool
                 'grading_period' => [
                     'type' => 'string',
                     'description' => 'The grading period as a plain number: "1", "2", "3" or "4". Required for create.',
+                ],
+                'based_on_lesson' => [
+                    'type' => 'string',
+                    'description' => 'The title of the lesson this assessment is drawn from, when there is one. Pass it whenever the teacher asked for questions about a lesson: it records the source on the card, and it makes sure you have actually read the lesson\'s uploaded material rather than working from its title.',
                 ],
                 'component' => [
                     'type' => 'string',
@@ -247,6 +262,12 @@ class ProposeAssessmentTool implements TalaTool
             return $component;
         }
 
+        $source = $this->resolveSourceLesson($input, $context);
+
+        if ($source instanceof ToolOutcome) {
+            return $source;
+        }
+
         $spec = new AssessmentSpec($input);
 
         if (! $spec->parseQuestions(true)) {
@@ -286,6 +307,10 @@ class ProposeAssessmentTool implements TalaTool
                 'questions' => count($spec->questions()),
                 'total_points' => $spec->totalPoints(),
                 'description' => ToolInput::text($input, 'description'),
+                // Provenance on the card: a teacher should be able to see which
+                // lesson a quiz came from, and whether its files were read.
+                'based_on_lesson' => $source['lesson'] ?? null,
+                'read_from_lesson' => $source['files'] === [] ? null : implode(', ', $source['files']),
             ], fn ($value) => $value !== null),
             'questions' => $spec->previewQuestions(),
         ];
@@ -317,17 +342,19 @@ class ProposeAssessmentTool implements TalaTool
                 .$this->points($spec->totalPoints()).' points)',
         ]);
 
-        return $this->outcome($proposal, [
+        return $this->outcome($proposal, array_filter([
             'proposed' => 'create',
             'status' => 'awaiting the teacher\'s approval',
             'will_create' => $preview['assessment'],
             'question_count' => count($spec->questions()),
             'total_points' => $spec->totalPoints(),
+            'based_on_lesson' => $source['lesson'],
+            'read_from_lesson' => $source['files'] ?: null,
             'warnings' => $warnings,
             'note' => 'Nothing has been created. A card is now in the chat for the teacher to '
                 .'approve or discard. Tell them it is waiting, and that it will be saved as a '
                 .'draft that students cannot see until they publish it.',
-        ]);
+        ], fn ($value) => $value !== null));
     }
 
     /**
@@ -421,6 +448,21 @@ class ProposeAssessmentTool implements TalaTool
 
             if ($hasQuestions && ! $spec->parseQuestions(true)) {
                 return $this->specErrors($spec);
+            }
+
+            // Replacing questions with ones drawn from a lesson gets the same
+            // gate as writing them from scratch.
+            if ($hasQuestions) {
+                $source = $this->resolveSourceLesson($input, $context);
+
+                if ($source instanceof ToolOutcome) {
+                    return $source;
+                }
+
+                if ($source['lesson'] !== null) {
+                    $preview['based_on_lesson'] = $source['lesson'];
+                    $preview['read_from_lesson'] = $source['files'];
+                }
             }
 
             if (! $hasQuestions && $newTitle === null && $description === null && $newType === null) {
@@ -704,6 +746,58 @@ class ProposeAssessmentTool implements TalaTool
             'questions' => count($item->resolvedQuestions()),
             'updated_at' => $item->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * The lesson an assessment is drawn from, if the model named one — and a
+     * refusal if it named one whose uploaded material it never opened.
+     *
+     * This is the gate that makes "a quiz from my lesson handout" mean what the
+     * teacher meant. The model cannot be asked to fetch the material inside this
+     * call: by the time a tool runs, the questions are already written. So the
+     * check is after the fact and blocking — read the files, then propose again.
+     *
+     * Same-turn deliberately. ToolMemory explains why a read on an earlier turn
+     * does not count.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{lesson: string|null, files: array<int, string>}|ToolOutcome
+     */
+    private function resolveSourceLesson(array $input, ToolContext $context)
+    {
+        $title = ToolInput::text($input, 'based_on_lesson');
+
+        if ($title === null) {
+            return ['lesson' => null, 'files' => []];
+        }
+
+        $lesson = AssignedLessonScope::query($context)
+            ->where('title', 'like', '%'.$title.'%')
+            ->orderBy('quarter')
+            ->orderBy('order')
+            ->first();
+
+        if ($lesson === null) {
+            return ToolOutcome::error(
+                'No lesson of the teacher\'s matches "'.$title.'", so an assessment cannot be based '
+                .'on it. Use list_lessons to see what they have, or leave based_on_lesson out if the '
+                .'questions are not from a saved lesson.'
+            );
+        }
+
+        $readable = $this->reader->readableNames($lesson, $context->attachmentTypes());
+        $alreadyRead = $context->memory->lessonMaterialRead($lesson->id);
+
+        if ($readable !== [] && $alreadyRead === []) {
+            return ToolOutcome::error(
+                '"'.$lesson->title.'" has '.count($readable).' file(s) you have not opened: '
+                .implode(', ', $readable).'. Call read_lesson_material on this lesson first, then '
+                .'propose the assessment again. Questions written from a filename are not questions '
+                .'from the lesson, and the teacher cannot tell the difference by reading them.'
+            );
+        }
+
+        return ['lesson' => $lesson->title, 'files' => $alreadyRead];
     }
 
     /**

@@ -172,8 +172,13 @@ class OpenAiChatProvider implements ChatProvider
         );
     }
 
-    public function withToolResults(array $messages, ChatResult $result, array $results, array $errors = []): array
-    {
+    public function withToolResults(
+        array $messages,
+        ChatResult $result,
+        array $results,
+        array $errors = [],
+        array $attachments = [],
+    ): array {
         $toolCalls = [];
 
         foreach ($result->assistantBlocks as $call) {
@@ -207,7 +212,49 @@ class OpenAiChatProvider implements ChatProvider
             ];
         }
 
+        /*
+         * A `role: "tool"` message takes a string, so an image cannot go in one.
+         * It follows as an ordinary user turn instead, which is also how a person
+         * would attach it.
+         */
+        if ($attachments !== []) {
+            $parts = [[
+                'type' => 'text',
+                'text' => 'Attached from the lesson: '
+                    .implode('; ', array_map(fn ($a) => $a->describe(), $attachments)),
+            ]];
+
+            foreach ($attachments as $attachment) {
+                $parts[] = [
+                    'type' => 'image_url',
+                    'image_url' => [
+                        'url' => 'data:'.$attachment->mediaType.';base64,'.$attachment->base64(),
+                    ],
+                ];
+            }
+
+            $messages[] = ['role' => 'user', 'content' => $parts];
+        }
+
         return $messages;
+    }
+
+    /**
+     * Images only, for now.
+     *
+     * The models on Tala's allowlist read images through `image_url` parts, which
+     * is long-settled. PDFs are a different content part on this API and support
+     * varies by model and endpoint, and it could not be verified against a real
+     * key here — so rather than risk a request that 400s in the middle of an
+     * answer, a PDF is reported as unreadable and the teacher is told why.
+     *
+     * To widen it: return true for `application/pdf` and emit a `file` part
+     * carrying `filename` plus a base64 `file_data` URL, then test against every
+     * model in config/tala.php that a school might have selected.
+     */
+    public function supportsAttachment(string $mediaType): bool
+    {
+        return in_array($mediaType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
     }
 
     /**

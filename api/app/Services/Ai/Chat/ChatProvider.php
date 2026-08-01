@@ -47,10 +47,33 @@ interface ChatProvider
      * loses detail the provider needs back — thinking-block signatures, in
      * Anthropic's case — so each keeps its own.
      *
+     * `$attachments` carries files a tool loaded this round — a lesson's images
+     * or PDFs. They come through here rather than in the tool result because a
+     * tool result is JSON text and a picture is not, so each provider inlines
+     * them as whatever its own wire format calls an image or a document.
+     *
      * @param  array<int, mixed>  $messages
      * @param  array<string, string>  $results  Tool call id => result payload (JSON).
      * @param  array<string, bool>  $errors  Tool call id => whether it failed.
+     * @param  array<int, \App\Services\Tala\Attachments\LessonAttachment>  $attachments
      * @return array<int, mixed>
      */
-    public function withToolResults(array $messages, ChatResult $result, array $results, array $errors = []): array;
+    public function withToolResults(
+        array $messages,
+        ChatResult $result,
+        array $results,
+        array $errors = [],
+        array $attachments = [],
+    ): array;
+
+    /**
+     * Whether this provider, on the model it was built for, can read a file of
+     * this media type.
+     *
+     * Asked before a file is pulled out of storage, so an unreadable upload
+     * costs a line in the tool result rather than a failed request mid-answer.
+     * A provider that says no to everything is a valid provider — it just means
+     * Tala works from what the teacher typed.
+     */
+    public function supportsAttachment(string $mediaType): bool;
 }

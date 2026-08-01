@@ -8,6 +8,7 @@ use App\Models\TalaConversation;
 use App\Models\TalaMessage;
 use App\Services\Ai\Chat\ChatProvider;
 use App\Services\Ai\Chat\ChatResult;
+use App\Services\Tala\Attachments\LessonAttachment;
 use App\Services\Tala\CredentialResolver;
 use App\Services\Tala\ResolvedCredential;
 use App\Services\Tala\TalaContext;
@@ -125,11 +126,22 @@ class TalaChatController extends Controller
         $system = $this->context->build($conversation->user, $conversation->institution_id);
         $history = $conversation->historyForModel();
 
+        /*
+         * Which file types the answering model can read, asked once here rather
+         * than per tool call. A school on a model that cannot read PDFs should
+         * get "I can see the filename but not open it", not a request that fails
+         * halfway through an answer.
+         */
+        $attachmentTypes = array_values(array_filter([
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+        ], fn (string $type) => $credential->provider()->supportsAttachment($type)));
+
         $toolContext = new ToolContext(
             $conversation->user,
             $conversation->institution_id,
             // Lets propose_assessment anchor an approval card to this thread.
             $conversation->id,
+            $attachmentTypes,
         );
 
         /*
@@ -294,6 +306,8 @@ class TalaChatController extends Controller
     ): array {
         $payloads = [];
         $errors = [];
+        /** @var array<int, LessonAttachment> $attachments */
+        $attachments = [];
 
         foreach ($result->toolCalls as $call) {
             $this->emit('tool', ['name' => $call->name, 'status' => 'running']);
@@ -329,6 +343,21 @@ class TalaChatController extends Controller
                 }
             }
 
+            /*
+             * Files a tool loaded from a lesson. They are collected across every
+             * call in this round and handed to withToolResults(), which inlines
+             * them in whatever the provider's wire format calls an image or a
+             * document — a tool result is JSON text and a picture is not.
+             *
+             * They arrive via `meta` rather than in the result the model reads,
+             * so megabytes of base64 never pass through the audit row either.
+             */
+            foreach ($outcome->meta['attachments'] ?? [] as $attachment) {
+                if ($attachment instanceof LessonAttachment) {
+                    $attachments[] = $attachment;
+                }
+            }
+
             $this->record($conversation, $credential, TalaMessage::ROLE_TOOL, [
                 'content' => json_encode([
                     'tool' => $call->name,
@@ -339,7 +368,7 @@ class TalaChatController extends Controller
             ]);
         }
 
-        return $provider->withToolResults($messages, $result, $payloads, $errors);
+        return $provider->withToolResults($messages, $result, $payloads, $errors, $attachments);
     }
 
     /**

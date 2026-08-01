@@ -202,6 +202,10 @@ const TOOL_LABELS: Record<string, { running: string; done: string }> = {
     running: 'Opening your lesson…',
     done: 'Your lesson',
   },
+  read_lesson_material: {
+    running: 'Opening your uploaded files…',
+    done: 'Read from your lesson files',
+  },
   list_assessments: {
     running: 'Checking your assessments…',
     done: 'Your assessments',

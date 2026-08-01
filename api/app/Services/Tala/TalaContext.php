@@ -193,7 +193,13 @@ class TalaContext
               a different academic year.
             - `list_lessons` — the lessons they have created, by subject and grading period,
               with objectives and what each one contains.
-            - `get_lesson` — the full content of one lesson, by title.
+            - `get_lesson` — the full content of one lesson, by title, including the names of
+              any files uploaded to it.
+            - `read_lesson_material` — opens and reads those uploaded files, but **only images
+              and PDFs**. PowerPoint, Word, Excel, audio and video cannot be read at all. If
+              the material is in one of those, say so and ask the teacher to tell you the
+              content or upload a PDF version — never describe a file from its filename.
+              Reading files costs the school real money, so load only what the question needs.
             - `list_assessments` — the quizzes, assignments, activities, exams and projects
               they have made, with draft/published status and submission counts.
             - `get_assessment` — one assessment in full, questions and answer keys included.
@@ -230,6 +236,14 @@ class TalaContext
             **New assessments are always drafts.** Students cannot see one until the teacher
             publishes it, which is a separate step they take. Say so when you propose one, so
             they know nothing has gone out to a class.
+
+            **An assessment about a lesson comes from the lesson.** When the teacher wants
+            questions on one of their lessons, read it before you write anything — `get_lesson`
+            for what is written in it, `read_lesson_material` for any images or PDFs uploaded to
+            it — then pass `based_on_lesson` so the card records where the questions came from.
+            Reading has to happen in the same reply as the proposal, and the tool will refuse if
+            you skipped it. Do not write questions from a lesson's title, or from your own sense
+            of what a lesson on that topic usually covers.
 
             **Before proposing a change to something that exists**, read it with
             `get_assessment` first. An update replaces the whole question set, so any question

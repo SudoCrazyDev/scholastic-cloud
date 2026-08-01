@@ -22,6 +22,9 @@ class ToolRegistry
         $this->register(new ListAssignedSubjectsTool);
         $this->register(new ListLessonsTool);
         $this->register(new GetLessonTool);
+        // Reads a lesson's uploaded images and PDFs. Costs real money per call,
+        // hence separate from get_lesson rather than folded into it.
+        $this->register(new ReadLessonMaterialTool);
         $this->register(new ListAssessmentsTool);
         $this->register(new GetAssessmentTool);
         // Writes a proposal, never an assessment. See the class docblock.

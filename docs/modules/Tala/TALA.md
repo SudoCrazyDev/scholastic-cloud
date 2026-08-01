@@ -68,7 +68,8 @@ repo-relative; line numbers drift — search the symbol if it has moved.
   (all `HasUuids`).
 
 **Backend — chat providers (`api/app/Services/Ai/Chat/`)**
-- `ChatProvider.php` — the interface: `stream()` and `withToolResults()`.
+- `ChatProvider.php` — the interface: `stream()`, `withToolResults()` (which also inlines
+  attachments), and `supportsAttachment()`.
 - `AnthropicChatProvider.php` — Claude, Messages API.
 - `OpenAiChatProvider.php` — OpenAI, Chat Completions.
 - `ChatProviderFactory.php` — builds one from a **resolved credential** (contrast `AiManager`, which
@@ -87,7 +88,8 @@ repo-relative; line numbers drift — search the symbol if it has moved.
   this existed.
 - `Tools/` — see [Guardrails](#guardrails):
   - Plumbing: `ToolContext.php`, `TalaTool.php`, `ToolOutcome.php`, `ToolRegistry.php`,
-    `ToolInput.php` (coerces the model's arguments).
+    `ToolInput.php` (coerces the model's arguments), `ToolMemory.php` (what the tools did this
+    turn — how one tool requires that another ran first).
   - Scopes: `AssignedSubjectScope.php` (subjects), `AssignedLessonScope.php` (lessons, inheriting the
     subject scope as a subquery), `AssignedAssessmentScope.php` (assessments, one join deeper —
     and the scope the **write** path re-resolves through).
@@ -95,7 +97,13 @@ repo-relative; line numbers drift — search the symbol if it has moved.
     `ListAssessmentsTool.php`, `GetAssessmentTool.php`.
   - `ProposeAssessmentTool.php` — the only tool that writes anything, and what it writes is a
     proposal. **Read its docblock before touching it.**
+  - `ReadLessonMaterialTool.php` — opens a lesson's uploaded images and PDFs. Costs real money
+    per call, which is why it is separate from `get_lesson`.
   - `LessonText.php` — HTML → plain text, and the block renderer that **drops signed media URLs**.
+- `Attachments/` — reading a lesson's uploaded files:
+  - `AttachmentReader.php` — fetches from R2 server-side, sniffs the real type, enforces the
+    budgets. **The content goes to the provider; the location never does.**
+  - `LessonAttachment.php`, `AttachmentBatch.php` — the bytes, and what was skipped and why.
 - `Assessments/` — everything behind the approval card:
   - `AssessmentTypes.php` — the allowlists, narrower than the schema on purpose, with the reason
     for each exclusion.
@@ -233,6 +241,98 @@ where `subject_id` in (
 Written as a subquery over `AssignedSubjectScope::query()` and not as a hand-rolled join, so there
 stays exactly one definition of "this teacher's subjects" in the codebase. Change the subject rule and
 lessons follow it without being edited.
+
+### Lesson attachments: the content leaves, the location does not
+
+Tala can read the images and PDFs a teacher uploaded to a lesson, so it can build an assessment from
+a scanned handout rather than from its filename.
+
+The property to preserve: **attachment bytes are sent to the provider; attachment URLs are not.**
+Lesson files live in a private R2 bucket behind signed links, and handing a model the URL would put a
+working credential for student-visible material into Anthropic's or OpenAI's logs. `AttachmentReader`
+fetches server-side and inlines the bytes. Verified by asserting that neither the base64 nor the
+`probe/` object key appears in the JSON the model reads.
+
+Three checks, cheapest first, because each costs more than the last:
+
+1. **Worth fetching?** Extension and the recorded MIME — no point pulling an 80 MB video out of R2
+   to discover nobody can read it.
+2. **Is it what it claims?** The block's `mime` came from the browser at upload time. The fetched
+   bytes are sniffed with `finfo` and **the sniffed type wins.** A file named `.pdf` that is really a
+   PNG is sent as an image, not mislabelled as a document. (Tested.)
+3. **Does it fit?** Per-file and per-turn byte budgets, a file count, and an image edge limit — all
+   in `config/tala.php` under `attachments`.
+
+**Oversized images are refused, not downscaled.** There is no GD and no Imagick on these servers, so
+there is nothing to resize with. The skip reason tells the teacher to re-save it smaller, which is
+better than a request that fails at the provider.
+
+**Skips are data, not log lines.** `AttachmentBatch::$skipped` carries a reason per file into the
+tool result, and the prompt tells the model to repeat them. A teacher whose handout was too large
+needs to hear that — otherwise the answer quietly omits the material the question was about.
+
+**Cost.** An attachment is the most expensive thing a turn can hold: a PDF page runs roughly a page
+of text plus an image of the page. Two things bound it. It is a **separate tool** rather than part of
+`get_lesson`, so "what's in my lesson" does not silently pay for every file in it. And attachments
+are **never replayed** — `historyForModel()` replays only user and assistant text, so a file is paid
+for once, on the turn that asked. Within that turn it persists across tool rounds, which is necessary
+and capped by `MAX_TOOL_ROUNDS`.
+
+**Per-provider capability.** `ChatProvider::supportsAttachment()` is asked once per turn and the
+answer rides on `ToolContext::$attachmentTypes`. Claude reads images and PDFs. OpenAI is **images
+only** here: its models take images through `image_url` parts, which is settled, but PDFs are a
+different content part whose support varies by model and endpoint and could not be verified against a
+real key — so a PDF is reported as unreadable rather than risking a request that 400s mid-answer.
+`OpenAiChatProvider::supportsAttachment()` says exactly what to change to widen it.
+
+Wire shapes, both verified by asserting the built message:
+
+```
+Anthropic — one user turn, tool_result first (the API requires that):
+  [0] tool_result   [1] text  [2] image {source:{type:base64,media_type,data}}
+                    [3] text  [4] document {source:{type:base64,media_type:application/pdf,data}}
+
+OpenAI — a tool message takes a string, so files follow as a user turn:
+  [0] assistant(tool_calls)  [1] tool  [2] user[text, image_url(data:…;base64,…)]
+```
+
+Attachments are **not** put inside a `tool_result` block: what that supports varies, whereas an image
+or document block in an ordinary user turn is the plainest thing either API does.
+
+**What cannot be read at all:** PowerPoint, Word, Excel, audio, video. The prompt tells Tala to say so
+and ask the teacher to describe the content or upload a PDF — never to describe a file from its name.
+Office formats are the obvious next step (a `.pptx` is a ZIP of XML; slide text extracts with
+`ZipArchive` + `DOMDocument` and no new dependency), and `ext-zip` is **not enabled** in the XAMPP dev
+PHP — `php_zip.dll` exists but `extension=zip` is commented out.
+
+### An assessment "from a lesson" comes from the lesson
+
+`propose_assessment` takes `based_on_lesson`. When it is set, the tool **refuses** unless that
+lesson's readable uploads were opened with `read_lesson_material` **in the same turn**.
+
+Two things force that shape rather than something simpler:
+
+- **A tool cannot fetch its own inputs.** By the time `propose_assessment` runs, the model has
+  already written the questions. It cannot read the handout and *then* author from it inside one
+  call, so the check is necessarily after the fact and blocking: read the files, propose again.
+- **Same turn, not same conversation.** Attachments are never replayed (see
+  [attachments](#lesson-attachments-the-content-leaves-the-location-does-not)), so on a later turn
+  the model no longer sees the handout — only its own earlier summary of it. Questions written from
+  that are questions written from a paraphrase, which is the failure this module already had once.
+
+The gate lives on `ToolMemory`, a small mutable object on `ToolContext` recording what the tools did
+this turn. It is the mechanism for "one tool requires another ran first"; nothing in it is persisted.
+
+It does **not** fire when there is nothing to read — a text-only lesson, or a school on a model that
+cannot read files at all. Blocking there would be a dead end rather than a safeguard.
+
+Provenance is recorded on the proposal and shown on the card as **From lesson** and **Read from**, so
+a teacher checking a quiz can see which lesson it came from and which of its files were actually
+opened.
+
+Verified: unread upload refuses and creates no proposal; read-then-propose succeeds and records both
+filenames; a fresh turn refuses again; text-only lesson proceeds; a lesson that is not theirs refuses;
+omitting `based_on_lesson` is unaffected.
 
 ### The write path: nothing the model says changes anything
 
@@ -450,6 +550,21 @@ Assessments, including the write path:
 | `grading_period: "9"` | Rejected against the year's period count |
 | Update that keeps 1 of 3 questions | 1 row kept with its id, 2 soft-deleted; answer history preserved |
 | Editor images in a question prompt | Reported as a count; no signed URL sent to the provider |
+
+Lesson attachments:
+
+| Attempt | Result |
+|---|---|
+| Read a lesson's files on Anthropic | Image + PDF loaded, `.pptx` skipped with a reason |
+| Same lesson on OpenAI | Image loaded, **PDF skipped** — "this school's model cannot read PDFs" |
+| Model that reads no files | Filenames reported, nothing fetched, teacher told to describe it |
+| base64 or the R2 object key in the model-facing tool JSON | **Neither** — only in the message blocks |
+| File named `.pdf` that is really a PNG | Sniffed and sent as an **image**; the recorded MIME loses |
+| File missing from the bucket | Skipped, "could not be downloaded"; turn continues |
+| File block with no filename | Ignored silently — a broken upload, nothing to say about it |
+| Another teacher reading the same lesson's files | No lesson matched, 0 attachments |
+| Per-file cap, total cap, file count, image edge | All enforced, each with its own skip reason |
+| Lesson with no uploads | Says so, tells the model not to describe material that isn't there |
 
 ### Other limits in the same layer
 
@@ -690,18 +805,35 @@ shape each translates (Anthropic `tools[]`, OpenAI `tools[].function`).
 - **`max_tokens` covers thinking and the reply together.**
 - **Provider errors are never thrown**, they come back as a failed `ChatResult`. Raw error bodies are
   logged, not shown — they can carry organisation and key detail.
+- **Attachments ride on `ToolOutcome::$meta`, not the tool result.** `meta` never reaches the
+  provider as text, which is what keeps megabytes of base64 out of both the model's JSON and the
+  `tala_messages` audit row. Add a new attachment-producing tool the same way.
+- **A new `ChatProvider` must answer `supportsAttachment()` honestly.** Returning true for a type the
+  model cannot read turns a readable lesson into a failed turn; returning false loses capability but
+  degrades to an explanation. Prefer false when unverified.
 
 ---
 
 ## Not yet wired
 
-- **Six tools.** Five read (`list_assigned_subjects`, `list_lessons`, `get_lesson`,
-  `list_assessments`, `get_assessment`) and one that proposes (`propose_assessment`). No class
+- **Seven tools.** Six read (`list_assigned_subjects`, `list_lessons`, `get_lesson`,
+  `read_lesson_material`, `list_assessments`, `get_assessment`) and one that proposes
+  (`propose_assessment`). No class
   records, no attendance, no grades, and not the AI planner's `lesson_plans` /
   `subject_quarter_plans` — a teacher asking "what's my Term 1 schedule" gets lessons, not the
   generated day-by-day plan.
 - **Lessons are read-only.** Tala can draft an assessment but not a lesson. Same pattern would
   work; nobody has asked for it.
+- **Office formats, audio and video in lesson uploads cannot be read.** `.pptx`/`.docx`/`.xlsx` are
+  ZIPs of XML and would extract with `ZipArchive` + `DOMDocument` — no new dependency — which is the
+  obvious next step. Legacy binary `.doc`/`.ppt`/`.xls` would need a real library. Audio and video,
+  nothing.
+- **No extracted-text cache.** Every `read_lesson_material` call re-fetches from R2 and re-sends the
+  bytes. Bounded by the caps and by attachments not being replayed across turns, but a teacher asking
+  five questions about the same handout pays for it five times.
+- **OpenAI cannot read PDFs through Tala** — see
+  [attachments](#lesson-attachments-the-content-leaves-the-location-does-not). A school on an OpenAI
+  key gets images only.
 - **Question types Tala can author are five of the ten the schema allows** — see
   `AssessmentTypes`. `fill_in_the_blanks` is excluded because `num_blanks` is missing from
   `SubjectEcrItemController`'s validation rules and is therefore stripped before storage, so **every
