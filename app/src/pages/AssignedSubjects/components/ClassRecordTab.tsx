@@ -111,15 +111,26 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
     }
   }, [studentsError, gradesError]);
 
-  // A subject can carry running grades from more than one school year. Rows are
-  // keyed by grading period further down, so leaving another year's row in the
-  // list lets it shadow this year's — showing a grade the class never earned.
-  const runningGradesForYear = (runningGradesData?.data ?? []).filter(
-    (grade: any) => !effectiveAcademicYear || grade.academic_year === effectiveAcademicYear
+  // A subject can carry running grades from more than one school year, and rows
+  // are keyed by grading period below — the last one wins. Ordering the section's
+  // own year last lets it win, while a period it has no row for still shows the
+  // grade there is rather than going blank.
+  const orderedRunningGrades = [...(runningGradesData?.data ?? [])].sort(
+    (a: any, b: any) =>
+      Number(a.academic_year === effectiveAcademicYear) - Number(b.academic_year === effectiveAcademicYear)
+  );
+
+  // The row each grading period actually shows, which is what the counts below
+  // should be about.
+  const visibleGrades: any[] = Object.values(
+    orderedRunningGrades.reduce((acc: any, grade: any) => {
+      acc[`${grade.student_id}|${grade.quarter}`] = grade;
+      return acc;
+    }, {})
   );
 
   // Group running grades by student
-  const gradesByStudent = runningGradesForYear.reduce((acc: any, grade: any) => {
+  const gradesByStudent = orderedRunningGrades.reduce((acc: any, grade: any) => {
     if (!acc[grade.student_id]) {
       acc[grade.student_id] = [];
     }
@@ -129,8 +140,8 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
 
   // Calculate statistics
   const totalStudents = filteredStudents.length;
-  const totalGrades = runningGradesForYear.length;
-  const gradesWithFinalGrade = runningGradesForYear.filter((grade: any) => grade.final_grade !== null).length;
+  const totalGrades = visibleGrades.length;
+  const gradesWithFinalGrade = visibleGrades.filter((grade: any) => grade.final_grade !== null).length;
   const completionRate = totalGrades > 0 ? Math.round((gradesWithFinalGrade / totalGrades) * 100) : 0;
 
   // Gender distribution
