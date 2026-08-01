@@ -22,6 +22,10 @@ class ToolRegistry
         $this->register(new ListAssignedSubjectsTool);
         $this->register(new ListLessonsTool);
         $this->register(new GetLessonTool);
+        $this->register(new ListAssessmentsTool);
+        $this->register(new GetAssessmentTool);
+        // Writes a proposal, never an assessment. See the class docblock.
+        $this->register(new ProposeAssessmentTool);
     }
 
     public function register(TalaTool $tool): void

@@ -365,6 +365,20 @@ Route::middleware('auth.token')->group(function () {
     Route::patch('tala/conversations/{id}', [App\Http\Controllers\TalaConversationController::class, 'update'])->middleware('module:tala,manage');
     Route::delete('tala/conversations/{id}', [App\Http\Controllers\TalaConversationController::class, 'destroy'])->middleware('module:tala,manage');
     Route::post('tala/conversations/{id}/messages', [App\Http\Controllers\TalaChatController::class, 'send'])->middleware('module:tala,manage');
+
+    /*
+     * Assessment suggestions Tala has drafted.
+     *
+     * `apply` is Tala's only write path into the gradebook, and it carries a
+     * second gate on purpose: `subjects,manage` is what the Assessments screen
+     * requires, so the assistant can never let a teacher change something they
+     * could not change by hand. The model cannot reach any of this — it writes a
+     * proposal row and the teacher clicks.
+     */
+    Route::get('tala/conversations/{conversationId}/proposals', [App\Http\Controllers\TalaProposalController::class, 'index'])->middleware('module:tala,view');
+    Route::get('tala/proposals/{id}', [App\Http\Controllers\TalaProposalController::class, 'show'])->middleware('module:tala,view');
+    Route::post('tala/proposals/{id}/apply', [App\Http\Controllers\TalaProposalController::class, 'apply'])->middleware(['module:tala,manage', 'module:subjects,manage']);
+    Route::post('tala/proposals/{id}/discard', [App\Http\Controllers\TalaProposalController::class, 'discard'])->middleware('module:tala,manage');
     // SubjectEcr routes
     Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class)->middleware('module:subjects,view');
     Route::post('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'uploadImage'])->middleware('module:subjects,manage');

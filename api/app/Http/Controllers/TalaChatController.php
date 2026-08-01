@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
+use App\Models\TalaAssessmentProposal;
 use App\Models\TalaConversation;
 use App\Models\TalaMessage;
 use App\Services\Ai\Chat\ChatProvider;
@@ -124,9 +125,26 @@ class TalaChatController extends Controller
         $system = $this->context->build($conversation->user, $conversation->institution_id);
         $history = $conversation->historyForModel();
 
-        $toolContext = new ToolContext($conversation->user, $conversation->institution_id);
+        $toolContext = new ToolContext(
+            $conversation->user,
+            $conversation->institution_id,
+            // Lets propose_assessment anchor an approval card to this thread.
+            $conversation->id,
+        );
 
-        $response = new StreamedResponse(function () use ($conversation, $credential, $system, $history, $userMessageId, $toolContext) {
+        /*
+         * Assessment proposals raised during this turn.
+         *
+         * Collected so they can be pointed at the assistant message once it
+         * exists: a proposal is written mid-stream, before there is a message
+         * row for the card to hang under, and without the backfill a reopened
+         * thread would not know where to draw it.
+         *
+         * @var array<int, string> $proposalIds
+         */
+        $proposalIds = [];
+
+        $response = new StreamedResponse(function () use ($conversation, $credential, $system, $history, $userMessageId, $toolContext, &$proposalIds) {
             /*
              * A long reply outlives PHP's default execution limit, and
              * ignore_user_abort keeps the script alive after the teacher closes
@@ -183,7 +201,7 @@ class TalaChatController extends Controller
                     break;
                 }
 
-                $messages = $this->runTools($conversation, $credential, $provider, $result, $messages, $toolContext);
+                $messages = $this->runTools($conversation, $credential, $provider, $result, $messages, $toolContext, $proposalIds);
             }
 
             /*
@@ -208,6 +226,14 @@ class TalaChatController extends Controller
             ]);
 
             $conversation->forceFill(['last_message_at' => now()])->save();
+
+            // Now that the assistant message exists, tie this turn's approval
+            // cards to it so they reappear in the right place on reload.
+            if ($proposalIds !== []) {
+                TalaAssessmentProposal::whereIn('id', $proposalIds)
+                    ->whereNull('message_id')
+                    ->update(['message_id' => $message->id]);
+            }
 
             if ($result->ok()) {
                 $this->touchCredential($credential);
@@ -254,6 +280,7 @@ class TalaChatController extends Controller
      * the replay window, so they cost nothing on later turns.
      *
      * @param  array<int, mixed>  $messages
+     * @param  array<int, string>  $proposalIds  Collected by reference; see send().
      * @return array<int, mixed>
      */
     private function runTools(
@@ -263,6 +290,7 @@ class TalaChatController extends Controller
         ChatResult $result,
         array $messages,
         ToolContext $toolContext,
+        array &$proposalIds,
     ): array {
         $payloads = [];
         $errors = [];
@@ -280,6 +308,26 @@ class TalaChatController extends Controller
                 'status' => $outcome->isError ? 'failed' : 'done',
                 'summary' => $outcome->summary,
             ]);
+
+            /*
+             * A tool that drafted a change to an assessment produced something
+             * the teacher has to act on. The card is pushed now rather than
+             * after the turn so it is on screen while the model is still
+             * explaining what it suggested.
+             *
+             * `meta` is not part of the tool result the provider sees — only the
+             * client gets this.
+             */
+            $proposalId = $outcome->meta['proposal_id'] ?? null;
+
+            if (is_string($proposalId)) {
+                $proposalIds[] = $proposalId;
+                $proposal = TalaAssessmentProposal::find($proposalId);
+
+                if ($proposal) {
+                    $this->emit('proposal', $proposal->toCard());
+                }
+            }
 
             $this->record($conversation, $credential, TalaMessage::ROLE_TOOL, [
                 'content' => json_encode([

@@ -10,19 +10,26 @@ class ToolOutcome
     /**
      * @param  array<string, mixed>  $data  Handed to the model as JSON.
      * @param  string  $summary  One line for the chat UI and the audit row.
+     * @param  array<string, mixed>  $meta  For the controller, not the model. A
+     *                                      tool that produces something the UI
+     *                                      must render — an approval card, say —
+     *                                      names it here; nothing in `meta` is
+     *                                      sent to the provider.
      */
     public function __construct(
         public readonly array $data,
         public readonly string $summary,
         public readonly bool $isError = false,
+        public readonly array $meta = [],
     ) {}
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $meta
      */
-    public static function ok(array $data, string $summary): self
+    public static function ok(array $data, string $summary, array $meta = []): self
     {
-        return new self($data, $summary);
+        return new self($data, $summary, false, $meta);
     }
 
     /**

@@ -4,9 +4,13 @@
 > Use the [file map](#file-map) to jump straight to whatever a new feature touches.
 > **Before adding a tool, read [Guardrails](#guardrails) in full.** Tala is the one module where
 > a mistake hands an assistant — and through it, whatever a teacher typed into a chat box — access
-> to somebody else's data.
+> to somebody else's data. Since the assessment tools landed it is also the one module where a
+> mistake could *change* a gradebook, which is why
+> [the write path](#the-write-path-nothing-the-model-says-changes-anything) is built the way it is.
 
 Location in nav: **My Work → Tala** (`/tala`).
+Applying an assessment suggestion additionally requires **`subjects.manage`** — see
+[the write path](#the-write-path-nothing-the-model-says-changes-anything).
 Module key: `tala`. Shipped to `subject-teacher` only; `institution-administrator` and `principal`
 also hold `tala.configure`.
 Everything is **institution-scoped**, resolved from the authenticated user — never from the request
@@ -85,14 +89,30 @@ repo-relative; line numbers drift — search the symbol if it has moved.
   - Plumbing: `ToolContext.php`, `TalaTool.php`, `ToolOutcome.php`, `ToolRegistry.php`,
     `ToolInput.php` (coerces the model's arguments).
   - Scopes: `AssignedSubjectScope.php` (subjects), `AssignedLessonScope.php` (lessons, inheriting the
-    subject scope as a subquery).
-  - Tools: `ListAssignedSubjectsTool.php`, `ListLessonsTool.php`, `GetLessonTool.php`.
+    subject scope as a subquery), `AssignedAssessmentScope.php` (assessments, one join deeper —
+    and the scope the **write** path re-resolves through).
+  - Read tools: `ListAssignedSubjectsTool.php`, `ListLessonsTool.php`, `GetLessonTool.php`,
+    `ListAssessmentsTool.php`, `GetAssessmentTool.php`.
+  - `ProposeAssessmentTool.php` — the only tool that writes anything, and what it writes is a
+    proposal. **Read its docblock before touching it.**
   - `LessonText.php` — HTML → plain text, and the block renderer that **drops signed media URLs**.
+- `Assessments/` — everything behind the approval card:
+  - `AssessmentTypes.php` — the allowlists, narrower than the schema on purpose, with the reason
+    for each exclusion.
+  - `AssessmentSpec.php` — validates the model's questions and **converts answer keys to the
+    letters the student UI actually submits**. The single most load-bearing conversion in the
+    module; its docblock explains what breaks without it.
+  - `AssessmentPresenter.php` — reads a stored assessment back out, keys rendered as readable
+    text, editor images reported as a count rather than a signed URL.
+  - `ProposalApplier.php` — the one place a proposal becomes a real change. Re-checks scope,
+    refuses stale proposals, single-use.
 
 **Backend — HTTP (`api/`)**
 - `app/Http/Controllers/TalaCredentialController.php` — config + both key scopes.
 - `app/Http/Controllers/TalaConversationController.php` — thread CRUD.
 - `app/Http/Controllers/TalaChatController.php` — the SSE endpoint and the tool loop.
+- `app/Http/Controllers/TalaProposalController.php` — **the write path.** Apply/discard an
+  assessment suggestion. Double-gated: `tala,manage` + `subjects,manage`.
 - `app/Http/Controllers/Concerns/AuthorizesModuleAccess.php` — `resolveStaff()` was added here for
   these controllers.
 - `routes/api.php` — the `tala/*` block, directly after the `ai/*` planner routes.
@@ -214,6 +234,75 @@ Written as a subquery over `AssignedSubjectScope::query()` and not as a hand-rol
 stays exactly one definition of "this teacher's subjects" in the codebase. Change the subject rule and
 lessons follow it without being edited.
 
+### The write path: nothing the model says changes anything
+
+Tala has create, update, delete, publish and unpublish access to a teacher's assessments. It has no
+write access to the database. Both of those are true at once, and the gap between them is the
+design.
+
+```
+model turn                          teacher's browser
+──────────                          ─────────────────
+propose_assessment ──> tala_assessment_proposals (a row describing an intent)
+                                      │
+                                      ▼
+                              approval card renders
+                                      │
+                            teacher clicks "Create draft"
+                                      │
+                                      ▼
+                       POST tala/proposals/{id}/apply
+                       (tala,manage + subjects,manage)
+                                      │
+                                      ▼
+                              ProposalApplier ──> subject_ecr_items
+```
+
+`ProposeAssessmentTool` validates a change and writes a **proposal**. `ProposalApplier` is the only
+code that touches `subject_ecr_items`, and the only caller is `TalaProposalController::apply()` — an
+ordinary authenticated POST. There is no path from a streamed turn to a gradebook write, so a model
+that misreads "no, not that one" as approval leaves an un-clicked card and nothing else.
+
+That is what makes full CRUD defensible rather than reckless: **the model's judgement decides what to
+suggest, and a teacher's click decides what happens.**
+
+Five things hold it up, in the order they would be tested:
+
+1. **Two permissions, not one.** `apply` requires `subjects,manage` on top of `tala,manage`.
+   `subjects,manage` is what the Assessments screen sits behind, so Tala can never be a route around
+   a permission the teacher does not already have. `subject-teacher` holds it; the route was checked
+   against `SystemRolePermissions` rather than assumed.
+2. **Ownership, twice.** The controller scopes every proposal query to `user_id`, so one teacher
+   cannot see or apply another's card even holding both abilities. Then the applier re-resolves the
+   target through `AssignedAssessmentScope`, so a teacher who has since lost the subject cannot apply
+   an old card either.
+3. **A staleness guard.** The proposal stores the target's status, submission count and question
+   count at draft time. If any has moved by the time the button is pressed, the apply is **refused** —
+   approving "replace these questions" is a different decision once a class has answered them. The
+   teacher is told what changed and asks Tala again.
+4. **Single use.** `claim()` flips `pending → applied` with a conditional `UPDATE` inside the
+   transaction. A second concurrent apply matches zero rows and is rejected, so a double-click cannot
+   create two assessments.
+5. **Draft is not negotiable.** `subject_ecr_items.status` **defaults to `published`**. A create
+   payload sets `draft` explicitly, `status` is not in the tool schema at all, and the applier
+   hard-codes it again rather than reading it from the payload. Three places, because forgetting any
+   one of them ships a quiz to a class the moment a card is approved.
+
+**Warnings are computed server-side, not written by the model.** A published target, existing
+submissions, questions being replaced, an empty assessment being published — each produces a
+`notice`/`warning`/`danger` entry the card renders and the prompt tells the model to repeat in
+words. The teacher who chose to allow edits to published work sees exactly what that costs before
+clicking, per question rather than as a net count: a "one question shorter" edit that also rewords
+four others discards the answers to five, and a net count hides that completely.
+
+**Question ids are carried forward server-side.** `AssessmentV2Service::syncQuestions()` reuses a row
+when the payload has its id and creates a new one otherwise. The model never sees ids — so without
+help, every question in an update would look new, all rows would be replaced, and every student
+answer (keyed by question id) would stop matching anything live, *including answers to questions
+nobody touched*. `ProposeAssessmentTool::carryIds()` matches retained questions by prompt text and
+attaches their ids. This was caught by a test asserting the soft-deleted row count, not by reading
+the code.
+
 ### Three deliberate omissions
 
 1. **No ids in the tool schemas.** `list_assigned_subjects` takes `search`, `class_section`,
@@ -228,9 +317,12 @@ lessons follow it without being edited.
    the teacher it is talking to, so a principal who also teaches sees their own load and nothing more.
    **If institution-wide visibility is ever wanted, it must be its own tool, described as such, gated
    on its own permission** — not a branch inside this one.
-3. **Read-only, with no write path planned.** Stated on the `TalaTool` interface, not merely implied
-   by the one implementation. An assistant that can change grades or attendance is a different
-   product with a different approval story.
+3. **No tool changes school data directly.** Stated on the `TalaTool` interface. Every tool is
+   read-only against the records it touches; `propose_assessment` writes a row, but the row is a
+   proposal. A tool that mutates a subject, lesson, assessment, grade or attendance record *without a
+   teacher's click between the model's decision and the write* does not belong in this layer — and
+   grades and attendance are not proposable either, because a wrong grade a teacher waved through is
+   a different kind of harm from a wrong quiz question.
 
 ### Their records versus your knowledge
 
@@ -337,6 +429,28 @@ Lessons:
 | Signed media URL / R2 object path in a lesson body | Never sent to the provider |
 | Declared tool names matched against `/web\|fetch\|browse\|url/` | No match — the no-internet claim holds |
 
+Assessments, including the write path:
+
+| Attempt | Result |
+|---|---|
+| `propose_assessment` create, then count rows before approval | 0 created — nothing exists until the click |
+| Apply as a different teacher | Refused; 0 rows created |
+| Apply the same proposal twice | Second refused; exactly 1 assessment exists |
+| Submission arrives between proposal and click | **Apply refused** with the counts, item untouched |
+| Applied create | `status=draft`, `content_version=2`, `academic_year` set, `score` = sum of points |
+| `status: "published"` smuggled into the tool input | Ignored — payload is `draft` |
+| Perfect student paper on a Tala-written quiz | Full objective marks (verified through `AssessmentScoringService`) |
+| Wrong paper | 0 |
+| Two choices sharing a first letter (`Melting`/`Mixing`) | Marks correctly — keys are letters, not text |
+| Answer not among the choices | Rejected, nothing stored |
+| `single_choice` with two answers, or every choice marked correct | Rejected |
+| Unsupported question type (`drag_picture`) or assessment type (`other`) | Rejected |
+| Create for a subject the teacher is not assigned to | Rejected |
+| Subject with several grading components, none named | Rejected, asks the teacher which |
+| `grading_period: "9"` | Rejected against the year's period count |
+| Update that keeps 1 of 3 questions | 1 row kept with its id, 2 soft-deleted; answer history preserved |
+| Editor images in a question prompt | Reported as a count; no signed URL sent to the provider |
+
 ### Other limits in the same layer
 
 - **`ToolRegistry` never throws.** An unknown tool name (models hallucinate them) or a tool that
@@ -387,6 +501,18 @@ read time: a school can change its key tomorrow and an old thread should still s
 query never joins back), `role` (`user` | `assistant` | `tool`), `content`, `provider`, `model`,
 `credential_source`, `tokens_in`, `tokens_out`, `stop_reason`, `error_message`.
 
+**`tala_assessment_proposals`** — a change to an assessment that nobody has approved.
+`institution_id`, `user_id` (the only person who can see or apply it), `conversation_id`,
+`message_id` (backfilled after the turn), `action`, resolved `subject_id` / `subject_ecr_id` /
+`subject_ecr_item_id`, `payload` (storage-shaped, includes the staleness `guard`), `preview` (the
+same content shaped for a human), `warnings`, `summary`, `status`
+(`pending` | `applied` | `discarded` | `failed`), `applied_item_id`, `applied_at`, `discarded_at`,
+`failure_reason`.
+
+`payload` is `$hidden` on the model: it is the applier's input and has no business in a chat
+response. The card reads `preview`, which is the same change with answer keys rendered back to
+readable choice text.
+
 Two ordering facts worth knowing:
 
 - **`created_at` is second-resolution**, and a question and its answer are routinely written inside
@@ -416,6 +542,14 @@ All under `auth.token`. Institution resolved by `resolveRequestedInstitution()`.
 | `PATCH` | `tala/conversations/{id}` | `tala.manage` |
 | `DELETE` | `tala/conversations/{id}` | `tala.manage` |
 | `POST` | `tala/conversations/{id}/messages` | `tala.manage` |
+| `GET` | `tala/conversations/{id}/proposals` | `tala.view` |
+| `GET` | `tala/proposals/{id}` | `tala.view` |
+| `POST` | `tala/proposals/{id}/apply` | `tala.manage` **+ `subjects.manage`** |
+| `POST` | `tala/proposals/{id}/discard` | `tala.manage` |
+
+`apply` answers **409** with a teacher-readable message when the suggestion no longer fits the
+database — a submission arrived, someone else published it, it was already applied. The client shows
+that message rather than a generic failure, because the reason is the actionable part.
 
 ### The streaming endpoint
 
@@ -433,12 +567,19 @@ Events:
 event: start   data: {"user_message_id": "..."}
 event: tool    data: {"name":"list_lessons","status":"running"}
 event: tool    data: {"name":"list_lessons","status":"done","summary":"6 lessons"}
+event: proposal data: {"id":"...","action":"create","status":"pending","preview":{...},"warnings":[...]}
 event: delta   data: {"text":"..."}
 event: done    data: {"message_id":"...","tokens_in":2400,"tokens_out":75}
 event: error   data: {"message_id":"...","message":"..."}
 ```
 
 Payloads are JSON-encoded specifically so a reply containing newlines cannot break SSE framing.
+
+The `proposal` event comes from `ToolOutcome::$meta`, which the controller reads and the **provider
+never sees** — a tool that produces something the UI must render names it there rather than smuggling
+it through the tool result the model reads. Cards are pushed mid-turn so they are on screen while the
+model is still explaining what it suggested; `message_id` is backfilled once the assistant message
+exists, which is what lets a reopened thread draw the card in the right place.
 
 **Serving notes.** The controller sets `Cache-Control: no-cache, no-transform` (a proxy that gzips
 will buffer, and a buffered stream is just a slow request), `X-Accel-Buffering: no`, calls
@@ -466,6 +607,15 @@ cannot use `$generator->getReturn()`; the controller builds its own result in th
   teaching load and their lessons, and see that it read nothing else. Labels come from `TOOL_LABELS` in
   `Transcript.tsx`; a tool with no entry still renders under its wire name, because a missing chip
   would hide the lookup entirely.
+- **`ProposalCard` is the approval gate, not a summary.** Every question and every answer key is on
+  the card before the button, expanded by default up to ten questions. A teacher approving a quiz is
+  taking responsibility for all of it, so "you can see what you are approving" beats a tidy card.
+- **Cards are merged by id from two sources**: `streamedProposals` (from the SSE event, so the card
+  appears while the reply is still being written) and `useTalaProposals` (the server list, which knows
+  what has been applied). The server wins. Cards with a `message_id` render under that message; one
+  raised in the current turn has none yet and renders after the last entry.
+- **Applying invalidates the assessment caches too**, not just the proposal list — a teacher with the
+  Assessments screen open in another tab should not be reading a stale list.
 
 ---
 
@@ -505,6 +655,19 @@ converts back to UTC for the query — which is also why it is a range rather th
 10. Add a label to `TOOL_LABELS` in `Transcript.tsx`, so the teacher can see the lookup happen.
 11. Add the cross-teacher / cross-institution / injected-argument cases to the guardrail checks.
 
+**If the tool would change anything**, it does not write — it proposes, following
+`ProposeAssessmentTool` → `tala_assessment_proposals` → a card → an authenticated apply endpoint.
+Additionally:
+
+12. Gate the apply endpoint on the permission the equivalent screen requires, on top of
+    `tala,manage`. Tala must never be a way around a permission the teacher lacks.
+13. Re-resolve the target through its scope **inside the applier**, not just when proposing.
+14. Store a staleness guard and refuse an apply whose ground has shifted.
+15. Make the claim single-use with a conditional `UPDATE` inside the transaction.
+16. Compute the consequences server-side as `warnings`. Do not leave it to the model to notice that
+    something is destructive, and do not let a net count hide per-row damage.
+17. Check what the underlying write service does with ids — see `carryIds()` for the trap.
+
 Both providers pick the new tool up automatically — `ToolRegistry::definitions()` returns a neutral
 shape each translates (Anthropic `tools[]`, OpenAI `tools[].function`).
 
@@ -532,9 +695,23 @@ shape each translates (Anthropic `tools[]`, OpenAI `tools[].function`).
 
 ## Not yet wired
 
-- **Three read tools** (`list_assigned_subjects`, `list_lessons`, `get_lesson`). No assessments, class
-  records, attendance, or the AI planner's `lesson_plans` / `subject_quarter_plans` — a teacher asking
-  "what's my Term 1 schedule" gets lessons, not the generated day-by-day plan.
+- **Six tools.** Five read (`list_assigned_subjects`, `list_lessons`, `get_lesson`,
+  `list_assessments`, `get_assessment`) and one that proposes (`propose_assessment`). No class
+  records, no attendance, no grades, and not the AI planner's `lesson_plans` /
+  `subject_quarter_plans` — a teacher asking "what's my Term 1 schedule" gets lessons, not the
+  generated day-by-day plan.
+- **Lessons are read-only.** Tala can draft an assessment but not a lesson. Same pattern would
+  work; nobody has asked for it.
+- **Question types Tala can author are five of the ten the schema allows** — see
+  `AssessmentTypes`. `fill_in_the_blanks` is excluded because `num_blanks` is missing from
+  `SubjectEcrItemController`'s validation rules and is therefore stripped before storage, so **every
+  fill-in-the-blanks question written through the API renders a single blank regardless of its key.**
+  That is a bug in the existing write path, not in Tala; fixing it is what would unblock the type.
+- **Assessment settings are not proposable** — time limits, attempt caps, pass marks, due dates,
+  scheduling, `allow_late_submission`. The teacher sets those on the assessment itself.
+- **No proposal expiry or cleanup.** Rows in `tala_assessment_proposals` live as long as their
+  conversation. The staleness guard means an old card refuses to apply rather than doing something
+  surprising, so this is untidy rather than unsafe.
 - **No institution usage screen.** The data is on `tala_messages` (`credential_source`, token counts);
   nothing renders it yet.
 - **No retention policy.** Conversations persist until a teacher deletes them.

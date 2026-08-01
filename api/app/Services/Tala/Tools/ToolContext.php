@@ -22,6 +22,13 @@ class ToolContext
     public function __construct(
         public readonly User $user,
         public readonly string $institutionId,
+        /**
+         * The thread this is running in. Carried so a tool that records
+         * something durable — an assessment proposal — can anchor it to the
+         * conversation the teacher will approve it from. Nullable because the
+         * read tools neither need it nor should depend on it.
+         */
+        public readonly ?string $conversationId = null,
     ) {}
 
     public function userId(): string

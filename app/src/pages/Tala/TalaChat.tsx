@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, KeyRound, Loader2, Settings2, Sparkles } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import {
@@ -7,6 +7,8 @@ import {
   useTalaConversation,
   useTalaConversationMutations,
   useTalaConversations,
+  useTalaProposalMutations,
+  useTalaProposals,
 } from '../../hooks/useTala'
 import { Button } from '../../components/button'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
@@ -37,7 +39,37 @@ const TalaChat: React.FC = () => {
   const detail = useTalaConversation(activeId)
   const chat = useTalaChat(activeId)
 
+  const proposals = useTalaProposals(activeId)
+  const { apply, discard } = useTalaProposalMutations(activeId)
+  const [applyError, setApplyError] = useState<string | null>(null)
+
   const { syncFrom, reset } = chat
+
+  /*
+   * The server's list is the authority on status — it knows what has been
+   * applied — but a card raised during the current turn only exists in stream
+   * state until the turn settles. Merged by id, server wins.
+   */
+  const visibleProposals = useMemo(() => {
+    const merged = new Map<string, (typeof chat.streamedProposals)[number]>()
+    for (const proposal of chat.streamedProposals) merged.set(proposal.id, proposal)
+    for (const proposal of proposals.data ?? []) merged.set(proposal.id, proposal)
+    return Array.from(merged.values())
+  }, [chat.streamedProposals, proposals.data])
+
+  const handleApply = async (id: string) => {
+    setApplyError(null)
+    try {
+      await apply.mutateAsync(id)
+    } catch (error: any) {
+      // A 409 means the suggestion no longer matches the database — a student
+      // submitted, or it was applied elsewhere. The server writes that message
+      // for the teacher, so show it rather than a generic failure.
+      setApplyError(
+        error?.response?.data?.message ?? 'That could not be applied. Nothing was changed.'
+      )
+    }
+  }
 
   /*
    * The thread whose server copy has already been loaded into the transcript.
@@ -177,6 +209,14 @@ const TalaChat: React.FC = () => {
               tools={chat.tools}
               isStreaming={chat.isStreaming}
               teacherName={teacherName}
+              proposals={visibleProposals}
+              applyingId={apply.isPending ? (apply.variables ?? null) : null}
+              discardingId={discard.isPending ? (discard.variables ?? null) : null}
+              onApplyProposal={handleApply}
+              onDiscardProposal={id => {
+                setApplyError(null)
+                discard.mutate(id)
+              }}
             />
           ) : (
             <NoKeyState
@@ -185,6 +225,20 @@ const TalaChat: React.FC = () => {
             />
           )}
         </div>
+
+        {applyError && (
+          <div className="flex items-start gap-2 border-t border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 sm:px-6">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="flex-1">{applyError}</span>
+            <button
+              type="button"
+              onClick={() => setApplyError(null)}
+              className="shrink-0 font-medium underline underline-offset-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {chat.blockedReason && (
           <div className="flex items-start gap-2 border-t border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 sm:px-6">

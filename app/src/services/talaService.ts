@@ -93,6 +93,54 @@ export interface TalaConversationDetail {
   messages: TalaMessage[]
 }
 
+export type TalaProposalAction = 'create' | 'update' | 'delete' | 'publish' | 'unpublish'
+
+export type TalaProposalStatus = 'pending' | 'applied' | 'discarded' | 'failed'
+
+export interface TalaProposalWarning {
+  level: 'notice' | 'warning' | 'danger'
+  message: string
+}
+
+export interface TalaProposalQuestion {
+  number: number
+  type: string
+  question: string
+  choices?: string[]
+  answer?: string
+  points?: number
+  images?: number
+}
+
+/**
+ * A change to an assessment that Tala has drafted and nobody has approved.
+ *
+ * The model cannot write to the gradebook. It produces one of these, the card
+ * below renders it, and `applyProposal` — an ordinary authenticated request —
+ * is what actually changes anything.
+ */
+export interface TalaProposal {
+  id: string
+  message_id: string | null
+  action: TalaProposalAction
+  status: TalaProposalStatus
+  title: string | null
+  assessment_type: string | null
+  quarter: string | null
+  summary: string | null
+  preview: {
+    action?: TalaProposalAction
+    assessment?: Record<string, string | number | null>
+    questions?: TalaProposalQuestion[]
+    replaces?: TalaProposalQuestion[]
+    changes?: Record<string, { from?: string | number | null; to?: string | number | null }>
+  }
+  warnings: TalaProposalWarning[]
+  applied_item_id: string | null
+  failure_reason: string | null
+  created_at: string | null
+}
+
 /**
  * A failure that happened before the model was reached — no key configured,
  * monthly allowance spent, message too long. These answer with JSON and a
@@ -120,6 +168,8 @@ export interface StreamHandlers {
   onDelta: (text: string) => void
   /** A lookup Tala ran on the teacher's behalf, so the UI can say what it is doing. */
   onTool?: (event: { name: string; status: 'running' | 'done' | 'failed'; summary?: string }) => void
+  /** Tala drafted a change to an assessment and is waiting for approval. */
+  onProposal?: (proposal: TalaProposal) => void
   onDone?: (event: { message_id: string; tokens_in: number | null; tokens_out: number | null }) => void
   /** The model was reached but the turn failed part-way. */
   onError?: (event: { message_id?: string; message: string }) => void
@@ -185,6 +235,34 @@ export const talaService = {
 
   async deleteConversation(id: string): Promise<void> {
     await api.delete(`/tala/conversations/${id}`)
+  },
+
+  async listProposals(conversationId: string): Promise<TalaProposal[]> {
+    const res = await api.get<ApiResponse<TalaProposal[]>>(
+      `/tala/conversations/${conversationId}/proposals`
+    )
+    return res.data.data
+  },
+
+  /**
+   * Apply a suggestion. This is the request that changes the gradebook —
+   * nothing the model does gets here on its own.
+   *
+   * A 409 means the suggestion no longer fits what is in the database (a student
+   * submitted, someone else published it, it was already applied). The message
+   * is written for the teacher, so it is surfaced rather than swallowed.
+   */
+  async applyProposal(id: string): Promise<{ proposal: TalaProposal; message: string }> {
+    const res = await api.post<ApiResponse<{ proposal: TalaProposal }> & { message: string }>(
+      `/tala/proposals/${id}/apply`,
+      {}
+    )
+    return { proposal: res.data.data.proposal, message: res.data.message }
+  },
+
+  async discardProposal(id: string): Promise<TalaProposal> {
+    const res = await api.post<ApiResponse<TalaProposal>>(`/tala/proposals/${id}/discard`, {})
+    return res.data.data
   },
 
   /**
@@ -286,6 +364,9 @@ function dispatchFrame(frame: string, handlers: StreamHandlers): void {
       break
     case 'tool':
       handlers.onTool?.(payload)
+      break
+    case 'proposal':
+      if (typeof payload.id === 'string') handlers.onProposal?.(payload as TalaProposal)
       break
     case 'done':
       handlers.onDone?.(payload)

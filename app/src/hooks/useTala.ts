@@ -5,12 +5,14 @@ import {
   TalaRequestError,
   type TalaConversationSummary,
   type TalaMessage,
+  type TalaProposal,
   type TalaProviderKey,
 } from '../services/talaService'
 
 const CONFIG_KEY = ['tala', 'config']
 const CONVERSATIONS_KEY = ['tala', 'conversations']
 const conversationKey = (id: string) => ['tala', 'conversation', id]
+const proposalsKey = (id: string) => ['tala', 'proposals', id]
 
 /**
  * Whose key is answering, which models are on offer, and how much of the
@@ -59,6 +61,53 @@ export function useTalaConversationMutations() {
     remove: useMutation({
       mutationFn: (id: string) => talaService.deleteConversation(id),
       onSuccess: invalidate,
+    }),
+  }
+}
+
+/**
+ * Assessment suggestions in a thread.
+ *
+ * Fetched rather than kept only in stream state, so reopening a chat still shows
+ * a card the teacher left un-approved — the suggestion outlives the turn that
+ * produced it.
+ */
+export function useTalaProposals(conversationId: string | null) {
+  return useQuery({
+    queryKey: proposalsKey(conversationId ?? 'none'),
+    queryFn: () => talaService.listProposals(conversationId as string),
+    enabled: Boolean(conversationId),
+    refetchOnWindowFocus: false,
+  })
+}
+
+/**
+ * Approving or discarding a suggestion.
+ *
+ * `apply` is the only path in the client that changes an assessment. It
+ * invalidates the assessment caches as well as the proposal list, because a
+ * teacher who has the Assessments screen open in another tab should not be
+ * looking at a stale list.
+ */
+export function useTalaProposalMutations(conversationId: string | null) {
+  const queryClient = useQueryClient()
+
+  const settle = () => {
+    if (conversationId) {
+      queryClient.invalidateQueries({ queryKey: proposalsKey(conversationId) })
+    }
+    queryClient.invalidateQueries({ queryKey: ['subjectEcrItems'] })
+    queryClient.invalidateQueries({ queryKey: ['assessmentMethods'] })
+  }
+
+  return {
+    apply: useMutation({
+      mutationFn: (id: string) => talaService.applyProposal(id),
+      onSettled: settle,
+    }),
+    discard: useMutation({
+      mutationFn: (id: string) => talaService.discardProposal(id),
+      onSettled: settle,
     }),
   }
 }
@@ -116,6 +165,14 @@ export function useTalaChat(conversationId: string | null) {
   const [tools, setTools] = useState<ToolActivity[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [blockedReason, setBlockedReason] = useState<TalaRequestError | null>(null)
+  /**
+   * Suggestions raised during this turn.
+   *
+   * Held locally so the card appears the moment Tala drafts it, while the reply
+   * is still being written. The server list from `useTalaProposals` is the
+   * authority once the turn settles.
+   */
+  const [streamedProposals, setStreamedProposals] = useState<TalaProposal[]>([])
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -135,6 +192,7 @@ export function useTalaChat(conversationId: string | null) {
     )
     setTools([])
     setBlockedReason(null)
+    setStreamedProposals([])
   }, [])
 
   const reset = useCallback(() => {
@@ -144,6 +202,7 @@ export function useTalaChat(conversationId: string | null) {
     setTools([])
     setIsStreaming(false)
     setBlockedReason(null)
+    setStreamedProposals([])
   }, [])
 
   const stop = useCallback(() => {
@@ -168,6 +227,7 @@ export function useTalaChat(conversationId: string | null) {
 
       setBlockedReason(null)
       setTools([])
+      setStreamedProposals([])
       setEntries(current => [
         ...current,
         { id: `${draftId}-user`, role: 'user', content: text },
@@ -198,6 +258,15 @@ export function useTalaChat(conversationId: string | null) {
 
                 const next = [...current]
                 next[existing] = activity
+                return next
+              }),
+            onProposal: proposal =>
+              setStreamedProposals(current => {
+                const existing = current.findIndex(item => item.id === proposal.id)
+                if (existing === -1) return [...current, proposal]
+
+                const next = [...current]
+                next[existing] = proposal
                 return next
               }),
             onDone: () =>
@@ -241,12 +310,24 @@ export function useTalaChat(conversationId: string | null) {
         // The thread now has a title and a timestamp; the allowance moved.
         queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY })
         queryClient.invalidateQueries({ queryKey: CONFIG_KEY })
+        // Any card raised this turn is now anchored to a message server-side.
+        queryClient.invalidateQueries({ queryKey: proposalsKey(threadId) })
       }
     },
     [conversationId, isStreaming, queryClient]
   )
 
-  return { entries, tools, isStreaming, blockedReason, send, stop, reset, syncFrom }
+  return {
+    entries,
+    tools,
+    isStreaming,
+    blockedReason,
+    streamedProposals,
+    send,
+    stop,
+    reset,
+    syncFrom,
+  }
 }
 
 export type { TalaConversationSummary }

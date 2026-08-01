@@ -19,13 +19,17 @@ modules should consume its data.
   students** (server-forced `audience=students`, `scope=institution`).
 - [Tala](Tala/TALA.md) — AI teaching assistant. A streaming chat module (`/tala`) shipped to
   **subject teachers**, running on a key the tenant supplies — the school's key, or a teacher's own
-  as the fallback. Claude or OpenAI, model picked from an allowlist. Has three read-only **tools**
-  (`list_assigned_subjects`, `list_lessons`, `get_lesson`). **Read
-  [Guardrails](Tala/TALA.md#guardrails) before adding a tool** — scope comes from the authenticated
-  request, never from the model; the institution-wide widening that `getMySubjects()` grants principals
-  is deliberately not reproduced; and
+  as the fallback. Claude or OpenAI, model picked from an allowlist. Five read **tools**
+  (`list_assigned_subjects`, `list_lessons`, `get_lesson`, `list_assessments`, `get_assessment`) plus
+  `propose_assessment`, which drafts a quiz/assignment/exam for the teacher to approve — **the model
+  has no write access; an approval card and an authenticated endpoint do the writing**, and it needs
+  `subjects.manage` as well. **Read [Guardrails](Tala/TALA.md#guardrails) before adding a tool**:
+  scope comes from the authenticated request, never from the model; the institution-wide widening that
+  `getMySubjects()` grants principals is deliberately not reproduced;
   [Their records versus your knowledge](Tala/TALA.md#their-records-versus-your-knowledge) is why a
-  missing tool has to be built rather than left for the model to fill in.
+  missing tool has to be built rather than left for the model to fill in; and
+  [the write path](Tala/TALA.md#the-write-path-nothing-the-model-says-changes-anything) is the pattern
+  any future mutating tool must follow.
 - [Staff Schedules](HRIS/StaffSchedules/STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates
   (weekly hours + lunch + per-day grace period), assigned to staff (one per staff), plus an
   institution calendar of holidays & events. Consumed by Payroll for lateness/undertime/overtime.

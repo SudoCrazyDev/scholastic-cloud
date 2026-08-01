@@ -3,12 +3,18 @@
 namespace App\Services\Tala\Tools;
 
 /**
- * Something Tala can look up on the teacher's behalf.
+ * Something Tala can look up, or propose, on the teacher's behalf.
  *
- * Read-only by design. There is no write path in the tool layer and none is
- * planned for it — an assistant that can change grades or attendance is a
- * different product with a different approval story, and nothing about
- * answering questions needs it.
+ * Every tool is read-only against the records it touches. One of them —
+ * ProposeAssessmentTool — writes a row, but it writes a *proposal*: a description
+ * of a change to an assessment that only takes effect when the teacher approves
+ * it through TalaProposalController. No tool mutates a subject, a lesson, an
+ * assessment, a grade or an attendance record.
+ *
+ * That is the line to keep. A tool that changes school data directly, without a
+ * teacher's click between the model's decision and the write, does not belong
+ * here — see the Guardrails section of docs/modules/Tala/TALA.md before adding
+ * one.
  */
 interface TalaTool
 {

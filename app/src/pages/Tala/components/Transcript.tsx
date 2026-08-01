@@ -2,13 +2,20 @@ import React, { useEffect, useRef } from 'react'
 import clsx from 'clsx'
 import { AlertCircle, Search, Sparkles } from 'lucide-react'
 import { MarkdownLite } from './MarkdownLite'
+import { ProposalCard } from './ProposalCard'
 import type { ChatEntry, ToolActivity } from '../../../hooks/useTala'
+import type { TalaProposal } from '../../../services/talaService'
 
 interface TranscriptProps {
   entries: ChatEntry[]
   tools: ToolActivity[]
   isStreaming: boolean
   teacherName: string
+  proposals: TalaProposal[]
+  applyingId: string | null
+  discardingId: string | null
+  onApplyProposal: (id: string) => void
+  onDiscardProposal: (id: string) => void
 }
 
 const SUGGESTIONS = [
@@ -18,14 +25,54 @@ const SUGGESTIONS = [
   'Help me word a message to a parent about missing homework.',
 ]
 
-export const Transcript: React.FC<TranscriptProps> = ({ entries, tools, isStreaming, teacherName }) => {
+export const Transcript: React.FC<TranscriptProps> = ({
+  entries,
+  tools,
+  isStreaming,
+  teacherName,
+  proposals,
+  applyingId,
+  discardingId,
+  onApplyProposal,
+  onDiscardProposal,
+}) => {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   // Follow the reply as it streams. Every token moves the bottom, so this runs
   // on content length rather than on entry count alone.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [entries.length, entries[entries.length - 1]?.content, tools.length])
+  }, [entries.length, entries[entries.length - 1]?.content, tools.length, proposals.length])
+
+  /*
+   * Cards sit under the message that raised them, so an old thread reads in
+   * order. One raised during the current turn has no message id yet — the
+   * backfill happens server-side once the assistant message is written — so
+   * those render after the last entry instead of vanishing until reload.
+   */
+  const byMessage = new Map<string, TalaProposal[]>()
+  const unanchored: TalaProposal[] = []
+
+  for (const proposal of proposals) {
+    if (proposal.message_id) {
+      const existing = byMessage.get(proposal.message_id)
+      existing ? existing.push(proposal) : byMessage.set(proposal.message_id, [proposal])
+    } else {
+      unanchored.push(proposal)
+    }
+  }
+
+  const renderCards = (list: TalaProposal[]) =>
+    list.map(proposal => (
+      <ProposalCard
+        key={proposal.id}
+        proposal={proposal}
+        applying={applyingId === proposal.id}
+        discarding={discardingId === proposal.id}
+        onApply={onApplyProposal}
+        onDiscard={onDiscardProposal}
+      />
+    ))
 
   if (entries.length === 0) {
     return (
@@ -57,10 +104,15 @@ export const Transcript: React.FC<TranscriptProps> = ({ entries, tools, isStream
   return (
     <div className="space-y-4 px-4 py-6 sm:px-6">
       {entries.map(entry => (
-        <MessageRow key={entry.id} entry={entry} />
+        <React.Fragment key={entry.id}>
+          <MessageRow entry={entry} />
+          {renderCards(byMessage.get(entry.id) ?? [])}
+        </React.Fragment>
       ))}
 
       {tools.length > 0 && <ToolTrail tools={tools} />}
+
+      {renderCards(unanchored)}
 
       {isStreaming && entries[entries.length - 1]?.content === '' && <ThinkingDots />}
 
@@ -149,6 +201,18 @@ const TOOL_LABELS: Record<string, { running: string; done: string }> = {
   get_lesson: {
     running: 'Opening your lesson…',
     done: 'Your lesson',
+  },
+  list_assessments: {
+    running: 'Checking your assessments…',
+    done: 'Your assessments',
+  },
+  get_assessment: {
+    running: 'Opening your assessment…',
+    done: 'Your assessment',
+  },
+  propose_assessment: {
+    running: 'Drafting a suggestion…',
+    done: 'Suggested for your approval',
   },
 }
 
