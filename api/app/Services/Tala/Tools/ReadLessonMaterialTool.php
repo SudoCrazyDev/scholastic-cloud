@@ -3,6 +3,7 @@
 namespace App\Services\Tala\Tools;
 
 use App\Models\Topic;
+use App\Services\Tala\Attachments\AttachmentBatch;
 use App\Services\Tala\Attachments\AttachmentReader;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -50,6 +51,12 @@ class ReadLessonMaterialTool implements TalaTool
             audio and video cannot: if the material is in one of those, say so plainly and ask
             the teacher to tell you the content or upload a PDF version. Do not guess what is
             in a file you could not read, and do not describe a file's contents from its name.
+
+            A large PDF comes back in a reduced form, and what you may claim about it depends
+            on which: under "text_extracts" you have its written text only — say nothing about
+            its diagrams, photographs or tables, because you have not seen them. As attached
+            page images, you have the pages themselves, but usually only the first few — the
+            result says which, and you should say so too rather than implying you read it all.
 
             Reading files is expensive, so it is deliberate: load only what you need, and
             prefer one file over all of them. If the result reports skipped files, tell the
@@ -159,28 +166,67 @@ class ReadLessonMaterialTool implements TalaTool
                 'lesson' => $lesson->title,
                 'subject' => $lesson->subject?->title,
                 'files_read' => $batch->describe(),
+                // Text pulled out of files too large to send whole. It is here,
+                // in the result, rather than attached — so it is read from this
+                // JSON, not from an image.
+                'text_extracts' => $batch->texts ?: null,
                 'skipped' => $batch->skipped ?: null,
-                'note' => 'The files are attached to this message — read them directly. '
-                    .($batch->skipped !== []
-                        ? 'Some files were skipped; tell the teacher which and why. '
-                        : '')
-                    .'Anything you say about this material must come from what you can see in it.',
+                'note' => $this->note($batch),
             ], fn ($value) => $value !== null),
-            $this->summary($batch->count(), $batch->skipped),
+            $this->summary($batch),
             // For the controller: the bytes to inline alongside this tool
             // result. Never sent as part of the JSON the model reads.
             ['attachments' => $batch->attachments],
         );
     }
 
-    /**
-     * @param  array<int, array{name: string, reason: string}>  $skipped
-     */
-    private function summary(int $read, array $skipped): string
+    private function note(AttachmentBatch $batch): string
     {
-        $summary = $read.' '.($read === 1 ? 'file' : 'files').' read';
+        $note = $batch->attachments !== []
+            ? 'The files are attached to this message — read them directly. '
+            : '';
 
-        return $skipped === [] ? $summary : $summary.', '.count($skipped).' skipped';
+        if ($batch->texts !== []) {
+            $note .= 'Some material was too large to send as a file, so its text is under '
+                .'"text_extracts" — read it there, and note what each entry says was left out. ';
+        }
+
+        if ($batch->skipped !== []) {
+            $note .= 'Some files were skipped; tell the teacher which and why. ';
+        }
+
+        return $note.'Anything you say about this material must come from what you can see in it.';
+    }
+
+    private function summary(AttachmentBatch $batch): string
+    {
+        $parts = [];
+
+        // Page images from a scan are counted as pages, not as files, because
+        // "8 files read" for one handout reads as a mistake in the chat trail.
+        $pages = count(array_filter(
+            $batch->attachments,
+            fn ($attachment) => $attachment->sourceName() !== $attachment->name,
+        ));
+        $files = $batch->count() - $pages;
+
+        if ($files > 0) {
+            $parts[] = $files.' '.($files === 1 ? 'file' : 'files').' read';
+        }
+
+        if ($pages > 0) {
+            $parts[] = $pages.' scanned '.($pages === 1 ? 'page' : 'pages').' read';
+        }
+
+        if ($batch->texts !== []) {
+            $parts[] = count($batch->texts).' read as text';
+        }
+
+        if ($batch->skipped !== []) {
+            $parts[] = count($batch->skipped).' skipped';
+        }
+
+        return $parts === [] ? 'Nothing readable' : implode(', ', $parts);
     }
 
     /**

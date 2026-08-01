@@ -102,8 +102,13 @@ repo-relative; line numbers drift — search the symbol if it has moved.
   - `LessonText.php` — HTML → plain text, and the block renderer that **drops signed media URLs**.
 - `Attachments/` — reading a lesson's uploaded files:
   - `AttachmentReader.php` — fetches from R2 server-side, sniffs the real type, enforces the
-    budgets. **The content goes to the provider; the location never does.**
-  - `LessonAttachment.php`, `AttachmentBatch.php` — the bytes, and what was skipped and why.
+    budgets, and routes an oversized PDF to `PdfReader`. **The content goes to the provider; the
+    location never does.**
+  - `PdfReader.php` — opens a PDF too large to send and decides, by measurement, whether to extract
+    its text or lift its pages out as images. `PdfExtract.php` is the result of that decision.
+  - `Png.php` — writes a PNG with nothing but zlib and crc32, because there is no GD here.
+  - `LessonAttachment.php`, `AttachmentBatch.php` — the bytes, the extracted text, and what was
+    skipped and why.
 - `Assessments/` — everything behind the approval card:
   - `AssessmentTypes.php` — the allowlists, narrower than the schema on purpose, with the reason
     for each exclusion.
@@ -255,8 +260,8 @@ fetches server-side and inlines the bytes. Verified by asserting that neither th
 
 Three checks, cheapest first, because each costs more than the last:
 
-1. **Worth fetching?** Extension and the recorded MIME — no point pulling an 80 MB video out of R2
-   to discover nobody can read it.
+1. **Worth fetching?** Extension and the recorded MIME, then the stored object's size via
+   `Storage::size()` — no point pulling an 80 MB video out of R2 to discover nobody can read it.
 2. **Is it what it claims?** The block's `mime` came from the browser at upload time. The fetched
    bytes are sniffed with `finfo` and **the sniffed type wins.** A file named `.pdf` that is really a
    PNG is sent as an image, not mislabelled as a document. (Tested.)
@@ -266,6 +271,52 @@ Three checks, cheapest first, because each costs more than the last:
 **Oversized images are refused, not downscaled.** There is no GD and no Imagick on these servers, so
 there is nothing to resize with. The skip reason tells the teacher to re-save it smaller, which is
 better than a request that fails at the provider.
+
+### A PDF too large to send is reduced, not refused
+
+Refusing an oversized PDF was the wrong answer, and it shipped that way first: a teacher uploaded a
+29.8 MB lesson PDF and Tala said it was over the 10 MB limit, which is true and useless. Real lesson
+files are that size routinely — a deck exported to PDF carries a photograph on every slide.
+
+So `max_pdf_bytes` now means *what may be sent as a PDF*, and anything larger is opened on the server
+by `PdfReader` (`smalot/pdfparser`, pure PHP, needs only zlib) and reduced to the part worth sending.
+Which part depends on what the file turns out to be, and that **cannot be told from the name or the
+size, so it is measured** — characters recovered per page:
+
+| The file is | Route | What the model gets | What it loses |
+|---|---|---|---|
+| ≤ `max_pdf_bytes` | sent whole | text, diagrams, tables, layout | nothing |
+| a deck or document exported to PDF (has a text layer) | text extracted | the written text, as JSON under `text_extracts` | **diagrams and photographs** |
+| scanned or photographed (no text layer) | pages as images | the first `max_pdf_pages` pages, as the model would see a photocopy | the later pages |
+| fax-encoded (CCITT/JBIG2) or JPEG 2000 scans | refused | a reason naming the format, and a suggestion | — |
+
+Measured on hand-built fixtures at the production 512 MB `memory_limit`: a 29.9 MB, 30-page scan
+yields **0 chars/page** and reads as 8 page images (7.97 MB, 0.3s, 190 MB peak); a 23.7 MB, 24-page
+deck yields 154 chars/page and reads as 3,709 characters of text. A 400-page text PDF extracts to
+1.27M characters, which is why extracted text has its own character budget and not just a file cap.
+
+Details worth keeping:
+
+- **Page images pass through, they are not re-encoded.** A `DCTDecode` stream *is* a JPEG — the
+  scanner's own file, stored verbatim — so it is sent as-is. That covers what scanners and phones
+  produce.
+- **A raw bitmap is wrapped as a PNG by hand** (`Png::fromPixels`) because there is no GD. The guard
+  is arithmetic rather than trust: raw 8-bit pixels are exactly `width × height × components` bytes,
+  and if the length does not match, the bytes are something else and the page is skipped rather than
+  sent garbled.
+- **The file is parsed twice on the scanned route**, once without image content and once with.
+  Retaining every embedded image costs several times the file size in memory, and paying that before
+  knowing whether the text layer makes it unnecessary is the expensive way round. Two passes over a
+  30 MB file measured at a fifth of a second.
+- **`max_pdf_fetch_bytes` is this server's limit, not a provider's.** Two schools share one machine
+  (see `project_vip_shared_server`); raising it means re-checking headroom against `memory_limit`.
+- **Truncation is always named.** "pages 1–8 of 30 were read; the rest were not" goes into `skipped`,
+  and the text route's note says outright that diagrams were not read. A model that has only the text
+  layer is told not to describe the pictures.
+- **A scan spends one file's worth of the per-turn file count**, not eight. `$filesRead` is counted
+  separately from `$attachments` for exactly this reason.
+- **Text reaches the model as JSON, bytes as inlined attachments** — two different routes out of
+  `AttachmentBatch`, which is why `isEmpty()` checks both.
 
 **Skips are data, not log lines.** `AttachmentBatch::$skipped` carries a reason per file into the
 tool result, and the prompt tells the model to repeat them. A teacher whose handout was too large
@@ -312,6 +363,9 @@ and ask the teacher to describe the content or upload a PDF — never to describ
 Office formats are the obvious next step (a `.pptx` is a ZIP of XML; slide text extracts with
 `ZipArchive` + `DOMDocument` and no new dependency), and `ext-zip` is **not enabled** in the XAMPP dev
 PHP — `php_zip.dll` exists but `extension=zip` is commented out.
+
+A PDF is no longer on that list at any size, only above `max_pdf_fetch_bytes` — see
+[the reduction routes](#a-pdf-too-large-to-send-is-reduced-not-refused).
 
 ### An assessment "from a lesson" comes from the lesson
 
@@ -573,6 +627,37 @@ Lesson attachments:
 | Another teacher reading the same lesson's files | No lesson matched, 0 attachments |
 | Per-file cap, total cap, file count, image edge | All enforced, each with its own skip reason |
 | Lesson with no uploads | Says so, tells the model not to describe material that isn't there |
+
+Large PDFs, against hand-built fixtures at the production 512 MB `memory_limit`:
+
+| Attempt | Result |
+|---|---|
+| 29.9 MB, 30-page scan (the reported case) | 0 chars/page → **8 page images**, 7.97 MB, 0.3s, 190 MB peak |
+| 23.7 MB, 24-page deck with a text layer | 154 chars/page → 3,709 chars of text, 0 bytes sent |
+| Same deck, on a model that cannot read PDFs | Still read — the text route needs no provider support |
+| 3 KB PDF | Sent whole, so its diagrams survive |
+| Scan stored as a raw bitmap, not a JPEG | Wrapped as a PNG by hand; `finfo` and `getimagesize` accept it |
+| Model that reads nothing | Filenames only; no fetch, no parse |
+| Over `max_pdf_fetch_bytes` | Refused **before downloading**, with both sizes named |
+| Text over the character budget | Truncated, and `truncated: true` plus a note saying so |
+| `max_pdf_pages` set to 2 | 2 read, and "pages 1–2 of 30 were read; the rest were not" |
+| `names()` after reading a scan as pages | The **lesson filename**, not "… (page 3)" — so the `based_on_lesson` gate still matches |
+
+And against a real-world corpus rather than fixtures (`pdf-parse`'s test data — files from actual
+generators, PDF 1.4 to 1.7, one using an object stream, one deliberately malformed):
+
+| Attempt | Result |
+|---|---|
+| 3 valid PDFs, 1.4–1.7, 79 KB – 3.4 MB | All read as text (18.7k–40k chars); the 14-page one truncated and said so |
+| A deliberately malformed PDF | "may be damaged, or password-protected"; **nothing thrown** |
+| A near-empty PDF using an object stream | Reported as nothing to work from — see below |
+| Whole corpus | **0 exceptions**, 54 MB peak |
+
+**A low character count does not prove a file is scanned**, and the messages no longer claim it does.
+That near-empty file yields 0 chars here and 22 via pdf.js — it is neither scanned nor text-bearing,
+just empty. What the measurement establishes is only that there is not enough text to answer from, so
+the pages are worth trying; if those yield nothing either, the report is that the file could not be
+read, without a guess at why.
 
 ### Other limits in the same layer
 
@@ -838,7 +923,16 @@ shape each translates (Anthropic `tools[]`, OpenAI `tools[].function`).
   nothing.
 - **No extracted-text cache.** Every `read_lesson_material` call re-fetches from R2 and re-sends the
   bytes. Bounded by the caps and by attachments not being replayed across turns, but a teacher asking
-  five questions about the same handout pays for it five times.
+  five questions about the same handout pays for it five times. This costs more now that a large PDF
+  is parsed on every read: the parse itself is fast (a fifth of a second for 30 MB) but the R2 fetch
+  and the 190 MB peak are paid again each time. Keying a cache on the object path and size would fix
+  both, and nothing in `PdfReader` depends on being called fresh.
+- **Only the first `max_pdf_pages` pages of a scan are read** — 8 by default. A 30-page scanned
+  lesson is read as its first 8 pages, which is stated in the result but is still partial material to
+  build an assessment from. Raising it costs tokens linearly and hits `max_total_bytes` first.
+- **Fax-encoded scans (CCITT, JBIG2) and JPEG 2000 pages cannot be read.** No decoder exists here and
+  neither format is one a provider accepts. The skip names the format and suggests exporting from the
+  original file instead of scanning it.
 - **Neither provider's PDF reading has been exercised against a live key.** The wire format is the
   documented one and is asserted in the checks; whether a given school's model handles a particular
   scanned PDF well is a question only a real run answers.

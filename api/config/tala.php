@@ -137,6 +137,60 @@ return [
         | downscaled — it is refused with a message the teacher can act on.
         */
         'max_image_edge' => (int) env('TALA_ATTACHMENT_MAX_IMAGE_EDGE', 8000),
+
+        /*
+        |----------------------------------------------------------------------
+        | PDFs too large to send whole
+        |----------------------------------------------------------------------
+        |
+        | `max_pdf_bytes` above is what may be sent to a provider *as a PDF*,
+        | where the model reads the text and sees every diagram. Real lesson
+        | files routinely exceed it — a deck exported to PDF with photographs on
+        | every slide runs to tens of megabytes — and refusing those was the
+        | wrong answer: the teacher gets a file they uploaded and cannot use.
+        |
+        | So a PDF over that limit is opened here instead, and only what is
+        | needed goes out. Which route depends on the file:
+        |
+        |   A text layer  -> the text is extracted and sent as text. A 30 MB
+        |                    file becomes a few KB. Diagrams are lost, which is
+        |                    why this is the fallback and not the default.
+        |   Scans only    -> each page is an embedded image, so the pages
+        |                    themselves are sent as images and the model reads
+        |                    them the way a person would.
+        |
+        | `fetch` is the ceiling on what will be pulled out of R2 and opened at
+        | all. It is not the provider's limit — it is this server's. Parsing
+        | costs several times the file size in memory: reading a 29.9 MB scan
+        | through the whole tool path peaked at 190 MB against a 512 MB
+        | memory_limit. Two tenants share one machine, so this ceiling stays well
+        | below the limit rather than close to it. Raising it means checking that
+        | headroom again, not just this number.
+        */
+        'max_pdf_fetch_bytes' => (int) env('TALA_ATTACHMENT_MAX_PDF_FETCH_BYTES', 40 * 1024 * 1024),
+
+        /*
+        | Per file, and generous — a 400-page PDF extracted to 1.27M characters
+        | would cost more in tokens than reading it was worth. Truncation is
+        | always reported, never silent.
+        */
+        'max_pdf_text_chars' => (int) env('TALA_ATTACHMENT_MAX_PDF_TEXT_CHARS', 40000),
+
+        /*
+        | How many pages of a scan to send as images. Each page is about as
+        | expensive as a photograph, so this is the real cost control on the
+        | scanned route; `max_total_bytes` above stops it sooner on a heavy file.
+        | Whatever is left unread is named in the result.
+        */
+        'max_pdf_pages' => (int) env('TALA_ATTACHMENT_MAX_PDF_PAGES', 8),
+
+        /*
+        | Below this many characters per page, a PDF is treated as scans rather
+        | than text. A page of prose runs to thousands; a scanned page yields
+        | zero, or a stray header from the scanner software. Set low so a sparse
+        | but genuine text layer is not thrown away.
+        */
+        'pdf_text_chars_per_page' => (int) env('TALA_ATTACHMENT_PDF_TEXT_PER_PAGE', 60),
     ],
 
     /*
