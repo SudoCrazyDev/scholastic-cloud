@@ -19,7 +19,9 @@ class ToolRegistry
 
     public function __construct()
     {
-        $this->register(new ListAssignedSubjectsTool());
+        $this->register(new ListAssignedSubjectsTool);
+        $this->register(new ListLessonsTool);
+        $this->register(new GetLessonTool);
     }
 
     public function register(TalaTool $tool): void

@@ -37,8 +37,13 @@ class TalaChatController extends Controller
      * involved (call, then answer). The rest is headroom for a model that
      * genuinely needs a second lookup, and a stop for one that has got stuck
      * asking for the same thing.
+     *
+     * Raised from four when the lesson tools landed: surveying with
+     * `list_lessons` and then opening two lessons with `get_lesson` is an
+     * ordinary request ("compare my two lessons on matter") and already spends
+     * four rounds before the answer is written.
      */
-    private const MAX_TOOL_ROUNDS = 4;
+    private const MAX_TOOL_ROUNDS = 6;
 
     public function __construct(
         private readonly CredentialResolver $resolver,

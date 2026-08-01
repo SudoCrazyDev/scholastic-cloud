@@ -7,6 +7,7 @@ use App\Models\InstitutionAcademicYear;
 use App\Models\StudentSection;
 use App\Models\StudentSubject;
 use App\Models\Subject;
+use App\Services\Tala\SectionLabel;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -184,11 +185,7 @@ class ListAssignedSubjectsTool implements TalaTool
 
     private function sectionName(?ClassSection $section): ?string
     {
-        if (! $section) {
-            return null;
-        }
-
-        return trim(($section->grade_level ? 'Grade '.$section->grade_level.' — ' : '').$section->title);
+        return SectionLabel::for($section);
     }
 
     /**
@@ -220,21 +217,8 @@ class ListAssignedSubjectsTool implements TalaTool
             ->value('year');
     }
 
-    /**
-     * Model arguments arrive as whatever the model felt like sending — a
-     * number, a null, an array. Anything that is not a usable string is
-     * treated as absent rather than passed to the query builder.
-     */
     private function text(array $input, string $key): ?string
     {
-        $value = $input[$key] ?? null;
-
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $value = trim($value);
-
-        return $value === '' ? null : $value;
+        return ToolInput::text($input, $key);
     }
 }

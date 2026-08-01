@@ -35,7 +35,7 @@ implementation growing methods it has no use for.
 
 **Turn lifecycle:** teacher sends → user message persisted → credential resolved → spend guard →
 model streams → *(optionally: model asks for a tool, tool runs, results fed back, model streams
-again)* → assistant message persisted. Up to **4 model round trips** per turn
+again)* → assistant message persisted. Up to **6 model round trips** per turn
 (`TalaChatController::MAX_TOOL_ROUNDS`).
 
 ---
@@ -76,10 +76,18 @@ repo-relative; line numbers drift — search the symbol if it has moved.
 - `ResolvedCredential.php` — decrypted key + resolved model, kept out of Eloquent so it cannot be
   serialised into a response by accident.
 - `UsageGuard.php` — the monthly spend cap, counted in Manila time.
-- `TalaContext.php` — builds the system prompt.
+- `TalaContext.php` — builds the system prompt, including the
+  [records-versus-knowledge rule](#their-records-versus-your-knowledge).
+- `SectionLabel.php` — names a class section. `class_sections.grade_level` already holds `"Grade 7"`,
+  so prefixing `"Grade "` yields `"Grade Grade 7"` — which is what the model was being told before
+  this existed.
 - `Tools/` — see [Guardrails](#guardrails):
-  `ToolContext.php`, `TalaTool.php`, `ToolOutcome.php`, `ToolRegistry.php`,
-  `AssignedSubjectScope.php`, `ListAssignedSubjectsTool.php`.
+  - Plumbing: `ToolContext.php`, `TalaTool.php`, `ToolOutcome.php`, `ToolRegistry.php`,
+    `ToolInput.php` (coerces the model's arguments).
+  - Scopes: `AssignedSubjectScope.php` (subjects), `AssignedLessonScope.php` (lessons, inheriting the
+    subject scope as a subquery).
+  - Tools: `ListAssignedSubjectsTool.php`, `ListLessonsTool.php`, `GetLessonTool.php`.
+  - `LessonText.php` — HTML → plain text, and the block renderer that **drops signed media URLs**.
 
 **Backend — HTTP (`api/`)**
 - `app/Http/Controllers/TalaCredentialController.php` — config + both key scopes.
@@ -191,11 +199,29 @@ select * from `subjects` where `adviser` = ? and `institution_id` = ?
 It resolves *through* the scope and returns `null` for an id that exists but is not this teacher's,
 so an outsider's id and a nonexistent one are indistinguishable from the chat.
 
+**Lessons inherit that scope rather than restating it.** Lessons live on `topics`, which has no owner
+column — a lesson belongs to whoever owns its subject. `Tools/AssignedLessonScope.php` expresses
+exactly that, as a subquery over the subject scope:
+
+```sql
+select * from `topics`
+where `subject_id` in (
+  select `subjects`.`id` from `subjects` where `adviser` = ? and `institution_id` = ?
+)
+```
+
+Written as a subquery over `AssignedSubjectScope::query()` and not as a hand-rolled join, so there
+stays exactly one definition of "this teacher's subjects" in the codebase. Change the subject rule and
+lessons follow it without being edited.
+
 ### Three deliberate omissions
 
-1. **No id in the tool schema.** `list_assigned_subjects` takes `search`, `class_section`,
-   `academic_year` — and returns no subject ids. There is no row identifier for the model to place in
-   a later argument, and nothing to probe with.
+1. **No ids in the tool schemas.** `list_assigned_subjects` takes `search`, `class_section`,
+   `academic_year`; the lesson tools take `subject`, `class_section`, `grading_period`, `search` and —
+   on `get_lesson` — a `title`. None of them return a row id, and none accept one. A teacher names a
+   lesson the way they'd say it out loud, that title is resolved *through* the scope, and a title
+   belonging to somebody else's lesson simply does not resolve. There is no identifier for the model
+   to place in a later argument and nothing to probe with.
 2. **The overview-role widening is not reproduced.** `UserController::getMySubjects()` widens to
    every subject in the institution for principals, institution administrators and department heads.
    That is right for a screen someone opened on purpose and wrong for an assistant: Tala answers about
@@ -206,9 +232,80 @@ so an outsider's id and a nonexistent one are indistinguishable from the chat.
    by the one implementation. An assistant that can change grades or attendance is a different
    product with a different approval story.
 
+### Their records versus your knowledge
+
+This is a guardrail, not a style note, and it was written after a failure in production.
+
+Asked *"for Sincerity what lessons do I have for term 1?"*, Tala — which at the time had no tool that
+could read lessons — answered with five plausible Grade 7 Science topics from the DepEd MATATAG
+curriculum and presented them as **the teacher's own Term 1 lessons**. Every item was invented. The
+teacher's actual saved lessons were something else entirely.
+
+Two things were wrong, and both needed fixing:
+
+1. **A missing tool.** There was no way to read `topics`, so the model had nothing to answer from.
+   `list_lessons` and `get_lesson` close that.
+2. **A prompt that invited the substitution.** The guidance said *"Follow the DepEd K-12 MATATAG
+   Curriculum when the question touches Philippine curriculum content"* — which, read literally, is
+   exactly what the model did. Curriculum guidance is now scoped to **drafting new material** and
+   explicitly disclaimed as a source for anything already recorded.
+
+The rule now stated in `TalaContext`, and the reason each part of it is there:
+
+- **Three sources, named explicitly**: the system prompt, what a tool returned *this turn*, and what
+  the teacher said in the conversation. Everything else is background knowledge — usable, but not a
+  source and never presentable as one.
+- **No internet, stated as fact.** Tala cannot search, browse, open a link the teacher pastes, or read
+  a PDF or a DepEd memo, and it must not say or imply that it did. This is a claim about the system,
+  and the code has to keep it true — see [the constraint below](#the-no-internet-claim-is-a-contract).
+- **No self-authored citations.** No URLs, memo or order numbers, page references, "according to
+  DepEd", competency codes or quoted passages. A fabricated reference is worse than none: it goes into
+  a lesson plan and someone asks the teacher to produce it. Material the *teacher* supplied — a code or
+  quotation they typed — is theirs and may be reused freely; the ban is on adding references they did
+  not give.
+- A question about what the teacher *has* is a tool call, every time. Never answered from curriculum
+  knowledge.
+- **An empty tool result is the answer.** Say nothing is saved and say where they'd create it. Do not
+  follow it with what such lessons "usually" contain unless asked — and if asked, label it a
+  suggestion.
+- **A failed tool result is not permission to answer anyway.** Say the lookup did not work.
+- Suggestions and records must be distinguishable in the reply, marked in the sentence that carries
+  them ("here's a sequence teachers often use", "this isn't from your records"). A teacher who cannot
+  tell them apart will plan around the wrong one.
+- **Prefer an honest gap to a confident guess.** No manufactured numbers, dates, titles, names or
+  codes to fill a hole.
+
+### The no-internet claim is a contract
+
+Two lines in the prompt — *"You have no internet access"* and *"these are the only tools you have"* —
+are assertions about the system rather than instructions to the model, and they are true only because
+of how the request is built: `ChatProvider::stream()` receives exactly what
+`ToolRegistry::definitions()` returns, every entry is a read against this database, and **neither
+provider declares a server-side tool**. No `web_search_*`, no `web_fetch_*`, no code execution.
+
+If a web search or fetch tool is ever added, **rewrite those paragraphs in the same commit.** A model
+told it cannot search, that then can, either narrates the search wrongly or declines to use it. The
+guardrail check asserts the declared tool names contain nothing matching `/web|fetch|browse|url/`.
+
+The tools carry the same rule in their own payloads, because a tool result is the last thing the model
+reads before it writes:
+
+- `description()` on both lesson tools says *"call this — do not answer from general curriculum
+  knowledge"* and *"if this returns no lessons, the teacher genuinely has none saved"*.
+- An empty `list_lessons` returns a `note` telling the model not to substitute curriculum knowledge —
+  plus `lessons_by_quarter`, a count of where their lessons actually are. A bare "none found" invites
+  the model to fill the silence, and is also just unhelpful to a teacher who asked about the wrong
+  period.
+- A miss on `get_lesson` says *"do not describe the contents of a lesson that was not found"*.
+- Truncating a long lesson body appends a `note` block saying how many parts were dropped, so the
+  model reports the gap instead of assuming what was in it. Truncation is **by block**, never
+  mid-sentence — half a paragraph with no marker gets presented as the whole lesson.
+
+Do not soften these when adding a tool. The next missing tool will be filled the same way.
+
 ### Verified behaviour
 
-Checked against two teachers across two institutions:
+Checked against two teachers across two institutions. Subjects:
 
 | Attempt | Result |
 |---|---|
@@ -222,6 +319,24 @@ Checked against two teachers across two institutions:
 | Wrong argument types (int / array / null) | Treated as absent |
 | `AssignedSubjectScope::find()` with a colleague's or cross-tenant id | `null` |
 
+Lessons:
+
+| Attempt | Result |
+|---|---|
+| Baseline list, owner | Own lessons only |
+| Same institution, different teacher | Empty, with the "none saved" note |
+| Same teacher, different institution | Empty |
+| `get_lesson` on the exact title, as another teacher | Not found |
+| `get_lesson` on the exact title, cross-institution | Not found |
+| `subject` / `class_section` filter naming a colleague's subject or section | Empty |
+| `grading_period` with no lessons in it | Empty + `lessons_by_quarter` breakdown |
+| `grading_period: "Term 1"`, `"Q1"`, `1`, `"99"` | Normalised to `1`; `"99"` treated as absent |
+| Junk args (nested array, null, int) | Treated as absent; scope unchanged |
+| `get_lesson` with no title / an array title | Error outcome, no query run |
+| Ambiguous title matching two lessons | Candidates listed; **no lesson picked** |
+| Signed media URL / R2 object path in a lesson body | Never sent to the provider |
+| Declared tool names matched against `/web\|fetch\|browse\|url/` | No match — the no-internet claim holds |
+
 ### Other limits in the same layer
 
 - **`ToolRegistry` never throws.** An unknown tool name (models hallucinate them) or a tool that
@@ -229,10 +344,19 @@ Checked against two teachers across two institutions:
   the turn dying mid-sentence.
 - **Registration is explicit** in `ToolRegistry::__construct`, not discovered from the filesystem. A
   tool appearing in Tala's hands should be a line someone wrote on purpose.
-- **Round cap.** `MAX_TOOL_ROUNDS = 4` stops a model that keeps re-asking for the same lookup from
+- **Round cap.** `MAX_TOOL_ROUNDS = 6` stops a model that keeps re-asking for the same lookup from
   spending a school's budget in a loop. Hitting it is not an error — the text produced still stands.
-- **Result cap.** `ListAssignedSubjectsTool::MAX_RESULTS = 60`, with `truncated` reported in the
-  payload.
+  Raised from 4 with the lesson tools: survey with `list_lessons`, then open two lessons, and four
+  rounds are gone before a word is written.
+- **Result caps**, each reported in the payload rather than silently clipped:
+  `ListAssignedSubjectsTool::MAX_RESULTS = 60`, `ListLessonsTool::MAX_RESULTS = 100`
+  (`truncated` + a note asking the model to narrow), `GetLessonTool::MAX_BODY_CHARS = 8000` and
+  `MAX_CANDIDATES = 12`.
+- **Attachments are named, never linked.** `LessonText` reports a file's name and MIME type and drops
+  its URL and R2 object key. Those are signed links to private media, and this payload is sent to
+  Anthropic or OpenAI. Video URLs are kept — they are public links the teacher pasted in.
+- **A lesson's HTML is flattened before it is sent.** Markup costs tokens, and a model reading `<p>`
+  tags writes them back out.
 - **Audit trail.** Every call is written to `tala_messages` with `role = 'tool'` — tool name,
   arguments, one-line summary. Excluded from the replay window, so it costs nothing on later turns.
 - **The prompt states the boundary.** `TalaContext` tells the model it cannot see other teachers'
@@ -307,8 +431,8 @@ Events:
 
 ```
 event: start   data: {"user_message_id": "..."}
-event: tool    data: {"name":"list_assigned_subjects","status":"running"}
-event: tool    data: {"name":"...","status":"done","summary":"3 assigned subjects"}
+event: tool    data: {"name":"list_lessons","status":"running"}
+event: tool    data: {"name":"list_lessons","status":"done","summary":"6 lessons"}
 event: delta   data: {"text":"..."}
 event: done    data: {"message_id":"...","tokens_in":2400,"tokens_out":75}
 event: error   data: {"message_id":"...","message":"..."}
@@ -339,7 +463,9 @@ cannot use `$generator->getReturn()`; the controller builds its own result in th
   constructs did not justify adding one. It builds React nodes and never touches
   `dangerouslySetInnerHTML`, so model output cannot inject markup.
 - **Tool activity is shown, not hidden** — a teacher should be able to see that Tala read their
-  teaching load, and see that it read nothing else.
+  teaching load and their lessons, and see that it read nothing else. Labels come from `TOOL_LABELS` in
+  `Transcript.tsx`; a tool with no entry still renders under its wire name, because a missing chip
+  would hide the lookup entirely.
 
 ---
 
@@ -362,11 +488,22 @@ converts back to UTC for the query — which is also why it is a range rather th
    directly. If the tool needs an id, resolve it through the scope's `find()`.
 3. Say the scope out loud in `description()` — "the subjects assigned to you" — so the model does not
    ask for something it cannot have and then explain the refusal as though something broke.
-4. Return filters only in `inputSchema()`. No identities. Prefer omitting ids entirely.
+4. Return filters only in `inputSchema()`. No identities. Prefer omitting ids entirely — name rows the
+   way a teacher would, and resolve the name through the scope. Read arguments with `ToolInput` rather
+   than off `$input` directly; models send arrays and integers where strings were asked for.
 5. Register it in `ToolRegistry::__construct`.
 6. Mention it in `TalaContext`'s "What you can and cannot see" section, including what it still
    cannot reach.
-7. Add the cross-teacher / cross-institution / injected-argument cases to the guardrail checks.
+7. **Make the empty result say so.** A tool that answers "nothing found" and nothing else will be
+   filled in from the model's own knowledge and presented as the teacher's record — see
+   [Their records versus your knowledge](#their-records-versus-your-knowledge). Return a note saying
+   there is none saved, where the teacher would create it, and not to substitute.
+8. Cap the result size and report the cap in the payload. Truncate at a boundary the model can see,
+   never mid-sentence.
+9. Check what leaves the building. Signed URLs, object keys and ids sent as part of a tool result end
+   up in a third party's logs.
+10. Add a label to `TOOL_LABELS` in `Transcript.tsx`, so the teacher can see the lookup happen.
+11. Add the cross-teacher / cross-institution / injected-argument cases to the guardrail checks.
 
 Both providers pick the new tool up automatically — `ToolRegistry::definitions()` returns a neutral
 shape each translates (Anthropic `tools[]`, OpenAI `tools[].function`).
@@ -395,7 +532,9 @@ shape each translates (Anthropic `tools[]`, OpenAI `tools[].function`).
 
 ## Not yet wired
 
-- **One tool only** (`list_assigned_subjects`). No lessons, assessments, class records or attendance.
+- **Three read tools** (`list_assigned_subjects`, `list_lessons`, `get_lesson`). No assessments, class
+  records, attendance, or the AI planner's `lesson_plans` / `subject_quarter_plans` — a teacher asking
+  "what's my Term 1 schedule" gets lessons, not the generated day-by-day plan.
 - **No institution usage screen.** The data is on `tala_messages` (`credential_source`, token counts);
   nothing renders it yet.
 - **No retention policy.** Conversations persist until a teacher deletes them.

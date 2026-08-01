@@ -12,9 +12,9 @@ interface TranscriptProps {
 }
 
 const SUGGESTIONS = [
-  'What subjects am I teaching this quarter?',
-  'Draft a 45-minute lesson plan for my biggest class.',
-  'Write five multiple-choice items on fractions, with answers.',
+  'What lessons do I have saved for this quarter?',
+  'Which of my lessons are still unpublished?',
+  'Write five multiple-choice items based on my lesson on fractions.',
   'Help me word a message to a parent about missing homework.',
 ]
 
@@ -36,7 +36,8 @@ export const Transcript: React.FC<TranscriptProps> = ({ entries, tools, isStream
         <h2 className="text-lg font-semibold text-zinc-900">Hi {teacherName}, I'm Tala.</h2>
         <p className="mt-1 max-w-md text-sm text-zinc-600">
           I can help with lesson planning, assessment items, and anything else about the subjects you
-          teach. I can see your assigned subjects — not your students' records.
+          teach. I can read your assigned subjects and the lessons you've saved — not your students'
+          records.
         </p>
 
         <ul className="mt-6 grid w-full max-w-xl gap-2 text-left sm:grid-cols-2">
@@ -129,12 +130,38 @@ const ToolTrail: React.FC<{ tools: ToolActivity[] }> = ({ tools }) => (
   </div>
 )
 
+/**
+ * What each lookup is called on screen.
+ *
+ * A tool with no entry still renders — its wire name is a poor label but a
+ * missing chip would hide the lookup entirely, and the point of the trail is
+ * that the teacher can see what was read.
+ */
+const TOOL_LABELS: Record<string, { running: string; done: string }> = {
+  list_assigned_subjects: {
+    running: 'Checking your assigned subjects…',
+    done: 'Your assigned subjects',
+  },
+  list_lessons: {
+    running: 'Reading your saved lessons…',
+    done: 'Your saved lessons',
+  },
+  get_lesson: {
+    running: 'Opening your lesson…',
+    done: 'Your lesson',
+  },
+}
+
 function labelFor(tool: ToolActivity): string {
-  if (tool.name === 'list_assigned_subjects') {
-    return tool.status === 'running' ? 'Checking your assigned subjects…' : `Your assigned subjects — ${tool.summary ?? 'done'}`
+  const label = TOOL_LABELS[tool.name]
+
+  if (!label) {
+    return tool.status === 'running' ? `Running ${tool.name}…` : (tool.summary ?? tool.name)
   }
 
-  return tool.status === 'running' ? `Running ${tool.name}…` : (tool.summary ?? tool.name)
+  if (tool.status === 'running') return label.running
+
+  return tool.summary ? `${label.done} — ${tool.summary}` : label.done
 }
 
 const ThinkingDots: React.FC = () => (
