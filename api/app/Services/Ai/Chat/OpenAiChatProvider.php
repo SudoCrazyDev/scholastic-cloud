@@ -225,12 +225,27 @@ class OpenAiChatProvider implements ChatProvider
             ]];
 
             foreach ($attachments as $attachment) {
-                $parts[] = [
-                    'type' => 'image_url',
-                    'image_url' => [
-                        'url' => 'data:'.$attachment->mediaType.';base64,'.$attachment->base64(),
-                    ],
-                ];
+                /*
+                 * Two different content parts, and the distinction is this API's,
+                 * not ours: an image is an `image_url` part carrying a data URL,
+                 * while a document is a `file` part with the base64 under
+                 * `file_data`. `filename` is what tells the API what it is
+                 * looking at, so it is not optional in practice.
+                 */
+                $parts[] = $attachment->isImage()
+                    ? [
+                        'type' => 'image_url',
+                        'image_url' => [
+                            'url' => 'data:'.$attachment->mediaType.';base64,'.$attachment->base64(),
+                        ],
+                    ]
+                    : [
+                        'type' => 'file',
+                        'file' => [
+                            'filename' => $attachment->name,
+                            'file_data' => 'data:'.$attachment->mediaType.';base64,'.$attachment->base64(),
+                        ],
+                    ];
             }
 
             $messages[] = ['role' => 'user', 'content' => $parts];
@@ -240,21 +255,23 @@ class OpenAiChatProvider implements ChatProvider
     }
 
     /**
-     * Images only, for now.
+     * Images and PDFs.
      *
-     * The models on Tala's allowlist read images through `image_url` parts, which
-     * is long-settled. PDFs are a different content part on this API and support
-     * varies by model and endpoint, and it could not be verified against a real
-     * key here — so rather than risk a request that 400s in the middle of an
-     * answer, a PDF is reported as unreadable and the teacher is told why.
+     * PDF parsing here reads the text *and* renders each page as an image, so it
+     * needs a vision-capable model — gpt-4o and later. Every OpenAI model on
+     * Tala's allowlist (config/tala.php) qualifies, so this does not branch on
+     * the model. If an older non-vision model is ever added to that list, this
+     * method is where it has to be excluded.
      *
-     * To widen it: return true for `application/pdf` and emit a `file` part
-     * carrying `filename` plus a base64 `file_data` URL, then test against every
-     * model in config/tala.php that a school might have selected.
+     * Size is not checked here: this API allows 50 MB per file, and Tala's own
+     * caps in `config/tala.php` are an order of magnitude below that.
      */
     public function supportsAttachment(string $mediaType): bool
     {
-        return in_array($mediaType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
+        return in_array($mediaType, [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'application/pdf',
+        ], true);
     }
 
     /**

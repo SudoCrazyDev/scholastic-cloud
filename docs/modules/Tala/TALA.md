@@ -279,13 +279,15 @@ for once, on the turn that asked. Within that turn it persists across tool round
 and capped by `MAX_TOOL_ROUNDS`.
 
 **Per-provider capability.** `ChatProvider::supportsAttachment()` is asked once per turn and the
-answer rides on `ToolContext::$attachmentTypes`. Claude reads images and PDFs. OpenAI is **images
-only** here: its models take images through `image_url` parts, which is settled, but PDFs are a
-different content part whose support varies by model and endpoint and could not be verified against a
-real key — so a PDF is reported as unreadable rather than risking a request that 400s mid-answer.
-`OpenAiChatProvider::supportsAttachment()` says exactly what to change to widen it.
+answer rides on `ToolContext::$attachmentTypes`. **Both providers read images and PDFs.**
 
-Wire shapes, both verified by asserting the built message:
+On OpenAI, a PDF is a `file` content part rather than an `image_url` one, and PDF parsing there reads
+the text *and* renders each page as an image — so it needs a vision-capable model, gpt-4o or later.
+Every OpenAI model on the allowlist in `config/tala.php` qualifies, which is why
+`supportsAttachment()` does not branch on the model; if a non-vision model is ever added to that list,
+that method is where it has to be excluded.
+
+Wire shapes, all verified by asserting the built message rather than assumed:
 
 ```
 Anthropic — one user turn, tool_result first (the API requires that):
@@ -293,8 +295,14 @@ Anthropic — one user turn, tool_result first (the API requires that):
                     [3] text  [4] document {source:{type:base64,media_type:application/pdf,data}}
 
 OpenAI — a tool message takes a string, so files follow as a user turn:
-  [0] assistant(tool_calls)  [1] tool  [2] user[text, image_url(data:…;base64,…)]
+  [0] assistant(tool_calls)  [1] tool
+  [2] user[ text,
+            image_url {url:"data:image/png;base64,…"},
+            file      {filename:"handout.pdf", file_data:"data:application/pdf;base64,…"} ]
 ```
+
+`filename` on the OpenAI `file` part is what tells that API what it is looking at, so it is not
+optional in practice.
 
 Attachments are **not** put inside a `tool_result` block: what that supports varies, whereas an image
 or document block in an ordinary user turn is the plainest thing either API does.
@@ -556,7 +564,7 @@ Lesson attachments:
 | Attempt | Result |
 |---|---|
 | Read a lesson's files on Anthropic | Image + PDF loaded, `.pptx` skipped with a reason |
-| Same lesson on OpenAI | Image loaded, **PDF skipped** — "this school's model cannot read PDFs" |
+| Same lesson on OpenAI | Image + PDF loaded (PDF as a `file` part), `.pptx` skipped |
 | Model that reads no files | Filenames reported, nothing fetched, teacher told to describe it |
 | base64 or the R2 object key in the model-facing tool JSON | **Neither** — only in the message blocks |
 | File named `.pdf` that is really a PNG | Sniffed and sent as an **image**; the recorded MIME loses |
@@ -831,9 +839,9 @@ shape each translates (Anthropic `tools[]`, OpenAI `tools[].function`).
 - **No extracted-text cache.** Every `read_lesson_material` call re-fetches from R2 and re-sends the
   bytes. Bounded by the caps and by attachments not being replayed across turns, but a teacher asking
   five questions about the same handout pays for it five times.
-- **OpenAI cannot read PDFs through Tala** — see
-  [attachments](#lesson-attachments-the-content-leaves-the-location-does-not). A school on an OpenAI
-  key gets images only.
+- **Neither provider's PDF reading has been exercised against a live key.** The wire format is the
+  documented one and is asserted in the checks; whether a given school's model handles a particular
+  scanned PDF well is a question only a real run answers.
 - **Question types Tala can author are five of the ten the schema allows** — see
   `AssessmentTypes`. `fill_in_the_blanks` is excluded because `num_blanks` is missing from
   `SubjectEcrItemController`'s validation rules and is therefore stripped before storage, so **every

@@ -45,10 +45,11 @@ class AttachmentReader
      * Load the readable files attached to a lesson.
      *
      * @param  string|null  $wanted  A filename, or part of one, to narrow to.
-     * @param  array<int, string>  $supported  Media types the answering provider can read.
-     *                                         Comes from ChatProvider::supportsAttachment(),
-     *                                         so a school on a model that cannot read PDFs
-     *                                         gets told rather than sent a failing request.
+     * @param  array<int, string>  $supported  Media types the answering provider can read, from
+     *                                         ChatProvider::supportsAttachment(). Both current
+     *                                         providers read images and PDFs; the list exists so
+     *                                         that a model which cannot is told rather than sent
+     *                                         a request that fails mid-answer.
      */
     public function forLesson(Topic $lesson, ?string $wanted, array $supported): AttachmentBatch
     {
