@@ -46,15 +46,29 @@ export const Transcript: React.FC<TranscriptProps> = ({
 
   /*
    * Cards sit under the message that raised them, so an old thread reads in
-   * order. One raised during the current turn has no message id yet — the
-   * backfill happens server-side once the assistant message is written — so
-   * those render after the last entry instead of vanishing until reload.
+   * order. Anything that cannot be placed that way goes after the last entry
+   * rather than nowhere: this card carries the only approval control there is,
+   * and a teacher who cannot see it cannot create the draft.
+   *
+   * Two ways an anchor fails, and both happen in one ordinary turn:
+   *
+   *   1. While the turn is running there is no message id at all — the backfill
+   *      happens server-side once the assistant message is written.
+   *   2. Once it is backfilled, the id names a message this transcript has never
+   *      heard of. Entries are built locally as the reply streams, with local
+   *      ids, and `syncFrom` deliberately does not re-run afterwards (see
+   *      TalaChat) — so the server's id does not appear on screen until the
+   *      thread is reopened.
+   *
+   * Hence membership is tested against the entries actually rendered, not merely
+   * against the id being present.
    */
+  const entryIds = new Set(entries.map(entry => entry.id))
   const byMessage = new Map<string, TalaProposal[]>()
   const unanchored: TalaProposal[] = []
 
   for (const proposal of proposals) {
-    if (proposal.message_id) {
+    if (proposal.message_id && entryIds.has(proposal.message_id)) {
       const existing = byMessage.get(proposal.message_id)
       existing ? existing.push(proposal) : byMessage.set(proposal.message_id, [proposal])
     } else {
