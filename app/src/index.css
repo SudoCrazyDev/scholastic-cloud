@@ -1,6 +1,24 @@
 @import "tailwindcss";
 
 /*
+ * Light mode only.
+ *
+ * By default Tailwind's `dark:` variant follows the operating system via
+ * `prefers-color-scheme`. That was never wanted here, but the rule below is
+ * the only thing that actually stops it: `color-scheme: light` further down
+ * tells the browser how to paint its own widgets and has no effect on the
+ * media query, so on a dark OS every `dark:` utility still fired. The shared
+ * components carry them (they came from Catalyst) while hand-written pages do
+ * not, which rendered half the app dark and left dark text on dark cards.
+ *
+ * Rebinding the variant to a `.dark` class nothing ever sets makes every
+ * `dark:` utility inert without deleting them. To take dark mode up properly
+ * later, style the remaining pages and put `dark` on <html>; to hand it back
+ * to the OS, delete this line.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
  * Per-institution themeable color scales.
  *
  * These register `primary`, `success`, `warning`, `danger` and `info` color
@@ -78,17 +96,12 @@
   --color-info-950: #172554;
 }
 
-/* Disable dark mode - force light mode always */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: light;
-  }
-}
-
-:root {
-  color-scheme: light;
-}
-
+/*
+ * Keep browser-painted widgets (scrollbars, date pickers, autofill, form
+ * controls) light too, even where the OS is set to dark. The `dark:` variant
+ * itself is disabled at the top of this file.
+ */
+:root,
 html {
   color-scheme: light;
 }
