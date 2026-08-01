@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { institutionService } from '../../services/institutionService';
 import {
   LayoutDashboard,
@@ -50,7 +51,20 @@ interface MenuItem {
   label: string;
   icon: React.ReactNode;
   path: string;
+  /**
+   * Module from the access catalog this item belongs to. The item is shown
+   * when the signed-in user's role can reach it at `ability` (default 'view').
+   */
+  module?: string;
+  ability?: string;
+  /**
+   * Role slugs, for the student portal only. Student access is not modelled as
+   * module permissions — those screens are a student's own records, and every
+   * staff-side module is closed to them regardless.
+   */
   allowedRoles?: string[];
+  /** Shown to any signed-in staff member; hidden from students. */
+  staffOnly?: boolean;
   // Match the path exactly (NavLink `end`) so a parent path doesn't stay
   // highlighted when a child route like `/announcements/manage` is active.
   end?: boolean;
@@ -92,7 +106,8 @@ const menuGroups: MenuGroup[] = [
         label: 'Manage Announcements',
         icon: <Send className="w-5 h-5" />,
         path: '/announcements/manage',
-        allowedRoles: ['subject-teacher', 'super-administrator', 'principal', 'institution-administrator', 'department-head', 'finance'],
+        module: 'announcements',
+        ability: 'manage',
       },
     ],
   },
@@ -140,18 +155,20 @@ const menuGroups: MenuGroup[] = [
     label: 'My Work',
     items: [
       {
+        // A teacher's own advisory sections and teaching load. Gated on
+        // Subjects because that is what makes a role a teaching one.
         id: 'my-class-sections',
         label: 'My Class Sections',
         icon: <BookOpen className="w-5 h-5" />,
         path: '/my-class-sections',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head', 'finance'],
+        module: 'subjects',
       },
       {
         id: 'assigned-subjects',
         label: 'My Assigned Subjects',
         icon: <AssignedSubjectsIcon className="w-5 h-5" />,
         path: '/assigned-subjects',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head', 'finance'],
+        module: 'subjects',
       },
     ],
   },
@@ -163,49 +180,51 @@ const menuGroups: MenuGroup[] = [
         label: 'Class Sections',
         icon: <GraduationCap className="w-5 h-5" />,
         path: '/class-sections',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'class-sections',
       },
       {
         id: 'timetable',
         label: 'Timetable',
         icon: <CalendarDays className="w-5 h-5" />,
         path: '/timetable',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'timetable',
       },
       {
         id: 'grade-levels',
         label: 'Grade Levels',
         icon: <ListOrdered className="w-5 h-5" />,
         path: '/grade-levels',
-        allowedRoles: ['super-administrator'],
+        module: 'grade-levels',
+        ability: 'manage',
       },
       {
         id: 'grading-scales',
         label: 'Grading Scales',
         icon: <ListChecks className="w-5 h-5" />,
         path: '/grading-scales',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'grading-scales',
       },
       {
         id: 'consolidated-grades',
         label: 'Consolidated Grades',
         icon: <BarChart3 className="w-5 h-5" />,
         path: '/consolidated-grades',
-        allowedRoles: ['principal', 'curriculum-head', 'assistant-principal'],
+        module: 'consolidated-grades',
       },
       {
         id: 'proficiency',
         label: 'Proficiency',
         icon: <TrendingUp className="w-5 h-5" />,
         path: '/proficiency',
-        allowedRoles: ['principal', 'institution-administrator', 'curriculum-head', 'assistant-principal'],
+        module: 'proficiency',
       },
       {
         id: 'school-days',
         label: 'School Days',
         icon: <Calendar className="w-5 h-5" />,
         path: '/school-days',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'school-days',
+        ability: 'manage',
       },
     ],
   },
@@ -217,21 +236,22 @@ const menuGroups: MenuGroup[] = [
         label: 'Students',
         icon: <StudentsIcon className="w-5 h-5" />,
         path: '/students',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'registrar'],
+        module: 'students',
+        ability: 'manage',
       },
       {
         id: 'admission-forms',
         label: 'Admission Forms',
         icon: <ClipboardList className="w-5 h-5" />,
         path: '/admission-forms',
-        allowedRoles: ['principal', 'institution-administrator', 'registrar'],
+        module: 'admission-forms',
       },
       {
         id: 'gate-entries',
         label: 'Gate Entries',
         icon: <ScanLine className="w-5 h-5" />,
         path: '/gate-entries',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'gate-entries',
       },
     ],
   },
@@ -243,28 +263,28 @@ const menuGroups: MenuGroup[] = [
         label: 'Finance',
         icon: <Wallet className="w-5 h-5" />,
         path: '/finance',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+        module: 'finance',
       },
       {
         id: 'payment-plans',
         label: 'Payment Plans',
         icon: <CalendarDays className="w-5 h-5" />,
         path: '/payment-plans',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+        module: 'payment-plans',
       },
       {
         id: 'finance-announcements',
         label: 'Announcements',
         icon: <Megaphone className="w-5 h-5" />,
         path: '/finance-announcements',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+        module: 'finance',
       },
       {
         id: 'disbursements',
         label: 'Disbursements',
         icon: <Banknote className="w-5 h-5" />,
         path: '/disbursements',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator', 'finance'],
+        module: 'disbursements',
       },
     ],
   },
@@ -276,60 +296,51 @@ const menuGroups: MenuGroup[] = [
         label: 'Biometric Devices',
         icon: <Fingerprint className="w-5 h-5" />,
         path: '/hris/devices',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'biometric-devices',
       },
       {
         id: 'hris-zk-users',
         label: 'ZK Users',
         icon: <Monitor className="w-5 h-5" />,
         path: '/hris/zk-users',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'zk-users',
       },
       {
         id: 'hris-attendance',
         label: 'Attendance Logs',
         icon: <Clock className="w-5 h-5" />,
         path: '/hris/attendance',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'attendance-logs',
       },
       {
         id: 'hris-staff-schedules',
         label: 'Staff Schedules',
         icon: <CalendarClock className="w-5 h-5" />,
         path: '/hris/staff-schedules',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'staff-schedules',
       },
       {
-        // Every staff member files their own; approvers also get a review queue.
+        // Every staff member files their own here, so this stays open to all
+        // staff; the approval queue inside is what the permission gates.
         id: 'hris-attendance-requests',
         label: 'Attendance Requests',
         icon: <CalendarCheck className="w-5 h-5" />,
         path: '/hris/attendance-requests',
-        allowedRoles: [
-          'principal',
-          'institution-administrator',
-          'subject-teacher',
-          'department-head',
-          'hr-admin',
-          'hr',
-          'staff',
-          'registrar',
-          'finance',
-        ],
+        staffOnly: true,
       },
       {
         id: 'hris-payroll',
         label: 'Payroll',
         icon: <Banknote className="w-5 h-5" />,
         path: '/hris/payroll',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'payroll',
       },
       {
         id: 'staffs',
         label: 'Staffs',
         icon: <UserCheck className="w-5 h-5" />,
         path: '/staffs',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'staffs',
       },
     ],
   },
@@ -341,21 +352,21 @@ const menuGroups: MenuGroup[] = [
         label: 'Gateways',
         icon: <Smartphone className="w-5 h-5" />,
         path: '/sms/gateways',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'sms-gateways',
       },
       {
         id: 'sms-messages',
         label: 'Messages',
         icon: <MessageSquare className="w-5 h-5" />,
         path: '/sms/messages',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'sms-messages',
       },
       {
         id: 'sms-settings',
         label: 'SMS Settings',
         icon: <Settings className="w-5 h-5" />,
         path: '/sms/settings',
-        allowedRoles: ['super-administrator', 'principal', 'institution-administrator'],
+        module: 'sms-settings',
       },
     ],
   },
@@ -367,49 +378,49 @@ const menuGroups: MenuGroup[] = [
         label: 'Users',
         icon: <Users className="w-5 h-5" />,
         path: '/users',
-        allowedRoles: ['super-administrator'],
+        module: 'users',
       },
       {
         id: 'institutions',
         label: 'Institutions',
         icon: <Building2 className="w-5 h-5" />,
         path: '/institutions',
-        allowedRoles: ['super-administrator'],
+        module: 'institutions',
       },
       {
         id: 'roles',
-        label: 'Roles',
+        label: 'Roles & Access',
         icon: <Shield className="w-5 h-5" />,
         path: '/roles',
-        allowedRoles: ['super-administrator'],
+        module: 'roles',
       },
       {
         id: 'subscriptions',
         label: 'Subscriptions',
         icon: <CreditCard className="w-5 h-5" />,
         path: '/subscriptions',
-        allowedRoles: ['super-administrator'],
+        module: 'subscriptions',
       },
       {
         id: 'departments',
         label: 'Departments',
         icon: <FolderTree className="w-5 h-5" />,
         path: '/departments',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'departments',
       },
       {
         id: 'tracks-strands',
         label: 'Tracks & Strands',
         icon: <Route className="w-5 h-5" />,
         path: '/tracks-strands',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'tracks-strands',
       },
       {
         id: 'settings',
         label: 'Settings',
         icon: <Settings className="w-5 h-5" />,
         path: '/settings',
-        allowedRoles: ['principal', 'institution-administrator'],
+        module: 'settings',
       },
     ],
   },
@@ -421,21 +432,21 @@ const menuGroups: MenuGroup[] = [
         label: 'Certificate Builder',
         icon: <FileText className="w-5 h-5" />,
         path: '/certificate-builder',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head', 'finance'],
+        module: 'certificate-builder',
       },
       {
         id: 'form-builder',
         label: 'Form Builder',
         icon: <LayoutTemplate className="w-5 h-5" />,
         path: '/form-builder',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head', 'finance'],
+        module: 'form-builder',
       },
       {
         id: 'id-card-builder',
         label: 'Student ID Builder',
         icon: <CreditCard className="w-5 h-5" />,
         path: '/id-card-builder',
-        allowedRoles: ['subject-teacher', 'principal', 'institution-administrator', 'department-head', 'finance'],
+        module: 'id-card-builder',
       },
     ],
   },
@@ -444,6 +455,7 @@ const menuGroups: MenuGroup[] = [
 const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user } = useAuth();
+  const { can, isStudent } = usePermissions();
   const userRoleSlug = user?.role?.slug;
 
   const institutionId = user?.user_institutions?.[0]?.institution_id;
@@ -477,13 +489,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
-          if (!item.allowedRoles) return true;
-          if (!userRoleSlug) return false;
-          return item.allowedRoles.includes(userRoleSlug);
+          // Module-gated: shown only when the role can reach it. This mirrors
+          // the API — hiding the link is presentation, the endpoint enforces.
+          if (item.module) return can(item.module, item.ability ?? 'view');
+
+          // Student-portal items are matched on the role slug; students hold
+          // no module permissions.
+          if (item.allowedRoles) {
+            return userRoleSlug ? item.allowedRoles.includes(userRoleSlug) : false;
+          }
+
+          if (item.staffOnly) return !isStudent;
+
+          return true;
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [userRoleSlug]);
+  }, [userRoleSlug, can, isStudent]);
 
   return (
     <motion.div

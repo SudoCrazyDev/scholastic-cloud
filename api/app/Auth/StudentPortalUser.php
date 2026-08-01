@@ -81,4 +81,31 @@ class StudentPortalUser implements Authenticatable
     {
         return new \Illuminate\Database\Eloquent\Collection([]);
     }
+
+    /**
+     * Students hold no module permissions. Their portal screens are personal
+     * modules — their own grades, their own ledger — which are never gated on
+     * the module catalog, and every staff-side module is closed to them.
+     *
+     * @return array<string>
+     */
+    public function permissionList(?string $institutionId = null): array
+    {
+        return [];
+    }
+
+    public function hasFullAccess(?string $institutionId = null): bool
+    {
+        return false;
+    }
+
+    public function hasPermissionTo(string $permission, ?string $institutionId = null): bool
+    {
+        return false;
+    }
+
+    public function hasModuleAccess(string $module, string $ability = 'view', ?string $institutionId = null): bool
+    {
+        return false;
+    }
 }

@@ -26,6 +26,10 @@ export { useDataTable } from './useDataTable'
 // Example implementation
 export { useSubscriptionsWithDataTable } from './useSubscriptionsWithDataTable'
 
+// Module access
+export { usePermissions } from './usePermissions'
+export { useModuleCatalog } from './useModuleCatalog'
+
 // Legacy hooks (for backward compatibility)
 export { useAuth } from './useAuth'
 export { useLogin, useLogout, useProfile } from './useAuthQueries' 

@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.token'        => \App\Http\Middleware\AuthenticateToken::class,
             'auth.bridge.token' => \App\Http\Middleware\AuthenticateBridgeToken::class,
             'auth.sms.token'    => \App\Http\Middleware\AuthenticateSmsToken::class,
+            'module'            => \App\Http\Middleware\EnsureModuleAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

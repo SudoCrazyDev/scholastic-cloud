@@ -23,9 +23,6 @@ use Illuminate\Validation\ValidationException;
  */
 class StaffAttendanceRequestController extends Controller
 {
-    /** Roles that may approve, and whose own filings are auto-approved. */
-    private const APPROVER_ROLES = ['principal', 'institution-administrator', 'super-administrator'];
-
     /**
      * List requests. Approvers see the whole institution by default; everyone
      * else only ever sees their own, regardless of the scope asked for.
@@ -529,7 +526,10 @@ class StaffAttendanceRequestController extends Controller
             return false;
         }
 
-        return in_array((string) ($user->getRole()?->slug ?? ''), self::APPROVER_ROLES, true);
+        // Read off the role's permissions rather than a fixed slug list, so a
+        // school can build its own approving role. The built-in roles are
+        // seeded with this permission, so their behaviour is unchanged.
+        return $user->hasPermissionTo('attendance-requests.approve');
     }
 
     private function isStudentUser(Request $request): bool

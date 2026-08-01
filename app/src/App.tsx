@@ -6,6 +6,7 @@ import { ThemeProvider } from './providers/ThemeProvider';
 import PublicLayout from './components/layouts/PublicLayout';
 import PrivateLayout from './components/layouts/PrivateLayout';
 import StudentOnlyRoute from './components/StudentOnlyRoute';
+import RequireModule from './components/RequireModule';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Institutions from './pages/Institutions';
@@ -92,23 +93,30 @@ function App() {
 
             {/* Private Routes */}
             <Route element={<PrivateLayout />}>
+              {/*
+                Pages wrapped in RequireModule are closed to roles that were not
+                given that module — typing the URL redirects to the dashboard
+                rather than rendering a screen that only fills with 403s.
+                Personal pages (dashboard, own profile, own portal) are never
+                gated.
+              */}
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="users" element={<Users />} />
+              <Route path="users" element={<RequireModule module="users"><Users /></RequireModule>} />
               <Route path="user-profile" element={<UserProfile />} />
-              <Route path="institutions" element={<Institutions />} />
-              <Route path="roles" element={<Roles />} />
-              <Route path="subscriptions" element={<Subscriptions />} />
-              <Route path="staffs" element={<Staffs />} />
-              <Route path="students" element={<Students />} />
-              <Route path="admission-forms" element={<AdmissionForms />} />
-              <Route path="gate-entries" element={<GateEntries />} />
-              <Route path="students/:id" element={<StudentDetail />} />
-              <Route path="class-sections" element={<ClassSections />} />
-              <Route path="timetable" element={<Timetable />} />
-              <Route path="my-class-sections" element={<MyClassSections />} />
-              <Route path="my-class-sections/:id" element={<ClassSectionDetail />} />
-              <Route path="assigned-subjects" element={<AssignedSubjects />} />
-              <Route path="assigned-subjects/:id" element={<SubjectDetail />} />
+              <Route path="institutions" element={<RequireModule module="institutions"><Institutions /></RequireModule>} />
+              <Route path="roles" element={<RequireModule module="roles"><Roles /></RequireModule>} />
+              <Route path="subscriptions" element={<RequireModule module="subscriptions"><Subscriptions /></RequireModule>} />
+              <Route path="staffs" element={<RequireModule module="staffs"><Staffs /></RequireModule>} />
+              <Route path="students" element={<RequireModule module="students" ability="manage"><Students /></RequireModule>} />
+              <Route path="admission-forms" element={<RequireModule module="admission-forms"><AdmissionForms /></RequireModule>} />
+              <Route path="gate-entries" element={<RequireModule module="gate-entries"><GateEntries /></RequireModule>} />
+              <Route path="students/:id" element={<RequireModule module="students"><StudentDetail /></RequireModule>} />
+              <Route path="class-sections" element={<RequireModule module="class-sections"><ClassSections /></RequireModule>} />
+              <Route path="timetable" element={<RequireModule module="timetable"><Timetable /></RequireModule>} />
+              <Route path="my-class-sections" element={<RequireModule module="subjects"><MyClassSections /></RequireModule>} />
+              <Route path="my-class-sections/:id" element={<RequireModule module="subjects"><ClassSectionDetail /></RequireModule>} />
+              <Route path="assigned-subjects" element={<RequireModule module="subjects"><AssignedSubjects /></RequireModule>} />
+              <Route path="assigned-subjects/:id" element={<RequireModule module="subjects"><SubjectDetail /></RequireModule>} />
               <Route
                 path="my-assessments"
                 element={(
@@ -151,51 +159,54 @@ function App() {
                   </StudentOnlyRoute>
                 )}
               />
-              <Route path="teacher-attendance" element={<TeacherAttendance />} />
+              <Route path="teacher-attendance" element={<RequireModule module="student-attendance"><TeacherAttendance /></RequireModule>} />
               <Route path="teacher-attendance-demo" element={<TeacherAttendanceDemo />} />
-              <Route path="consolidated-grades" element={<ConsolidatedGrades />} />
-              <Route path="consolidated-grades/:sectionId/:quarter" element={<SectionGrades />} />
-              <Route path="proficiency" element={<Proficiency />} />
-              <Route path="sf9" element={<SF9 />} />
-              <Route path="certificate-builder/new" element={<CertificateBuilder />} />
-              <Route path="certificate-builder" element={<CertificateBuilderPage />} />
-              <Route path="certificates" element={<CertificateList />} />
-              <Route path="id-card-builder/new" element={<IdCardBuilder />} />
-              <Route path="id-card-builder" element={<IdCardBuilderPage />} />
-              <Route path="form-builder" element={<FormBuilderPage />} />
-              <Route path="school-days" element={<SchoolDays />} />
-              <Route path="departments" element={<Departments />} />
-              <Route path="grade-levels" element={<GradeLevels />} />
-              <Route path="grading-scales" element={<GradingScales />} />
-              <Route path="tracks-strands" element={<TracksStrands />} />
-              <Route path="finance" element={<Finance />} />
-              <Route path="finance/school-fees" element={<Finance />} />
-              <Route path="payment-plans" element={<PaymentPlansView />} />
-              <Route path="disbursements" element={<Disbursements />} />
-              <Route path="finance-announcements" element={<FinanceAnnouncementsView />} />
-              <Route path="finance/default-amounts" element={<Finance />} />
-              <Route path="finance/student-fees" element={<Finance />} />
-              <Route path="finance/cashiering" element={<Finance />} />
-              <Route path="finance/ledger" element={<Finance />} />
-              <Route path="finance/collections" element={<Finance />} />
-              <Route path="finance/discounts" element={<Finance />} />
-              <Route path="finance/default-discounts" element={<Finance />} />
-              <Route path="finance/sibling-discounts" element={<Finance />} />
-              <Route path="finance/receipt-builder" element={<Finance />} />
-              <Route path="finance/receipt-approvals" element={<Finance />} />
-              <Route path="finance/void-requests" element={<Finance />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="hris/devices" element={<HrisDevices />} />
-              <Route path="hris/zk-users" element={<HrisZkUsers />} />
-              <Route path="hris/attendance" element={<HrisAttendance />} />
-              <Route path="hris/staff-schedules" element={<HrisStaffSchedules />} />
+              <Route path="consolidated-grades" element={<RequireModule module="consolidated-grades"><ConsolidatedGrades /></RequireModule>} />
+              <Route path="consolidated-grades/:sectionId/:quarter" element={<RequireModule module="consolidated-grades"><SectionGrades /></RequireModule>} />
+              <Route path="proficiency" element={<RequireModule module="proficiency"><Proficiency /></RequireModule>} />
+              <Route path="sf9" element={<RequireModule module="consolidated-grades"><SF9 /></RequireModule>} />
+              <Route path="certificate-builder/new" element={<RequireModule module="certificate-builder" ability="manage"><CertificateBuilder /></RequireModule>} />
+              <Route path="certificate-builder" element={<RequireModule module="certificate-builder"><CertificateBuilderPage /></RequireModule>} />
+              <Route path="certificates" element={<RequireModule module="certificate-builder"><CertificateList /></RequireModule>} />
+              <Route path="id-card-builder/new" element={<RequireModule module="id-card-builder" ability="manage"><IdCardBuilder /></RequireModule>} />
+              <Route path="id-card-builder" element={<RequireModule module="id-card-builder"><IdCardBuilderPage /></RequireModule>} />
+              <Route path="form-builder" element={<RequireModule module="form-builder"><FormBuilderPage /></RequireModule>} />
+              <Route path="school-days" element={<RequireModule module="school-days" ability="manage"><SchoolDays /></RequireModule>} />
+              <Route path="departments" element={<RequireModule module="departments"><Departments /></RequireModule>} />
+              <Route path="grade-levels" element={<RequireModule module="grade-levels" ability="manage"><GradeLevels /></RequireModule>} />
+              <Route path="grading-scales" element={<RequireModule module="grading-scales"><GradingScales /></RequireModule>} />
+              <Route path="tracks-strands" element={<RequireModule module="tracks-strands"><TracksStrands /></RequireModule>} />
+              <Route path="finance" element={<RequireModule module="finance"><Finance /></RequireModule>} />
+              <Route path="finance/school-fees" element={<RequireModule module="school-fees"><Finance /></RequireModule>} />
+              <Route path="payment-plans" element={<RequireModule module="payment-plans"><PaymentPlansView /></RequireModule>} />
+              <Route path="disbursements" element={<RequireModule module="disbursements"><Disbursements /></RequireModule>} />
+              <Route path="finance-announcements" element={<RequireModule module="finance"><FinanceAnnouncementsView /></RequireModule>} />
+              <Route path="finance/default-amounts" element={<RequireModule module="school-fees"><Finance /></RequireModule>} />
+              <Route path="finance/student-fees" element={<RequireModule module="school-fees"><Finance /></RequireModule>} />
+              <Route path="finance/cashiering" element={<RequireModule module="finance"><Finance /></RequireModule>} />
+              <Route path="finance/ledger" element={<RequireModule module="finance"><Finance /></RequireModule>} />
+              <Route path="finance/collections" element={<RequireModule module="finance-reports"><Finance /></RequireModule>} />
+              <Route path="finance/discounts" element={<RequireModule module="discounts"><Finance /></RequireModule>} />
+              <Route path="finance/default-discounts" element={<RequireModule module="discounts"><Finance /></RequireModule>} />
+              <Route path="finance/sibling-discounts" element={<RequireModule module="discounts"><Finance /></RequireModule>} />
+              <Route path="finance/receipt-builder" element={<RequireModule module="receipt-templates"><Finance /></RequireModule>} />
+              <Route path="finance/receipt-approvals" element={<RequireModule module="finance"><Finance /></RequireModule>} />
+              <Route path="finance/void-requests" element={<RequireModule module="finance"><Finance /></RequireModule>} />
+              <Route path="settings" element={<RequireModule module="settings"><Settings /></RequireModule>} />
+              <Route path="hris/devices" element={<RequireModule module="biometric-devices"><HrisDevices /></RequireModule>} />
+              <Route path="hris/zk-users" element={<RequireModule module="zk-users"><HrisZkUsers /></RequireModule>} />
+              <Route path="hris/attendance" element={<RequireModule module="attendance-logs"><HrisAttendance /></RequireModule>} />
+              <Route path="hris/staff-schedules" element={<RequireModule module="staff-schedules"><HrisStaffSchedules /></RequireModule>} />
+              {/* Any staff member files their own request here; the approval
+                  queue inside the page is what the permission gates. */}
               <Route path="hris/attendance-requests" element={<HrisAttendanceRequests />} />
-              <Route path="hris/payroll" element={<HrisPayroll />} />
-              <Route path="sms/gateways" element={<SmsGateways />} />
-              <Route path="sms/messages" element={<SmsMessages />} />
-              <Route path="sms/settings" element={<SmsSettings />} />
+              <Route path="hris/payroll" element={<RequireModule module="payroll"><HrisPayroll /></RequireModule>} />
+              <Route path="sms/gateways" element={<RequireModule module="sms-gateways"><SmsGateways /></RequireModule>} />
+              <Route path="sms/messages" element={<RequireModule module="sms-messages"><SmsMessages /></RequireModule>} />
+              <Route path="sms/settings" element={<RequireModule module="sms-settings"><SmsSettings /></RequireModule>} />
+              {/* The board is everyone's; authoring is gated. */}
               <Route path="announcements" element={<AnnouncementBoard />} />
-              <Route path="announcements/manage" element={<AnnouncementsManage />} />
+              <Route path="announcements/manage" element={<RequireModule module="announcements" ability="manage"><AnnouncementsManage /></RequireModule>} />
 
             </Route>
 

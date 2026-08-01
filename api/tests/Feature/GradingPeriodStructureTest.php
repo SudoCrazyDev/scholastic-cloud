@@ -153,7 +153,7 @@ class GradingPeriodStructureTest extends TestCase
         $this->academicYear('2025-2026', 'quarter');
         $this->academicYear('2026-2027', 'term', true);
 
-        $this->makeUserWithRole('teacher', 'grading-periods-token');
+        $this->makeUserWithRole('subject-teacher', 'grading-periods-token');
 
         $this->withHeader('Authorization', 'Bearer grading-periods-token')
             ->getJson('/api/grading-periods?academic_year=2026-2027')
@@ -191,7 +191,7 @@ class GradingPeriodStructureTest extends TestCase
     public function test_non_admin_role_cannot_switch_the_structure(): void
     {
         $this->academicYear('2026-2027', 'quarter', true);
-        $this->makeUserWithRole('teacher', 'teacher-token');
+        $this->makeUserWithRole('subject-teacher', 'teacher-token');
 
         $this->withHeader('Authorization', 'Bearer teacher-token')
             ->putJson("/api/institutions/{$this->institution->id}/academic-years/grading-periods", [
@@ -281,7 +281,7 @@ class GradingPeriodStructureTest extends TestCase
     public function test_term_based_subject_rejects_a_fourth_period_final_grade(): void
     {
         $this->academicYear('2026-2027', 'term', true);
-        $user = $this->makeUserWithRole('teacher', 'final-grade-token');
+        $user = $this->makeUserWithRole('subject-teacher', 'final-grade-token');
 
         $section = ClassSection::create([
             'institution_id' => $this->institution->id,

@@ -27,6 +27,7 @@ use App\Http\Controllers\PaymentPlanController;
 use App\Http\Controllers\PaymentReceiptSubmissionController;
 use App\Http\Controllers\PaymentTransactionController;
 use App\Http\Controllers\PaymentVoidRequestController;
+use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\RfidScanLogController;
 use App\Http\Controllers\RoleController;
@@ -119,11 +120,36 @@ Route::post('/public/admission-form-submissions', [AdmissionFormSubmissionContro
 
 // Protected routes (authentication required)
 Route::middleware('auth.token')->group(function () {
+    /*
+    |--------------------------------------------------------------------------
+    | Module access
+    |--------------------------------------------------------------------------
+    |
+    | Routes below are gated with `module:<module>,<ability>`, resolved against
+    | the permissions on the role the user holds at their active institution
+    | (see config/modules.php and App\Http\Middleware\EnsureModuleAccess).
+    |
+    | Two things are deliberately left ungated:
+    |
+    |  - Personal endpoints — a person's own profile, own timesheet, own class
+    |    load. Locking someone out of their own record is never what an
+    |    institution means by restricting access.
+    |  - Routes marked `,shared`, which the student portal also calls. Staff
+    |    still need the permission; students are passed through to controllers
+    |    that already scope the query to the signed-in student.
+    |
+    */
+
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile/password', [AuthController::class, 'updatePassword']);
-    Route::post('/assume-user', [AuthController::class, 'assumeUser']);
-    Route::post('/assume-student', [AuthController::class, 'assumeStudent']);
+    Route::post('/assume-user', [AuthController::class, 'assumeUser'])->middleware('module:users,assume');
+    Route::post('/assume-student', [AuthController::class, 'assumeStudent'])->middleware('module:users,assume');
+
+    // The module catalog and the signed-in user's own permission set — needed
+    // by the client before it can decide what to render, so never gated.
+    Route::get('permissions/catalog', [PermissionController::class, 'catalog']);
+    Route::get('permissions/me', [PermissionController::class, 'me']);
 
     // Desktop app specific endpoints - for offline data synchronization
     Route::prefix('desktop')->group(function () {
@@ -139,39 +165,60 @@ Route::middleware('auth.token')->group(function () {
         Route::get('/running-grades/download', [\App\Http\Controllers\DesktopController::class, 'downloadRunningGrades']);
         Route::post('/running-grades/upload', [\App\Http\Controllers\DesktopController::class, 'uploadRunningGrades']);
     });
-    // Role routes
-    Route::apiResource('roles', RoleController::class);
+    // Role routes — the role builder itself
+    Route::apiResource('roles', RoleController::class)->middleware('module:roles,view');
     // Subscription routes
-    Route::apiResource('subscriptions', SubscriptionController::class);
-    // Institution routes
-    Route::apiResource('institutions', InstitutionController::class);
-    Route::post('institutions/{id}', [InstitutionController::class, 'update']); // POST route for file uploads
-    Route::put('institutions/{id}/academic-year', [InstitutionController::class, 'updateAcademicYear']);
-    // Per-institution color theme (self-serve for institution admins)
+    Route::apiResource('subscriptions', SubscriptionController::class)->middleware('module:subscriptions,view');
+    // Institution routes.
+    //
+    // Reading institutions is lookup data every signed-in staff member needs —
+    // the sidebar's school name and logo, the institution picker on the Users
+    // screen, the header on a printed ID card. Only creating and deleting
+    // institutions is platform administration.
+    //
+    // Editing one is a school managing its own profile, so it answers to
+    // Settings rather than to the platform-only Institutions module.
+    Route::apiResource('institutions', InstitutionController::class)
+        ->only(['index', 'show']);
+    Route::apiResource('institutions', InstitutionController::class)
+        ->only(['store', 'destroy'])
+        ->middleware('module:institutions,manage');
+    Route::apiResource('institutions', InstitutionController::class)
+        ->only(['update'])
+        ->middleware('module:settings,manage');
+    Route::post('institutions/{id}', [InstitutionController::class, 'update'])->middleware('module:settings,manage'); // POST route for file uploads
+    Route::put('institutions/{id}/academic-year', [InstitutionController::class, 'updateAcademicYear'])->middleware('module:settings,manage');
+    // Per-institution color theme (self-serve for institution admins). Reading
+    // the theme is what paints every screen, including a student's, so only the
+    // write side is gated.
     Route::get('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'show']);
-    Route::put('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'update']);
+    Route::put('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'update'])->middleware('module:settings,manage');
     Route::get('institutions/{id}/academic-years', [InstitutionController::class, 'getAcademicYears']);
-    Route::put('institutions/{id}/academic-years/grading-periods', [InstitutionController::class, 'updateAcademicYearGradingPeriods']);
-    // Resolved quarter-vs-term structure for the signed-in user's institution
+    Route::put('institutions/{id}/academic-years/grading-periods', [InstitutionController::class, 'updateAcademicYearGradingPeriods'])->middleware('module:settings,manage');
+    // Resolved quarter-vs-term structure for the signed-in user's institution.
+    // Every grade screen needs it to label periods — ungated reference data.
     Route::get('grading-periods', [InstitutionController::class, 'gradingPeriods']);
-    Route::get('grade-levels', [GradeLevelController::class, 'index']);
-    Route::post('grade-levels', [GradeLevelController::class, 'store']);
-    Route::put('grade-levels/{id}', [GradeLevelController::class, 'update']);
-    Route::delete('grade-levels/{id}', [GradeLevelController::class, 'destroy']);
-    Route::apiResource('grading-scales', \App\Http\Controllers\GradingScaleController::class);
-    Route::get('departments', [DepartmentController::class, 'index']);
-    Route::post('departments', [DepartmentController::class, 'store']);
-    Route::get('departments/{id}', [DepartmentController::class, 'show']);
-    Route::put('departments/{id}', [DepartmentController::class, 'update']);
-    Route::patch('departments/{id}', [DepartmentController::class, 'update']);
-    Route::delete('departments/{id}', [DepartmentController::class, 'destroy']);
+    Route::get('grade-levels', [GradeLevelController::class, 'index'])->middleware('module:grade-levels,view');
+    Route::post('grade-levels', [GradeLevelController::class, 'store'])->middleware('module:grade-levels,manage');
+    Route::put('grade-levels/{id}', [GradeLevelController::class, 'update'])->middleware('module:grade-levels,manage');
+    Route::delete('grade-levels/{id}', [GradeLevelController::class, 'destroy'])->middleware('module:grade-levels,manage');
+    Route::apiResource('grading-scales', \App\Http\Controllers\GradingScaleController::class)->middleware('module:grading-scales,view');
+    Route::get('departments', [DepartmentController::class, 'index'])->middleware('module:departments,view');
+    Route::post('departments', [DepartmentController::class, 'store'])->middleware('module:departments,manage');
+    Route::get('departments/{id}', [DepartmentController::class, 'show'])->middleware('module:departments,view');
+    Route::put('departments/{id}', [DepartmentController::class, 'update'])->middleware('module:departments,manage');
+    Route::patch('departments/{id}', [DepartmentController::class, 'update'])->middleware('module:departments,manage');
+    Route::delete('departments/{id}', [DepartmentController::class, 'destroy'])->middleware('module:departments,manage');
+    // The logo is branding shown to everyone signed in, including students.
     Route::get('institutions/{id}/logo', [InstitutionController::class, 'showLogo']);
-    Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo']);
-    Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions']);
-    // User routes
+    Route::post('institutions/{id}/logo', [InstitutionController::class, 'uploadLogo'])->middleware('module:settings,manage');
+    Route::get('institutions/subscriptions/list', [InstitutionController::class, 'getSubscriptions'])->middleware('module:subscriptions,view');
+    // User routes — "my" endpoints are the signed-in teacher's own load.
     Route::get('users/my/class-sections', [UserController::class, 'getMyClassSections']);
     Route::get('users/my/subjects', [UserController::class, 'getMySubjects']);
-    Route::apiResource('users', UserController::class);
+    Route::apiResource('users', UserController::class)->middleware('module:users,view');
+    // Personal data sheet — every route below reads and writes only the
+    // signed-in user's own record, so none of them are permission-gated.
     // UserOtherPersonalInfo routes (one-to-one, no index)
     Route::post('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'store']);
     Route::get('user-other-personal-info', [\App\Http\Controllers\UserOtherPersonalInfoController::class, 'show']);
@@ -205,107 +252,112 @@ Route::middleware('auth.token')->group(function () {
     Route::patch('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'update']);
     Route::delete('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'destroy']);
     // Student routes - specific routes first to avoid conflicts
-    Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists']);
-    Route::post('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'store']);
-    Route::get('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'show']);
-    Route::get('students/{student}/auth/logs', [App\Http\Controllers\StudentAuthController::class, 'logs']);
-    Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger']);
-    Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount']);
-    Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show']);
-    Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store']);
-    Route::get('students/{id}/sibling-group', [SiblingGroupController::class, 'showForStudent']);
-    Route::get('payment-plan-changes', [StudentPaymentPlanChangeController::class, 'index']);
-    Route::apiResource('payment-plans', PaymentPlanController::class);
-    Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment']);
-    Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
-    Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord']);
-    Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index']);
-    Route::post('students/{studentId}/documents', [StudentDocumentController::class, 'store']);
-    Route::post('students/{studentId}/documents/{documentId}/cross-check', [StudentDocumentController::class, 'crossCheck']);
-    Route::delete('students/{studentId}/documents/{documentId}', [StudentDocumentController::class, 'destroy']);
-    Route::apiResource('students', StudentController::class);
+    Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists'])->middleware('module:students,view');
+    Route::post('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'store'])->middleware('module:students,manage');
+    Route::get('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'show'])->middleware('module:students,view');
+    Route::get('students/{student}/auth/logs', [App\Http\Controllers\StudentAuthController::class, 'logs'])->middleware('module:students,view');
+    // Ledger, notice of account and payment plan are read by the student's own
+    // portal as well as by finance staff.
+    Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger'])->middleware('module:finance,view,shared');
+    Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount'])->middleware('module:finance,view,shared');
+    Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show'])->middleware('module:payment-plans,view,shared');
+    Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store'])->middleware('module:payment-plans,manage');
+    Route::get('students/{id}/sibling-group', [SiblingGroupController::class, 'showForStudent'])->middleware('module:discounts,view');
+    Route::get('payment-plan-changes', [StudentPaymentPlanChangeController::class, 'index'])->middleware('module:payment-plans,view');
+    Route::apiResource('payment-plans', PaymentPlanController::class)->middleware('module:payment-plans,view');
+    Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment'])->middleware('module:students,view');
+    Route::post('students/{id}/update', [StudentController::class, 'updateWithFile'])->middleware('module:students,manage');
+    Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord'])->middleware('module:students,manage');
+    Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index'])->middleware('module:students,view,shared');
+    Route::post('students/{studentId}/documents', [StudentDocumentController::class, 'store'])->middleware('module:students,manage,shared');
+    Route::post('students/{studentId}/documents/{documentId}/cross-check', [StudentDocumentController::class, 'crossCheck'])->middleware('module:students,manage');
+    Route::delete('students/{studentId}/documents/{documentId}', [StudentDocumentController::class, 'destroy'])->middleware('module:students,manage');
+    // Students read their own record here (My Finance loads the student first).
+    Route::apiResource('students', StudentController::class)->middleware('module:students,view,shared');
     // Staff routes
-    Route::put('staffs/{id}/role', [StaffController::class, 'updateRole']);
-    Route::post('staffs/{id}/reset-password', [StaffController::class, 'resetPassword']);
-    Route::apiResource('staffs', StaffController::class);
+    Route::put('staffs/{id}/role', [StaffController::class, 'updateRole'])->middleware('module:staffs,manage');
+    Route::post('staffs/{id}/reset-password', [StaffController::class, 'resetPassword'])->middleware('module:staffs,manage');
+    Route::apiResource('staffs', StaffController::class)->middleware('module:staffs,view');
     // Track & Strand routes
-    Route::get('tracks', [TrackController::class, 'index']);
-    Route::post('tracks', [TrackController::class, 'store']);
-    Route::put('tracks/{id}', [TrackController::class, 'update']);
-    Route::delete('tracks/{id}', [TrackController::class, 'destroy']);
-    Route::get('strands', [StrandController::class, 'index']);
-    Route::post('strands', [StrandController::class, 'store']);
-    Route::put('strands/{id}', [StrandController::class, 'update']);
-    Route::delete('strands/{id}', [StrandController::class, 'destroy']);
+    Route::get('tracks', [TrackController::class, 'index'])->middleware('module:tracks-strands,view');
+    Route::post('tracks', [TrackController::class, 'store'])->middleware('module:tracks-strands,manage');
+    Route::put('tracks/{id}', [TrackController::class, 'update'])->middleware('module:tracks-strands,manage');
+    Route::delete('tracks/{id}', [TrackController::class, 'destroy'])->middleware('module:tracks-strands,manage');
+    Route::get('strands', [StrandController::class, 'index'])->middleware('module:tracks-strands,view');
+    Route::post('strands', [StrandController::class, 'store'])->middleware('module:tracks-strands,manage');
+    Route::put('strands/{id}', [StrandController::class, 'update'])->middleware('module:tracks-strands,manage');
+    Route::delete('strands/{id}', [StrandController::class, 'destroy'])->middleware('module:tracks-strands,manage');
     // ClassSection routes
-    Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution']);
-    Route::get('class-sections/academic-years', [ClassSectionController::class, 'getAcademicYears']);
-    Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve']);
-    Route::post('class-sections/{id}/transfer-student', [ClassSectionController::class, 'transferStudent']);
-    Route::apiResource('class-sections', ClassSectionController::class);
+    Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution'])->middleware('module:class-sections,view');
+    Route::get('class-sections/academic-years', [ClassSectionController::class, 'getAcademicYears'])->middleware('module:class-sections,view');
+    Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve'])->middleware('module:class-sections,manage');
+    Route::post('class-sections/{id}/transfer-student', [ClassSectionController::class, 'transferStudent'])->middleware('module:class-sections,manage');
+    Route::apiResource('class-sections', ClassSectionController::class)->middleware('module:class-sections,view');
 
     // Timetable routes
-    Route::get('timetable/section/{sectionId}', [TimetableController::class, 'getSectionTimetable']);
-    Route::get('timetable/conflicts', [TimetableController::class, 'getConflicts']);
-    Route::get('timetable/teachers', [TimetableController::class, 'getTeachersTimetable']);
-    Route::patch('timetable/subjects/{subjectId}/schedule', [TimetableController::class, 'updateSubjectSchedule']);
+    Route::get('timetable/section/{sectionId}', [TimetableController::class, 'getSectionTimetable'])->middleware('module:timetable,view');
+    Route::get('timetable/conflicts', [TimetableController::class, 'getConflicts'])->middleware('module:timetable,view');
+    Route::get('timetable/teachers', [TimetableController::class, 'getTeachersTimetable'])->middleware('module:timetable,view');
+    Route::patch('timetable/subjects/{subjectId}/schedule', [TimetableController::class, 'updateSubjectSchedule'])->middleware('module:timetable,manage');
     // Subject routes
-    Route::get('subjects/by-institution', [SubjectController::class, 'indexByInstitution']);
-    Route::apiResource('subjects', SubjectController::class);
-    Route::post('subjects/reorder', [SubjectController::class, 'reorder']);
-    Route::post('subjects/reorder-children', [SubjectController::class, 'reorderChildren']);
+    Route::get('subjects/by-institution', [SubjectController::class, 'indexByInstitution'])->middleware('module:subjects,view');
+    Route::apiResource('subjects', SubjectController::class)->middleware('module:subjects,view,shared');
+    Route::post('subjects/reorder', [SubjectController::class, 'reorder'])->middleware('module:subjects,manage');
+    Route::post('subjects/reorder-children', [SubjectController::class, 'reorderChildren'])->middleware('module:subjects,manage');
 
     // Subject Template routes
-    Route::apiResource('subject-templates', SubjectTemplateController::class);
-    Route::post('subject-templates/{id}/apply', [SubjectTemplateController::class, 'applyToSection']);
+    Route::apiResource('subject-templates', SubjectTemplateController::class)->middleware('module:subjects,view');
+    Route::post('subject-templates/{id}/apply', [SubjectTemplateController::class, 'applyToSection'])->middleware('module:subjects,manage');
 
     // StudentSubject routes
-    Route::apiResource('student-subjects', App\Http\Controllers\StudentSubjectController::class);
-    Route::post('student-subjects/bulk-assign', [App\Http\Controllers\StudentSubjectController::class, 'bulkAssign']);
+    Route::apiResource('student-subjects', App\Http\Controllers\StudentSubjectController::class)->middleware('module:subjects,view,shared');
+    Route::post('student-subjects/bulk-assign', [App\Http\Controllers\StudentSubjectController::class, 'bulkAssign'])->middleware('module:subjects,manage');
     // Topic routes
-    Route::get('topics', [App\Http\Controllers\TopicController::class, 'index']);
-    Route::post('topics', [App\Http\Controllers\TopicController::class, 'store']);
-    Route::post('topics/bulk', [App\Http\Controllers\TopicBulkController::class, 'store']);
-    Route::get('topics/{id}', [App\Http\Controllers\TopicController::class, 'show']);
-    Route::put('topics/{id}', [App\Http\Controllers\TopicController::class, 'update']);
-    Route::patch('topics/{id}', [App\Http\Controllers\TopicController::class, 'update']);
-    Route::delete('topics/{id}', [App\Http\Controllers\TopicController::class, 'destroy']);
-    Route::post('topics/reorder', [App\Http\Controllers\TopicController::class, 'reorder']);
-    Route::patch('topics/{id}/toggle-completion', [App\Http\Controllers\TopicController::class, 'toggleCompletion']);
-    Route::post('topics/{id}/upload', [App\Http\Controllers\TopicController::class, 'uploadAttachment']);
-    Route::post('topics/{id}/copy', [App\Http\Controllers\TopicController::class, 'copyToSubjects']);
+    Route::get('topics', [App\Http\Controllers\TopicController::class, 'index'])->middleware('module:subjects,view');
+    Route::post('topics', [App\Http\Controllers\TopicController::class, 'store'])->middleware('module:subjects,manage');
+    Route::post('topics/bulk', [App\Http\Controllers\TopicBulkController::class, 'store'])->middleware('module:subjects,manage');
+    Route::get('topics/{id}', [App\Http\Controllers\TopicController::class, 'show'])->middleware('module:subjects,view');
+    Route::put('topics/{id}', [App\Http\Controllers\TopicController::class, 'update'])->middleware('module:subjects,manage');
+    Route::patch('topics/{id}', [App\Http\Controllers\TopicController::class, 'update'])->middleware('module:subjects,manage');
+    Route::delete('topics/{id}', [App\Http\Controllers\TopicController::class, 'destroy'])->middleware('module:subjects,manage');
+    Route::post('topics/reorder', [App\Http\Controllers\TopicController::class, 'reorder'])->middleware('module:subjects,manage');
+    Route::patch('topics/{id}/toggle-completion', [App\Http\Controllers\TopicController::class, 'toggleCompletion'])->middleware('module:subjects,manage');
+    Route::post('topics/{id}/upload', [App\Http\Controllers\TopicController::class, 'uploadAttachment'])->middleware('module:subjects,manage');
+    Route::post('topics/{id}/copy', [App\Http\Controllers\TopicController::class, 'copyToSubjects'])->middleware('module:subjects,manage');
 
     // Subject quarter plans (AI planner)
-    Route::get('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'showBySubjectAndQuarter']);
-    Route::put('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'upsertBySubjectAndQuarter']);
+    Route::get('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'showBySubjectAndQuarter'])->middleware('module:subjects,view');
+    Route::put('subject-quarter-plans/by-subject-and-quarter', [App\Http\Controllers\SubjectQuarterPlanController::class, 'upsertBySubjectAndQuarter'])->middleware('module:subjects,manage');
 
     // Lesson plans
-    Route::get('lesson-plans', [App\Http\Controllers\LessonPlanController::class, 'index']);
-    Route::get('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'show']);
-    Route::patch('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'update']);
-    Route::delete('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'destroy']);
+    Route::get('lesson-plans', [App\Http\Controllers\LessonPlanController::class, 'index'])->middleware('module:subjects,view');
+    Route::get('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'show'])->middleware('module:subjects,view');
+    Route::patch('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'update'])->middleware('module:subjects,manage');
+    Route::delete('lesson-plans/{id}', [App\Http\Controllers\LessonPlanController::class, 'destroy'])->middleware('module:subjects,manage');
 
     // AI planner generation endpoints
-    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/topics/generate', [App\Http\Controllers\AiPlannerController::class, 'generateTopics']);
-    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/lesson-plans/generate', [App\Http\Controllers\AiPlannerController::class, 'generateLessonPlans']);
-    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/assessments/generate', [App\Http\Controllers\AiPlannerController::class, 'generateAssessments']);
-    Route::get('ai/generation-tasks/{taskId}/status', [App\Http\Controllers\AiPlannerController::class, 'checkGenerationStatus']);
+    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/topics/generate', [App\Http\Controllers\AiPlannerController::class, 'generateTopics'])->middleware('module:subjects,manage');
+    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/lesson-plans/generate', [App\Http\Controllers\AiPlannerController::class, 'generateLessonPlans'])->middleware('module:subjects,manage');
+    Route::post('ai/subjects/{subjectId}/quarters/{quarter}/assessments/generate', [App\Http\Controllers\AiPlannerController::class, 'generateAssessments'])->middleware('module:subjects,manage');
+    Route::get('ai/generation-tasks/{taskId}/status', [App\Http\Controllers\AiPlannerController::class, 'checkGenerationStatus'])->middleware('module:subjects,view');
     // SubjectEcr routes
-    Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class);
-    Route::post('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'uploadImage']);
-    Route::delete('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'deleteImage']);
-    Route::post('subjects-ecr-items/{id}/copy', [App\Http\Controllers\SubjectEcrItemController::class, 'copyToSubjects']);
-    Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class);
+    Route::apiResource('subjects-ecr', App\Http\Controllers\SubjectEcrController::class)->middleware('module:subjects,view');
+    Route::post('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'uploadImage'])->middleware('module:subjects,manage');
+    Route::delete('subjects-ecr-items/images', [App\Http\Controllers\SubjectEcrItemController::class, 'deleteImage'])->middleware('module:subjects,manage');
+    Route::post('subjects-ecr-items/{id}/copy', [App\Http\Controllers\SubjectEcrItemController::class, 'copyToSubjects'])->middleware('module:subjects,manage');
+    Route::apiResource('subjects-ecr-items', App\Http\Controllers\SubjectEcrItemController::class)->middleware('module:subjects,view,shared');
     // SubjectSummativeAssessment routes
-    Route::apiResource('subject-summative-assessments', \App\Http\Controllers\SubjectSummativeAssessmentController::class);
+    Route::apiResource('subject-summative-assessments', \App\Http\Controllers\SubjectSummativeAssessmentController::class)->middleware('module:subjects,view');
     // StudentSection routes
-    Route::apiResource('student-sections', StudentSectionController::class);
-    Route::post('student-sections/bulk-assign', [StudentSectionController::class, 'bulkAssign']);
+    Route::apiResource('student-sections', StudentSectionController::class)->middleware('module:class-sections,view,shared');
+    Route::post('student-sections/bulk-assign', [StudentSectionController::class, 'bulkAssign'])->middleware('module:class-sections,manage');
     // StudentEcrItemScore routes
-    Route::get('student-ecr-item-scores/by-subject-section', [StudentEcrItemScoreController::class, 'getScoresBySubjectAndSection']);
-    Route::get('student-ecr-item-scores/by-student-subject', [StudentEcrItemScoreController::class, 'getByStudentAndSubject']);
-    Route::apiResource('student-ecr-item-scores', StudentEcrItemScoreController::class);
-    // Student assessments (LMS: list/take quiz, assignment, exam; live score)
+    Route::get('student-ecr-item-scores/by-subject-section', [StudentEcrItemScoreController::class, 'getScoresBySubjectAndSection'])->middleware('module:subjects,view');
+    Route::get('student-ecr-item-scores/by-student-subject', [StudentEcrItemScoreController::class, 'getByStudentAndSubject'])->middleware('module:subjects,view,shared');
+    Route::apiResource('student-ecr-item-scores', StudentEcrItemScoreController::class)->middleware('module:subjects,view,shared');
+    // Student assessments (LMS: list/take quiz, assignment, exam; live score).
+    // Student-portal endpoints: the controller resolves the signed-in student
+    // and refuses anything that is not their own attempt.
     Route::get('student-assessments', [\App\Http\Controllers\StudentAssessmentController::class, 'index']);
     Route::get('student-assessments/{id}', [\App\Http\Controllers\StudentAssessmentController::class, 'show']);
     Route::post('student-assessments/{id}/start', [\App\Http\Controllers\StudentAssessmentController::class, 'start']);
@@ -317,222 +369,232 @@ Route::middleware('auth.token')->group(function () {
     Route::post('student-lessons/{id}/start', [\App\Http\Controllers\StudentLessonController::class, 'start']);
     Route::post('student-lessons/{id}/complete', [\App\Http\Controllers\StudentLessonController::class, 'complete']);
     // Teacher grading of assessment submissions (manual questions: essays, uploads)
-    Route::get('assessment-methods/{itemId}/submissions', [\App\Http\Controllers\AssessmentGradingController::class, 'submissions']);
-    Route::post('assessment-methods/{itemId}/submissions/{attemptId}/grade', [\App\Http\Controllers\AssessmentGradingController::class, 'grade']);
-    Route::post('assessment-methods/{itemId}/submissions/recheck', [\App\Http\Controllers\AssessmentGradingController::class, 'recheck']);
-    // StudentRunningGrade routes
-    Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade']);
-    Route::post('student-running-grades/bulk-upsert-final-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'bulkUpsertFinalGrades']);
-    Route::post('student-running-grades/recalculate-parent-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'recalculateParentSubjectGrades']);
-    Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class);
+    Route::get('assessment-methods/{itemId}/submissions', [\App\Http\Controllers\AssessmentGradingController::class, 'submissions'])->middleware('module:subjects,view');
+    Route::post('assessment-methods/{itemId}/submissions/{attemptId}/grade', [\App\Http\Controllers\AssessmentGradingController::class, 'grade'])->middleware('module:subjects,manage');
+    Route::post('assessment-methods/{itemId}/submissions/recheck', [\App\Http\Controllers\AssessmentGradingController::class, 'recheck'])->middleware('module:subjects,manage');
+    // StudentRunningGrade routes — students read their own grades from the
+    // index here (My Subject), so the read side is shared.
+    Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade'])->middleware('module:consolidated-grades,manage');
+    Route::post('student-running-grades/bulk-upsert-final-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'bulkUpsertFinalGrades'])->middleware('module:consolidated-grades,manage');
+    Route::post('student-running-grades/recalculate-parent-grades', [\App\Http\Controllers\StudentRunningGradeController::class, 'recalculateParentSubjectGrades'])->middleware('module:consolidated-grades,manage');
+    Route::apiResource('student-running-grades', \App\Http\Controllers\StudentRunningGradeController::class)->middleware('module:consolidated-grades,view,shared');
     // StudentAttendance routes
-    Route::post('student-attendances/bulk-upsert', [StudentAttendanceController::class, 'bulkUpsert']);
-    Route::apiResource('student-attendances', StudentAttendanceController::class);
+    Route::post('student-attendances/bulk-upsert', [StudentAttendanceController::class, 'bulkUpsert'])->middleware('module:student-attendance,manage');
+    Route::apiResource('student-attendances', StudentAttendanceController::class)->middleware('module:student-attendance,view,shared');
     // SchoolDays routes
-    Route::post('school-days/bulk-upsert', [SchoolDayController::class, 'bulkUpsert']);
-    Route::apiResource('school-days', SchoolDayController::class);
+    Route::post('school-days/bulk-upsert', [SchoolDayController::class, 'bulkUpsert'])->middleware('module:school-days,manage');
+    Route::apiResource('school-days', SchoolDayController::class)->middleware('module:school-days,view');
 
     // School fee and student finance routes
-    Route::apiResource('school-fees', SchoolFeeController::class);
-    Route::get('finance/dashboard', [FinanceDashboardController::class, 'summary']);
-    Route::post('school-fee-defaults/bulk-upsert', [SchoolFeeDefaultController::class, 'bulkUpsert']);
-    Route::post('school-fee-defaults/apply-all', [SchoolFeeDefaultController::class, 'applyToAll']);
-    Route::get('school-fee-defaults', [SchoolFeeDefaultController::class, 'index']);
-    Route::post('school-fee-defaults', [SchoolFeeDefaultController::class, 'store']);
-    Route::put('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'update']);
-    Route::patch('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'update']);
-    Route::delete('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'destroy']);
-    Route::get('student-payments', [StudentPaymentController::class, 'index']);
-    Route::post('student-payments', [StudentPaymentController::class, 'store']);
-    Route::get('student-payments/{id}', [StudentPaymentController::class, 'show']);
-    Route::get('student-payments/{id}/receipt', [StudentPaymentController::class, 'receipt']);
-    Route::get('payment-transactions/{id}', [PaymentTransactionController::class, 'show']);
-    Route::get('payment-transactions/{id}/receipt', [PaymentTransactionController::class, 'receipt']);
-    Route::get('student-online-payments', [StudentOnlinePaymentController::class, 'index']);
-    Route::post('student-online-payments/checkout', [StudentOnlinePaymentController::class, 'createCheckout']);
-    Route::get('student-online-payments/{id}', [StudentOnlinePaymentController::class, 'show']);
-    Route::post('student-online-payments/{id}/outcome', [StudentOnlinePaymentController::class, 'recordOutcome']);
-    Route::get('student-discounts', [StudentDiscountController::class, 'index']);
-    Route::post('student-discounts', [StudentDiscountController::class, 'store']);
-    Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update']);
-    Route::patch('student-discounts/{id}', [StudentDiscountController::class, 'update']);
-    Route::delete('student-discounts/{id}', [StudentDiscountController::class, 'destroy']);
-    Route::post('student-discounts/{id}/void', [StudentDiscountController::class, 'void']);
+    Route::apiResource('school-fees', SchoolFeeController::class)->middleware('module:school-fees,view');
+    Route::get('finance/dashboard', [FinanceDashboardController::class, 'summary'])->middleware('module:finance-reports,view');
+    Route::post('school-fee-defaults/bulk-upsert', [SchoolFeeDefaultController::class, 'bulkUpsert'])->middleware('module:school-fees,manage');
+    Route::post('school-fee-defaults/apply-all', [SchoolFeeDefaultController::class, 'applyToAll'])->middleware('module:school-fees,manage');
+    Route::get('school-fee-defaults', [SchoolFeeDefaultController::class, 'index'])->middleware('module:school-fees,view');
+    Route::post('school-fee-defaults', [SchoolFeeDefaultController::class, 'store'])->middleware('module:school-fees,manage');
+    Route::put('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'update'])->middleware('module:school-fees,manage');
+    Route::patch('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'update'])->middleware('module:school-fees,manage');
+    Route::delete('school-fee-defaults/{id}', [SchoolFeeDefaultController::class, 'destroy'])->middleware('module:school-fees,manage');
+    Route::get('student-payments', [StudentPaymentController::class, 'index'])->middleware('module:finance,view,shared');
+    Route::post('student-payments', [StudentPaymentController::class, 'store'])->middleware('module:finance,manage');
+    Route::get('student-payments/{id}', [StudentPaymentController::class, 'show'])->middleware('module:finance,view,shared');
+    Route::get('student-payments/{id}/receipt', [StudentPaymentController::class, 'receipt'])->middleware('module:finance,view,shared');
+    Route::get('payment-transactions/{id}', [PaymentTransactionController::class, 'show'])->middleware('module:finance,view,shared');
+    Route::get('payment-transactions/{id}/receipt', [PaymentTransactionController::class, 'receipt'])->middleware('module:finance,view,shared');
+    // Online payments are initiated by the student from their own portal.
+    Route::get('student-online-payments', [StudentOnlinePaymentController::class, 'index'])->middleware('module:finance,view,shared');
+    Route::post('student-online-payments/checkout', [StudentOnlinePaymentController::class, 'createCheckout'])->middleware('module:finance,manage,shared');
+    Route::get('student-online-payments/{id}', [StudentOnlinePaymentController::class, 'show'])->middleware('module:finance,view,shared');
+    Route::post('student-online-payments/{id}/outcome', [StudentOnlinePaymentController::class, 'recordOutcome'])->middleware('module:finance,manage,shared');
+    Route::get('student-discounts', [StudentDiscountController::class, 'index'])->middleware('module:discounts,view,shared');
+    Route::post('student-discounts', [StudentDiscountController::class, 'store'])->middleware('module:discounts,manage');
+    Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update'])->middleware('module:discounts,manage');
+    Route::patch('student-discounts/{id}', [StudentDiscountController::class, 'update'])->middleware('module:discounts,manage');
+    Route::delete('student-discounts/{id}', [StudentDiscountController::class, 'destroy'])->middleware('module:discounts,manage');
+    Route::post('student-discounts/{id}/void', [StudentDiscountController::class, 'void'])->middleware('module:discounts,manage');
 
     // Default (reusable) discounts
-    Route::apiResource('default-discounts', DefaultDiscountController::class);
+    Route::apiResource('default-discounts', DefaultDiscountController::class)->middleware('module:discounts,view');
 
     // Grade-level discounts
-    Route::get('grade-level-discounts', [GradeLevelDiscountController::class, 'index']);
-    Route::post('grade-level-discounts', [GradeLevelDiscountController::class, 'store']);
-    Route::post('grade-level-discounts/{id}/void-for-student', [GradeLevelDiscountController::class, 'voidForStudent']);
-    Route::put('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
-    Route::patch('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update']);
-    Route::delete('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'destroy']);
+    Route::get('grade-level-discounts', [GradeLevelDiscountController::class, 'index'])->middleware('module:discounts,view');
+    Route::post('grade-level-discounts', [GradeLevelDiscountController::class, 'store'])->middleware('module:discounts,manage');
+    Route::post('grade-level-discounts/{id}/void-for-student', [GradeLevelDiscountController::class, 'voidForStudent'])->middleware('module:discounts,manage');
+    Route::put('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update'])->middleware('module:discounts,manage');
+    Route::patch('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update'])->middleware('module:discounts,manage');
+    Route::delete('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'destroy'])->middleware('module:discounts,manage');
 
     // Sibling groups & per-sibling discounts
-    Route::get('sibling-groups', [SiblingGroupController::class, 'index']);
-    Route::post('sibling-groups', [SiblingGroupController::class, 'store']);
-    Route::delete('sibling-groups/{id}', [SiblingGroupController::class, 'destroy']);
-    Route::post('sibling-groups/{id}/members', [SiblingGroupController::class, 'addMember']);
-    Route::put('sibling-groups/{id}/members/{memberId}', [SiblingGroupController::class, 'updateMember']);
-    Route::delete('sibling-groups/{id}/members/{memberId}', [SiblingGroupController::class, 'removeMember']);
-    Route::post('sibling-groups/{id}/members/{memberId}/apply-discount', [SiblingGroupController::class, 'applyDiscount']);
+    Route::get('sibling-groups', [SiblingGroupController::class, 'index'])->middleware('module:discounts,view');
+    Route::post('sibling-groups', [SiblingGroupController::class, 'store'])->middleware('module:discounts,manage');
+    Route::delete('sibling-groups/{id}', [SiblingGroupController::class, 'destroy'])->middleware('module:discounts,manage');
+    Route::post('sibling-groups/{id}/members', [SiblingGroupController::class, 'addMember'])->middleware('module:discounts,manage');
+    Route::put('sibling-groups/{id}/members/{memberId}', [SiblingGroupController::class, 'updateMember'])->middleware('module:discounts,manage');
+    Route::delete('sibling-groups/{id}/members/{memberId}', [SiblingGroupController::class, 'removeMember'])->middleware('module:discounts,manage');
+    Route::post('sibling-groups/{id}/members/{memberId}/apply-discount', [SiblingGroupController::class, 'applyDiscount'])->middleware('module:discounts,manage');
 
     // Student additional fees
-    Route::get('student-additional-fees', [StudentAdditionalFeeController::class, 'index']);
-    Route::post('student-additional-fees', [StudentAdditionalFeeController::class, 'store']);
-    Route::put('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
-    Route::patch('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update']);
-    Route::delete('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'destroy']);
-    Route::post('student-additional-fees/{id}/restore', [StudentAdditionalFeeController::class, 'restore']);
+    Route::get('student-additional-fees', [StudentAdditionalFeeController::class, 'index'])->middleware('module:finance,view,shared');
+    Route::post('student-additional-fees', [StudentAdditionalFeeController::class, 'store'])->middleware('module:finance,manage');
+    Route::put('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update'])->middleware('module:finance,manage');
+    Route::patch('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'update'])->middleware('module:finance,manage');
+    Route::delete('student-additional-fees/{id}', [StudentAdditionalFeeController::class, 'destroy'])->middleware('module:finance,manage');
+    Route::post('student-additional-fees/{id}/restore', [StudentAdditionalFeeController::class, 'restore'])->middleware('module:finance,manage');
 
     // Reusable student fees, searched and picked from the ledger
-    Route::apiResource('student-fees', StudentFeeController::class);
+    Route::apiResource('student-fees', StudentFeeController::class)->middleware('module:school-fees,view');
 
     // Payment receipt submissions (student uploads proof of payment, finance verifies)
-    Route::get('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'index']);
-    Route::post('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'store']);
-    Route::post('payment-receipt-submissions/{id}/approve', [PaymentReceiptSubmissionController::class, 'approve']);
-    Route::post('payment-receipt-submissions/{id}/reject', [PaymentReceiptSubmissionController::class, 'reject']);
+    Route::get('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'index'])->middleware('module:finance,view,shared');
+    Route::post('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'store'])->middleware('module:finance,manage,shared');
+    Route::post('payment-receipt-submissions/{id}/approve', [PaymentReceiptSubmissionController::class, 'approve'])->middleware('module:finance,manage');
+    Route::post('payment-receipt-submissions/{id}/reject', [PaymentReceiptSubmissionController::class, 'reject'])->middleware('module:finance,manage');
 
     // Payment void requests (finance requests, admin approves/disapproves)
-    Route::get('payment-void-requests', [PaymentVoidRequestController::class, 'index']);
-    Route::post('payment-void-requests', [PaymentVoidRequestController::class, 'store']);
-    Route::post('payment-void-requests/{id}/approve', [PaymentVoidRequestController::class, 'approve']);
-    Route::post('payment-void-requests/{id}/disapprove', [PaymentVoidRequestController::class, 'disapprove']);
+    Route::get('payment-void-requests', [PaymentVoidRequestController::class, 'index'])->middleware('module:finance,view');
+    Route::post('payment-void-requests', [PaymentVoidRequestController::class, 'store'])->middleware('module:finance,request-void');
+    Route::post('payment-void-requests/{id}/approve', [PaymentVoidRequestController::class, 'approve'])->middleware('module:finance,approve-void');
+    Route::post('payment-void-requests/{id}/disapprove', [PaymentVoidRequestController::class, 'disapprove'])->middleware('module:finance,approve-void');
 
     // Receipt templates
-    Route::apiResource('receipt-templates', ReceiptTemplateController::class);
+    Route::apiResource('receipt-templates', ReceiptTemplateController::class)->middleware('module:receipt-templates,view');
 
     // Disbursement types (dynamic expense categories)
-    Route::get('disbursement-types', [DisbursementTypeController::class, 'index']);
-    Route::post('disbursement-types', [DisbursementTypeController::class, 'store']);
-    Route::put('disbursement-types/{id}', [DisbursementTypeController::class, 'update']);
-    Route::patch('disbursement-types/{id}', [DisbursementTypeController::class, 'update']);
-    Route::delete('disbursement-types/{id}', [DisbursementTypeController::class, 'destroy']);
+    Route::get('disbursement-types', [DisbursementTypeController::class, 'index'])->middleware('module:disbursements,view');
+    Route::post('disbursement-types', [DisbursementTypeController::class, 'store'])->middleware('module:disbursements,manage');
+    Route::put('disbursement-types/{id}', [DisbursementTypeController::class, 'update'])->middleware('module:disbursements,manage');
+    Route::patch('disbursement-types/{id}', [DisbursementTypeController::class, 'update'])->middleware('module:disbursements,manage');
+    Route::delete('disbursement-types/{id}', [DisbursementTypeController::class, 'destroy'])->middleware('module:disbursements,manage');
 
     // Disbursements / expenses (update is POST-based for multipart receipt uploads)
-    Route::get('disbursements', [DisbursementController::class, 'index']);
-    Route::post('disbursements', [DisbursementController::class, 'store']);
-    Route::get('disbursements/{id}', [DisbursementController::class, 'show']);
-    Route::post('disbursements/{id}', [DisbursementController::class, 'update']);
-    Route::delete('disbursements/{id}', [DisbursementController::class, 'destroy']);
+    Route::get('disbursements', [DisbursementController::class, 'index'])->middleware('module:disbursements,view');
+    Route::post('disbursements', [DisbursementController::class, 'store'])->middleware('module:disbursements,manage');
+    Route::get('disbursements/{id}', [DisbursementController::class, 'show'])->middleware('module:disbursements,view');
+    Route::post('disbursements/{id}', [DisbursementController::class, 'update'])->middleware('module:disbursements,manage');
+    Route::delete('disbursements/{id}', [DisbursementController::class, 'destroy'])->middleware('module:disbursements,manage');
 
     // Finance collections (monthly/quarterly breakdown)
-    Route::get('finance/collections', [FinanceDashboardController::class, 'collections']);
+    Route::get('finance/collections', [FinanceDashboardController::class, 'collections'])->middleware('module:finance-reports,view');
 
     // Finance collections detailed report (arbitrary date range)
-    Route::get('finance/collections/report', [FinanceDashboardController::class, 'collectionsReport']);
+    Route::get('finance/collections/report', [FinanceDashboardController::class, 'collectionsReport'])->middleware('module:finance-reports,view');
 
     // Section Consolidated Grades route
-    Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index']);
-    Route::get('proficiency', [\App\Http\Controllers\ProficiencyController::class, 'index']);
-    Route::get('proficiency/by-section', [\App\Http\Controllers\ProficiencyController::class, 'bySection']);
+    Route::get('section-consolidated-grades', [SectionConsolidatedGradesController::class, 'index'])->middleware('module:consolidated-grades,view');
+    Route::get('proficiency', [\App\Http\Controllers\ProficiencyController::class, 'index'])->middleware('module:proficiency,view');
+    Route::get('proficiency/by-section', [\App\Http\Controllers\ProficiencyController::class, 'bySection'])->middleware('module:proficiency,view');
     // RealtimeAttendance GET route
-    Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index']);
+    Route::get('realtime-attendance', [\App\Http\Controllers\RealtimeAttendanceController::class, 'index'])->middleware('module:student-attendance,view');
     // Student RFID Tag routes
-    Route::apiResource('student-rfid-tags', StudentRfidTagController::class);
+    Route::apiResource('student-rfid-tags', StudentRfidTagController::class)->middleware('module:gate-entries,view');
     // RFID Scan Log routes
-    Route::post('rfid-scan-logs/scan', [RfidScanLogController::class, 'scan']);
-    Route::get('rfid-scan-logs/class-section-daily', [RfidScanLogController::class, 'classSectionDaily']);
-    Route::apiResource('rfid-scan-logs', RfidScanLogController::class)->only(['index', 'store', 'show', 'destroy']);
+    Route::post('rfid-scan-logs/scan', [RfidScanLogController::class, 'scan'])->middleware('module:gate-entries,manage');
+    Route::get('rfid-scan-logs/class-section-daily', [RfidScanLogController::class, 'classSectionDaily'])->middleware('module:gate-entries,view');
+    Route::apiResource('rfid-scan-logs', RfidScanLogController::class)->only(['index', 'store', 'show', 'destroy'])->middleware('module:gate-entries,view');
     // Core Value Marking routes
-    Route::apiResource('core-value-markings', CoreValueMarkingController::class);
+    Route::apiResource('core-value-markings', CoreValueMarkingController::class)->middleware('module:proficiency,view');
     // SF9 routes
-    Route::post('sf9/generate', [SF9Controller::class, 'generate']);
-    Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears']);
+    Route::post('sf9/generate', [SF9Controller::class, 'generate'])->middleware('module:consolidated-grades,view');
+    Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears'])->middleware('module:consolidated-grades,view');
 
     // Certificate routes
-    Route::apiResource('certificates', CertificateController::class);
+    Route::apiResource('certificates', CertificateController::class)->middleware('module:certificate-builder,view');
 
     // Student ID card template routes
-    Route::post('id-card-templates/assets', [IdCardTemplateController::class, 'uploadAsset']);
-    Route::apiResource('id-card-templates', IdCardTemplateController::class);
+    Route::post('id-card-templates/assets', [IdCardTemplateController::class, 'uploadAsset'])->middleware('module:id-card-builder,manage');
+    Route::apiResource('id-card-templates', IdCardTemplateController::class)->middleware('module:id-card-builder,view');
 
     // HRIS — Attendance logs
-    Route::get('attendance/logs', [\App\Http\Controllers\AttendanceLogController::class, 'index']);
+    Route::get('attendance/logs', [\App\Http\Controllers\AttendanceLogController::class, 'index'])->middleware('module:attendance-logs,view');
 
     // HRIS — Staff schedules (templates + assignments)
-    Route::get('staff-schedule-assignments', [\App\Http\Controllers\StaffScheduleController::class, 'assignments']);
-    Route::delete('staff-schedule-assignments/{assignmentId}', [\App\Http\Controllers\StaffScheduleController::class, 'unassign']);
-    Route::post('staff-schedules/{id}/assign', [\App\Http\Controllers\StaffScheduleController::class, 'assign']);
-    Route::apiResource('staff-schedules', \App\Http\Controllers\StaffScheduleController::class);
+    Route::get('staff-schedule-assignments', [\App\Http\Controllers\StaffScheduleController::class, 'assignments'])->middleware('module:staff-schedules,view');
+    Route::delete('staff-schedule-assignments/{assignmentId}', [\App\Http\Controllers\StaffScheduleController::class, 'unassign'])->middleware('module:staff-schedules,manage');
+    Route::post('staff-schedules/{id}/assign', [\App\Http\Controllers\StaffScheduleController::class, 'assign'])->middleware('module:staff-schedules,manage');
+    Route::apiResource('staff-schedules', \App\Http\Controllers\StaffScheduleController::class)->middleware('module:staff-schedules,view');
 
     // HRIS — Staff calendar (holidays, events & suspensions)
     Route::apiResource('staff-calendar-events', \App\Http\Controllers\StaffCalendarEventController::class)
-        ->only(['index', 'store', 'update', 'destroy']);
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('module:staff-schedules,view');
 
     // HRIS — The signed-in staff member's own punches (dashboard timesheet)
     Route::get('my-timesheet', [\App\Http\Controllers\MyTimesheetController::class, 'index']);
 
-    // HRIS — Attendance exception requests (early out, official business, …)
+    // HRIS — Attendance exception requests (early out, official business, …).
+    // Filing and cancelling are things any staff member does for themselves;
+    // only the approval side is gated.
     Route::get('staff-attendance-requests', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'index']);
     Route::post('staff-attendance-requests', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'store']);
-    Route::post('staff-attendance-requests/{id}/approve', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'approve']);
-    Route::post('staff-attendance-requests/{id}/disapprove', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'disapprove']);
+    Route::post('staff-attendance-requests/{id}/approve', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'approve'])->middleware('module:attendance-requests,approve');
+    Route::post('staff-attendance-requests/{id}/disapprove', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'disapprove'])->middleware('module:attendance-requests,approve');
     Route::post('staff-attendance-requests/{id}/cancel', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'cancel']);
-    Route::post('staff-attendance-requests/{id}/void', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'void']);
+    Route::post('staff-attendance-requests/{id}/void', [\App\Http\Controllers\StaffAttendanceRequestController::class, 'void'])->middleware('module:attendance-requests,approve');
 
     // HRIS — Payroll (compensation settings, deduction types, periods, payslips)
     Route::apiResource('payroll-deduction-types', \App\Http\Controllers\PayrollDeductionTypeController::class)
-        ->only(['index', 'store', 'update', 'destroy']);
-    Route::get('payroll-settings', [\App\Http\Controllers\PayrollSettingController::class, 'show']);
-    Route::put('payroll-settings', [\App\Http\Controllers\PayrollSettingController::class, 'update']);
-    Route::get('payroll-compensations', [\App\Http\Controllers\PayrollCompensationController::class, 'index']);
-    Route::put('payroll-compensations/{userId}', [\App\Http\Controllers\PayrollCompensationController::class, 'upsert']);
-    Route::post('payroll-periods/{id}/generate', [\App\Http\Controllers\PayrollPeriodController::class, 'generate']);
-    Route::post('payroll-periods/{id}/finalize', [\App\Http\Controllers\PayrollPeriodController::class, 'finalize']);
-    Route::post('payroll-periods/{id}/reopen', [\App\Http\Controllers\PayrollPeriodController::class, 'reopen']);
-    Route::get('payroll-periods/{periodId}/payslips', [\App\Http\Controllers\PayslipController::class, 'indexByPeriod']);
-    Route::get('payroll-periods/{periodId}/sheet', [\App\Http\Controllers\PayslipController::class, 'sheetByPeriod']);
-    Route::apiResource('payroll-periods', \App\Http\Controllers\PayrollPeriodController::class);
-    Route::apiResource('payslip-templates', \App\Http\Controllers\PayslipTemplateController::class);
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('module:payroll,view');
+    Route::get('payroll-settings', [\App\Http\Controllers\PayrollSettingController::class, 'show'])->middleware('module:payroll,view');
+    Route::put('payroll-settings', [\App\Http\Controllers\PayrollSettingController::class, 'update'])->middleware('module:payroll,manage');
+    Route::get('payroll-compensations', [\App\Http\Controllers\PayrollCompensationController::class, 'index'])->middleware('module:payroll,view');
+    Route::put('payroll-compensations/{userId}', [\App\Http\Controllers\PayrollCompensationController::class, 'upsert'])->middleware('module:payroll,manage');
+    Route::post('payroll-periods/{id}/generate', [\App\Http\Controllers\PayrollPeriodController::class, 'generate'])->middleware('module:payroll,manage');
+    // Finalising a period is what publishes payslips to staff — a separate
+    // ability from ordinary payroll editing.
+    Route::post('payroll-periods/{id}/finalize', [\App\Http\Controllers\PayrollPeriodController::class, 'finalize'])->middleware('module:payroll,release');
+    Route::post('payroll-periods/{id}/reopen', [\App\Http\Controllers\PayrollPeriodController::class, 'reopen'])->middleware('module:payroll,release');
+    Route::get('payroll-periods/{periodId}/payslips', [\App\Http\Controllers\PayslipController::class, 'indexByPeriod'])->middleware('module:payroll,view');
+    Route::get('payroll-periods/{periodId}/sheet', [\App\Http\Controllers\PayslipController::class, 'sheetByPeriod'])->middleware('module:payroll,view');
+    Route::apiResource('payroll-periods', \App\Http\Controllers\PayrollPeriodController::class)->middleware('module:payroll,view');
+    Route::apiResource('payslip-templates', \App\Http\Controllers\PayslipTemplateController::class)->middleware('module:payroll,view');
+    // A staff member opens their own payslip here; the controller checks
+    // ownership before falling back to the payroll permission.
     Route::get('payslips/{id}', [\App\Http\Controllers\PayslipController::class, 'show']);
-    Route::put('payslips/{id}', [\App\Http\Controllers\PayslipController::class, 'update']);
-    Route::put('payslips/{id}/days/{dayId}', [\App\Http\Controllers\PayslipController::class, 'updateDay']);
+    Route::put('payslips/{id}', [\App\Http\Controllers\PayslipController::class, 'update'])->middleware('module:payroll,manage');
+    Route::put('payslips/{id}/days/{dayId}', [\App\Http\Controllers\PayslipController::class, 'updateDay'])->middleware('module:payroll,manage');
 
     // HRIS — Biometric devices
-    Route::get('biometric/devices', [BiometricDeviceController::class, 'index']);
-    Route::post('biometric/devices', [BiometricDeviceController::class, 'store']);
-    Route::get('biometric/devices/{id}', [BiometricDeviceController::class, 'show']);
-    Route::delete('biometric/devices/{id}', [BiometricDeviceController::class, 'destroy']);
-    Route::post('biometric/devices/{id}/refresh-pairing-code', [BiometricDeviceController::class, 'refreshPairingCode']);
-    Route::post('biometric/devices/{id}/fetch-users', [BiometricDeviceController::class, 'fetchUsers']);
-    Route::post('biometric/devices/{id}/fetch-attendance', [BiometricDeviceController::class, 'fetchAttendance']);
+    Route::get('biometric/devices', [BiometricDeviceController::class, 'index'])->middleware('module:biometric-devices,view');
+    Route::post('biometric/devices', [BiometricDeviceController::class, 'store'])->middleware('module:biometric-devices,manage');
+    Route::get('biometric/devices/{id}', [BiometricDeviceController::class, 'show'])->middleware('module:biometric-devices,view');
+    Route::delete('biometric/devices/{id}', [BiometricDeviceController::class, 'destroy'])->middleware('module:biometric-devices,manage');
+    Route::post('biometric/devices/{id}/refresh-pairing-code', [BiometricDeviceController::class, 'refreshPairingCode'])->middleware('module:biometric-devices,manage');
+    Route::post('biometric/devices/{id}/fetch-users', [BiometricDeviceController::class, 'fetchUsers'])->middleware('module:biometric-devices,manage');
+    Route::post('biometric/devices/{id}/fetch-attendance', [BiometricDeviceController::class, 'fetchAttendance'])->middleware('module:biometric-devices,manage');
 
     // HRIS — ZK user mappings
-    Route::get('biometric/zk-users', [ZkUserMappingController::class, 'index']);
-    Route::post('biometric/zk-users', [ZkUserMappingController::class, 'store']);
-    Route::post('biometric/zk-users/{id}/link', [ZkUserMappingController::class, 'link']);
-    Route::delete('biometric/zk-users/{id}/link', [ZkUserMappingController::class, 'unlink']);
-    Route::delete('biometric/zk-users/{id}', [ZkUserMappingController::class, 'destroy']);
-    Route::post('biometric/zk-users/{id}/enroll', [ZkUserMappingController::class, 'enroll']);
-    Route::post('biometric/zk-users/{id}/trigger-fingerprint', [ZkUserMappingController::class, 'triggerFingerprint']);
+    Route::get('biometric/zk-users', [ZkUserMappingController::class, 'index'])->middleware('module:zk-users,view');
+    Route::post('biometric/zk-users', [ZkUserMappingController::class, 'store'])->middleware('module:zk-users,manage');
+    Route::post('biometric/zk-users/{id}/link', [ZkUserMappingController::class, 'link'])->middleware('module:zk-users,manage');
+    Route::delete('biometric/zk-users/{id}/link', [ZkUserMappingController::class, 'unlink'])->middleware('module:zk-users,manage');
+    Route::delete('biometric/zk-users/{id}', [ZkUserMappingController::class, 'destroy'])->middleware('module:zk-users,manage');
+    Route::post('biometric/zk-users/{id}/enroll', [ZkUserMappingController::class, 'enroll'])->middleware('module:zk-users,manage');
+    Route::post('biometric/zk-users/{id}/trigger-fingerprint', [ZkUserMappingController::class, 'triggerFingerprint'])->middleware('module:zk-users,manage');
 
     // SMS Gateway — kiosk devices
-    Route::get('sms/gateways', [SmsGatewayController::class, 'index']);
-    Route::post('sms/gateways', [SmsGatewayController::class, 'store']);
-    Route::get('sms/gateways/{id}', [SmsGatewayController::class, 'show']);
-    Route::patch('sms/gateways/{id}', [SmsGatewayController::class, 'update']);
-    Route::delete('sms/gateways/{id}', [SmsGatewayController::class, 'destroy']);
-    Route::post('sms/gateways/{id}/refresh-pairing-code', [SmsGatewayController::class, 'refreshPairingCode']);
-    Route::get('sms/gateways/{id}/installer', [SmsGatewayController::class, 'installer']);
+    Route::get('sms/gateways', [SmsGatewayController::class, 'index'])->middleware('module:sms-gateways,view');
+    Route::post('sms/gateways', [SmsGatewayController::class, 'store'])->middleware('module:sms-gateways,manage');
+    Route::get('sms/gateways/{id}', [SmsGatewayController::class, 'show'])->middleware('module:sms-gateways,view');
+    Route::patch('sms/gateways/{id}', [SmsGatewayController::class, 'update'])->middleware('module:sms-gateways,manage');
+    Route::delete('sms/gateways/{id}', [SmsGatewayController::class, 'destroy'])->middleware('module:sms-gateways,manage');
+    Route::post('sms/gateways/{id}/refresh-pairing-code', [SmsGatewayController::class, 'refreshPairingCode'])->middleware('module:sms-gateways,manage');
+    Route::get('sms/gateways/{id}/installer', [SmsGatewayController::class, 'installer'])->middleware('module:sms-gateways,manage');
 
     // SMS Gateway — messages
-    Route::get('sms/messages', [SmsMessageController::class, 'index']);
-    Route::post('sms/messages', [SmsMessageController::class, 'store']);
-    Route::get('sms/messages/{id}', [SmsMessageController::class, 'show']);
-    Route::post('sms/messages/{id}/retry', [SmsMessageController::class, 'retry']);
-    Route::post('sms/messages/{id}/cancel', [SmsMessageController::class, 'cancel']);
+    Route::get('sms/messages', [SmsMessageController::class, 'index'])->middleware('module:sms-messages,view');
+    Route::post('sms/messages', [SmsMessageController::class, 'store'])->middleware('module:sms-messages,manage');
+    Route::get('sms/messages/{id}', [SmsMessageController::class, 'show'])->middleware('module:sms-messages,view');
+    Route::post('sms/messages/{id}/retry', [SmsMessageController::class, 'retry'])->middleware('module:sms-messages,manage');
+    Route::post('sms/messages/{id}/cancel', [SmsMessageController::class, 'cancel'])->middleware('module:sms-messages,manage');
 
     // SMS Gateway — settings
-    Route::get('sms/settings', [SmsSettingsController::class, 'show']);
-    Route::put('sms/settings', [SmsSettingsController::class, 'update']);
+    Route::get('sms/settings', [SmsSettingsController::class, 'show'])->middleware('module:sms-settings,view');
+    Route::put('sms/settings', [SmsSettingsController::class, 'update'])->middleware('module:sms-settings,manage');
 
     // SMS Gateway — per-gate (entrance/exit) notification config
-    Route::get('sms/gate-settings', [GateSmsSettingController::class, 'index']);
-    Route::put('sms/gate-settings/{gateType}', [GateSmsSettingController::class, 'update']);
+    Route::get('sms/gate-settings', [GateSmsSettingController::class, 'index'])->middleware('module:sms-settings,view');
+    Route::put('sms/gate-settings/{gateType}', [GateSmsSettingController::class, 'update'])->middleware('module:sms-settings,manage');
 
     // Announcements
     // Viewer feed (students + staff) — declared before the apiResource so the
@@ -541,18 +603,18 @@ Route::middleware('auth.token')->group(function () {
     Route::get('announcements/unread-count', [AnnouncementController::class, 'unreadCount']);
     Route::post('announcements/{id}/read', [AnnouncementController::class, 'markRead']);
     // Authoring (teachers + admins)
-    Route::post('announcements/{id}/attachments', [AnnouncementController::class, 'uploadAttachment']);
-    Route::delete('announcements/{id}/attachments/{attachmentId}', [AnnouncementController::class, 'deleteAttachment']);
-    Route::apiResource('announcements', AnnouncementController::class);
+    Route::post('announcements/{id}/attachments', [AnnouncementController::class, 'uploadAttachment'])->middleware('module:announcements,manage');
+    Route::delete('announcements/{id}/attachments/{attachmentId}', [AnnouncementController::class, 'deleteAttachment'])->middleware('module:announcements,manage');
+    Route::apiResource('announcements', AnnouncementController::class)->middleware('module:announcements,view,shared');
 
     // Online admission form submissions (admin list/detail/accept/reject)
-    Route::get('admission-form-settings', [AdmissionFormSubmissionController::class, 'settings']);
-    Route::put('admission-form-settings', [AdmissionFormSubmissionController::class, 'updateSettings']);
-    Route::get('admission-form-submissions', [AdmissionFormSubmissionController::class, 'index']);
-    Route::get('admission-form-submissions/{id}', [AdmissionFormSubmissionController::class, 'show']);
-    Route::post('admission-form-submissions/{id}/accept', [AdmissionFormSubmissionController::class, 'accept']);
-    Route::post('admission-form-submissions/{id}/create-student', [AdmissionFormSubmissionController::class, 'createStudent']);
-    Route::post('admission-form-submissions/{id}/reject', [AdmissionFormSubmissionController::class, 'reject']);
+    Route::get('admission-form-settings', [AdmissionFormSubmissionController::class, 'settings'])->middleware('module:admission-forms,view');
+    Route::put('admission-form-settings', [AdmissionFormSubmissionController::class, 'updateSettings'])->middleware('module:admission-forms,manage');
+    Route::get('admission-form-submissions', [AdmissionFormSubmissionController::class, 'index'])->middleware('module:admission-forms,view');
+    Route::get('admission-form-submissions/{id}', [AdmissionFormSubmissionController::class, 'show'])->middleware('module:admission-forms,view');
+    Route::post('admission-form-submissions/{id}/accept', [AdmissionFormSubmissionController::class, 'accept'])->middleware('module:admission-forms,manage');
+    Route::post('admission-form-submissions/{id}/create-student', [AdmissionFormSubmissionController::class, 'createStudent'])->middleware('module:students,manage');
+    Route::post('admission-form-submissions/{id}/reject', [AdmissionFormSubmissionController::class, 'reject'])->middleware('module:admission-forms,manage');
 });
 
 Route::get('/health', function () {

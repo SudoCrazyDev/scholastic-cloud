@@ -7,12 +7,10 @@ import { Button } from '../../components/button'
 import { Select } from '../../components/select'
 import FileAttendanceRequestModal from '../../components/attendance/FileAttendanceRequestModal'
 import { KIND_LABELS } from '../../components/attendance/attendanceRequestKinds'
-import { useAuth } from '../../hooks/useAuth'
+import { usePermissions } from '../../hooks/usePermissions'
 import { staffAttendanceRequestService } from '../../services/staffAttendanceRequestService'
 import type { AttendanceRequestStatus, StaffAttendanceRequest } from '../../types'
 import { errorMessage, shortDate } from './Payroll/helpers'
-
-const APPROVER_ROLES = ['principal', 'institution-administrator', 'super-administrator']
 
 type Tab = 'mine' | 'review'
 
@@ -60,8 +58,8 @@ const EffectChips: React.FC<{ request: StaffAttendanceRequest }> = ({ request })
 
 const AttendanceRequests: React.FC = () => {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
-  const canApprove = APPROVER_ROLES.includes(user?.role?.slug || '')
+  const { can } = usePermissions()
+  const canApprove = can('attendance-requests', 'approve')
 
   const [tab, setTab] = useState<Tab>(canApprove ? 'review' : 'mine')
   const [showForm, setShowForm] = useState(false)

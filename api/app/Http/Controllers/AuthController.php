@@ -216,6 +216,10 @@ class AuthController extends Controller
                     'title' => $role->title,
                     'slug' => $role->slug,
                 ],
+                // Students hold no module permissions — their portal screens
+                // are personal, not gated on the module catalog.
+                'permissions' => [],
+                'full_access' => false,
                 'user_institutions' => $userInstitutions,
                 'created_at' => $student->created_at,
                 'updated_at' => $student->updated_at,
@@ -244,6 +248,10 @@ class AuthController extends Controller
                 'title' => $role->title,
                 'slug' => $role->slug,
             ] : null,
+            // What this user's role can reach, so the client can gate the
+            // sidebar and routes without re-deriving it from the role slug.
+            'permissions' => $user->permissionList(),
+            'full_access' => $user->hasFullAccess(),
             'user_institutions' => $user->userInstitutions->map(function ($userInstitution) {
                 return [
                     'institution_id' => $userInstitution->institution_id,
@@ -336,6 +344,10 @@ class AuthController extends Controller
                 'title' => $targetRole->title,
                 'slug' => $targetRole->slug,
             ] : null,
+            // Impersonation has to hand over the target's access as well, or
+            // the sidebar would still be drawn from the admin's permissions.
+            'permissions' => $targetUser->permissionList(),
+            'full_access' => $targetUser->hasFullAccess(),
             'user_institutions' => $targetUser->userInstitutions->map(function ($userInstitution) {
                 return [
                     'institution_id' => $userInstitution->institution_id,
@@ -473,6 +485,8 @@ class AuthController extends Controller
                 'title' => 'Student',
                 'slug' => 'student',
             ],
+            'permissions' => [],
+            'full_access' => false,
             'user_institutions' => $institutions,
             'created_at' => $student->created_at,
             'updated_at' => $student->updated_at,

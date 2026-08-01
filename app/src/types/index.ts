@@ -16,15 +16,52 @@ export interface User {
   created_at: string;
   updated_at: string;
   role?: Role;
+  /** Permission strings ("finance.manage") the user's role grants. */
+  permissions?: string[];
+  /** True for super-administrators, who hold a wildcard grant. */
+  full_access?: boolean;
   user_institutions?: UserInstitution[];
 }
 
 export interface Role {
   id: string;
+  /** Null for the platform's built-in roles; set for institution-created ones. */
+  institution_id?: string | null;
   title: string;
   slug: string;
+  /** Built-in roles are shared platform-wide and cannot be edited or deleted. */
+  is_system?: boolean;
+  permissions?: string[];
+  assigned_users_count?: number;
   created_at: string;
   updated_at: string;
+}
+
+/** One switchable ability beyond the view/manage pair, e.g. approving voids. */
+export interface ModuleSpecialAbility {
+  key: string;
+  permission: string;
+  label: string;
+  description?: string | null;
+}
+
+export interface ModuleCatalogEntry {
+  key: string;
+  label: string;
+  description?: string | null;
+  system_only: boolean;
+  special: ModuleSpecialAbility[];
+}
+
+export interface ModuleCatalogGroup {
+  key: string;
+  label: string;
+  modules: ModuleCatalogEntry[];
+}
+
+export interface ModuleCatalog {
+  groups: ModuleCatalogGroup[];
+  abilities: string[];
 }
 
 export interface ApiResponse<T = any> {
@@ -54,12 +91,13 @@ export interface ValidationErrors {
 // Role types
 export interface CreateRoleData {
   title: string;
-  slug: string;
+  /** Permission strings the role should hold. Omit for a role with no access. */
+  permissions?: string[];
 }
 
 export interface UpdateRoleData {
   title?: string;
-  slug?: string;
+  permissions?: string[];
 }
 
 export interface GradeLevel {

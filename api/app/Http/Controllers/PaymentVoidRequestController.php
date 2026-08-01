@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
-use App\Models\PaymentTransaction;
 use App\Models\PaymentVoidRequest;
 use App\Models\StudentPayment;
 use App\Models\User;
@@ -13,45 +12,34 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentVoidRequestController extends Controller
 {
-    /** Roles that may request a void (creates a pending request). */
-    private const REQUESTER_ROLES = ['finance'];
-
-    /** Roles that may approve/disapprove a queued request. */
-    private const APPROVER_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator'];
-
-    /** Roles whose own voids skip the queue and apply immediately. */
-    private const SELF_APPROVING_ROLES = ['institution-administrator', 'principal', 'super-administrator'];
-
-    private function roleSlug(Request $request): ?string
-    {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            return null;
-        }
-
-        return $user->getRole()?->slug;
-    }
+    /*
+    | These used to be hardcoded lists of role slugs. They are now read off the
+    | role's permissions, so a school can build its own "Cashier" or "Finance
+    | Head" role and have it work here. The built-in roles are seeded with the
+    | matching permissions, so their behaviour is unchanged.
+    */
 
     private function canApprove(Request $request): bool
     {
-        $slug = $this->roleSlug($request);
+        $user = $request->user();
 
-        return $slug !== null && in_array($slug, self::APPROVER_ROLES, true);
+        return $user instanceof User && $user->hasPermissionTo('finance.approve-void');
     }
 
+    /** Whose own voids skip the queue and apply immediately. */
     private function canSelfApprove(Request $request): bool
     {
-        $slug = $this->roleSlug($request);
+        $user = $request->user();
 
-        return $slug !== null && in_array($slug, self::SELF_APPROVING_ROLES, true);
+        return $user instanceof User && $user->hasPermissionTo('finance.void-immediately');
     }
 
     private function canRequest(Request $request): bool
     {
-        $slug = $this->roleSlug($request);
+        $user = $request->user();
 
-        return $slug !== null
-            && (in_array($slug, self::REQUESTER_ROLES, true) || in_array($slug, self::APPROVER_ROLES, true));
+        return $user instanceof User
+            && ($user->hasPermissionTo('finance.request-void') || $this->canApprove($request));
     }
 
     private function resolveInstitutionId(Request $request): ?string

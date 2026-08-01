@@ -1,119 +1,84 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, LockClosedIcon } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { Button } from '../../../components/button'
+import { ModuleAccessGrid } from './ModuleAccessGrid'
+import { useModuleCatalog } from '../../../hooks/useModuleCatalog'
 import type { Role } from '../../../types'
 
 interface RoleModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: { title: string; slug: string }) => Promise<void>
+  onSubmit: (data: { title: string; permissions: string[] }) => Promise<void>
   role?: Role | null
   loading?: boolean
   error?: string | null
 }
 
-export function RoleModal({ 
-  isOpen, 
-  onClose, 
-  onSubmit, 
-  role, 
+export function RoleModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  role,
   loading = false,
-  error = null 
+  error = null
 }: RoleModalProps) {
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-  })
+  const [title, setTitle] = useState('')
+  const [permissions, setPermissions] = useState<string[]>([])
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
   const isEditing = !!role
+  // Built-in roles are shared by every institution on the platform, so they are
+  // shown read-only rather than hidden — seeing what "Principal" grants is
+  // useful when deciding what a new custom role needs.
+  const isReadOnly = Boolean(role?.is_system)
 
-  // Reset form when modal opens/closes or role changes
+  const { data: catalog, isLoading: catalogLoading, error: catalogError } = useModuleCatalog(isOpen)
+
   useEffect(() => {
-    if (isOpen) {
-      if (role) {
-        setFormData({
-          title: role.title,
-          slug: role.slug,
-        })
-      } else {
-        setFormData({
-          title: '',
-          slug: '',
-        })
-      }
-      setErrors({})
-    }
+    if (!isOpen) return
+
+    setTitle(role?.title ?? '')
+    setPermissions(role?.permissions ?? [])
+    setErrors({})
   }, [isOpen, role])
 
-  // Auto-generate slug from title
-  const handleTitleChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      title: value,
-      slug: prev.slug || value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-    }))
-    if (errors.title) {
-      setErrors(prev => ({ ...prev, title: '' }))
-    }
-  }
+  const grantedCount = useMemo(
+    () => new Set(permissions.filter((p) => p.endsWith('.view')).map((p) => p.split('.')[0])).size,
+    [permissions]
+  )
 
-  const handleSlugChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      slug: value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-    }))
-    if (errors.slug) {
-      setErrors(prev => ({ ...prev, slug: '' }))
-    }
-  }
+  const validate = () => {
+    const next: { [key: string]: string } = {}
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {}
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required'
-    } else if (formData.title.length < 2) {
-      newErrors.title = 'Title must be at least 2 characters'
-    } else if (formData.title.length > 100) {
-      newErrors.title = 'Title must be less than 100 characters'
+    if (!title.trim()) {
+      next.title = 'Name is required'
+    } else if (title.trim().length < 2) {
+      next.title = 'Name must be at least 2 characters'
+    } else if (title.length > 100) {
+      next.title = 'Name must be less than 100 characters'
     }
 
-    if (!formData.slug.trim()) {
-      newErrors.slug = 'Slug is required'
-    } else if (formData.slug.length < 2) {
-      newErrors.slug = 'Slug must be at least 2 characters'
-    } else if (formData.slug.length > 100) {
-      newErrors.slug = 'Slug must be less than 100 characters'
-    } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
-      newErrors.slug = 'Slug can only contain lowercase letters, numbers, and hyphens'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    setErrors(next)
+    return Object.keys(next).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
+
+    if (isReadOnly || !validate()) return
 
     try {
-      await onSubmit(formData)
+      await onSubmit({ title: title.trim(), permissions })
       onClose()
-    } catch (err) {
-      // Error handling is done by the parent component
+    } catch {
+      // Surfaced by the parent through the `error` prop.
     }
   }
 
   const handleClose = () => {
-    if (!loading) {
-      onClose()
-    }
+    if (!loading) onClose()
   }
 
   return (
@@ -136,57 +101,99 @@ export function RoleModal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full max-w-md bg-white rounded-lg shadow-xl"
+              className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl"
             >
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {isEditing ? 'Edit Role' : 'Create New Role'}
-                </h3>
+              <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-6">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {isReadOnly
+                      ? role?.title
+                      : isEditing
+                        ? 'Edit Role'
+                        : 'Create New Role'}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {isReadOnly
+                      ? 'This is a built-in role. Create a role of your own to customise access.'
+                      : 'Choose which modules this role can open, and what it can change in them.'}
+                  </p>
+                </div>
                 <button
                   onClick={handleClose}
                   disabled={loading}
-                  className="text-gray-400 hover:text-gray-600 transition-colors duration-200 disabled:opacity-50"
+                  className="text-gray-400 transition-colors duration-200 hover:text-gray-600 disabled:opacity-50"
                 >
-                  <XMarkIcon className="w-6 h-6" />
+                  <XMarkIcon className="h-6 w-6" />
                 </button>
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{error}</p>
+              <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
+                  {error && (
+                    <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                      <p className="text-sm text-red-600">{error}</p>
+                    </div>
+                  )}
+
+                  {isReadOnly && (
+                    <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
+                      <LockClosedIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                      <p className="text-sm text-gray-600">
+                        Built-in roles are shared by every school on the platform and cannot be
+                        edited or deleted.
+                      </p>
+                    </div>
+                  )}
+
+                  <Input
+                    label="Role name"
+                    type="text"
+                    value={title}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setTitle(e.target.value)
+                      if (errors.title) setErrors((prev) => ({ ...prev, title: '' }))
+                    }}
+                    placeholder="e.g. Cashier, Guidance Counselor"
+                    error={errors.title}
+                    disabled={loading || isReadOnly}
+                    required
+                  />
+
+                  <div>
+                    <div className="mb-3 flex items-baseline justify-between gap-4">
+                      <h4 className="text-sm font-semibold text-gray-900">Module access</h4>
+                      <span className="text-xs text-gray-500">
+                        {grantedCount === 0
+                          ? 'No modules selected'
+                          : `${grantedCount} module${grantedCount === 1 ? '' : 's'} granted`}
+                      </span>
+                    </div>
+
+                    {catalogLoading && (
+                      <p className="py-8 text-center text-sm text-gray-500">Loading modules…</p>
+                    )}
+
+                    {catalogError && (
+                      <p className="py-8 text-center text-sm text-red-600">
+                        Could not load the module list. Close this and try again.
+                      </p>
+                    )}
+
+                    {catalog && (
+                      <ModuleAccessGrid
+                        groups={catalog.groups}
+                        value={permissions}
+                        onChange={setPermissions}
+                        disabled={loading || isReadOnly}
+                      />
+                    )}
                   </div>
-                )}
-
-                {/* Title Field */}
-                <Input
-                  label="Title"
-                  type="text"
-                  value={formData.title}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleTitleChange(e.target.value)}
-                  placeholder="Enter role title"
-                  error={errors.title}
-                  disabled={loading}
-                  required
-                />
-
-                {/* Slug Field */}
-                <Input
-                  label="Slug"
-                  type="text"
-                  value={formData.slug}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSlugChange(e.target.value)}
-                  placeholder="Enter role slug"
-                  error={errors.slug}
-                  disabled={loading}
-                  helperText="Auto-generated from title. Can only contain lowercase letters, numbers, and hyphens."
-                  required
-                />
+                </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end space-x-3 pt-4">
+                <div className="flex items-center justify-end space-x-3 border-t border-gray-200 p-6">
                   <Button
                     type="button"
                     onClick={handleClose}
@@ -194,16 +201,13 @@ export function RoleModal({
                     variant="outline"
                     color="secondary"
                   >
-                    Cancel
+                    {isReadOnly ? 'Close' : 'Cancel'}
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    loading={loading}
-                    color="primary"
-                  >
-                    {isEditing ? 'Update Role' : 'Create Role'}
-                  </Button>
+                  {!isReadOnly && (
+                    <Button type="submit" disabled={loading} loading={loading} color="primary">
+                      {isEditing ? 'Save Changes' : 'Create Role'}
+                    </Button>
+                  )}
                 </div>
               </form>
             </motion.div>
@@ -212,4 +216,4 @@ export function RoleModal({
       )}
     </AnimatePresence>
   )
-} 
+}

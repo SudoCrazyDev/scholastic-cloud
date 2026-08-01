@@ -35,6 +35,7 @@ import { studentFeeService } from '../../services/studentFeeService'
 import { paymentVoidService } from '../../services/paymentVoidService'
 import { paymentPlanService } from '../../services/paymentPlanService'
 import { useAuth } from '../../hooks/useAuth'
+import { usePermissions } from '../../hooks/usePermissions'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import { PaymentPlanPicker } from '../../components/payment-plan-picker'
 import { PaymentPlanHistoryTable } from '../../components/payment-plan-history-table'
@@ -58,11 +59,6 @@ const BILLING_TYPE_OPTIONS = [
   { value: 'cash', label: 'Cash Basis (collected on its own)' },
   { value: 'installment', label: 'Installment Plan (added to the schedule)' },
 ]
-
-const VOID_APPROVER_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator']
-// Finance reviews the queue but does not skip it: a void raised from the ledger still
-// becomes a pending request, which only these roles bypass.
-const VOID_SELF_APPROVER_ROLES = ['institution-administrator', 'principal', 'super-administrator']
 
 type FinanceView =
   | 'dashboard'
@@ -166,10 +162,13 @@ const Finance: React.FC = () => {
   }, [location.pathname])
 
   const { user } = useAuth()
+  const { can } = usePermissions()
   const roleSlug: string | undefined = user?.role?.slug
-  const isVoidApprover = Boolean(roleSlug && VOID_APPROVER_ROLES.includes(roleSlug))
-  const voidsImmediately = Boolean(roleSlug && VOID_SELF_APPROVER_ROLES.includes(roleSlug))
-  const canRequestVoid = roleSlug === 'finance' || isVoidApprover
+  const isVoidApprover = can('finance', 'approve-void')
+  // Finance reviews the queue but does not skip it: a void raised from the ledger
+  // still becomes a pending request unless the role may void immediately.
+  const voidsImmediately = can('finance', 'void-immediately')
+  const canRequestVoid = can('finance', 'request-void') || isVoidApprover
   // Students may make their first plan selection in the portal; every later change
   // is staff-only, and the API rejects a student attempting one either way.
   const canManagePaymentPlan = roleSlug !== 'student'

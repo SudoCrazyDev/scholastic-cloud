@@ -3,12 +3,13 @@ import type { Role, PaginatedResponse } from '../types'
 
 export interface CreateRoleData {
   title: string
-  slug: string
+  /** Permission strings ("finance.manage") the role should hold. */
+  permissions?: string[]
 }
 
 export interface UpdateRoleData {
   title?: string
-  slug?: string
+  permissions?: string[]
 }
 
 class RoleService {
