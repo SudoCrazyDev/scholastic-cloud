@@ -85,6 +85,7 @@ class StudentFeeController extends Controller
                 })
             ],
             'amount' => 'required|numeric|min:0',
+            'billing_type' => ['nullable', Rule::in(StudentFee::BILLING_TYPES)],
             'description' => 'nullable|string',
             'is_active' => 'nullable|boolean',
         ]);
@@ -93,6 +94,9 @@ class StudentFeeController extends Controller
             'institution_id' => $institutionId,
             'name' => $validated['name'],
             'amount' => $validated['amount'],
+            // Most ad-hoc fees are collected on the spot, so cash is the basis unless
+            // the fee is explicitly meant to be spread over the payment plan.
+            'billing_type' => $validated['billing_type'] ?? StudentFee::BILLING_CASH,
             'description' => $validated['description'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
             'created_by' => $request->user()?->id,
@@ -178,10 +182,13 @@ class StudentFeeController extends Controller
                 })->ignore($fee->id)
             ],
             'amount' => 'sometimes|required|numeric|min:0',
+            'billing_type' => ['sometimes', 'required', Rule::in(StudentFee::BILLING_TYPES)],
             'description' => 'nullable|string',
             'is_active' => 'nullable|boolean',
         ]);
 
+        // Charges already posted keep the basis they were posted under, so re-pointing the
+        // template only changes what the next charge from it will do.
         $fee->update($validated);
 
         return response()->json([

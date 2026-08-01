@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Auth\StudentPortalUser;
 use App\Models\Student;
 use App\Models\StudentAdditionalFee;
+use App\Models\StudentFee;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class StudentAdditionalFeeController extends Controller
 {
@@ -74,6 +76,7 @@ class StudentAdditionalFeeController extends Controller
             'academic_year' => 'required|string|max:255',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'billing_type' => ['nullable', Rule::in(StudentAdditionalFee::BILLING_TYPES)],
             'amount' => 'required|numeric|min:0.01',
         ]);
 
@@ -85,6 +88,15 @@ class StudentAdditionalFeeController extends Controller
             return response()->json(['success' => false, 'message' => 'Student not found in this institution'], 404);
         }
 
+        // The caller decides the basis; a charge raised from a saved fee falls back to
+        // whatever that template declares, and anything typed by hand is cash.
+        $billingType = $validated['billing_type'] ?? null;
+        if (! $billingType && ! empty($validated['student_fee_id'])) {
+            $billingType = StudentFee::where('institution_id', $institutionId)
+                ->whereKey($validated['student_fee_id'])
+                ->value('billing_type');
+        }
+
         $fee = StudentAdditionalFee::create([
             'institution_id' => $institutionId,
             'student_id' => $validated['student_id'],
@@ -92,6 +104,9 @@ class StudentAdditionalFeeController extends Controller
             'academic_year' => $validated['academic_year'],
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
+            'billing_type' => in_array($billingType, StudentAdditionalFee::BILLING_TYPES, true)
+                ? $billingType
+                : StudentAdditionalFee::BILLING_CASH,
             'amount' => $validated['amount'],
             'created_by' => $request->user()?->id,
         ]);
@@ -118,6 +133,11 @@ class StudentAdditionalFeeController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
+            // A late fee is charged against one installment and collected with it, so its
+            // basis is not the caller's to set — only ad-hoc charges can be re-based.
+            'billing_type' => $fee->isLateFee()
+                ? 'prohibited'
+                : ['sometimes', 'required', Rule::in(StudentAdditionalFee::BILLING_TYPES)],
             'amount' => 'sometimes|required|numeric|min:0.01',
         ]);
 

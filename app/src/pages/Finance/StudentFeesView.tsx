@@ -6,13 +6,25 @@ import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Select } from '../../components/select'
 import { studentFeeService } from '../../services/studentFeeService'
-import type { StudentFee, CreateStudentFeeData } from '../../types'
+import type { StudentFee, CreateStudentFeeData, FeeBillingType } from '../../types'
 
 const emptyForm = {
   name: '',
   amount: '',
+  // Most ad-hoc fees are collected on the spot rather than amortized, so cash leads.
+  billing_type: 'cash' as FeeBillingType,
   description: '',
   is_active: true,
+}
+
+const BILLING_TYPE_OPTIONS = [
+  { value: 'cash', label: 'Cash Basis (collected on its own)' },
+  { value: 'installment', label: 'Installment Plan (spread across installments)' },
+]
+
+const BILLING_TYPE_LABELS: Record<FeeBillingType, string> = {
+  cash: 'Cash Basis',
+  installment: 'Installment Plan',
 }
 
 const formatCurrency = (value: number) =>
@@ -100,6 +112,7 @@ const StudentFeesView: React.FC = () => {
     const data: CreateStudentFeeData = {
       name: form.name.trim(),
       amount,
+      billing_type: form.billing_type,
       description: form.description.trim() || undefined,
       is_active: form.is_active,
     }
@@ -116,6 +129,7 @@ const StudentFeesView: React.FC = () => {
     setForm({
       name: fee.name,
       amount: Number(fee.amount).toString(),
+      billing_type: fee.billing_type ?? 'cash',
       description: fee.description || '',
       is_active: fee.is_active,
     })
@@ -144,7 +158,8 @@ const StudentFeesView: React.FC = () => {
       <h2 className="text-xl font-semibold text-gray-900 mb-1">Student Fees</h2>
       <p className="text-sm text-gray-500 mb-4">
         Create reusable student fees here so a cashier can search for one on the ledger and add it to
-        a student without typing the amount each time.
+        a student without typing the amount each time. Each fee also says how it is collected — on
+        its own in cash, or spread across the student's payment plan.
       </p>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
@@ -174,24 +189,52 @@ const StudentFeesView: React.FC = () => {
           placeholder="Optional notes"
           disabled={isSaving}
         />
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-          <Select
-            value={form.is_active ? 'active' : 'inactive'}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, is_active: event.target.value === 'active' }))
-            }
-            options={[
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
-            ]}
-            className="w-full"
-            disabled={isSaving}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Only active fees appear in the ledger search.
-          </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Billing Basis</label>
+            <Select
+              value={form.billing_type}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  billing_type: event.target.value as FeeBillingType,
+                }))
+              }
+              options={BILLING_TYPE_OPTIONS}
+              className="w-full"
+              disabled={isSaving}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              {form.billing_type === 'installment'
+                ? 'Charges from this fee join the payable the payment plan divides, so each installment grows.'
+                : 'Charges from this fee are collected on their own and stay out of the payment schedule.'}
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <Select
+              value={form.is_active ? 'active' : 'inactive'}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, is_active: event.target.value === 'active' }))
+              }
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+              ]}
+              className="w-full"
+              disabled={isSaving}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Only active fees appear in the ledger search.
+            </p>
+          </div>
         </div>
+        {editing && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Changing the billing basis only affects charges added from here on — fees already
+            posted to a student's ledger keep the basis they were charged under.
+          </p>
+        )}
         {formError && <p className="text-sm text-red-600">{formError}</p>}
         <div className="flex flex-wrap gap-3">
           <Button type="submit" loading={isSaving} className="bg-primary-600 hover:bg-primary-700 text-white">
@@ -231,6 +274,7 @@ const StudentFeesView: React.FC = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Billing</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -246,6 +290,17 @@ const StudentFeesView: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 tabular-nums">
                       {formatCurrency(Number(fee.amount))}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                          (fee.billing_type ?? 'cash') === 'installment'
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}
+                      >
+                        {BILLING_TYPE_LABELS[fee.billing_type ?? 'cash']}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {fee.is_active ? 'Active' : 'Inactive'}
@@ -269,7 +324,7 @@ const StudentFeesView: React.FC = () => {
                 ))}
                 {!visibleFees.length && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                    <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
                       {fees.length ? 'No student fees match your search.' : 'No student fees added yet.'}
                     </td>
                   </tr>

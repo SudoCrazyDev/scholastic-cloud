@@ -768,11 +768,23 @@ export interface LedgerFeeBreakdown {
   fee_name: string;
   is_additional: boolean;
   source?: StudentAdditionalFeeSource;
+  // Whether this fee is inside the payment schedule. Standard grade-level fees and late
+  // fees are; a cash-basis ad-hoc fee is collected on its own.
+  billing_type?: FeeBillingType;
   installment_sequence?: number | null;
   charge: number;
   discount: number;
   paid: number;
   outstanding: number;
+}
+
+// Charges that never entered the payment schedule, reported so the schedule can leave
+// them out of Total Payable without calling their collections unapplied.
+export interface LedgerCashBasisSummary {
+  charges: number;
+  paid: number;
+  outstanding: number;
+  fee_count: number;
 }
 
 export interface StudentLedgerResponse {
@@ -785,11 +797,14 @@ export interface StudentLedgerResponse {
     charges: number;
     // Portion of `charges` booked as late fees for overdue installments.
     late_fees?: number;
+    // Portion of `charges` booked as cash-basis fees, outside the schedule.
+    cash_fees?: number;
     discounts: number;
     payments: number;
     balance_forward: number;
     balance: number;
   };
+  cash_basis?: LedgerCashBasisSummary;
   fee_breakdown?: LedgerFeeBreakdown[];
   unallocated_payments?: number;
   payment_plan?: StudentPaymentPlan | null;
@@ -808,6 +823,7 @@ export interface StudentNOAResponse {
     amount: number;
     is_additional?: boolean;
     source?: StudentAdditionalFeeSource;
+    billing_type?: FeeBillingType;
     installment_sequence?: number | null;
   }>;
   discounts?: Array<{
@@ -831,11 +847,13 @@ export interface StudentNOAResponse {
   totals: {
     charges: number;
     late_fees?: number;
+    cash_fees?: number;
     discounts: number;
     payments: number;
     balance_forward: number;
     balance: number;
   };
+  cash_basis?: LedgerCashBasisSummary;
   payment_plan?: StudentPaymentPlan | null;
   downpayment?: ScheduleDownpayment;
   installments?: StudentInstallment[];
@@ -915,6 +933,9 @@ export interface StudentAdditionalFee {
   // 'late_fee' rows are booked automatically for overdue payment-plan installments;
   // deleting one waives the fee.
   source?: StudentAdditionalFeeSource;
+  // The basis this charge was posted under. It is fixed at posting time, so re-pointing
+  // the saved fee it came from never moves a charge already on the ledger.
+  billing_type?: FeeBillingType;
   installment_sequence?: number | null;
   late_fee_percentage?: number | null;
   base_amount?: number | null;
@@ -935,14 +956,20 @@ export interface CreateStudentAdditionalFeeData {
   academic_year: string;
   name: string;
   description?: string;
+  billing_type?: FeeBillingType;
   amount: number;
 }
+
+// How a fee is collected. 'cash' stands on its own outside the payment plan (the
+// default); 'installment' joins the principal the plan splits across installments.
+export type FeeBillingType = 'cash' | 'installment';
 
 export interface StudentFee {
   id: string;
   institution_id: string;
   name: string;
   amount: number;
+  billing_type?: FeeBillingType;
   description?: string | null;
   is_active: boolean;
   created_at: string;
@@ -952,6 +979,7 @@ export interface StudentFee {
 export interface CreateStudentFeeData {
   name: string;
   amount: number;
+  billing_type?: FeeBillingType;
   description?: string;
   is_active?: boolean;
 }
@@ -959,6 +987,7 @@ export interface CreateStudentFeeData {
 export interface UpdateStudentFeeData {
   name?: string;
   amount?: number;
+  billing_type?: FeeBillingType;
   description?: string;
   is_active?: boolean;
 }

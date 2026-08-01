@@ -17,6 +17,14 @@ class StudentAdditionalFee extends Model
     /** Materialized by LateFeeService when a payment-plan installment went overdue. */
     public const SOURCE_LATE_FEE = 'late_fee';
 
+    /** Collected on its own, outside the payment plan. The default. */
+    public const BILLING_CASH = 'cash';
+
+    /** Joins the principal the payment plan splits across installments. */
+    public const BILLING_INSTALLMENT = 'installment';
+
+    public const BILLING_TYPES = [self::BILLING_CASH, self::BILLING_INSTALLMENT];
+
     protected $fillable = [
         'institution_id',
         'student_id',
@@ -24,6 +32,7 @@ class StudentAdditionalFee extends Model
         'academic_year',
         'name',
         'description',
+        'billing_type',
         'source',
         'installment_sequence',
         'late_fee_percentage',
@@ -76,6 +85,23 @@ class StudentAdditionalFee extends Model
     public function isLateFee(): bool
     {
         return $this->source === self::SOURCE_LATE_FEE;
+    }
+
+    /**
+     * Whether this charge feeds the principal the payment plan splits.
+     *
+     * A late fee never does — it is charged against one installment and collected with
+     * it, so folding it back into the split would compound it across every period.
+     */
+    public function isInstallmentBased(): bool
+    {
+        return ! $this->isLateFee() && $this->billing_type === self::BILLING_INSTALLMENT;
+    }
+
+    /** A charge collected on its own, outside the schedule. */
+    public function isCashBasis(): bool
+    {
+        return ! $this->isLateFee() && ! $this->isInstallmentBased();
     }
 
     public function scopeLateFees($query)

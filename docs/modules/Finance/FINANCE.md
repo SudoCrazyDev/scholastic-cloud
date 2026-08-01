@@ -85,11 +85,21 @@ views' requests.
   `late_fee` (auto-charged, see below). They appear in the ledger/NOA fee breakdown flagged
   `is_additional`, each as its own collectible line, and are settled in cashiering through
   `student_payments.student_additional_fee_id`. **Soft-deleted** — removing one keeps the row.
+- **Billing basis** (`billing_type` on both `student_fees` and `student_additional_fees`) — how an
+  ad-hoc fee is collected. `cash` (**the default**) is owed in full on its own: it stays out of the
+  principal the payment plan divides, and money paid against it never fills an installment.
+  `installment` joins that principal, so every installment grows. The basis lives on the reusable
+  template (what to suggest) *and* on the posted charge (what was actually used) — re-pointing a
+  template never moves a charge already on a ledger. Charges posted before this existed were
+  backfilled to `installment`, preserving their schedules. The ledger/NOA report it per fee in
+  `fee_breakdown[].billing_type` plus a `cash_basis` summary (`charges`/`paid`/`outstanding`/
+  `fee_count`) and `totals.cash_fees`. Late fees always report as `installment`: they are not
+  amortized, but the schedule shows each one on the period that incurred it.
 - **Payment plans** (`payment_plans` + `payment_plan_installments`) — institution-defined
   installment schedules (label, due month/day, share %, grace days, late fee). A student's chosen
   plan lives in `student_payment_plans` (unique per student+year), with every change audited in
   `student_payment_plan_changes`. Plans are managed on the standalone `/payment-plans` page; the
-  Ledger's monthly/quarterly schedule views and My Finance consume them.
+  Ledger's Payment Schedule view and My Finance consume them.
 - **Late fees** (`LateFeeService`) — the first time a ledger or NOA load sees an installment past
   `due_date + grace_period_days` while it still owes money, the plan's `late_fee_percentage` of the
   installment's net amount is **booked as a real charge**: a `student_additional_fees` row with
@@ -218,13 +228,20 @@ printing. Invalidates `finance-dashboard`, `student-ledger`, `cashier-ledger` qu
 
 ### Ledger (`/finance/ledger`)
 Same student search → `GET /students/{id}/ledger` + `GET /students/{id}/noa`. Three view modes:
-`entries` (chronological charges/payments/discounts), `monthly`, `quarterly` (installment
-schedule tables with cumulative due/paid/remaining, driven by the student's payment plan). From
-here staff can:
+- `entries` — chronological charges/payments/discounts with the running balance.
+- `schedule` (**Payment Schedule**) — the installment table with cumulative due/paid/remaining,
+  driven by the student's payment plan. Cash-basis fees are **excluded** from its Total Payable
+  and called out in a banner instead, since they were never amortized.
+- `fees` (**Fees**) — the ledger's `fee_breakdown` grouped by billing basis ("Payment Plan Fees"
+  vs "Cash Basis Fees"), each row showing charged / discount / paid / outstanding + a
+  paid/partial/unpaid status, with per-group subtotals and charged/discount/paid/outstanding
+  stat tiles across the whole year.
+
+From here staff can:
 - **Apply a discount** — fixed/percentage, optionally prefilled from a default discount; fixed
   discounts can be **split across fees** with allocation rows that must sum exactly to the total.
   → `POST /student-discounts`.
-- **Add an additional fee** — name + amount → `POST /student-additional-fees`.
+- **Add an additional fee** — name + amount + **billing basis** → `POST /student-additional-fees`.
 - **Void a discount** — note required → `POST /student-discounts/{id}/void` (direct, no queue).
 - **Request a payment void** — note required, keyed by the entry's `receipt_number` →
   `POST /payment-void-requests` (goes to the approval queue unless requester is an approver).
@@ -259,10 +276,12 @@ Fee amounts per grade level + academic year via `/school-fee-defaults`. Supports
 by grade/year. The route keeps its `default-amounts` slug; only the label reads "School Fees Amounts".
 
 ### Setup → Student Fees (`/finance/student-fees`) — `StudentFeesView.tsx`
-CRUD on reusable student fee templates via `/student-fees` (name, amount, description, active flag).
-The Ledger's **Additional Fees** form has an `Autocomplete` over the active ones: picking a fee fills
-in name/amount/description and stores `student_fee_id` on the resulting `student_additional_fees` row,
-so the charge can be traced back to the template. Cashiers can still type a one-off fee by hand.
+CRUD on reusable student fee templates via `/student-fees` (name, amount, **billing basis**,
+description, active flag). The Ledger's **Additional Fees** form has an `Autocomplete` over the
+active ones: picking a fee fills in name/amount/description/basis and stores `student_fee_id` on the
+resulting `student_additional_fees` row, so the charge can be traced back to the template. The
+cashier can override the basis on the charge, and can still type a one-off fee by hand — a hand-typed
+one is cash basis.
 
 ### Setup → Grade Level Discounts (`/finance/discounts`) — `DiscountsView.tsx`
 Bulk discounts applied to an entire grade level for a year (fixed/percentage, optionally tied to

@@ -47,7 +47,17 @@ import StudentFeesView from './StudentFeesView'
 import SiblingDiscountsView from './SiblingDiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
-import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType } from '../../types'
+
+const BILLING_TYPE_LABELS: Record<FeeBillingType, string> = {
+  cash: 'Cash Basis',
+  installment: 'Installment Plan',
+}
+
+const BILLING_TYPE_OPTIONS = [
+  { value: 'cash', label: 'Cash Basis (collected on its own)' },
+  { value: 'installment', label: 'Installment Plan (added to the schedule)' },
+]
 
 const VOID_APPROVER_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator']
 // Finance reviews the queue but does not skip it: a void raised from the ledger still
@@ -230,7 +240,7 @@ const Finance: React.FC = () => {
   const [debouncedLedgerSearch, setDebouncedLedgerSearch] = useState('')
   const [selectedLedgerStudent, setSelectedLedgerStudent] = useState<Student | null>(null)
   const [ledgerAcademicYear, setLedgerAcademicYear] = useState(defaultAcademicYear)
-  const [ledgerViewMode, setLedgerViewMode] = useState<'entries' | 'monthly' | 'quarterly'>('entries')
+  const [ledgerViewMode, setLedgerViewMode] = useState<'entries' | 'schedule' | 'fees'>('entries')
   const [showLedgerDiscount, setShowLedgerDiscount] = useState(false)
   const [ledgerDiscountForm, setLedgerDiscountForm] = useState({
     default_discount_id: '',
@@ -248,6 +258,8 @@ const Finance: React.FC = () => {
     student_fee_id: '',
     name: '',
     description: '',
+    // Cash unless the fee is meant to be amortized — picking a saved fee overrides it.
+    billing_type: 'cash' as FeeBillingType,
     amount: '',
   })
   const [ledgerAdditionalFeeError, setLedgerAdditionalFeeError] = useState<string | null>(null)
@@ -346,7 +358,13 @@ const Finance: React.FC = () => {
     mutationFn: (payload: CreateStudentAdditionalFeeData) =>
       studentAdditionalFeeService.createFee(payload),
     onSuccess: () => {
-      setLedgerAdditionalFeeForm({ student_fee_id: '', name: '', description: '', amount: '' })
+      setLedgerAdditionalFeeForm({
+        student_fee_id: '',
+        name: '',
+        description: '',
+        billing_type: 'cash',
+        amount: '',
+      })
       setLedgerAdditionalFeeError(null)
       setShowLedgerAdditionalFee(false)
       queryClient.invalidateQueries({ queryKey: ['student-additional-fees', selectedLedgerStudent?.id] })
@@ -585,6 +603,7 @@ const Finance: React.FC = () => {
       academic_year: ledgerAcademicYear,
       name: ledgerAdditionalFeeForm.name,
       description: ledgerAdditionalFeeForm.description || undefined,
+      billing_type: ledgerAdditionalFeeForm.billing_type,
       amount,
     })
   }
@@ -658,7 +677,9 @@ const Finance: React.FC = () => {
         description: `₱${Number(fee.amount).toLocaleString('en-PH', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
-        })}${fee.description ? ` — ${fee.description}` : ''}`,
+        })} · ${BILLING_TYPE_LABELS[fee.billing_type ?? 'cash']}${
+          fee.description ? ` — ${fee.description}` : ''
+        }`,
       })),
     [studentFeeOptions]
   )
@@ -683,6 +704,8 @@ const Finance: React.FC = () => {
       student_fee_id: preset.id,
       name: preset.name,
       description: preset.description || '',
+      // The saved fee decides the basis, but the cashier can still override it below.
+      billing_type: preset.billing_type ?? 'cash',
       amount: Number(preset.amount).toString(),
     })
   }
@@ -2325,7 +2348,7 @@ const Finance: React.FC = () => {
                             {ledgerQuery.data.data.payment_plan.name || 'Assigned plan'}
                           </span>{' '}
                           · {ledgerQuery.data.data.payment_plan.installment_count} installments ·
-                          drives the Monthly and Quarterly views for{' '}
+                          drives the Payment Schedule view for{' '}
                           <span className="font-medium">{ledgerAcademicYear}</span>.
                         </p>
                       ) : (
@@ -2720,6 +2743,27 @@ const Finance: React.FC = () => {
                         }
                         placeholder="Optional note"
                       />
+                      <div className="sm:col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Billing Basis
+                        </label>
+                        <Select
+                          value={ledgerAdditionalFeeForm.billing_type}
+                          onChange={(e) =>
+                            setLedgerAdditionalFeeForm((prev) => ({
+                              ...prev,
+                              billing_type: e.target.value as FeeBillingType,
+                            }))
+                          }
+                          options={BILLING_TYPE_OPTIONS}
+                          className="w-full sm:w-72"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          {ledgerAdditionalFeeForm.billing_type === 'installment'
+                            ? 'This fee is added to the payable the plan divides, so every remaining installment grows.'
+                            : 'This fee is collected on its own and stays out of the Payment Schedule — it shows under Fees.'}
+                        </p>
+                      </div>
                       {ledgerAdditionalFeeError && (
                         <p className="sm:col-span-3 text-sm text-red-600">{ledgerAdditionalFeeError}</p>
                       )}
@@ -2741,6 +2785,7 @@ const Finance: React.FC = () => {
                           <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Billing</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
                           </tr>
@@ -2786,6 +2831,28 @@ const Finance: React.FC = () => {
                                 }`}
                               >
                                 {formatCurrency(fee.amount)}
+                              </td>
+                              <td className="px-4 py-2 text-sm">
+                                {isLateFee ? (
+                                  <span
+                                    className="text-xs text-gray-500"
+                                    title="Charged against one installment and collected with it"
+                                  >
+                                    With installment {fee.installment_sequence ?? '—'}
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                      isWaived
+                                        ? 'bg-gray-100 text-gray-400'
+                                        : (fee.billing_type ?? 'cash') === 'installment'
+                                          ? 'bg-indigo-100 text-indigo-700'
+                                          : 'bg-emerald-100 text-emerald-700'
+                                    }`}
+                                  >
+                                    {BILLING_TYPE_LABELS[fee.billing_type ?? 'cash']}
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-2 text-sm text-gray-600">
                                 {isWaived ? (
@@ -2881,25 +2948,25 @@ const Finance: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setLedgerViewMode('monthly')}
+                        onClick={() => setLedgerViewMode('schedule')}
                         className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                          ledgerViewMode === 'monthly'
+                          ledgerViewMode === 'schedule'
                             ? 'bg-primary-600 text-white'
                             : 'bg-white text-gray-700 hover:bg-gray-50'
                         }`}
                       >
-                        Monthly
+                        Payment Schedule
                       </button>
                       <button
                         type="button"
-                        onClick={() => setLedgerViewMode('quarterly')}
+                        onClick={() => setLedgerViewMode('fees')}
                         className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                          ledgerViewMode === 'quarterly'
+                          ledgerViewMode === 'fees'
                             ? 'bg-primary-600 text-white'
                             : 'bg-white text-gray-700 hover:bg-gray-50'
                         }`}
                       >
-                        Quarterly
+                        Fees
                       </button>
                     </div>
                   </div>
@@ -3060,15 +3127,31 @@ const Finance: React.FC = () => {
                     </>
                   )}
 
-                  {(ledgerViewMode === 'monthly' || ledgerViewMode === 'quarterly') && (() => {
+                  {ledgerViewMode === 'schedule' && (() => {
                     const ledger = ledgerQuery.data?.data
                     const totals = ledger?.totals
                     const balanceForward = totals?.balance_forward ?? 0
-                    const totalPayable = balanceForward + (totals?.charges ?? 0) - (totals?.discounts ?? 0)
+                    // Cash-basis fees never entered the schedule, so they are not part of
+                    // what it amortizes — they are reported on their own below and in Fees.
+                    const cashBasis = ledger?.cash_basis
+                    const cashCharges = cashBasis?.charges ?? 0
+                    const cashPaid = cashBasis?.paid ?? 0
+                    const totalPayable =
+                      balanceForward + (totals?.charges ?? 0) - (totals?.discounts ?? 0) - cashCharges
                     const startYear = Number(ledgerAcademicYear.split('-')[0]) || currentYear
                     const allEntries = ledger?.entries ?? []
                     // Voided payments stay listed for audit but never count as collected.
                     const activePayments = allEntries.filter((e) => e.type === 'payment' && !e.voided)
+                    // Money collected against a cash-basis fee settles that fee, so it must
+                    // not fill a schedule period it was never owed to.
+                    const cashFeeIds = new Set(
+                      (ledger?.fee_breakdown ?? [])
+                        .filter((f) => f.is_additional && (f.billing_type ?? 'cash') === 'cash')
+                        .map((f) => f.fee_id)
+                    )
+                    const schedulePayments = activePayments.filter(
+                      (p) => !(p.fee_id && cashFeeIds.has(p.fee_id))
+                    )
                     const planInstallments = ledger?.installments ?? []
                     const plan = ledger?.payment_plan
 
@@ -3145,7 +3228,7 @@ const Finance: React.FC = () => {
                       ]
 
                       const paidByMonth: Record<string, number> = {}
-                      for (const p of activePayments) {
+                      for (const p of schedulePayments) {
                         if (!p.date) continue
                         const d = new Date(`${p.date}T00:00:00`)
                         const key = `${d.getMonth() + 1}-${d.getFullYear()}`
@@ -3224,127 +3307,18 @@ const Finance: React.FC = () => {
                     // Anything collected beyond the schedule (overpayment, or money against a
                     // balance forward the plan does not model) is called out instead of silently
                     // making the columns disagree with the entries view. A downpayment is
-                    // already accounted for by its leading row, so it is not "unapplied".
+                    // already accounted for by its leading row, and cash-basis collections are
+                    // owed elsewhere, so neither is "unapplied".
                     const unapplied = Math.max(
                       (totals?.payments ?? 0) -
+                        cashPaid -
                         [...leadingRows, ...periods].reduce((s, p) => s + p.paid, 0),
                       0
                     )
 
-                    if (ledgerViewMode === 'monthly') {
-                      const rows = buildRows(periods)
-                      const totalDue = rows.reduce((s, r) => s + r.due, 0)
-                      const totalPaid = rows.reduce((s, r) => s + r.paid, 0)
-
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
-                            <span>Total Payable: <strong className="text-gray-900">{formatCurrency(totalPayable)}</strong></span>
-                            {planInstallments.length > 0 ? (
-                              <span>
-                                Plan: <strong className="text-gray-900">{plan?.name ?? 'Assigned plan'}</strong>{' '}
-                                ({planInstallments.length} installment{planInstallments.length === 1 ? '' : 's'})
-                              </span>
-                            ) : (
-                              <span className="text-amber-600">
-                                No payment plan assigned — showing an even 10-month split.
-                              </span>
-                            )}
-                            {unapplied > 0.01 && (
-                              <span>Unapplied payments: <strong className="text-gray-900">{formatCurrency(unapplied)}</strong></span>
-                            )}
-                          </div>
-                          <div className="overflow-x-auto rounded-lg border border-gray-200">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
-                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount Due</th>
-                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
-                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Due</th>
-                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Paid</th>
-                                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Remaining</th>
-                                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-200 bg-white">
-                                {rows.map((r) => {
-                                  const isFullyPaid = r.cumulativePaid >= r.cumulativeDue - 0.01
-                                  return (
-                                    <tr key={r.key} className="hover:bg-gray-50/50">
-                                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                        {r.label}
-                                        {r.sublabel && (
-                                          <span className="block text-xs font-normal text-gray-500">{r.sublabel}</span>
-                                        )}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.due)}</td>
-                                      <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(r.paid)}</td>
-                                      <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativeDue)}</td>
-                                      <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativePaid)}</td>
-                                      <td className="px-4 py-3 text-sm text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.remaining)}</td>
-                                      <td className="px-4 py-3 text-center">
-                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                                          isFullyPaid
-                                            ? 'bg-green-100 text-green-700'
-                                            : r.paid > 0
-                                              ? 'bg-yellow-100 text-yellow-700'
-                                              : 'bg-gray-100 text-gray-500'
-                                        }`}>
-                                          {isFullyPaid ? 'Paid' : r.paid > 0 ? 'Partial' : 'Unpaid'}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  )
-                                })}
-                              </tbody>
-                              <tfoot className="bg-gray-50">
-                                <tr className="font-semibold">
-                                  <td className="px-4 py-3 text-sm text-gray-900">Total</td>
-                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalDue)}</td>
-                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                    {formatCurrency(totalPaid)}
-                                  </td>
-                                  <td colSpan={2} />
-                                  <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                    {formatCurrency(Math.max(totalDue - totalPaid - unapplied, 0))}
-                                  </td>
-                                  <td />
-                                </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        </div>
-                      )
-                    }
-
-                    // Quarters are the schedule's own first, second, third and fourth
-                    // three-month windows, so grouping holds for any plan shape.
-                    const qRows = buildRows(
-                      [0, 1, 2, 3]
-                        .map((qi) => {
-                          const members = periods.filter(
-                            (p) => Math.min(Math.floor(p.monthOffset / 3), 3) === qi
-                          )
-                          const span = members.length
-                            ? members[0].monthLabel === members[members.length - 1].monthLabel
-                              ? members[0].monthLabel
-                              : `${members[0].monthLabel} – ${members[members.length - 1].monthLabel}`
-                            : ''
-
-                          return {
-                            key: `quarter-${qi + 1}`,
-                            label: `Q${qi + 1}`,
-                            sublabel: span,
-                            due: members.reduce((s, m) => s + m.due, 0),
-                            paid: members.reduce((s, m) => s + m.paid, 0),
-                            memberCount: members.length,
-                          }
-                        })
-                        .filter((q) => q.memberCount > 0)
-                    )
-                    const qTotalDue = qRows.reduce((s, r) => s + r.due, 0)
-                    const qTotalPaid = qRows.reduce((s, r) => s + r.paid, 0)
+                    const rows = buildRows(periods)
+                    const totalDue = rows.reduce((s, r) => s + r.due, 0)
+                    const totalPaid = rows.reduce((s, r) => s + r.paid, 0)
 
                     return (
                       <div className="space-y-4">
@@ -3353,22 +3327,30 @@ const Finance: React.FC = () => {
                           {planInstallments.length > 0 ? (
                             <span>
                               Plan: <strong className="text-gray-900">{plan?.name ?? 'Assigned plan'}</strong>{' '}
-                              — installments grouped into three-month windows.
+                              ({planInstallments.length} installment{planInstallments.length === 1 ? '' : 's'})
                             </span>
                           ) : (
                             <span className="text-amber-600">
-                              No payment plan assigned — showing an even 10-month split grouped by quarter.
+                              No payment plan assigned — showing an even 10-month split.
                             </span>
                           )}
                           {unapplied > 0.01 && (
                             <span>Unapplied payments: <strong className="text-gray-900">{formatCurrency(unapplied)}</strong></span>
                           )}
                         </div>
+                        {cashCharges > 0.01 && (
+                          <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">
+                            <strong>{formatCurrency(cashCharges)}</strong> in cash-basis fees is
+                            collected outside this schedule
+                            {cashPaid > 0.01 && <> — {formatCurrency(cashPaid)} already received</>}.
+                            See the <strong>Fees</strong> tab for the per-fee balance.
+                          </div>
+                        )}
                         <div className="overflow-x-auto rounded-lg border border-gray-200">
                           <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                               <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quarter</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Period</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount Due</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cumulative Due</th>
@@ -3378,7 +3360,7 @@ const Finance: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 bg-white">
-                              {qRows.map((r) => {
+                              {rows.map((r) => {
                                 const isFullyPaid = r.cumulativePaid >= r.cumulativeDue - 0.01
                                 return (
                                   <tr key={r.key} className="hover:bg-gray-50/50">
@@ -3411,19 +3393,191 @@ const Finance: React.FC = () => {
                             <tfoot className="bg-gray-50">
                               <tr className="font-semibold">
                                 <td className="px-4 py-3 text-sm text-gray-900">Total</td>
-                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(qTotalDue)}</td>
+                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalDue)}</td>
                                 <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                  {formatCurrency(qTotalPaid)}
+                                  {formatCurrency(totalPaid)}
                                 </td>
                                 <td colSpan={2} />
                                 <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                  {formatCurrency(Math.max(qTotalDue - qTotalPaid - unapplied, 0))}
+                                  {formatCurrency(Math.max(totalDue - totalPaid - unapplied, 0))}
                                 </td>
                                 <td />
                               </tr>
                             </tfoot>
                           </table>
                         </div>
+                      </div>
+                    )
+                  })()}
+
+                  {ledgerViewMode === 'fees' && (() => {
+                    const ledger = ledgerQuery.data?.data
+                    const breakdown = ledger?.fee_breakdown ?? []
+
+                    // Grouped by how each fee is collected, because that is what decides
+                    // where the cashier goes for it: the schedule, or cash on its own.
+                    const scheduled = breakdown.filter(
+                      (fee) => (fee.billing_type ?? 'installment') === 'installment'
+                    )
+                    const cashBased = breakdown.filter(
+                      (fee) => (fee.billing_type ?? 'installment') === 'cash'
+                    )
+
+                    const sum = (rows: typeof breakdown, key: 'charge' | 'discount' | 'paid' | 'outstanding') =>
+                      rows.reduce((total, fee) => total + Number(fee[key] ?? 0), 0)
+
+                    const groups = [
+                      {
+                        key: 'installment',
+                        title: 'Payment Plan Fees',
+                        blurb:
+                          'Charged into the payable the plan divides — collected through the Payment Schedule.',
+                        rows: scheduled,
+                        accent: 'text-indigo-700',
+                      },
+                      {
+                        key: 'cash',
+                        title: 'Cash Basis Fees',
+                        blurb:
+                          'Collected on their own, outside the schedule. Each one is due in full.',
+                        rows: cashBased,
+                        accent: 'text-emerald-700',
+                      },
+                    ].filter((group) => group.rows.length > 0)
+
+                    if (ledgerQuery.isLoading) {
+                      return <p className="text-gray-500">Loading fees...</p>
+                    }
+
+                    if (!breakdown.length) {
+                      return (
+                        <p className="rounded-lg border border-gray-200 bg-white px-4 py-8 text-center text-gray-500">
+                          No fees charged for this academic year.
+                        </p>
+                      )
+                    }
+
+                    return (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {[
+                            { label: 'Charged', value: sum(breakdown, 'charge') },
+                            { label: 'Discounts', value: sum(breakdown, 'discount') },
+                            { label: 'Paid', value: sum(breakdown, 'paid') },
+                            { label: 'Outstanding', value: sum(breakdown, 'outstanding') },
+                          ].map((tile, index) => (
+                            <div
+                              key={tile.label}
+                              className={`rounded-lg border p-4 ${
+                                index === 3
+                                  ? 'border-primary-100 bg-primary-50'
+                                  : 'border-gray-200 bg-gray-50'
+                              }`}
+                            >
+                              <p className="text-sm text-gray-500">{tile.label}</p>
+                              <p
+                                className={`text-xl font-semibold tabular-nums ${
+                                  index === 3 ? 'text-primary-900' : 'text-gray-900'
+                                }`}
+                              >
+                                {formatCurrency(tile.value)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {groups.map((group) => (
+                          <div key={group.key}>
+                            <div className="mb-2">
+                              <h4 className={`text-sm font-semibold ${group.accent}`}>
+                                {group.title}
+                              </h4>
+                              <p className="text-xs text-gray-500">{group.blurb}</p>
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border border-gray-200">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Charged</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Discount</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Outstanding</th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 bg-white">
+                                  {group.rows.map((fee) => {
+                                    const outstanding = Number(fee.outstanding ?? 0)
+                                    const paid = Number(fee.paid ?? 0)
+                                    const isSettled = outstanding <= 0.01
+                                    const isLateFee = fee.source === 'late_fee'
+
+                                    return (
+                                      <tr
+                                        key={fee.fee_id}
+                                        className={isLateFee ? 'bg-red-50/40' : 'hover:bg-gray-50/50'}
+                                      >
+                                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                          {fee.fee_name}
+                                          <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+                                            {fee.is_additional ? 'Additional' : 'Standard'}
+                                          </span>
+                                          {isLateFee && (
+                                            <span
+                                              className="ml-1.5 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
+                                              title="Charged automatically for an overdue installment"
+                                            >
+                                              Late fee
+                                            </span>
+                                          )}
+                                          {isLateFee && fee.installment_sequence && (
+                                            <span className="block text-xs font-normal text-gray-500">
+                                              Collected with installment {fee.installment_sequence}
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(Number(fee.charge ?? 0))}</td>
+                                        <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(Number(fee.discount ?? 0))}</td>
+                                        <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(paid)}</td>
+                                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 tabular-nums">{formatCurrency(outstanding)}</td>
+                                        <td className="px-4 py-3 text-center">
+                                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                            isSettled
+                                              ? 'bg-green-100 text-green-700'
+                                              : paid > 0
+                                                ? 'bg-yellow-100 text-yellow-700'
+                                                : 'bg-gray-100 text-gray-500'
+                                          }`}>
+                                            {isSettled ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid'}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                                <tfoot className="bg-gray-50">
+                                  <tr className="font-semibold">
+                                    <td className="px-4 py-3 text-sm text-gray-900">Subtotal</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(sum(group.rows, 'charge'))}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(sum(group.rows, 'discount'))}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(sum(group.rows, 'paid'))}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(sum(group.rows, 'outstanding'))}</td>
+                                    <td />
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+                        ))}
+
+                        {Number(ledger?.unallocated_payments ?? 0) > 0.01 && (
+                          <p className="text-xs text-gray-500">
+                            {formatCurrency(Number(ledger?.unallocated_payments))} was collected
+                            without being allocated to a specific fee, so it is not shown against
+                            any line above.
+                          </p>
+                        )}
                       </div>
                     )
                   })()}

@@ -132,12 +132,23 @@ class StudentFinanceController extends Controller
             ->filter(fn ($fee) => $fee->isLateFee())
             ->keyBy(fn ($fee) => (int) $fee->installment_sequence);
 
+        // An ad-hoc fee declares whether it is amortized or collected on its own. Only the
+        // installment-based ones join the principal the plan divides; a cash-basis fee is a
+        // charge in its own right, like a late fee, and is settled outside the schedule.
+        $installmentAdditionalFees = $manualAdditionalFees
+            ->filter(fn ($fee) => $fee->isInstallmentBased())
+            ->values();
+        $cashAdditionalFees = $manualAdditionalFees
+            ->filter(fn ($fee) => $fee->isCashBasis())
+            ->values();
+
         $feeAmountMap = $feeDefaults->keyBy('school_fee_id')->map(function ($default) {
             return (float) $default->amount;
         });
 
         $standardCharges = (float) $feeDefaults->sum('amount');
-        $principalCharges = $standardCharges + (float) $manualAdditionalFees->sum('amount');
+        $cashChargesTotal = round((float) $cashAdditionalFees->sum('amount'), 2);
+        $principalCharges = $standardCharges + (float) $installmentAdditionalFees->sum('amount');
         $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
         $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
         // Voided discounts stay visible in the ledger for audit, but they are
@@ -150,12 +161,15 @@ class StudentFinanceController extends Controller
         );
         $discountsTotal = (float) $activeDiscountsWithAmount->sum('amount') + (float) $activeGradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $activePayments->sum('amount');
-        // Money collected against late fees settles those charges, not the installments.
+        // Money collected against a late fee or a cash-basis fee settles that charge, not
+        // the installments — both sit outside the schedule.
+        $offScheduleFees = $chargedLateFees->values()->toBase()->merge($cashAdditionalFees);
         $lateFeePaymentsTotal = (float) $this->paymentsForFees($activePayments, $chargedLateFees)->sum('amount');
-        $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal, 2));
+        $cashPaymentsTotal = round((float) $this->paymentsForFees($activePayments, $cashAdditionalFees)->sum('amount'), 2);
+        $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal - $cashPaymentsTotal, 2));
         // The same money as $principalPayments but row by row: a downpayment is decided by
         // payment date, which a single total cannot answer.
-        $principalPaymentRows = $this->paymentsExcludingFees($activePayments, $chargedLateFees);
+        $principalPaymentRows = $this->paymentsExcludingFees($activePayments, $offScheduleFees);
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
             $academicYear,
@@ -203,7 +217,9 @@ class StudentFinanceController extends Controller
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
 
         $lateFeesTotal = (float) $chargedLateFees->sum(fn ($fee) => (float) $fee->amount);
-        $chargesTotal = round($principalCharges + $lateFeesTotal, 2);
+        // Cash-basis fees are outside the schedule but still owed, so they are part of what
+        // the student was charged.
+        $chargesTotal = round($principalCharges + $cashChargesTotal + $lateFeesTotal, 2);
         $overdueDatesBySequence = collect($installments)
             ->keyBy(fn ($inst) => (int) $inst['sequence'])
             ->map(fn ($inst) => $inst['overdue_date'] ?? null);
@@ -259,6 +275,9 @@ class StudentFinanceController extends Controller
                 'fee_id' => $af->id,
                 'fee_name' => $af->name,
                 'source' => $af->source,
+                'billing_type' => $af->isInstallmentBased()
+                    ? StudentAdditionalFee::BILLING_INSTALLMENT
+                    : StudentAdditionalFee::BILLING_CASH,
             ];
         });
 
@@ -427,6 +446,8 @@ class StudentFinanceController extends Controller
                 'fee_id' => $feeId,
                 'fee_name' => $default->schoolFee?->name ?? 'School Fee',
                 'is_additional' => false,
+                // Standard grade-level fees are the plan's principal by definition.
+                'billing_type' => StudentAdditionalFee::BILLING_INSTALLMENT,
                 'charge' => round($charge, 2),
                 'discount' => round($discount, 2),
                 'paid' => round($paid, 2),
@@ -447,6 +468,12 @@ class StudentFinanceController extends Controller
                         'fee_name' => $af->name,
                         'is_additional' => true,
                         'source' => $af->source,
+                        // A late fee is reported as installment-based: it is not amortized,
+                        // but the schedule shows it on the period that incurred it, so the
+                        // Fees view must not list it as separately collectible cash.
+                        'billing_type' => $af->isCashBasis()
+                            ? StudentAdditionalFee::BILLING_CASH
+                            : StudentAdditionalFee::BILLING_INSTALLMENT,
                         'installment_sequence' => $af->installment_sequence,
                         'charge' => round($charge, 2),
                         'discount' => round($discount, 2),
@@ -471,10 +498,20 @@ class StudentFinanceController extends Controller
                 'totals' => [
                     'charges' => round($chargesTotal, 2),
                     'late_fees' => round($lateFeesTotal, 2),
+                    'cash_fees' => $cashChargesTotal,
                     'discounts' => round($discountsTotal, 2),
                     'payments' => round($paymentsTotal, 2),
                     'balance_forward' => round($balanceForward, 2),
                     'balance' => round($balance, 2),
+                ],
+                // Charges that never entered the schedule, so the Payment Schedule view can
+                // exclude them from Total Payable without treating their collections as
+                // money it failed to apply.
+                'cash_basis' => [
+                    'charges' => $cashChargesTotal,
+                    'paid' => $cashPaymentsTotal,
+                    'outstanding' => round(max($cashChargesTotal - $cashPaymentsTotal, 0), 2),
+                    'fee_count' => $cashAdditionalFees->count(),
                 ],
                 'fee_breakdown' => $feeBreakdown,
                 'unallocated_payments' => round($unallocatedPayments, 2),
@@ -591,15 +628,26 @@ class StudentFinanceController extends Controller
             ->filter(fn ($fee) => $fee->isLateFee())
             ->keyBy(fn ($fee) => (int) $fee->installment_sequence);
 
+        // And the same split by basis: only amortized ad-hoc fees are divided by the plan.
+        $installmentAdditionalFees = $manualAdditionalFees
+            ->filter(fn ($fee) => $fee->isInstallmentBased())
+            ->values();
+        $cashAdditionalFees = $manualAdditionalFees
+            ->filter(fn ($fee) => $fee->isCashBasis())
+            ->values();
+
         $standardCharges = (float) $feeDefaults->sum('amount');
-        $principalCharges = $standardCharges + (float) $manualAdditionalFees->sum('amount');
+        $cashChargesTotal = round((float) $cashAdditionalFees->sum('amount'), 2);
+        $principalCharges = $standardCharges + (float) $installmentAdditionalFees->sum('amount');
         $discountsWithAmount = $this->applyDiscounts($discounts, $feeAmountMap, $standardCharges);
         $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
         $discountsTotal = (float) $discountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $payments->sum('amount');
+        $offScheduleFees = $chargedLateFees->values()->toBase()->merge($cashAdditionalFees);
         $lateFeePaymentsTotal = (float) $this->paymentsForFees($payments, $chargedLateFees)->sum('amount');
-        $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal, 2));
-        $principalPaymentRows = $this->paymentsExcludingFees($payments, $chargedLateFees);
+        $cashPaymentsTotal = round((float) $this->paymentsForFees($payments, $cashAdditionalFees)->sum('amount'), 2);
+        $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal - $cashPaymentsTotal, 2));
+        $principalPaymentRows = $this->paymentsExcludingFees($payments, $offScheduleFees);
         $balanceForward = $this->calculateBalanceForward(
             $studentSections,
             $academicYear,
@@ -641,7 +689,7 @@ class StudentFinanceController extends Controller
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
 
         $lateFeesTotal = (float) $chargedLateFees->sum(fn ($fee) => (float) $fee->amount);
-        $chargesTotal = round($principalCharges + $lateFeesTotal, 2);
+        $chargesTotal = round($principalCharges + $cashChargesTotal + $lateFeesTotal, 2);
         $balance = $balanceForward + $chargesTotal - $discountsTotal - $paymentsTotal;
 
         $allDiscountsMapped = $discountsWithAmount->map(function ($payload) {
@@ -680,6 +728,7 @@ class StudentFinanceController extends Controller
                 'fee_name' => $default->schoolFee?->name ?? 'School Fee',
                 'amount' => (float) $default->amount,
                 'is_additional' => false,
+                'billing_type' => StudentAdditionalFee::BILLING_INSTALLMENT,
             ];
         })->toBase()->merge(
             $manualAdditionalFees
@@ -691,6 +740,9 @@ class StudentFinanceController extends Controller
                         'amount' => (float) $af->amount,
                         'is_additional' => true,
                         'source' => $af->source,
+                        'billing_type' => $af->isCashBasis()
+                            ? StudentAdditionalFee::BILLING_CASH
+                            : StudentAdditionalFee::BILLING_INSTALLMENT,
                         'installment_sequence' => $af->installment_sequence,
                     ];
                 })
@@ -717,10 +769,17 @@ class StudentFinanceController extends Controller
                 'totals' => [
                     'charges' => round($chargesTotal, 2),
                     'late_fees' => round($lateFeesTotal, 2),
+                    'cash_fees' => $cashChargesTotal,
                     'discounts' => round($discountsTotal, 2),
                     'payments' => round($paymentsTotal, 2),
                     'balance_forward' => round($balanceForward, 2),
                     'balance' => round($balance, 2),
+                ],
+                'cash_basis' => [
+                    'charges' => $cashChargesTotal,
+                    'paid' => $cashPaymentsTotal,
+                    'outstanding' => round(max($cashChargesTotal - $cashPaymentsTotal, 0), 2),
+                    'fee_count' => $cashAdditionalFees->count(),
                 ],
                 'payment_plan' => $this->planService->serializePlan($paymentPlan),
                 'downpayment' => $downpayment,
