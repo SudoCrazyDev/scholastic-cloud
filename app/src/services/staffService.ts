@@ -80,7 +80,10 @@ class StaffService {
   }
 
   async resetPassword(id: string) {
-    const response = await api.post<{ message: string }>(`${this.baseUrl}/${id}/reset-password`)
+    const response = await api.post<{
+      message: string
+      data?: { temporary_password?: string }
+    }>(`${this.baseUrl}/${id}/reset-password`)
     return response.data
   }
 

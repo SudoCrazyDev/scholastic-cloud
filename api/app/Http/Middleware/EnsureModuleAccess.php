@@ -39,7 +39,23 @@ class EnsureModuleAccess
         }
 
         if ($audience === 'shared' && $user instanceof StudentPortalUser) {
-            return $next($request);
+            // `shared` says students may reach this route — not that they may
+            // do anything to it. A resource group declared `view,shared` for
+            // the sake of its GETs also carries store/update/destroy, and
+            // letting students through unconditionally handed them writes on
+            // every one of those: their own grades, attendance and scores.
+            //
+            // Routes that genuinely accept a student write say so by declaring
+            // `manage,shared` (uploading a document, starting a checkout), and
+            // those still pass.
+            if ($ability === 'manage' || $request->isMethodSafe()) {
+                return $next($request);
+            }
+
+            return response()->json([
+                'message' => 'Students are not allowed to make changes here.',
+                'error' => 'forbidden',
+            ], 403);
         }
 
         // Write verbs on a route declared `view` still require `manage`. This

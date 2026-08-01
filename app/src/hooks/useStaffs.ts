@@ -170,9 +170,16 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: (id: string) => staffService.resetPassword(id),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['staffs'] })
-      setResetPasswordSuccess('Password reset successfully!')
+      // The temporary password is random and returned exactly once, so it has
+      // to reach the admin here — there is no way to look it up afterwards.
+      const temporaryPassword = result?.data?.temporary_password
+      setResetPasswordSuccess(
+        temporaryPassword
+          ? `Password reset. Temporary password: ${temporaryPassword} — share it with the staff member now, it will not be shown again.`
+          : 'Password reset successfully!'
+      )
       setResetPasswordError(null)
       
       // Show success toast notification

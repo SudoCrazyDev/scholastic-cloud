@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\Student;
 use App\Models\StudentRunningGrade;
 use App\Models\CoreValueMarking;
@@ -16,6 +17,40 @@ use Illuminate\Support\Facades\DB;
 
 class SF9Controller extends Controller
 {
+    use AuthorizesModuleAccess;
+
+    /**
+     * A report card names both the student and the institution it is printed
+     * for, and neither was checked against the caller: any holder of
+     * `consolidated-grades.view` could print any student's SF9 from any
+     * school. Both have to belong to the caller's own institution(s).
+     */
+    private function denyUnlessOwnStudent(Request $request, string $studentId, ?string $institutionId): ?JsonResponse
+    {
+        if ($deny = $this->denyUnlessStaff($request)) {
+            return $deny;
+        }
+
+        if ($request->user()->hasFullAccess()) {
+            return null;
+        }
+
+        $callerInstitutionIds = $this->callerInstitutionIds($request);
+
+        if ($institutionId !== null && ! in_array($institutionId, $callerInstitutionIds, true)) {
+            return $this->forbidden('You do not have access to this institution');
+        }
+
+        $studentInstitutionIds = Student::find($studentId)
+            ?->studentInstitutions()
+            ->pluck('institution_id')
+            ->all() ?? [];
+
+        return array_intersect($callerInstitutionIds, $studentInstitutionIds) === []
+            ? $this->forbidden('You can only view students within your own institution')
+            : null;
+    }
+
     /**
      * Generate SF9 data for a specific student
      */
@@ -30,6 +65,10 @@ class SF9Controller extends Controller
         $studentId = $request->student_id;
         $academicYear = $request->academic_year;
         $institutionId = $request->institution_id;
+
+        if ($deny = $this->denyUnlessOwnStudent($request, $studentId, $institutionId)) {
+            return $deny;
+        }
 
         try {
             // Get student information
@@ -202,6 +241,10 @@ class SF9Controller extends Controller
         ]);
 
         $studentId = $request->student_id;
+
+        if ($deny = $this->denyUnlessOwnStudent($request, $studentId, null)) {
+            return $deny;
+        }
 
         try {
             $academicYears = StudentSection::where('student_id', $studentId)

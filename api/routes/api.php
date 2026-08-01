@@ -75,7 +75,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Bridge pairing (public — no auth; just a one-time code)
-Route::post('/bridge/pair', [BridgeController::class, 'pair']);
+Route::post('/bridge/pair', [BridgeController::class, 'pair'])->middleware('throttle:pairing');
 
 // Bridge endpoints (authenticated with per-device bridge token)
 Route::middleware('auth.bridge.token')->group(function () {
@@ -86,7 +86,7 @@ Route::middleware('auth.bridge.token')->group(function () {
 });
 
 // SMS gateway pairing (public — one-time code)
-Route::post('/sms-gateway/pair', [SmsBridgeController::class, 'pair']);
+Route::post('/sms-gateway/pair', [SmsBridgeController::class, 'pair'])->middleware('throttle:pairing');
 
 // SMS gateway kiosk endpoints (authenticated with per-gateway token)
 Route::middleware('auth.sms.token')->group(function () {
@@ -98,13 +98,13 @@ Route::middleware('auth.sms.token')->group(function () {
 });
 
 // Public routes (no authentication required)
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/payments/webhooks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
 // Backward-compatible alias.
 Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
 
 // Public kiosk endpoint for RFID gate scanners
-Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan']);
+Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan'])->middleware('throttle:pairing');
 
 // Permanent (non-expiring) media links for uploaded files. Not behind auth
 // because browsers request these from <img>/<a> without the bearer token —

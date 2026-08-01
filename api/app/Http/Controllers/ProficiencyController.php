@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\ClassSection;
 use App\Models\StudentSection;
 use App\Models\StudentRunningGrade;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class ProficiencyController extends Controller
 {
+    use AuthorizesModuleAccess;
+
     /** Passing grade threshold (DepEd standard) */
     private const PASSING_GRADE = 75;
 
@@ -28,23 +31,15 @@ class ProficiencyController extends Controller
             'grade_level' => 'sometimes|string',
         ]);
 
-        $user = $request->user();
         $academicYear = $request->academic_year;
         $gradeLevelFilter = $request->grade_level;
 
-        $institutionId = $request->filled('institution_id')
-            ? $request->institution_id
-            : $user->getDefaultInstitutionId();
-
-        if (!$institutionId) {
-            $userInstitutions = $user->userInstitutions()->pluck('institution_id');
-            if ($userInstitutions->isEmpty()) {
-                return response()->json([
-                    'success' => true,
-                    'data' => [],
-                ]);
-            }
-            $institutionId = $userInstitutions->first();
+        // `exists:institutions,id` only proves the row exists, not that the
+        // caller has anything to do with it — taking the id straight from the
+        // request made another school's grades readable.
+        $institutionId = null;
+        if ($deny = $this->resolveRequestedInstitution($request, $institutionId)) {
+            return $deny;
         }
 
         $gradingPeriods = GradingPeriods::config(
@@ -232,24 +227,16 @@ class ProficiencyController extends Controller
             'section_id' => 'sometimes|string|exists:class_sections,id',
         ]);
 
-        $user = $request->user();
         $academicYear = $request->academic_year;
         $gradeLevelFilter = $request->grade_level;
         $sectionIdFilter = $request->section_id;
 
-        $institutionId = $request->filled('institution_id')
-            ? $request->institution_id
-            : $user->getDefaultInstitutionId();
-
-        if (!$institutionId) {
-            $userInstitutions = $user->userInstitutions()->pluck('institution_id');
-            if ($userInstitutions->isEmpty()) {
-                return response()->json([
-                    'success' => true,
-                    'data' => [],
-                ]);
-            }
-            $institutionId = $userInstitutions->first();
+        // `exists:institutions,id` only proves the row exists, not that the
+        // caller has anything to do with it — taking the id straight from the
+        // request made another school's grades readable.
+        $institutionId = null;
+        if ($deny = $this->resolveRequestedInstitution($request, $institutionId)) {
+            return $deny;
         }
 
         $gradingPeriods = GradingPeriods::config(

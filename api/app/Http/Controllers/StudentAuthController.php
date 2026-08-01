@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\Student;
 use App\Models\StudentAuth;
 use App\Models\StudentAuthLog;
@@ -13,10 +14,46 @@ use Illuminate\Validation\Rule;
 
 /**
  * Manage student_auth (email/password) for student portal login.
- * Only staff (User) should call these endpoints.
+ *
+ * Only staff holding the students module may call these endpoints, and only
+ * for students in their own institution(s). This used to be a comment rather
+ * than a check, which let any authenticated caller — including a signed-in
+ * student — overwrite any other student's portal credentials and take over
+ * the account, in any institution.
  */
 class StudentAuthController extends Controller
 {
+    use AuthorizesModuleAccess;
+
+    /**
+     * Deny unless the caller is staff who may manage this particular student.
+     *
+     * Institution membership is checked against the student's own enrolments,
+     * so a school can only ever reach its own students. Super-administrators
+     * hold the wildcard and are intentionally unscoped.
+     */
+    private function denyUnlessManagesStudent(Request $request, string $studentId, string $ability): ?JsonResponse
+    {
+        if ($deny = $this->denyUnlessModule($request, 'students', $ability)) {
+            return $deny;
+        }
+
+        if ($request->user()->hasFullAccess()) {
+            return null;
+        }
+
+        $studentInstitutionIds = Student::find($studentId)
+            ?->studentInstitutions()
+            ->pluck('institution_id')
+            ->all() ?? [];
+
+        $shared = array_intersect($this->callerInstitutionIds($request), $studentInstitutionIds);
+
+        return $shared === []
+            ? $this->forbidden('You can only manage students within your own institution')
+            : null;
+    }
+
     /**
      * Create or update login credentials for a student.
      * POST /students/{student}/auth with email, password, is_new (optional).
@@ -24,6 +61,10 @@ class StudentAuthController extends Controller
      */
     public function store(Request $request, string $student): JsonResponse
     {
+        if ($deny = $this->denyUnlessManagesStudent($request, $student, 'manage')) {
+            return $deny;
+        }
+
         $request->validate([
             'email' => [
                 'required',
@@ -49,6 +90,10 @@ class StudentAuthController extends Controller
                 'email' => $newEmail,
                 'password' => Hash::make($request->password),
                 'is_new' => $request->boolean('is_new', true),
+                // Credentials changed, so any session issued against the old
+                // ones should stop working rather than outlive the reset.
+                'token' => null,
+                'token_expiry' => null,
             ]
         );
 
@@ -85,8 +130,12 @@ class StudentAuthController extends Controller
     /**
      * Get student auth info (email, is_new only; no password).
      */
-    public function show(string $student): JsonResponse
+    public function show(Request $request, string $student): JsonResponse
     {
+        if ($deny = $this->denyUnlessManagesStudent($request, $student, 'view')) {
+            return $deny;
+        }
+
         $auth = StudentAuth::where('student_id', $student)->first();
         if (!$auth) {
             return response()->json(['message' => 'No login credentials for this student'], 404);
@@ -105,8 +154,12 @@ class StudentAuthController extends Controller
      * List the portal access change history for a student.
      * GET /students/{student}/auth/logs
      */
-    public function logs(string $student): JsonResponse
+    public function logs(Request $request, string $student): JsonResponse
     {
+        if ($deny = $this->denyUnlessManagesStudent($request, $student, 'view')) {
+            return $deny;
+        }
+
         $logs = StudentAuthLog::with('performedBy:id,first_name,middle_name,last_name,ext_name')
             ->where('student_id', $student)
             ->orderByDesc('created_at')

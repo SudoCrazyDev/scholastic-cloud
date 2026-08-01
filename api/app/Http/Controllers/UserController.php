@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\User;
 use App\Models\UserInstitution;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
+    use AuthorizesModuleAccess;
+
     /**
      * Roles that see every subject in their institution(s) instead of only
      * the subjects they advise.
@@ -20,14 +23,40 @@ class UserController extends Controller
 
     /**
      * Display a listing of the resource with pagination and filtering.
+     *
+     * This is the staff directory several modules read to populate people
+     * pickers (disbursements, timetable, schedules), so it stays available to
+     * any staff account rather than requiring the `users` module. What it must
+     * not do is reach past the caller's own institutions — super-administrators
+     * excepted, since they operate across tenants.
      */
     public function index(Request $request): JsonResponse
     {
+        if ($deny = $this->denyUnlessStaff($request)) {
+            return $deny;
+        }
+
         $perPage = $request->get('per_page', 15);
         $search = $request->get('search', '');
         $roleId = $request->get('role_id');
 
         $query = User::with(['role', 'userInstitutions.institution', 'userInstitutions.role']);
+
+        if (! $request->user()->hasFullAccess()) {
+            $institutionIds = $this->callerInstitutionIds($request);
+
+            if ($institutionIds === []) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is not associated with any institutions',
+                ], 403);
+            }
+
+            $query->whereHas(
+                'userInstitutions',
+                fn ($q) => $q->whereIn('institution_id', $institutionIds)
+            );
+        }
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -75,6 +104,10 @@ class UserController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if ($deny = $this->denyUnlessModule($request, 'users', 'manage')) {
+            return $deny;
+        }
+
         try {
             $validated = $request->validate([
                 'first_name' => 'required|string|max:255',
@@ -145,12 +178,26 @@ class UserController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessStaff($request)) {
+            return $deny;
+        }
+
         try {
-            $user = User::with(['role', 'userInstitutions.institution', 'userInstitutions.role'])
-                       ->findOrFail($id);
-            
+            $query = User::with(['role', 'userInstitutions.institution', 'userInstitutions.role']);
+
+            if (! $request->user()->hasFullAccess()) {
+                $institutionIds = $this->callerInstitutionIds($request);
+
+                $query->whereHas(
+                    'userInstitutions',
+                    fn ($q) => $q->whereIn('institution_id', $institutionIds)
+                );
+            }
+
+            $user = $query->findOrFail($id);
+
             return response()->json([
                 'success' => true,
                 'data' => $user
@@ -174,9 +221,13 @@ class UserController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessModule($request, 'users', 'manage')) {
+            return $deny;
+        }
+
         try {
             $user = User::findOrFail($id);
-            
+
             $validated = $request->validate([
                 'first_name' => 'sometimes|required|string|max:255',
                 'middle_name' => 'nullable|string|max:255',
@@ -246,11 +297,15 @@ class UserController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessModule($request, 'users', 'manage')) {
+            return $deny;
+        }
+
         try {
             $user = User::findOrFail($id);
-            
+
             DB::beginTransaction();
             
             // Delete user institutions first (due to foreign key constraints)

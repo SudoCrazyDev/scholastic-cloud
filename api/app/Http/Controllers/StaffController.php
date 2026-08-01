@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\User;
 use App\Models\UserInstitution;
 use App\Models\Role;
@@ -10,9 +11,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class StaffController extends Controller
 {
+    use AuthorizesModuleAccess;
+
     /**
      * Display a listing of staff with pagination and filtering.
      * Only shows staff from the authenticated user's default institution
@@ -20,6 +24,14 @@ class StaffController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Read stays open to any staff account: timetable, staff schedules,
+        // ZK user mapping and the attendance-request modal all need the
+        // colleague list without holding the `staffs` module. Writes below are
+        // gated; the query is already institution-scoped.
+        if ($deny = $this->denyUnlessStaff($request)) {
+            return $deny;
+        }
+
         $perPage = $request->get('limit', $request->get('per_page', 15));
         $search = $request->get('search', '');
         $authenticatedUser = $request->user();
@@ -84,6 +96,10 @@ class StaffController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if ($deny = $this->denyUnlessModule($request, 'staffs', 'manage')) {
+            return $deny;
+        }
+
         try {
             $authenticatedUser = $request->user();
 
@@ -177,10 +193,14 @@ class StaffController extends Controller
      * Display the specified staff member.
      * Only allows access to staff from the same institution.
      */
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessStaff($request)) {
+            return $deny;
+        }
+
         try {
-            $authenticatedUser = request()->user();
+            $authenticatedUser = $request->user();
 
             // Get the authenticated user's default institution
             $defaultInstitution = $authenticatedUser->userInstitutions()
@@ -235,6 +255,10 @@ class StaffController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessModule($request, 'staffs', 'manage')) {
+            return $deny;
+        }
+
         try {
             $authenticatedUser = $request->user();
 
@@ -343,6 +367,12 @@ class StaffController extends Controller
      */
     public function updateRole(Request $request, string $id): JsonResponse
     {
+        // Changing what a colleague can reach is an access-control decision,
+        // so it answers to the roles module rather than staff record editing.
+        if ($deny = $this->denyUnlessModule($request, 'roles', 'manage')) {
+            return $deny;
+        }
+
         try {
             $authenticatedUser = $request->user();
 
@@ -423,10 +453,17 @@ class StaffController extends Controller
      * Reset password for a staff member.
      * Sets password to 'password' and is_new to 1.
      */
-    public function resetPassword(string $id): JsonResponse
+    public function resetPassword(Request $request, string $id): JsonResponse
     {
+        // Without this, any staff account could reset a colleague's password
+        // to a known value and sign in as them — a teacher could take over the
+        // principal's account, and with it payroll.
+        if ($deny = $this->denyUnlessModule($request, 'staffs', 'manage')) {
+            return $deny;
+        }
+
         try {
-            $authenticatedUser = request()->user();
+            $authenticatedUser = $request->user();
 
             // Get the authenticated user's default institution
             $defaultInstitution = $authenticatedUser->userInstitutions()
@@ -469,15 +506,26 @@ class StaffController extends Controller
                 ], 403);
             }
 
-            // Reset password to 'password' and set is_new to 1
+            // A one-time random password rather than a shared constant: the
+            // old literal 'password' meant every reset account was walk-in
+            // accessible to anyone who knew the convention. Returned once, to
+            // the admin who asked for it, and never stored in the clear.
+            $temporaryPassword = Str::password(14, true, true, false, false);
+
             $staff->update([
-                'password' => Hash::make('password'),
+                'password' => Hash::make($temporaryPassword),
                 'is_new' => 1,
+                // Any session the account already had is no longer trustworthy.
+                'token' => null,
+                'token_expiry' => null,
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Password reset successfully. The staff member will be prompted to change their password on next login.'
+                'message' => 'Password reset successfully. Share the temporary password with the staff member — it will not be shown again, and they will be prompted to change it on next login.',
+                'data' => [
+                    'temporary_password' => $temporaryPassword,
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -492,10 +540,14 @@ class StaffController extends Controller
      * Remove the specified staff member.
      * Only allows deleting staff from the same institution.
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessModule($request, 'staffs', 'manage')) {
+            return $deny;
+        }
+
         try {
-            $authenticatedUser = request()->user();
+            $authenticatedUser = $request->user();
 
             // Get the authenticated user's default institution
             $defaultInstitution = $authenticatedUser->userInstitutions()

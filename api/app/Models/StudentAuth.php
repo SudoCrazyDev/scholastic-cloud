@@ -23,6 +23,9 @@ class StudentAuth extends Model
 
     protected $hidden = [
         'password',
+        // Live portal credential — see the note on User::$hidden.
+        'token',
+        'token_expiry',
     ];
 
     protected function casts(): array

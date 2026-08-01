@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Applies the `api` limiter defined in AppServiceProvider. Without
+        // this, no API route is rate limited at all.
+        $middleware->throttleApi();
+
         $middleware->alias([
             'auth.token'        => \App\Http\Middleware\AuthenticateToken::class,
             'auth.bridge.token' => \App\Http\Middleware\AuthenticateBridgeToken::class,

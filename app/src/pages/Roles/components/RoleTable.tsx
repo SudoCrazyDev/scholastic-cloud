@@ -3,6 +3,7 @@ import { PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
 import { DataTable, type Column, type Action } from '../../../components/DataTable'
 import { Badge } from '../../../components/badge'
 import { useModuleCatalog } from '../../../hooks/useModuleCatalog'
+import { usePermissions } from '../../../hooks/usePermissions'
 import type { Role } from '../../../types'
 
 interface RoleTableProps {
@@ -46,6 +47,7 @@ export const RoleTable: React.FC<RoleTableProps> = ({
   onDelete,
 }) => {
   const { data: catalog } = useModuleCatalog()
+  const { fullAccess } = usePermissions()
 
   /** module key -> the group it belongs to, for naming what a role reaches. */
   const groupOfModule = useMemo(() => {
@@ -152,7 +154,10 @@ export const RoleTable: React.FC<RoleTableProps> = ({
       // pencil on something that cannot be edited is a lie.
       onClick: (role) => onEdit(role),
       render: (role) => {
-        const readOnly = Boolean(role.is_system)
+        // A built-in role opens read-only for an institution but is editable by
+        // a super-administrator, matching what the API allows. Offering a
+        // pencil on something that cannot be edited would be a lie.
+        const readOnly = Boolean(role.is_system) && !fullAccess
         const Icon = readOnly ? EyeIcon : PencilIcon
 
         return (

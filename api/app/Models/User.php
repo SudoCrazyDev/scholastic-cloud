@@ -44,6 +44,12 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        // The API token is a live credential. It is issued in the login
+        // response body and must never ride along in a serialized user —
+        // several endpoints return user models to callers who are not that
+        // user, which would hand out working sessions for other accounts.
+        'token',
+        'token_expiry',
     ];
 
     /**

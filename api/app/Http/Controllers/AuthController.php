@@ -33,6 +33,10 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if ($user && Hash::check($request->password, $user->password)) {
+            // No is_active gate here on purpose: the users table has no such
+            // column, so a staff account cannot be deactivated at all — the
+            // only way to revoke staff access today is to delete the record.
+            // Worth adding, but it needs a migration, not a check.
             $user->update([
                 'token' => $token,
                 'token_expiry' => $tokenExpiry,
@@ -49,6 +53,12 @@ class AuthController extends Controller
 
         if ($studentAuth && Hash::check($request->password, $studentAuth->password)) {
             $student = $studentAuth->student;
+
+            if (! $student || ! $student->is_active) {
+                return response()->json([
+                    'message' => 'This account has been deactivated. Please contact your school.',
+                ], 403);
+            }
 
             // Check student's institutions: must belong to at least one
             $student->loadMissing('studentInstitutions.institution');

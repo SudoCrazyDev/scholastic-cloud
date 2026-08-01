@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { XMarkIcon, LockClosedIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, LockClosedIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { Input } from '../../../components/input'
 import { Button } from '../../../components/button'
 import { ModuleAccessGrid } from './ModuleAccessGrid'
 import { useModuleCatalog } from '../../../hooks/useModuleCatalog'
+import { usePermissions } from '../../../hooks/usePermissions'
 import type { Role } from '../../../types'
 
 interface RoleModalProps {
@@ -28,11 +29,16 @@ export function RoleModal({
   const [permissions, setPermissions] = useState<string[]>([])
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
+  const { fullAccess } = usePermissions()
+
   const isEditing = !!role
-  // Built-in roles are shared by every institution on the platform, so they are
-  // shown read-only rather than hidden — seeing what "Principal" grants is
-  // useful when deciding what a new custom role needs.
-  const isReadOnly = Boolean(role?.is_system)
+  const isBuiltIn = Boolean(role?.is_system)
+  // Built-in roles are shown to an institution read-only rather than hidden —
+  // seeing what "Principal" grants is useful when deciding what a new custom
+  // role needs. A super-administrator may edit them, which is what the API
+  // allows, so the two agree on who can do what.
+  const isReadOnly = isBuiltIn && !fullAccess
+  const isEditingBuiltIn = isBuiltIn && fullAccess
 
   const { data: catalog, isLoading: catalogLoading, error: catalogError } = useModuleCatalog(isOpen)
 
@@ -109,9 +115,11 @@ export function RoleModal({
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {isReadOnly
                       ? role?.title
-                      : isEditing
-                        ? 'Edit Role'
-                        : 'Create New Role'}
+                      : isEditingBuiltIn
+                        ? `Edit ${role?.title}`
+                        : isEditing
+                          ? 'Edit Role'
+                          : 'Create New Role'}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {isReadOnly
@@ -143,6 +151,24 @@ export function RoleModal({
                       <p className="text-sm text-gray-600 dark:text-gray-300">
                         Built-in roles are shared by every school on the platform and cannot be
                         edited or deleted.
+                      </p>
+                    </div>
+                  )}
+
+                  {/*
+                    A super-administrator may edit these, but neither
+                    consequence is visible from the form: the role belongs to
+                    every tenant, and the deploy seeder rewrites built-in roles
+                    from SystemRolePermissions. Say both before they save.
+                  */}
+                  {isEditingBuiltIn && (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-400/30 dark:bg-amber-400/10">
+                      <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                      <p className="text-sm text-amber-800 dark:text-amber-300">
+                        This is a built-in role. Changes apply to{' '}
+                        <strong className="font-semibold">every school on the platform</strong>, and
+                        are overwritten the next time built-in roles are re-seeded on deploy. To
+                        change it for good, edit it in the code instead.
                       </p>
                     </div>
                   )}

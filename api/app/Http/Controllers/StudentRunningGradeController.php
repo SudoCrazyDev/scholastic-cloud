@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\StudentRunningGrade;
 use App\Services\ParentSubjectGradeService;
 use App\Support\GradingPeriods;
@@ -12,11 +13,25 @@ use Illuminate\Support\Facades\Log;
 
 class StudentRunningGradeController extends Controller
 {
+    use AuthorizesModuleAccess;
+
     protected $parentSubjectGradeService;
 
     public function __construct(ParentSubjectGradeService $parentSubjectGradeService)
     {
         $this->parentSubjectGradeService = $parentSubjectGradeService;
+    }
+
+    /**
+     * Grades are reachable by students because the portal shows them their
+     * own — the route is declared `consolidated-grades,view,shared`. Writing
+     * is never theirs to do, whatever the route says.
+     */
+    private function denyStudentWrite(Request $request): ?JsonResponse
+    {
+        return $this->isStudentActor($request)
+            ? $this->forbidden('Students are not allowed to change grades')
+            : null;
     }
 
     /**
@@ -32,14 +47,24 @@ class StudentRunningGradeController extends Controller
 
         $query = StudentRunningGrade::with(['student', 'subject']);
 
+        // A student sees their own grades and nothing else. Without this the
+        // endpoint answered for any student_id passed in — and, with no filter
+        // at all, returned every grade in the database.
+        if ($this->isStudentActor($request)) {
+            $selfStudentId = $this->actingStudentId($request);
+
+            if (! $selfStudentId) {
+                return $this->forbidden('This account is not linked to a student record');
+            }
+
+            $query->where('student_id', $selfStudentId);
+        } elseif ($request->filled('student_id')) {
+            $query->where('student_id', $request->student_id);
+        }
+
         // Filter by subject_id if provided
         if ($request->filled('subject_id')) {
             $query->where('subject_id', $request->subject_id);
-        }
-
-        // Filter by student_id if provided
-        if ($request->filled('student_id')) {
-            $query->where('student_id', $request->student_id);
         }
 
         // If class_section_id is provided, filter by students in that class section
@@ -62,6 +87,10 @@ class StudentRunningGradeController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        if ($deny = $this->denyStudentWrite($request)) {
+            return $deny;
+        }
+
         $validated = $request->validate([
             'student_id' => 'required|string|exists:students,id',
             'subject_id' => 'required|string|exists:subjects,id',
@@ -98,8 +127,15 @@ class StudentRunningGradeController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(StudentRunningGrade $studentRunningGrade): JsonResponse
+    public function show(Request $request, StudentRunningGrade $studentRunningGrade): JsonResponse
     {
+        if (
+            $this->isStudentActor($request)
+            && $studentRunningGrade->student_id !== $this->actingStudentId($request)
+        ) {
+            return $this->forbidden('You can only view your own grades');
+        }
+
         return response()->json([
             'success' => true,
             'data' => $studentRunningGrade->load(['student', 'subject']),
@@ -111,6 +147,10 @@ class StudentRunningGradeController extends Controller
      */
     public function update(Request $request, StudentRunningGrade $studentRunningGrade): JsonResponse
     {
+        if ($deny = $this->denyStudentWrite($request)) {
+            return $deny;
+        }
+
         $validated = $request->validate([
             'student_id' => 'sometimes|required|string|exists:students,id',
             'subject_id' => 'sometimes|required|string|exists:subjects,id',
@@ -152,8 +192,12 @@ class StudentRunningGradeController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(StudentRunningGrade $studentRunningGrade): JsonResponse
+    public function destroy(Request $request, StudentRunningGrade $studentRunningGrade): JsonResponse
     {
+        if ($deny = $this->denyStudentWrite($request)) {
+            return $deny;
+        }
+
         $studentRunningGrade->delete();
 
         return response()->json([
@@ -167,6 +211,10 @@ class StudentRunningGradeController extends Controller
      */
     public function upsertFinalGrade(Request $request): JsonResponse
     {
+        if ($deny = $this->denyStudentWrite($request)) {
+            return $deny;
+        }
+
         $validated = $request->validate([
             'student_id' => 'required|string|exists:students,id',
             'subject_id' => 'required|string|exists:subjects,id',
@@ -249,6 +297,10 @@ class StudentRunningGradeController extends Controller
      */
     public function bulkUpsertFinalGrades(Request $request): JsonResponse
     {
+        if ($deny = $this->denyStudentWrite($request)) {
+            return $deny;
+        }
+
         $validated = $request->validate([
             'grades' => 'required|array|min:1|max:100',
             'grades.*.student_id' => 'required|string|exists:students,id',
@@ -415,6 +467,10 @@ class StudentRunningGradeController extends Controller
      */
     public function recalculateParentSubjectGrades(Request $request): JsonResponse
     {
+        if ($deny = $this->denyStudentWrite($request)) {
+            return $deny;
+        }
+
         $validated = $request->validate([
             'student_id' => 'required|string|exists:students,id',
             'quarter' => 'required|integer|between:1,4',
