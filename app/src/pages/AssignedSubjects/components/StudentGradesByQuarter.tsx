@@ -10,7 +10,8 @@ interface StudentGradesByQuarterProps {
   student: Student;
   subjectId: string;
   runningGrades: StudentRunningGrade[];
-  academicYear?: string;
+  /** Always passed explicitly: a defaulted school year files grades under the wrong one. */
+  academicYear: string;
   selectedQuarter?: string;
   // Batch submission props
   isBatchMode?: boolean;
@@ -31,7 +32,7 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
   student,
   subjectId,
   runningGrades,
-  academicYear = '2025-2026',
+  academicYear,
   selectedQuarter,
   isBatchMode = false,
   onGradeChange,

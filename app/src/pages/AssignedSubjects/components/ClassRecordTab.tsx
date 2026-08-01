@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Select } from '../../../components/select'
 import { Button } from '../../../components/button'
+import { useAuth } from '../../../hooks/useAuth'
 import { useStudents } from '../../../hooks/useStudents'
 import { useStudentRunningGrades } from '../../../hooks/useStudentRunningGrades'
 import { useUpdateFinalGrade, useUpsertFinalGrade, useBulkUpsertFinalGrades } from '../../../hooks/useStudentRunningGrades'
@@ -27,6 +28,8 @@ interface ClassRecordTabProps {
   isLimited?: boolean
   assignedStudentIds?: string[]
   gradingBands?: GradeBandLike[] | null
+  /** School year of the subject's class section; final grades are saved under it. */
+  academicYear?: string
 }
 
 // Type for batch grade changes
@@ -43,7 +46,12 @@ interface BatchGradeChange {
 // Type for submission strategy
 type SubmissionStrategy = 'bulk' | 'individual' | 'hybrid';
 
-export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [], gradingBands = null }) => {
+export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [], gradingBands = null, academicYear }) => {
+  // The section's own year is the one the subject's grade items are filed under;
+  // the institution setting only covers sections saved before it was recorded.
+  const { currentAcademicYear } = useAuth();
+  const effectiveAcademicYear = academicYear ?? currentAcademicYear ?? '';
+
   // Fetch students
   const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId });
 
@@ -103,8 +111,15 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
     }
   }, [studentsError, gradesError]);
 
+  // A subject can carry running grades from more than one school year. Rows are
+  // keyed by grading period further down, so leaving another year's row in the
+  // list lets it shadow this year's — showing a grade the class never earned.
+  const runningGradesForYear = (runningGradesData?.data ?? []).filter(
+    (grade: any) => !effectiveAcademicYear || grade.academic_year === effectiveAcademicYear
+  );
+
   // Group running grades by student
-  const gradesByStudent = runningGradesData?.data?.reduce((acc: any, grade: any) => {
+  const gradesByStudent = runningGradesForYear.reduce((acc: any, grade: any) => {
     if (!acc[grade.student_id]) {
       acc[grade.student_id] = [];
     }
@@ -114,8 +129,8 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
 
   // Calculate statistics
   const totalStudents = filteredStudents.length;
-  const totalGrades = runningGradesData?.data?.length || 0;
-  const gradesWithFinalGrade = runningGradesData?.data?.filter((grade: any) => grade.final_grade !== null).length || 0;
+  const totalGrades = runningGradesForYear.length;
+  const gradesWithFinalGrade = runningGradesForYear.filter((grade: any) => grade.final_grade !== null).length;
   const completionRate = totalGrades > 0 ? Math.round((gradesWithFinalGrade / totalGrades) * 100) : 0;
 
   // Gender distribution
@@ -717,7 +732,7 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
                           student={student}
                           subjectId={subjectId}
                           runningGrades={gradesByStudent[student.id] || []}
-                          academicYear="2025-2026"
+                          academicYear={effectiveAcademicYear}
                           selectedQuarter={selectedQuarter}
                           isBatchMode={isBatchMode}
                           onGradeChange={handleGradeChange}

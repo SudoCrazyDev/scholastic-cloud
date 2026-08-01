@@ -7,6 +7,7 @@ use App\Models\Subject;
 use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentV2Service;
+use App\Support\AcademicYear;
 use App\Support\GradingPeriods;
 use App\Support\MediaUrl;
 use Illuminate\Http\JsonResponse;
@@ -178,6 +179,7 @@ class SubjectEcrItemController extends Controller
                 'content.questions.*.cards.*.targetId' => 'nullable|string',
                 'content.questions.*.points' => 'nullable|numeric|min:0',
                 'quarter' => 'nullable|string',
+                'academic_year' => 'nullable|string',
                 'scheduled_date' => 'nullable|date_format:Y-m-d',
                 'open_at' => 'nullable|date',
                 'close_at' => 'nullable|date|after_or_equal:open_at',
@@ -185,6 +187,14 @@ class SubjectEcrItemController extends Controller
                 'allow_late_submission' => 'nullable|boolean',
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
+
+            // An item with no academic year is skipped by every year-scoped query,
+            // including the running-grade calculation, so never store one without it.
+            if (empty($validatedData['academic_year'])) {
+                $validatedData['academic_year'] = AcademicYear::forSubject(
+                    SubjectEcr::whereKey($validatedData['subject_ecr_id'])->value('subject_id')
+                );
+            }
 
             $isV2 = (int) ($validatedData['content_version'] ?? 1) === 2;
             $questions = $isV2 ? ($validatedData['content']['questions'] ?? []) : null;

@@ -6,6 +6,7 @@ use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
 use App\Models\StudentEcrItemScore;
 use App\Models\StudentRunningGrade;
+use App\Support\AcademicYear;
 
 class RunningGradeRecalcService
 {
@@ -23,7 +24,12 @@ class RunningGradeRecalcService
         $subjectEcr = $ecrItem->subjectEcr;
         $subjectId = $subjectEcr->subject_id;
         $quarter = $ecrItem->quarter;
-        $academicYear = $ecrItem->academic_year ?? '2025-2026';
+
+        // Items created before the year was stamped on them have none. Resolving the
+        // subject's year keeps the running grade on the same row the rest of the app
+        // reads, instead of stranding it under a year nothing else uses.
+        $academicYear = $ecrItem->academic_year ?: AcademicYear::forSubject($subjectId);
+        $includeUnstampedItems = empty($ecrItem->academic_year);
 
         $subjectEcrs = SubjectEcr::where('subject_id', $subjectId)->get();
         $totalGrade = 0;
@@ -32,7 +38,12 @@ class RunningGradeRecalcService
             $categoryPercentage = (float) $categoryEcr->percentage;
             $categoryItems = SubjectEcrItem::where('subject_ecr_id', $categoryEcr->id)
                 ->where('quarter', $quarter)
-                ->where('academic_year', $academicYear)
+                ->where(function ($query) use ($academicYear, $includeUnstampedItems) {
+                    $query->where('academic_year', $academicYear);
+                    if ($includeUnstampedItems) {
+                        $query->orWhereNull('academic_year');
+                    }
+                })
                 ->get();
 
             $totalPossible = $categoryItems->sum('score');

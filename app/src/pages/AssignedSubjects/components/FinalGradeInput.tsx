@@ -13,7 +13,8 @@ interface FinalGradeInputProps {
   currentFinalGrade?: number;
   calculatedGrade?: number;
   gradeId?: string;
-  academicYear?: string;
+  /** Always passed explicitly: a defaulted school year files grades under the wrong one. */
+  academicYear: string;
   // Batch submission props
   isBatchMode?: boolean;
   onGradeChange?: (data: {
@@ -37,7 +38,7 @@ export const FinalGradeInput: React.FC<FinalGradeInputProps> = ({
   currentFinalGrade,
   calculatedGrade,
   gradeId,
-  academicYear = '2025-2026',
+  academicYear,
   isBatchMode = false,
   onGradeChange,
   isDisabled = false,

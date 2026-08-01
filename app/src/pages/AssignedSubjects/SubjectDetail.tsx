@@ -228,6 +228,7 @@ const SubjectDetail: React.FC = () => {
               isLimited={!!subject.is_limited_student}
               assignedStudentIds={assignedStudentIds}
               gradingBands={gradingBands}
+              academicYear={subject.class_section?.academic_year}
             />
           )}
           {activeTab === 'student-scores' && (

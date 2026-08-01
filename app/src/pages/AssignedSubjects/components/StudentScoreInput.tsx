@@ -54,7 +54,7 @@ export const StudentScoreInput: React.FC<StudentScoreInputProps> = ({
   const createMutation = useMutation({
     mutationFn: (score: number) =>
       studentScoreService.create({
-        academic_year: "2025-2026",
+        // No year here: a score belongs to whatever year its grade item is filed under.
         student_id: studentId,
         subject_ecr_item_id: itemId,
         score,
