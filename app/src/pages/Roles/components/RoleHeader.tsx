@@ -15,11 +15,13 @@ export const RoleHeader: React.FC<RoleHeaderProps> = ({
   onBulkDelete,
 }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Roles Management</h1>
-          <p className="text-gray-600 mt-1">Manage user roles and permissions</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Roles Management</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-400">
+            Create roles and choose which modules each one can reach
+          </p>
         </div>
         <div className="flex items-center space-x-3">
           {selectedRows.length > 0 && (

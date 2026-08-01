@@ -101,19 +101,19 @@ export function RoleModal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2 }}
-              className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl"
+              className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl dark:bg-gray-900 dark:ring-1 dark:ring-white/10"
             >
               {/* Header */}
-              <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-6">
+              <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-6 dark:border-gray-700">
                 <div className="min-w-0">
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {isReadOnly
                       ? role?.title
                       : isEditing
                         ? 'Edit Role'
                         : 'Create New Role'}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {isReadOnly
                       ? 'This is a built-in role. Create a role of your own to customise access.'
                       : 'Choose which modules this role can open, and what it can change in them.'}
@@ -122,7 +122,7 @@ export function RoleModal({
                 <button
                   onClick={handleClose}
                   disabled={loading}
-                  className="text-gray-400 transition-colors duration-200 hover:text-gray-600 disabled:opacity-50"
+                  className="text-gray-400 transition-colors duration-200 hover:text-gray-600 disabled:opacity-50 dark:hover:text-gray-200"
                 >
                   <XMarkIcon className="h-6 w-6" />
                 </button>
@@ -132,15 +132,15 @@ export function RoleModal({
               <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-6">
                   {error && (
-                    <div className="rounded-md border border-red-200 bg-red-50 p-3">
-                      <p className="text-sm text-red-600">{error}</p>
+                    <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-500/30 dark:bg-red-500/10">
+                      <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                     </div>
                   )}
 
                   {isReadOnly && (
-                    <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
-                      <LockClosedIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-                      <p className="text-sm text-gray-600">
+                    <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/60">
+                      <LockClosedIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
                         Built-in roles are shared by every school on the platform and cannot be
                         edited or deleted.
                       </p>
@@ -163,8 +163,8 @@ export function RoleModal({
 
                   <div>
                     <div className="mb-3 flex items-baseline justify-between gap-4">
-                      <h4 className="text-sm font-semibold text-gray-900">Module access</h4>
-                      <span className="text-xs text-gray-500">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Module access</h4>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {grantedCount === 0
                           ? 'No modules selected'
                           : `${grantedCount} module${grantedCount === 1 ? '' : 's'} granted`}
@@ -172,11 +172,11 @@ export function RoleModal({
                     </div>
 
                     {catalogLoading && (
-                      <p className="py-8 text-center text-sm text-gray-500">Loading modules…</p>
+                      <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Loading modules…</p>
                     )}
 
                     {catalogError && (
-                      <p className="py-8 text-center text-sm text-red-600">
+                      <p className="py-8 text-center text-sm text-red-600 dark:text-red-400">
                         Could not load the module list. Close this and try again.
                       </p>
                     )}
@@ -193,7 +193,7 @@ export function RoleModal({
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end space-x-3 border-t border-gray-200 p-6">
+                <div className="flex items-center justify-end space-x-3 border-t border-gray-200 p-6 dark:border-gray-700">
                   <Button
                     type="button"
                     onClick={handleClose}
