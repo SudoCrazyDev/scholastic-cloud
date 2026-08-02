@@ -148,6 +148,12 @@ views' requests.
   request themselves it is auto-approved and the payment is voided immediately** (backend
   behavior in `PaymentVoidRequestController@store`). Voided payments keep their rows —
   `student_payments` gets `voided_at/voided_by/void_note`.
+- **Void workflow (discounts)** — no queue and no request: the void is immediate, a note is
+  required, and the row is kept. Gated by its own role-builder ability, **`discounts.void`**
+  ("Void a discount", listed under Discounts as an extra ability), which sits outside
+  `discounts.manage` — applying a discount and taking one back are separate grants. Both
+  endpoints (`POST /student-discounts/{id}/void`,
+  `POST /grade-level-discounts/{id}/void-for-student`) run behind `module:discounts,void`.
 - **Receipt submissions** (`payment_receipt_submissions`) — a student uploads a proof-of-payment
   image/PDF for an installment on My Finance (status `pending`; file stored on R2 under
   `{institution}/student/{student}/payment-receipts/`). Reviewer roles (finance + admin roles)
@@ -243,6 +249,7 @@ From here staff can:
   → `POST /student-discounts`.
 - **Add an additional fee** — name + amount + **billing basis** → `POST /student-additional-fees`.
 - **Void a discount** — note required → `POST /student-discounts/{id}/void` (direct, no queue).
+  Needs the `discounts.void` ability, not `discounts.manage`.
 - **Request a payment void** — note required, keyed by the entry's `receipt_number` →
   `POST /payment-void-requests` (goes to the approval queue unless requester is an approver).
 - **Download the NOA PDF** (`PDFDownloadLink` + `StudentNOAPDF`).
@@ -355,9 +362,13 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
     and void immediately. A void `finance` raises from the Ledger still lands in the queue, so the
     request and its approval remain two records even though finance can action both.
   - `canRequestVoid` = `finance` role or approver → sees the Void Requests tab and the per-row
-    void buttons in the Ledger.
+    **payment** void button in the Ledger.
+  - `canVoidDiscount` = `can('discounts', 'void')` → the per-row **discount** void button. The
+    Ledger's Action column is drawn when either flag is set (`showLedgerActions`), so a role with
+    only one of the two abilities sees only its own buttons.
   - Backend enforcement lives in `PaymentVoidRequestController` (`REQUESTER_ROLES`,
-    `APPROVER_ROLES`, `SELF_APPROVING_ROLES`); other finance controllers rely on institution
+    `APPROVER_ROLES`, `SELF_APPROVING_ROLES`) for payments, and in the `module:discounts,void`
+    middleware + `canVoid()` for discounts; other finance controllers rely on institution
     scoping only, **not** roles — keep that in mind before exposing new endpoints.
 
 ---

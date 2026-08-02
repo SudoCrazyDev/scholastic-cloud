@@ -456,7 +456,7 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-discounts/{id}', [StudentDiscountController::class, 'update'])->middleware('module:discounts,manage');
     Route::patch('student-discounts/{id}', [StudentDiscountController::class, 'update'])->middleware('module:discounts,manage');
     Route::delete('student-discounts/{id}', [StudentDiscountController::class, 'destroy'])->middleware('module:discounts,manage');
-    Route::post('student-discounts/{id}/void', [StudentDiscountController::class, 'void'])->middleware('module:discounts,manage');
+    Route::post('student-discounts/{id}/void', [StudentDiscountController::class, 'void'])->middleware('module:discounts,void');
 
     // Default (reusable) discounts
     Route::apiResource('default-discounts', DefaultDiscountController::class)->middleware('module:discounts,view');
@@ -464,7 +464,7 @@ Route::middleware('auth.token')->group(function () {
     // Grade-level discounts
     Route::get('grade-level-discounts', [GradeLevelDiscountController::class, 'index'])->middleware('module:discounts,view');
     Route::post('grade-level-discounts', [GradeLevelDiscountController::class, 'store'])->middleware('module:discounts,manage');
-    Route::post('grade-level-discounts/{id}/void-for-student', [GradeLevelDiscountController::class, 'voidForStudent'])->middleware('module:discounts,manage');
+    Route::post('grade-level-discounts/{id}/void-for-student', [GradeLevelDiscountController::class, 'voidForStudent'])->middleware('module:discounts,void');
     Route::put('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update'])->middleware('module:discounts,manage');
     Route::patch('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'update'])->middleware('module:discounts,manage');
     Route::delete('grade-level-discounts/{id}', [GradeLevelDiscountController::class, 'destroy'])->middleware('module:discounts,manage');

@@ -13,9 +13,6 @@ use Illuminate\Validation\Rule;
 
 class StudentDiscountController extends Controller
 {
-    /** Roles allowed to void a discount (same set that can request payment voids). */
-    private const VOID_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator'];
-
     /**
      * Display a listing of student discounts.
      */
@@ -366,6 +363,11 @@ class StudentDiscountController extends Controller
         ]);
     }
 
+    /**
+     * Voiding is its own ability, not part of managing discounts: a clerk who
+     * applies discounts is not automatically someone who may take one back.
+     * A school decides who holds it in the role builder ("discounts.void").
+     */
     private function canVoid(Request $request): bool
     {
         $user = $request->user();
@@ -373,9 +375,7 @@ class StudentDiscountController extends Controller
             return false;
         }
 
-        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
-
-        return in_array((string) ($role->slug ?? ''), self::VOID_ROLES, true);
+        return $user->hasModuleAccess('discounts', 'void');
     }
 
     private function resolveInstitutionId(Request $request): ?string

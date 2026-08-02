@@ -169,6 +169,12 @@ const Finance: React.FC = () => {
   // still becomes a pending request unless the role may void immediately.
   const voidsImmediately = can('finance', 'void-immediately')
   const canRequestVoid = can('finance', 'request-void') || isVoidApprover
+  // Voiding a discount is its own ability — a role may be allowed to take back
+  // a discount without touching posted payments, or the other way round.
+  const canVoidDiscount = can('discounts', 'void')
+  // The ledger's Action column carries both void buttons, so it is drawn for
+  // either ability. Header, cell and empty-row colSpan all read this.
+  const showLedgerActions = canRequestVoid || canVoidDiscount
   // Students may make their first plan selection in the portal; every later change
   // is staff-only, and the API rejects a student attempting one either way.
   const canManagePaymentPlan = roleSlug !== 'student'
@@ -3000,7 +3006,7 @@ const Finance: React.FC = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                               Processed By
                             </th>
-                            {canRequestVoid && (
+                            {showLedgerActions && (
                               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                                 Action
                               </th>
@@ -3074,9 +3080,12 @@ const Finance: React.FC = () => {
                               <td className="px-4 py-3 text-sm text-gray-600">
                                 {entry.processed_by ?? '—'}
                               </td>
-                              {canRequestVoid && (
+                              {showLedgerActions && (
                                 <td className="px-4 py-3 text-sm text-right">
-                                  {entry.type === 'payment' && !entry.voided && entry.receipt_number ? (
+                                  {canRequestVoid &&
+                                  entry.type === 'payment' &&
+                                  !entry.voided &&
+                                  entry.receipt_number ? (
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -3087,7 +3096,8 @@ const Finance: React.FC = () => {
                                     >
                                       Void
                                     </button>
-                                  ) : entry.type === 'discount' &&
+                                  ) : canVoidDiscount &&
+                                    entry.type === 'discount' &&
                                     !entry.voided &&
                                     entry.discount_id &&
                                     (entry.discount_scope === 'student' ||
@@ -3112,7 +3122,7 @@ const Finance: React.FC = () => {
                           {!ledgerQuery.data?.data?.entries?.length && (
                             <tr>
                               <td
-                                colSpan={canRequestVoid ? 8 : 7}
+                                colSpan={showLedgerActions ? 8 : 7}
                                 className="px-4 py-8 text-center text-gray-500"
                               >
                                 No ledger entries for this academic year.

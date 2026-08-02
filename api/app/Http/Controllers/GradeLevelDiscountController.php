@@ -13,8 +13,6 @@ use Illuminate\Validation\Rule;
 
 class GradeLevelDiscountController extends Controller
 {
-    private const VOID_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator'];
-
     public function index(Request $request): JsonResponse
     {
         if ($this->isStudentUser($request)) {
@@ -218,6 +216,10 @@ class GradeLevelDiscountController extends Controller
         ]);
     }
 
+    /**
+     * Same ability that gates a student discount void — see
+     * StudentDiscountController::canVoid().
+     */
     private function canVoid(Request $request): bool
     {
         $user = $request->user();
@@ -225,9 +227,7 @@ class GradeLevelDiscountController extends Controller
             return false;
         }
 
-        $role = method_exists($user, 'getRole') ? $user->getRole() : null;
-
-        return in_array((string) ($role->slug ?? ''), self::VOID_ROLES, true);
+        return $user->hasModuleAccess('discounts', 'void');
     }
 
     private function resolveInstitutionId(Request $request): ?string

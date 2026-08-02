@@ -136,18 +136,24 @@ class SystemRolePermissions
     public const SPECIAL = [
         'institution-administrator' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
+            'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'tala.configure',
         ],
         'principal' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
+            'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'tala.configure',
         ],
         // Finance both raises and reviews void requests, but does not skip the
         // queue — a void it raises from the ledger still becomes a pending
         // request. Only `void-immediately` bypasses that.
-        'finance' => ['finance.request-void', 'finance.approve-void'],
+        //
+        // `discounts.void` is direct either way: a discount has no approval
+        // queue behind it, and these three are the roles the discount
+        // controllers hardcoded before the ability existed.
+        'finance' => ['finance.request-void', 'finance.approve-void', 'discounts.void'],
     ];
 
     /**

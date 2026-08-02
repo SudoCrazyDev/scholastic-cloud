@@ -203,6 +203,12 @@ return [
                 'discounts' => [
                     'label' => 'Discounts',
                     'description' => 'Default, grade-level and sibling discounts.',
+                    'special' => [
+                        'void' => [
+                            'label' => 'Void a discount',
+                            'description' => 'Take back a discount already applied to a student, with a note.',
+                        ],
+                    ],
                 ],
                 'disbursements' => [
                     'label' => 'Disbursements',

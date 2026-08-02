@@ -132,6 +132,53 @@ class StudentDiscountVoidTest extends TestCase
         $this->assertNull($discount->fresh()->voided_at);
     }
 
+    /**
+     * Applying discounts and taking them back are separate grants, so a school
+     * can give a clerk the first without the second.
+     */
+    public function test_managing_discounts_does_not_by_itself_allow_voiding(): void
+    {
+        $role = Role::create([
+            'title' => 'Discount Clerk',
+            'slug' => 'discount-clerk',
+            'institution_id' => $this->institution->id,
+        ]);
+        $role->syncPermissions(['discounts.view', 'discounts.manage']);
+
+        $user = User::factory()->create([
+            'token' => 'clerk-token',
+            'token_expiry' => now()->addDay()->toDateTimeString(),
+        ]);
+        UserInstitution::factory()->create([
+            'user_id' => $user->id,
+            'institution_id' => $this->institution->id,
+            'role_id' => $role->id,
+            'is_default' => true,
+            'is_main' => true,
+        ]);
+
+        $discount = $this->makeDiscount();
+
+        $this->withHeader('Authorization', 'Bearer clerk-token')
+            ->postJson("/api/student-discounts/{$discount->id}/void", [
+                'void_note' => 'Applied in error',
+            ])
+            ->assertStatus(403);
+
+        $this->assertNull($discount->fresh()->voided_at);
+
+        // Tick the ability and the same request goes through.
+        $role->syncPermissions(['discounts.view', 'discounts.manage', 'discounts.void']);
+
+        $this->withHeader('Authorization', 'Bearer clerk-token')
+            ->postJson("/api/student-discounts/{$discount->id}/void", [
+                'void_note' => 'Applied in error',
+            ])
+            ->assertOk();
+
+        $this->assertNotNull($discount->fresh()->voided_at);
+    }
+
     public function test_voided_discount_excluded_from_ledger_totals_but_still_listed(): void
     {
         $user = $this->makeUserWithRole('finance', 'finance-token');
