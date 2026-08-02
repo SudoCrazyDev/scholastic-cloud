@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react'
-import { ExternalLink, Info, KeyRound, Trash2 } from 'lucide-react'
+import { Check, ExternalLink, Info, KeyRound, Loader2, Search, Users, X } from 'lucide-react'
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../components/dialog'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
-import { useTalaKeyMutations } from '../../../hooks/useTala'
-import type { TalaConfig, TalaProviderKey } from '../../../services/talaService'
+import { useTalaAccess, useTalaAccessMutation, useTalaKeyMutations } from '../../../hooks/useTala'
+import type { TalaAccessRow, TalaConfig, TalaProviderKey } from '../../../services/talaService'
 
 interface TalaSettingsDialogProps {
   open: boolean
@@ -13,21 +13,79 @@ interface TalaSettingsDialogProps {
   onClose: () => void
 }
 
-type Scope = 'own' | 'institution'
+type Tab = 'key' | 'access'
 
 /**
- * Where a school, or a teacher, points Tala at a provider.
+ * Tala's administration, both halves of it: the key the school chats through,
+ * and which teachers may chat.
  *
- * Two scopes in one dialog because the precedence between them is the thing
- * people get wrong: the school's key wins, and a teacher who has just typed
- * their own key in needs to be told that before they wonder why their model
- * choice is being ignored.
+ * Everything in here belongs to `tala.configure`. Teachers have no settings at
+ * all any more — they open Tala and type — so this dialog is only ever reached
+ * by an administrator, and the parent hides the button that opens it.
  */
 export const TalaSettingsDialog: React.FC<TalaSettingsDialogProps> = ({ open, config, onClose }) => {
-  const mutations = useTalaKeyMutations()
+  const [tab, setTab] = useState<Tab>('key')
 
-  const canConfigureSchool = config.can_configure_institution
-  const [scope, setScope] = useState<Scope>(canConfigureSchool ? 'institution' : 'own')
+  return (
+    <Dialog open={open} onClose={onClose} size="2xl">
+      <DialogTitle>Tala settings</DialogTitle>
+
+      {!config.can_configure_institution ? (
+        <>
+          <DialogBody>
+            <p className="text-sm text-zinc-600">
+              Tala is set up by your school administrator. There is nothing for you to configure —
+              open a conversation and start typing.
+            </p>
+          </DialogBody>
+          <DialogActions>
+            <Button onClick={onClose}>Close</Button>
+          </DialogActions>
+        </>
+      ) : (
+        <>
+          <DialogBody className="space-y-5">
+            <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
+              {(
+                [
+                  { key: 'key' as const, label: 'School key' },
+                  { key: 'access' as const, label: 'Who can use Tala' },
+                ]
+              ).map(entry => (
+                <button
+                  key={entry.key}
+                  type="button"
+                  onClick={() => setTab(entry.key)}
+                  className={
+                    tab === entry.key
+                      ? 'flex-1 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 shadow-sm'
+                      : 'flex-1 rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:text-zinc-900'
+                  }
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+
+            {tab === 'key' ? <KeyPanel config={config} onClose={onClose} /> : <AccessPanel />}
+          </DialogBody>
+
+          {tab === 'access' && (
+            <DialogActions>
+              <Button variant="outline" color="secondary" onClick={onClose}>
+                Done
+              </Button>
+            </DialogActions>
+          )}
+        </>
+      )}
+    </Dialog>
+  )
+}
+
+/** The API key the whole school talks through. */
+const KeyPanel: React.FC<{ config: TalaConfig; onClose: () => void }> = ({ config, onClose }) => {
+  const mutations = useTalaKeyMutations()
 
   const [provider, setProvider] = useState<TalaProviderKey>(
     config.active_provider ?? config.providers[0]?.key ?? 'anthropic'
@@ -43,13 +101,7 @@ export const TalaSettingsDialog: React.FC<TalaSettingsDialogProps> = ({ open, co
     [config.providers, provider]
   )
 
-  const saving = mutations.saveOwn.isPending || mutations.saveInstitution.isPending
-
-  const reset = () => {
-    setApiKey('')
-    setModel('')
-    setError(null)
-  }
+  const saving = mutations.saveInstitution.isPending
 
   const handleSave = async () => {
     if (apiKey.trim() === '') {
@@ -60,263 +112,336 @@ export const TalaSettingsDialog: React.FC<TalaSettingsDialogProps> = ({ open, co
     setError(null)
 
     try {
-      if (scope === 'institution') {
-        await mutations.saveInstitution.mutateAsync({
-          provider,
-          api_key: apiKey.trim(),
-          model: model || null,
-          shared_with_staff: sharedWithStaff,
-          monthly_message_limit: monthlyLimit === '' ? null : Number(monthlyLimit),
-        })
-      } else {
-        await mutations.saveOwn.mutateAsync({
-          provider,
-          api_key: apiKey.trim(),
-          model: model || null,
-        })
-      }
+      await mutations.saveInstitution.mutateAsync({
+        provider,
+        api_key: apiKey.trim(),
+        model: model || null,
+        shared_with_staff: sharedWithStaff,
+        monthly_message_limit: monthlyLimit === '' ? null : Number(monthlyLimit),
+      })
 
-      reset()
+      setApiKey('')
+      setModel('')
       onClose()
     } catch (caught: any) {
       setError(caught?.response?.data?.message ?? 'That key could not be saved.')
     }
   }
 
-  const handleRemove = async (target: Scope, targetProvider: TalaProviderKey) => {
-    setError(null)
-
-    try {
-      if (target === 'institution') {
-        await mutations.deleteInstitution.mutateAsync(targetProvider)
-      } else {
-        await mutations.deleteOwn.mutateAsync(targetProvider)
-      }
-    } catch (caught: any) {
-      setError(caught?.response?.data?.message ?? 'That key could not be removed.')
-    }
-  }
-
   return (
-    <Dialog open={open} onClose={onClose} size="2xl">
-      <DialogTitle>Tala settings</DialogTitle>
+    <div className="space-y-5">
+      <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          This is the only key Tala uses. Every teacher you give access to chats through it, on the
+          model chosen here, and the school is billed for it — teachers cannot add a key of their own.
+        </span>
+      </div>
 
-      <DialogBody className="space-y-5">
-        {canConfigureSchool && (
-          <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
-            {(
-              [
-                { key: 'institution' as const, label: 'School key' },
-                { key: 'own' as const, label: 'My key' },
-              ]
-            ).map(tab => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => {
-                  setScope(tab.key)
-                  reset()
-                }}
-                className={
-                  scope === tab.key
-                    ? 'flex-1 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 shadow-sm'
-                    : 'flex-1 rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:text-zinc-900'
-                }
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        )}
+      {config.institution_configured ? (
+        <div className="rounded-lg border border-zinc-200 px-3 py-2.5 text-sm text-zinc-700">
+          A school key is set and{' '}
+          {config.institution_shared ? 'in use' : 'currently paused — Tala will not answer'}.
+        </div>
+      ) : (
+        <p className="text-sm text-zinc-500">
+          No school key has been set yet, so Tala cannot answer anyone.
+        </p>
+      )}
 
-        <PrecedenceNote scope={scope} config={config} />
+      <div className="space-y-4 border-t border-zinc-200 pt-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-zinc-700">Provider</label>
+          <Select
+            value={provider}
+            onChange={event => {
+              setProvider(event.target.value as TalaProviderKey)
+              setModel('')
+            }}
+            options={config.providers.map(entry => ({ value: entry.key, label: entry.label }))}
+          />
+        </div>
 
-        <ExistingKeys config={config} scope={scope} onRemove={handleRemove} />
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-zinc-700">
+            API key
+            {selectedProvider?.key_hint && (
+              <span className="ml-2 font-normal text-zinc-500">{selectedProvider.key_hint}</span>
+            )}
+          </label>
+          <Input
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={event => setApiKey(event.target.value)}
+            placeholder="Paste the key here"
+          />
+          {selectedProvider?.console_url && (
+            <a
+              href={selectedProvider.console_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1.5 inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800"
+            >
+              Get a key from {selectedProvider.label}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
 
-        <div className="space-y-4 border-t border-zinc-200 pt-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-700">Provider</label>
-            <Select
-              value={provider}
-              onChange={event => {
-                setProvider(event.target.value as TalaProviderKey)
-                setModel('')
-              }}
-              options={config.providers.map(entry => ({ value: entry.key, label: entry.label }))}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-zinc-700">Model</label>
+          <Select
+            value={model}
+            onChange={event => setModel(event.target.value)}
+            options={[
+              { value: '', label: `Default (${selectedProvider?.default_model ?? '—'})` },
+              ...(selectedProvider?.models ?? []).map(entry => ({
+                value: entry.key,
+                label: entry.label,
+              })),
+            ]}
+          />
+          {model && (
+            <p className="mt-1.5 text-xs text-zinc-500">
+              {selectedProvider?.models.find(entry => entry.key === model)?.description}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-4 rounded-lg bg-zinc-50 p-3">
+          <label className="flex items-start gap-2.5 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={sharedWithStaff}
+              onChange={event => setSharedWithStaff(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-zinc-300"
             />
-          </div>
+            <span>
+              Tala is switched on
+              <span className="block text-xs text-zinc-500">
+                Turn this off to pause Tala for the whole school without deleting the key. Access
+                you have given individual teachers is remembered.
+              </span>
+            </span>
+          </label>
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-              API key
-              {selectedProvider?.key_hint && (
-                <span className="ml-2 font-normal text-zinc-500">{selectedProvider.key_hint}</span>
-              )}
+              Monthly messages per teacher
             </label>
             <Input
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={event => setApiKey(event.target.value)}
-              placeholder="Paste the key here"
+              type="number"
+              min={1}
+              value={monthlyLimit}
+              onChange={event => setMonthlyLimit(event.target.value)}
+              placeholder="Leave blank for no limit"
             />
-            {selectedProvider?.console_url && (
-              <a
-                href={selectedProvider.console_url}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1.5 inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800"
-              >
-                Get a key from {selectedProvider.label}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-700">Model</label>
-            <Select
-              value={model}
-              onChange={event => setModel(event.target.value)}
-              options={[
-                { value: '', label: `Default (${selectedProvider?.default_model ?? '—'})` },
-                ...(selectedProvider?.models ?? []).map(entry => ({
-                  value: entry.key,
-                  label: entry.label,
-                })),
-              ]}
-            />
-            {model && (
-              <p className="mt-1.5 text-xs text-zinc-500">
-                {selectedProvider?.models.find(entry => entry.key === model)?.description}
-              </p>
-            )}
-          </div>
-
-          {scope === 'institution' && (
-            <div className="space-y-4 rounded-lg bg-zinc-50 p-3">
-              <label className="flex items-start gap-2.5 text-sm text-zinc-700">
-                <input
-                  type="checkbox"
-                  checked={sharedWithStaff}
-                  onChange={event => setSharedWithStaff(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300"
-                />
-                <span>
-                  Let staff use this key
-                  <span className="block text-xs text-zinc-500">
-                    Turn this off to keep the key on file without opening it up. Teachers with their
-                    own key fall back to it.
-                  </span>
-                </span>
-              </label>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Monthly messages per teacher
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={monthlyLimit}
-                  onChange={event => setMonthlyLimit(event.target.value)}
-                  placeholder="Leave blank for no limit"
-                />
-                <p className="mt-1.5 text-xs text-zinc-500">
-                  Counted per teacher, resetting at the start of each month (Philippine time).
-                </p>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-        </div>
-      </DialogBody>
-
-      <DialogActions>
-        <Button variant="outline" color="secondary" onClick={onClose} disabled={saving}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} loading={saving} leftIcon={<KeyRound className="h-4 w-4" />}>
-          Save key
-        </Button>
-      </DialogActions>
-    </Dialog>
-  )
-}
-
-/** Says out loud which key is in charge, and why the other one is idle. */
-const PrecedenceNote: React.FC<{ scope: Scope; config: TalaConfig }> = ({ scope, config }) => {
-  const message =
-    scope === 'own' && config.own_key_overridden
-      ? 'Your school has supplied a key, so Tala is using that one. Yours stays saved and takes over if the school removes theirs or stops sharing it.'
-      : scope === 'institution'
-        ? 'The school key is used by every teacher who can open Tala, and it takes precedence over any key a teacher has added themselves.'
-        : 'Your key is used only when the school has not supplied one. You are billed by the provider directly for anything you send.'
-
-  return (
-    <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-      <Info className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  )
-}
-
-const ExistingKeys: React.FC<{
-  config: TalaConfig
-  scope: Scope
-  onRemove: (scope: Scope, provider: TalaProviderKey) => void
-}> = ({ config, scope, onRemove }) => {
-  // The API never returns a stored key, so the school tab can only report that
-  // one exists — the summaries themselves are on the teacher's own keys.
-  if (scope === 'institution') {
-    if (!config.institution_configured) {
-      return <p className="text-sm text-zinc-500">No school key has been set yet.</p>
-    }
-
-    return (
-      <div className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2.5 text-sm">
-        <span className="text-zinc-700">
-          A school key is set and {config.institution_shared ? 'shared with staff' : 'not shared with staff'}.
-        </span>
-      </div>
-    )
-  }
-
-  if (config.own_keys.length === 0) {
-    return <p className="text-sm text-zinc-500">You have not added a key of your own.</p>
-  }
-
-  return (
-    <div className="space-y-2">
-      {config.own_keys.map(credential => (
-        <div
-          key={credential.id}
-          className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2.5"
-        >
-          <div className="min-w-0 text-sm">
-            <p className="font-medium text-zinc-900">{credential.provider_label}</p>
-            <p className="truncate text-xs text-zinc-500">
-              {credential.masked_key} · {credential.model}
+            <p className="mt-1.5 text-xs text-zinc-500">
+              Counted per teacher, resetting at the start of each month (Philippine time).
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={() => onRemove('own', credential.provider)}
-            aria-label={`Remove ${credential.provider_label} key`}
-            className="rounded p-1.5 text-zinc-400 transition hover:bg-red-50 hover:text-red-600"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
         </div>
-      ))}
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} loading={saving} leftIcon={<KeyRound className="h-4 w-4" />}>
+            Save key
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
 
-export default TalaSettingsDialog
+/**
+ * The teacher-by-teacher grant.
+ *
+ * Selection and bulk actions rather than one row at a time, because a school
+ * arriving here for the first time has nobody granted — access starts empty —
+ * and "give it to these fourteen people" should not be fourteen requests.
+ */
+const AccessPanel: React.FC = () => {
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const access = useTalaAccess(true, search)
+  const mutation = useTalaAccessMutation()
+
+  const rows = access.data?.rows ?? []
+
+  const toggle = (id: string) =>
+    setSelected(current => {
+      const next = new Set(current)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+
+  const apply = async (userIds: string[], granted: boolean) => {
+    if (userIds.length === 0) return
+
+    setError(null)
+    setNotice(null)
+
+    try {
+      setNotice(await mutation.mutateAsync({ userIds, granted }))
+      setSelected(new Set())
+    } catch (caught: any) {
+      setError(caught?.response?.data?.message ?? 'That could not be saved.')
+    }
+  }
+
+  const allShownSelected = rows.length > 0 && rows.every(row => selected.has(row.id))
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          Only the teachers you pick here can open Tala. Everyone else will not see it in their
+          sidebar at all.
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <Input
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search staff by name or email"
+            className="pl-9"
+          />
+        </div>
+
+        <span className="shrink-0 text-xs text-zinc-500">
+          <Users className="mr-1 inline h-3.5 w-3.5" />
+          {access.data ? `${access.data.granted_count} of ${access.data.staff_count}` : '—'}
+        </span>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 pb-3">
+          <button
+            type="button"
+            onClick={() =>
+              setSelected(allShownSelected ? new Set() : new Set(rows.map(row => row.id)))
+            }
+            className="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+          >
+            {allShownSelected ? 'Clear selection' : `Select all ${rows.length}`}
+          </button>
+
+          {selected.size > 0 && (
+            <>
+              <span className="text-xs text-zinc-400">{selected.size} selected</span>
+              <Button
+                size="sm"
+                onClick={() => apply([...selected], true)}
+                loading={mutation.isPending}
+                leftIcon={<Check className="h-3.5 w-3.5" />}
+              >
+                Give access
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                color="secondary"
+                onClick={() => apply([...selected], false)}
+                loading={mutation.isPending}
+                leftIcon={<X className="h-3.5 w-3.5" />}
+              >
+                Remove access
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      {notice && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {notice}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="max-h-80 space-y-1 overflow-y-auto">
+        {access.isLoading && (
+          <p className="flex items-center gap-2 py-6 text-sm text-zinc-500">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading staff…
+          </p>
+        )}
+
+        {!access.isLoading && rows.length === 0 && (
+          <p className="py-6 text-sm text-zinc-500">
+            {search ? 'Nobody matches that search.' : 'No staff found for this school.'}
+          </p>
+        )}
+
+        {rows.map(row => (
+          <StaffRow
+            key={row.id}
+            row={row}
+            selected={selected.has(row.id)}
+            busy={mutation.isPending}
+            onSelect={() => toggle(row.id)}
+            onToggleAccess={() => apply([row.id], !row.granted)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const StaffRow: React.FC<{
+  row: TalaAccessRow
+  selected: boolean
+  busy: boolean
+  onSelect: () => void
+  onToggleAccess: () => void
+}> = ({ row, selected, busy, onSelect, onToggleAccess }) => (
+  <div className="flex items-center gap-3 rounded-lg border border-zinc-200 px-3 py-2">
+    <input
+      type="checkbox"
+      checked={selected}
+      onChange={onSelect}
+      aria-label={`Select ${row.name}`}
+      className="h-4 w-4 shrink-0 rounded border-zinc-300"
+    />
+
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm font-medium text-zinc-900">{row.name}</p>
+      <p className="truncate text-xs text-zinc-500">
+        {[row.role, row.email].filter(Boolean).join(' · ')}
+      </p>
+    </div>
+
+    {row.granted && (
+      <span className="hidden shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 sm:inline">
+        Has access
+      </span>
+    )}
+
+    <Button
+      size="sm"
+      variant={row.granted ? 'outline' : 'solid'}
+      color={row.granted ? 'secondary' : 'primary'}
+      disabled={busy}
+      onClick={onToggleAccess}
+    >
+      {row.granted ? 'Remove' : 'Give access'}
+    </Button>
+  </div>
+)

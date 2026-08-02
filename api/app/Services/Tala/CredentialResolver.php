@@ -11,48 +11,38 @@ use Throwable;
 /**
  * Decides which key answers a teacher's message.
  *
- * The institution's key wins. A school that has set one up is paying the bill
- * and choosing the model its staff talk to; a teacher's own key is the fallback
- * for schools that have not set one up, or that have switched sharing off.
+ * There is one: the school's. An administrator supplies it, chooses the model
+ * the staff talk to, and carries the bill — and a teacher opens Tala and types,
+ * with no setup step of their own.
  *
- * Resolution looks only at what exists and is enabled — it never fails over to
- * a personal key because the school's key errored at runtime. A teacher whose
- * school key has expired should see "the school's key was rejected", not a
- * silent switch onto their own credit card.
+ * Teachers could once add a personal key, used when the school had not supplied
+ * one. That fallback is gone, and its absence is worth stating plainly: when the
+ * school's key is missing or parked, Tala does not answer. It does not quietly
+ * find another way to bill someone.
  */
 class CredentialResolver
 {
     /**
-     * The credential a request should use, or null when the school and the
-     * teacher have both supplied nothing usable.
+     * The credential a request should use, or null when the school has supplied
+     * nothing usable.
+     *
+     * $user is still taken, and still unused, because every caller has one and
+     * the day this grows a per-teacher model preference it will need it.
      */
     public function resolve(User $user, string $institutionId, ?string $preferredProvider = null): ?ResolvedCredential
     {
-        $institution = $this->pick(
+        return $this->pick(
             TalaCredential::query()
                 ->forInstitution($institutionId)
                 ->institutionWide()
                 ->get(),
             $preferredProvider,
         );
-
-        if ($institution !== null) {
-            return $institution;
-        }
-
-        return $this->pick(
-            TalaCredential::query()
-                ->forInstitution($institutionId)
-                ->ownedBy($user->id)
-                ->get(),
-            $preferredProvider,
-        );
     }
 
     /**
-     * What the chat screen should tell the teacher before they type anything:
-     * whether Tala is usable at all, on whose key, and whether their own key
-     * is currently doing anything.
+     * What the chat screen should know before a teacher types: whether Tala is
+     * usable at all, and on which model.
      *
      * @return array<string, mixed>
      */
@@ -60,32 +50,18 @@ class CredentialResolver
     {
         $active = $this->resolve($user, $institutionId);
 
-        $ownKeys = TalaCredential::query()
-            ->forInstitution($institutionId)
-            ->ownedBy($user->id)
-            ->get();
-
         $institutionKeys = TalaCredential::query()
             ->forInstitution($institutionId)
             ->institutionWide()
             ->get();
-
-        $institutionUsable = $institutionKeys->contains(fn (TalaCredential $c) => $c->isUsable());
 
         return [
             'ready' => $active !== null,
             'active_source' => $active?->source,
             'active_provider' => $active?->provider,
             'active_model' => $active?->model,
-
-            // Set when a teacher has a key that the school's key is currently
-            // overriding, so the settings screen can say so rather than leave
-            // them wondering why their model choice is being ignored.
-            'own_key_overridden' => $institutionUsable && $ownKeys->contains(fn (TalaCredential $c) => $c->isUsable()),
-
-            'own_keys' => $ownKeys->map->toSummary()->values()->all(),
             'institution_configured' => $institutionKeys->isNotEmpty(),
-            'institution_shared' => $institutionUsable,
+            'institution_shared' => $institutionKeys->contains(fn (TalaCredential $c) => $c->isUsable()),
         ];
     }
 

@@ -172,15 +172,23 @@ const menuGroups: MenuGroup[] = [
         module: 'subjects',
       },
       {
-        // Sending a message is a write, and EnsureModuleAccess upgrades write
-        // verbs to `manage` — so `view` alone would show a link to a screen
-        // that could read old threads and not answer anything.
+        /*
+         * `view` rather than `manage`, and Tala is the one module where that is
+         * not a loosening. Neither permission comes from a role any more: an
+         * administrator grants Tala per teacher, which confers both, so `view`
+         * here still means "was given access" for a teacher.
+         *
+         * What it additionally lets through is the administrator who holds
+         * `tala.configure` without a seat — who needs the link precisely so they
+         * can reach the screen that sets the key and hands access out. They get
+         * the setup panel instead of a composer.
+         */
         id: 'tala',
         label: 'Tala',
         icon: <Sparkles className="w-5 h-5" />,
         path: '/tala',
         module: 'tala',
-        ability: 'manage',
+        ability: 'view',
       },
     ],
   },

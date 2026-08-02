@@ -54,19 +54,41 @@ export interface TalaUsage {
 }
 
 export interface TalaConfig {
-  /** False when neither the school nor the teacher has supplied a usable key. */
+  /** False when the school has not supplied a usable key. There is no other source. */
   ready: boolean
   active_source: TalaCredentialSource | null
   active_provider: TalaProviderKey | null
   active_model: string | null
-  /** The teacher has a key, but the school's key is taking precedence. */
-  own_key_overridden: boolean
-  own_keys: TalaCredentialSummary[]
   institution_configured: boolean
   institution_shared: boolean
   providers: TalaProviderOption[]
   can_configure_institution: boolean
+  /**
+   * Whether this person may chat, as opposed to only administer.
+   *
+   * An administrator reaches the screen through `tala.configure` and can set the
+   * key and hand out access without holding a seat themselves, so the two are
+   * separate answers.
+   */
+  can_chat: boolean
   usage: TalaUsage
+}
+
+/** One member of staff on the administrator's access list. */
+export interface TalaAccessRow {
+  id: string
+  name: string
+  email: string | null
+  role: string | null
+  granted: boolean
+  granted_at: string | null
+  granted_by: string | null
+}
+
+export interface TalaAccessList {
+  rows: TalaAccessRow[]
+  granted_count: number
+  staff_count: number
 }
 
 export interface TalaConversationSummary {
@@ -181,17 +203,27 @@ export const talaService = {
     return res.data.data
   },
 
-  async saveOwnKey(payload: {
-    provider: TalaProviderKey
-    api_key: string
-    model?: string | null
-  }): Promise<TalaCredentialSummary> {
-    const res = await api.put<ApiResponse<TalaCredentialSummary>>('/tala/credentials', payload)
-    return res.data.data
+  /** The staff roster with each person's Tala access. Needs `tala.configure`. */
+  async listAccess(search?: string): Promise<TalaAccessList> {
+    const res = await api.get<ApiResponse<TalaAccessRow[]> & { meta?: Record<string, number> }>(
+      '/tala/access',
+      { params: search ? { search } : undefined }
+    )
+
+    return {
+      rows: res.data.data,
+      granted_count: res.data.meta?.granted_count ?? 0,
+      staff_count: res.data.meta?.staff_count ?? 0,
+    }
   },
 
-  async deleteOwnKey(provider: TalaProviderKey): Promise<void> {
-    await api.delete(`/tala/credentials/${provider}`)
+  /** Grant or revoke for one teacher or many. Needs `tala.configure`. */
+  async setAccess(userIds: string[], granted: boolean): Promise<string> {
+    const res = await api.put<ApiResponse<unknown> & { message: string }>('/tala/access', {
+      user_ids: userIds,
+      granted,
+    })
+    return res.data.message
   },
 
   async getInstitutionKeys(): Promise<TalaCredentialSummary[]> {

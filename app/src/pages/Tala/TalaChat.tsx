@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, KeyRound, Loader2, Settings2, Sparkles } from 'lucide-react'
+import { AlertTriangle, KeyRound, Loader2, Settings2, Sparkles, Users } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import {
   useTalaChat,
@@ -146,7 +146,16 @@ const TalaChat: React.FC = () => {
     )
   }
 
-  const ready = config.data?.ready ?? false
+  /*
+   * Two different reasons the composer might be missing, and they need different
+   * words on screen. `ready` is about the school: no key is set, so Tala cannot
+   * answer anyone. `canChat` is about this person: administrators reach this
+   * screen through `tala.configure` to set the key and hand out access, without
+   * necessarily holding access themselves.
+   */
+  const canConfigure = config.data?.can_configure_institution ?? false
+  const canChat = config.data?.can_chat ?? false
+  const ready = (config.data?.ready ?? false) && canChat
   const teacherName = user?.first_name || 'there'
 
   return (
@@ -175,10 +184,10 @@ const TalaChat: React.FC = () => {
               <p className="truncate text-sm font-semibold text-zinc-900">Tala</p>
               <p className="truncate text-xs text-zinc-500">
                 {ready
-                  ? `${config.data?.active_model} · ${
-                      config.data?.active_source === 'institution' ? "school's key" : 'your key'
-                    }`
-                  : 'No API key configured'}
+                  ? `${config.data?.active_model} · school's key`
+                  : canChat
+                    ? 'No API key configured'
+                    : 'Administration only'}
               </p>
             </div>
           </div>
@@ -190,15 +199,18 @@ const TalaChat: React.FC = () => {
               </span>
             )}
 
-            <Button
-              variant="outline"
-              color="secondary"
-              size="sm"
-              leftIcon={<Settings2 className="h-4 w-4" />}
-              onClick={() => setSettingsOpen(true)}
-            >
-              Settings
-            </Button>
+            {/* Teachers have nothing to set up any more, so they get no button. */}
+            {canConfigure && (
+              <Button
+                variant="outline"
+                color="secondary"
+                size="sm"
+                leftIcon={<Settings2 className="h-4 w-4" />}
+                onClick={() => setSettingsOpen(true)}
+              >
+                Settings
+              </Button>
+            )}
           </div>
         </header>
 
@@ -218,11 +230,10 @@ const TalaChat: React.FC = () => {
                 discard.mutate(id)
               }}
             />
+          ) : canChat ? (
+            <NoKeyState canConfigureSchool={canConfigure} onOpenSettings={() => setSettingsOpen(true)} />
           ) : (
-            <NoKeyState
-              canConfigureSchool={config.data?.can_configure_institution ?? false}
-              onOpenSettings={() => setSettingsOpen(true)}
-            />
+            <NoAccessState canConfigure={canConfigure} onOpenSettings={() => setSettingsOpen(true)} />
           )}
         </div>
 
@@ -256,13 +267,24 @@ const TalaChat: React.FC = () => {
           </div>
         )}
 
-        <Composer
-          disabled={!ready}
-          isStreaming={chat.isStreaming}
-          placeholder={ready ? 'Ask Tala about your subjects, lessons or assessments…' : 'Add an API key to start chatting'}
-          onSend={handleSend}
-          onStop={chat.stop}
-        />
+        {/*
+          * Hidden outright rather than disabled for someone without access: a
+          * greyed-out box invites them to work out how to un-grey it, and the
+          * answer is "ask an administrator", which the panel above already says.
+          */}
+        {canChat && (
+          <Composer
+            disabled={!ready}
+            isStreaming={chat.isStreaming}
+            placeholder={
+              ready
+                ? 'Ask Tala about your subjects, lessons or assessments…'
+                : 'Waiting for the school to add an API key'
+            }
+            onSend={handleSend}
+            onStop={chat.stop}
+          />
+        )}
       </main>
 
       {config.data && (
@@ -297,12 +319,46 @@ const NoKeyState: React.FC<{ canConfigureSchool: boolean; onOpenSettings: () => 
     <h2 className="text-lg font-semibold text-zinc-900">Tala needs an API key</h2>
     <p className="mt-1 max-w-md text-sm text-zinc-600">
       {canConfigureSchool
-        ? 'Set a school key so every teacher can use Tala, or add one of your own to try it out first.'
-        : 'Your school has not set one up yet. Ask an administrator to add a school key, or add your own to get started.'}
+        ? 'Set the school key and Tala can start answering the teachers you have given access to.'
+        : 'Your school has not set one up yet. Ask an administrator to add the school key — there is nothing for you to configure.'}
     </p>
-    <Button className="mt-5" leftIcon={<KeyRound className="h-4 w-4" />} onClick={onOpenSettings}>
-      Add an API key
-    </Button>
+    {canConfigureSchool && (
+      <Button className="mt-5" leftIcon={<KeyRound className="h-4 w-4" />} onClick={onOpenSettings}>
+        Add an API key
+      </Button>
+    )}
+  </div>
+)
+
+/**
+ * For an administrator who can set Tala up but has not given themselves access.
+ *
+ * Reachable rather than hidden on purpose: `tala.configure` carries the right to
+ * open this screen precisely so the key and the access list can be reached, and
+ * an administrator should not have to grant themselves a teacher's seat to
+ * administer the thing.
+ */
+const NoAccessState: React.FC<{ canConfigure: boolean; onOpenSettings: () => void }> = ({
+  canConfigure,
+  onOpenSettings,
+}) => (
+  <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+    <div className="mb-4 rounded-2xl bg-zinc-100 p-4">
+      <Users className="h-7 w-7 text-zinc-500" />
+    </div>
+    <h2 className="text-lg font-semibold text-zinc-900">
+      {canConfigure ? 'You administer Tala but do not use it' : 'Tala is not switched on for you'}
+    </h2>
+    <p className="mt-1 max-w-md text-sm text-zinc-600">
+      {canConfigure
+        ? 'You can set the school key and choose which teachers may use Tala. To chat with it yourself, give yourself access on the same screen.'
+        : 'Access is given teacher by teacher. Ask an administrator at your school to switch Tala on for you.'}
+    </p>
+    {canConfigure && (
+      <Button className="mt-5" leftIcon={<Settings2 className="h-4 w-4" />} onClick={onOpenSettings}>
+        Open Tala settings
+      </Button>
+    )}
   </div>
 )
 

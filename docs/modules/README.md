@@ -17,9 +17,10 @@ modules should consume its data.
   announcements channel (`/finance-announcements`, below Payment Plans in the sidebar). A thin
   surface over the Announcements module: posts get `category='finance'` and are **always for all
   students** (server-forced `audience=students`, `scope=institution`).
-- [Tala](Tala/TALA.md) — AI teaching assistant. A streaming chat module (`/tala`) shipped to
-  **subject teachers**, running on a key the tenant supplies — the school's key, or a teacher's own
-  as the fallback. Claude or OpenAI, model picked from an allowlist. Six read **tools**
+- [Tala](Tala/TALA.md) — AI teaching assistant. A streaming chat module (`/tala`) an administrator
+  grants to **individual teachers** (`tala_access` — the one module a role cannot hand out), running
+  on the **school's key**, which an administrator also sets. Teachers have no setup step at all.
+  Claude or OpenAI, model picked from an allowlist. Six read **tools**
   (`list_assigned_subjects`, `list_lessons`, `get_lesson`, `read_lesson_material` — which opens a
   lesson's uploaded **images and PDFs**, bytes sent server-side so no signed media URL ever reaches
   the provider — `list_assessments`, `get_assessment`) plus

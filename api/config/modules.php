@@ -71,11 +71,24 @@ return [
             'modules' => [
                 'tala' => [
                     'label' => 'Tala',
-                    'description' => 'The AI teaching assistant. View reads past conversations; manage is what lets a role actually chat and set its own API key.',
+                    'description' => 'The AI teaching assistant. Who may chat with Tala is chosen teacher by teacher on the Tala screen, not here — a role only decides who administers it.',
+
+                    /*
+                     * Tala is the one module a role cannot hand out.
+                     *
+                     * Access is per teacher: an administrator grants it from the
+                     * Tala screen, and `tala_access` is the only source of
+                     * `tala.view` and `tala.manage` (see HasModulePermissions).
+                     * Offering the usual View/Manage boxes here would let an
+                     * administrator tick something that then does nothing, which
+                     * is worse than not offering it.
+                     */
+                    'base_abilities' => [],
+
                     'special' => [
                         'configure' => [
-                            'label' => 'Set the institution AI key',
-                            'description' => 'Supply the API key the whole school chats through, and cap how much each teacher may use.',
+                            'label' => 'Administer Tala',
+                            'description' => 'Set the API key the school chats through, choose which teachers may use Tala, and cap how much each of them may send.',
                         ],
                     ],
                 ],

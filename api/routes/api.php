@@ -352,8 +352,14 @@ Route::middleware('auth.token')->group(function () {
      * `configure` is the school-wide key an administrator sets.
      */
     Route::get('tala/config', [App\Http\Controllers\TalaCredentialController::class, 'config'])->middleware('module:tala,view');
-    Route::put('tala/credentials', [App\Http\Controllers\TalaCredentialController::class, 'storeOwn'])->middleware('module:tala,manage');
-    Route::delete('tala/credentials/{provider}', [App\Http\Controllers\TalaCredentialController::class, 'destroyOwn'])->middleware('module:tala,manage');
+
+    /*
+     * Who may chat. Gated on `tala.configure` — the administrator who supplies
+     * the school's key is the one who hands it out. A teacher has no endpoint
+     * here at all, by design: there is nothing left for them to set up.
+     */
+    Route::get('tala/access', [App\Http\Controllers\TalaAccessController::class, 'index'])->middleware('module:tala,configure');
+    Route::put('tala/access', [App\Http\Controllers\TalaAccessController::class, 'update'])->middleware('module:tala,configure');
 
     Route::get('tala/institution-credentials', [App\Http\Controllers\TalaCredentialController::class, 'indexInstitution'])->middleware('module:tala,configure');
     Route::put('tala/institution-credentials', [App\Http\Controllers\TalaCredentialController::class, 'storeInstitution'])->middleware('module:tala,configure');

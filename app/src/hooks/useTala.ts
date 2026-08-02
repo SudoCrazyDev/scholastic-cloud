@@ -117,14 +117,6 @@ export function useTalaKeyMutations() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: CONFIG_KEY })
 
   return {
-    saveOwn: useMutation({
-      mutationFn: talaService.saveOwnKey,
-      onSuccess: invalidate,
-    }),
-    deleteOwn: useMutation({
-      mutationFn: (provider: TalaProviderKey) => talaService.deleteOwnKey(provider),
-      onSuccess: invalidate,
-    }),
     saveInstitution: useMutation({
       mutationFn: talaService.saveInstitutionKey,
       onSuccess: invalidate,
@@ -134,6 +126,44 @@ export function useTalaKeyMutations() {
       onSuccess: invalidate,
     }),
   }
+}
+
+const ACCESS_KEY = ['tala', 'access'] as const
+
+/**
+ * The staff roster with each person's Tala access, for administrators.
+ *
+ * `enabled` matters here: the endpoint is gated on `tala.configure`, and asking
+ * for it as an ordinary teacher would be a 403 on every render of the settings
+ * dialog.
+ */
+export function useTalaAccess(enabled: boolean, search = '') {
+  return useQuery({
+    queryKey: [...ACCESS_KEY, search],
+    queryFn: () => talaService.listAccess(search),
+    enabled,
+    refetchOnWindowFocus: false,
+  })
+}
+
+/**
+ * Granting or revoking Tala for staff.
+ *
+ * Invalidates the config as well as the list, because an administrator changing
+ * their own access changes what the rest of the screen may do — the composer
+ * appears or disappears on the strength of `can_chat`.
+ */
+export function useTalaAccessMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ userIds, granted }: { userIds: string[]; granted: boolean }) =>
+      talaService.setAccess(userIds, granted),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ACCESS_KEY })
+      queryClient.invalidateQueries({ queryKey: CONFIG_KEY })
+    },
+  })
 }
 
 /** A message on screen. Pending ones exist only until the turn is persisted. */

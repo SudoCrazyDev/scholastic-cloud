@@ -97,7 +97,7 @@ class Modules
         $permissions = [];
 
         foreach (static::all() as $key => $module) {
-            foreach (static::BASE_ABILITIES as $ability) {
+            foreach (static::baseAbilitiesFor($module) as $ability) {
                 $permissions[] = "{$key}.{$ability}";
             }
 
@@ -107,6 +107,25 @@ class Modules
         }
 
         return $permissions;
+    }
+
+    /**
+     * The View/Manage pair a module offers a role — usually both.
+     *
+     * A module may declare `'base_abilities' => []` to offer neither, which
+     * means its access is decided somewhere other than the role builder. Tala is
+     * the case this exists for: an administrator grants it to individual
+     * teachers, so a role that could also grant it would be a second answer to
+     * the same question.
+     *
+     * @param  array<string, mixed>  $module
+     * @return array<string>
+     */
+    public static function baseAbilitiesFor(array $module): array
+    {
+        $declared = $module['base_abilities'] ?? null;
+
+        return is_array($declared) ? $declared : static::BASE_ABILITIES;
     }
 
     /**
@@ -127,6 +146,16 @@ class Modules
     public static function isValidPermission(string $permission): bool
     {
         return in_array($permission, static::permissions(), true);
+    }
+
+    /**
+     * Does the module this permission belongs to hand out View/Manage at all?
+     */
+    private static function offersBaseAbilities(string $permission): bool
+    {
+        $module = static::all()[static::moduleOf($permission)] ?? null;
+
+        return $module === null || static::baseAbilitiesFor($module) !== [];
     }
 
     /**
@@ -161,8 +190,11 @@ class Modules
 
             // Anything beyond a bare `view` — `manage` or a special ability
             // like `approve-void` — is useless without being able to open the
-            // module, so it carries `view` with it.
-            if (! str_ends_with($permission, '.view')) {
+            // module, so it carries `view` with it. Unless the module has no
+            // role-assignable View to carry: Tala's is granted per teacher, and
+            // manufacturing one here would put a permission into a role that the
+            // role is not allowed to hold.
+            if (! str_ends_with($permission, '.view') && static::offersBaseAbilities($permission)) {
                 $expanded[static::moduleOf($permission).'.view'] = true;
             }
         }
@@ -200,6 +232,12 @@ class Modules
                     'label' => $module['label'] ?? $moduleKey,
                     'description' => $module['description'] ?? null,
                     'system_only' => $module['system_only'] ?? false,
+
+                    // Usually ['view', 'manage']. Empty means the role builder
+                    // must not draw those toggles — access to this module is
+                    // decided elsewhere, and a dead checkbox is worse than none.
+                    'base_abilities' => static::baseAbilitiesFor($module),
+
                     'special' => $special,
                 ];
             }

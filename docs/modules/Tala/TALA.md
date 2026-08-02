@@ -11,8 +11,9 @@
 Location in nav: **My Work → Tala** (`/tala`).
 Applying an assessment suggestion additionally requires **`subjects.manage`** — see
 [the write path](#the-write-path-nothing-the-model-says-changes-anything).
-Module key: `tala`. Shipped to `subject-teacher` only; `institution-administrator` and `principal`
-also hold `tala.configure`.
+Module key: `tala`. **No role grants it.** An administrator holding `tala.configure`
+(`institution-administrator`, `principal`) gives it to individual teachers, and a row in
+`tala_access` is the whole access decision — see [Permissions](#permissions--tala-is-the-one-module-a-role-cannot-grant).
 Everything is **institution-scoped**, resolved from the authenticated user — never from the request
 body and never from anything the model says.
 
@@ -56,16 +57,20 @@ repo-relative; line numbers drift — search the symbol if it has moved.
   message length cap, default monthly limit, timezone. **No credentials live here.**
 - `app/Support/TalaProviders.php` — reads `config/tala.php`; answers what providers/models exist and
   resolves a stored model that has since left the allowlist.
-- `app/Support/SystemRolePermissions.php` — seeds `tala` (view+manage) to `subject-teacher`,
-  `institution-administrator`, `principal`; `tala.configure` to the latter two.
+- `app/Support/SystemRolePermissions.php` — seeds `tala.configure` to `institution-administrator`
+  and `principal`. `tala` itself appears in no role's list: chatting is granted per teacher.
+- `app/Models/Concerns/HasModulePermissions.php` — `applyTalaAccess()`, the one place the role system
+  and the per-teacher grant meet.
 
 **Backend — data (`api/`)**
 - Migrations (`database/migrations/`):
   - `2026_08_01_120000_create_tala_credentials_table.php` — `tala_credentials`.
   - `2026_08_01_120100_create_tala_conversations_table.php` — `tala_conversations`.
   - `2026_08_01_120200_create_tala_messages_table.php` — `tala_messages`.
-- Models (`app/Models/`): `TalaCredential.php`, `TalaConversation.php`, `TalaMessage.php`
-  (all `HasUuids`).
+  - `2026_08_02_140000_create_tala_access_table.php` — `tala_access`, and the two deletions that
+    retire the old model: teachers' personal keys, and `tala.view`/`tala.manage` on roles.
+- Models (`app/Models/`): `TalaCredential.php`, `TalaAccess.php`, `TalaConversation.php`,
+  `TalaMessage.php` (all `HasUuids`).
 
 **Backend — chat providers (`api/app/Services/Ai/Chat/`)**
 - `ChatProvider.php` — the interface: `stream()`, `withToolResults()` (which also inlines
@@ -121,7 +126,10 @@ repo-relative; line numbers drift — search the symbol if it has moved.
     refuses stale proposals, single-use.
 
 **Backend — HTTP (`api/`)**
-- `app/Http/Controllers/TalaCredentialController.php` — config + both key scopes.
+- `app/Http/Controllers/TalaCredentialController.php` — config + the school's key. There is no
+  teacher-key scope any more.
+- `app/Http/Controllers/TalaAccessController.php` — who may chat. The administrator's roster, and
+  the grant/revoke that backs it.
 - `app/Http/Controllers/TalaConversationController.php` — thread CRUD.
 - `app/Http/Controllers/TalaChatController.php` — the SSE endpoint and the tool loop.
 - `app/Http/Controllers/TalaProposalController.php` — **the write path.** Apply/discard an
@@ -143,41 +151,70 @@ repo-relative; line numbers drift — search the symbol if it has moved.
 
 ---
 
-## Permissions
+## Permissions — Tala is the one module a role cannot grant
 
-`EnsureModuleAccess` **upgrades every write verb to `manage`**, whatever the route declares. Sending
-a message is a POST, so it needs `tala.manage` — `tala.view` alone would show a teacher a screen that
-reads old threads and answers nothing. That constraint is why the abilities split the way they do:
+Every other module is answered entirely by the role attached to a user's institution. **Tala is not.**
+An administrator grants it to individual teachers, because schools wanted to run it with two teachers
+before opening it to a department, and a role could only ever say all-or-nothing.
 
-| Permission | Means |
-|---|---|
-| `tala.view` | Read past conversations |
-| `tala.manage` | **Chat**, and set your own API key |
-| `tala.configure` | Set the school-wide key, cap per-teacher usage |
+So a row in **`tala_access`** is the only source of `tala.view` and `tala.manage`. The rule lives in
+one place — `HasModulePermissions::applyTalaAccess()` — and reads:
 
-`Modules::expand()` makes any non-`view` permission carry `.view`, so `tala.configure` implies
-`tala.view` — there is no way to grant configure-without-read, and no reason to want one.
+| Holder | Gets | Why |
+|---|---|---|
+| An active `tala_access` row | `tala.view` + `tala.manage` | This is the grant. It is the whole access decision. |
+| A role carrying `tala.view`/`tala.manage` | **nothing** | Stripped, not merely un-added — roles predating this change still store them. |
+| `tala.configure` (a role ability) | `tala.view` | So the administrator can open the screen where the key and the access list live. `view` only: administering Tala is not using it. |
+| The wildcard `*` | everything | Platform super-administrator, who must be able to support a school's setup and is not somebody a school can grant. |
 
-Widening Tala beyond subject teachers is **one entry** in `SystemRolePermissions::MANAGE`, or a
-checkbox in a school's own role builder. `department-head` shares the subject-teacher permission set
-in that file and was deliberately left out.
+Because the grant materialises as ordinary permission strings, **nothing downstream needed changing**:
+`EnsureModuleAccess` still gates routes on `module:tala,manage`, the sidebar still reads the profile's
+permission list, and every `can()` check keeps working. One source of truth, one place to look.
+
+Two consequences worth knowing:
+
+- **`config/modules.php` declares `'base_abilities' => []` for Tala**, so the role builder draws only
+  its extra abilities and not the View/Manage pair. A checkbox that set something inert would be worse
+  than no checkbox — it is exactly the "I granted it and nothing happened" complaint the design avoids.
+- **`Modules::expand()` skips the implied `.view`** for such a module, so `tala.configure` does not
+  quietly write a permission into a role that the role is not allowed to hold.
+
+`EnsureModuleAccess` still upgrades every write verb to `manage`, so sending a message needs
+`tala.manage` — which is to say, needs the grant.
+
+**The sidebar gates Tala on `tala.view`, not `manage`.** For a teacher that is the same thing, since
+the grant confers both. What it additionally admits is the administrator holding `tala.configure`,
+who needs the link precisely to reach the setup screen; they get the administration panel instead of
+a composer (`can_chat` on `/tala/config` tells the two apart).
+
+Granting is `PUT /api/tala/access` with a list of user ids, gated on `tala.configure`. Membership of
+the institution is **verified server-side** rather than trusted from the request — the ids come from a
+browser, and granting Tala to somebody at another school would spend this school's key on a stranger.
+Revoking keeps the row and clears `is_active`, so who granted, who revoked, and when all survive.
 
 ---
 
-## Credentials
+## Credentials — one key, and an administrator sets it
 
-Two scopes in one table, told apart by `user_id`:
+One kind of row now: `user_id` is always null, the institution's key, set under `tala.configure` and
+used by every teacher who has been granted access.
 
-- **`user_id` null** — the institution's key, set by an administrator, used by every teacher.
-- **`user_id` set** — a teacher's own key.
+**Teachers have no setup step at all.** They open Tala and type. There is no screen on which a teacher
+could add, view or replace a key, and `CredentialResolver` has no personal-key branch to fall back to.
 
-**The institution's key wins.** A school that has set one up is paying the bill and choosing the
-model its staff talk to; a personal key is the fallback for schools that have not set one up, or
-that have switched sharing off (`shared_with_staff`).
+That last point is worth stating plainly rather than leaving implied: when the school's key is missing
+or parked (`shared_with_staff` off, which is now the "pause Tala for everyone" switch), **Tala does not
+answer.** It does not quietly find another way to bill someone.
 
-Resolution (`CredentialResolver::resolve`) looks only at **what exists and is enabled**. It does not
-fail over to a personal key because the school's key errored at runtime — a teacher whose school key
-has expired sees "the school's key was rejected", not a silent switch onto their own credit card.
+Resolution looks only at **what exists and is enabled**, never at what errored at runtime — a teacher
+whose school key has expired sees "the school's key was rejected", which is the truth and is
+actionable by the person who can fix it.
+
+> **Migration note.** `2026_08_02_140000_create_tala_access_table` **deletes every user-owned row** in
+> `tala_credentials`. They were unreachable after this change — no screen could show, rotate or delete
+> them — and they held encrypted third-party credentials that nobody owned. It also clears
+> `tala.view`/`tala.manage` out of `role_permissions`, since nothing reads them and leaving them would
+> have the table claim a school still hands out Tala by role.
 
 Storage notes that will bite if forgotten:
 
@@ -613,6 +650,24 @@ Assessments, including the write path:
 | Update that keeps 1 of 3 questions | 1 row kept with its id, 2 soft-deleted; answer history preserved |
 | Editor images in a question prompt | Reported as a count; no signed URL sent to the provider |
 
+Access, in `tests/Feature/TalaAccessTest.php` — a permission boundary, so it lives in the suite
+rather than in a scratch run:
+
+| Attempt | Result |
+|---|---|
+| A teacher before an administrator grants anything | No `tala.*` at all; cannot chat |
+| Administrator grants them | `tala.view` + `tala.manage`; can chat |
+| Administrator revokes | Cannot chat; **row kept**, with who revoked it and when |
+| A role that still stores `tala.manage` from before the change | Stripped — the role confers nothing |
+| Administrator with `tala.configure`, no grant | Can open and administer; **cannot chat** |
+| A grant at another school | Does not carry across |
+| Granting somebody outside the institution | 422, nothing written |
+| A teacher granting themselves | 403, nothing written |
+| A teacher reading the access list | 403 |
+| `PUT tala/credentials` (a teacher's own key) | **404 — the route is gone**, not merely gated |
+| `Modules::isValidPermission('tala.view' / 'tala.manage')` | False; `tala.configure` still true |
+| `Modules::expand(['tala.configure'])` | Just itself — no manufactured `tala.view` |
+
 Lesson attachments:
 
 | Attempt | Result |
@@ -739,8 +794,8 @@ All under `auth.token`. Institution resolved by `resolveRequestedInstitution()`.
 | Method | Path | Ability |
 |---|---|---|
 | `GET` | `tala/config` | `tala.view` |
-| `PUT` | `tala/credentials` | `tala.manage` |
-| `DELETE` | `tala/credentials/{provider}` | `tala.manage` |
+| `GET` | `tala/access` | `tala.configure` |
+| `PUT` | `tala/access` | `tala.configure` |
 | `GET` | `tala/institution-credentials` | `tala.configure` |
 | `PUT` | `tala/institution-credentials` | `tala.configure` |
 | `DELETE` | `tala/institution-credentials/{provider}` | `tala.configure` |
@@ -829,8 +884,9 @@ cannot use `$generator->getReturn()`; the controller builds its own result in th
 
 ## Spend
 
-Only messages sent on the **institution's** key count. A teacher on their own key is spending their
-own money and is not capped.
+Every message counts, because every message is on the school's key — there is no longer any other
+kind. The cap is per teacher, set alongside the key, and applies to each teacher who has been granted
+access.
 
 Months are counted in **`Asia/Manila`**, not UTC. `config/app.php` pins the app to UTC while the
 schools do not, so a naive `whereMonth` would roll a teacher's allowance over at 8am on the 1st and

@@ -50,6 +50,12 @@ export interface ModuleCatalogEntry {
   label: string;
   description?: string | null;
   system_only: boolean;
+  /**
+   * Usually ['view', 'manage']. Empty when a module's access is not a role's to
+   * give — Tala is granted to individual teachers by an administrator — in which
+   * case the role builder must not draw those toggles.
+   */
+  base_abilities?: string[];
   special: ModuleSpecialAbility[];
 }
 

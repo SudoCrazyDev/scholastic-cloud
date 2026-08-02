@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { Checkbox } from '../../../components/checkbox'
-import type { ModuleCatalogGroup } from '../../../types'
+import type { ModuleCatalogEntry, ModuleCatalogGroup } from '../../../types'
 
 interface ModuleAccessGridProps {
   groups: ModuleCatalogGroup[]
@@ -29,6 +29,15 @@ export const ModuleAccessGrid: React.FC<ModuleAccessGridProps> = ({
   const selected = useMemo(() => new Set(value), [value])
 
   const apply = (next: Set<string>) => onChange(Array.from(next))
+
+  /*
+   * Does this module hand out View/Manage through a role at all?
+   *
+   * Almost all do. Tala does not: an administrator grants it to individual
+   * teachers on the Tala screen, so the row shows only its extra abilities and
+   * the two toggles are absent rather than present-and-inert.
+   */
+  const hasBase = (module: ModuleCatalogEntry) => (module.base_abilities ?? ['view', 'manage']).length > 0
 
   const toggleView = (moduleKey: string, checked: boolean) => {
     const next = new Set(selected)
@@ -59,12 +68,17 @@ export const ModuleAccessGrid: React.FC<ModuleAccessGridProps> = ({
     apply(next)
   }
 
-  const toggleSpecial = (moduleKey: string, permission: string, checked: boolean) => {
+  const toggleSpecial = (module: ModuleCatalogEntry, permission: string, checked: boolean) => {
     const next = new Set(selected)
 
     if (checked) {
       next.add(permission)
-      next.add(`${moduleKey}.view`)
+
+      // An extra ability is useless without being able to open the module —
+      // unless the module has no role-assignable View to grant.
+      if (hasBase(module)) {
+        next.add(`${module.key}.view`)
+      }
     } else {
       next.delete(permission)
     }
@@ -76,22 +90,33 @@ export const ModuleAccessGrid: React.FC<ModuleAccessGridProps> = ({
     const next = new Set(selected)
 
     group.modules.forEach((module) => {
-      if (checked) {
-        next.add(`${module.key}.view`)
-        next.add(`${module.key}.manage`)
-      } else {
+      if (!checked) {
         Array.from(next)
           .filter((p) => p.startsWith(`${module.key}.`))
           .forEach((p) => next.delete(p))
+        return
+      }
+
+      if (hasBase(module)) {
+        next.add(`${module.key}.view`)
+        next.add(`${module.key}.manage`)
+      } else {
+        // Nothing else to give: the row's only checkboxes are its extras.
+        module.special.forEach((ability) => next.add(ability.permission))
       }
     })
 
     apply(next)
   }
 
+  const isGranted = (module: ModuleCatalogEntry) =>
+    hasBase(module)
+      ? selected.has(`${module.key}.view`)
+      : module.special.some((ability) => selected.has(ability.permission))
+
   const groupState = (group: ModuleCatalogGroup) => {
     const total = group.modules.length
-    const granted = group.modules.filter((m) => selected.has(`${m.key}.view`)).length
+    const granted = group.modules.filter(isGranted).length
 
     return { granted, total, all: granted === total && total > 0, some: granted > 0 && granted < total }
   }
@@ -133,17 +158,22 @@ export const ModuleAccessGrid: React.FC<ModuleAccessGridProps> = ({
 
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {group.modules.map((module) => {
+                const rowHasBase = hasBase(module)
                 const canView = selected.has(`${module.key}.view`)
                 const canManage = selected.has(`${module.key}.manage`)
                 const grantedSpecials = module.special.filter((a) =>
                   selected.has(a.permission)
                 ).length
 
+                // A module with no View of its own shows its extras always;
+                // there is no toggle that would otherwise unfold them.
+                const showSpecials = module.special.length > 0 && (canView || !rowHasBase)
+
                 return (
                   <div
                     key={module.key}
                     className={`px-4 py-3 transition-colors ${
-                      canView ? 'bg-primary-50/40 dark:bg-primary-500/5' : ''
+                      isGranted(module) ? 'bg-primary-50/40 dark:bg-primary-500/5' : ''
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -179,45 +209,47 @@ export const ModuleAccessGrid: React.FC<ModuleAccessGridProps> = ({
                             {module.description}
                           </p>
                         )}
-                        {module.special.length > 0 && !canView && (
+                        {module.special.length > 0 && rowHasBase && !canView && (
                           <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-500">
                             Grant View to choose them
                           </p>
                         )}
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-5">
-                        <label
-                          className={`flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 ${
-                            disabled ? '' : 'cursor-pointer'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={canView}
-                            disabled={disabled}
-                            onChange={(checked: boolean) => toggleView(module.key, checked)}
-                          />
-                          View
-                        </label>
-                        <label
-                          className={`flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 ${
-                            disabled ? '' : 'cursor-pointer'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={canManage}
-                            disabled={disabled}
-                            onChange={(checked: boolean) => toggleManage(module.key, checked)}
-                          />
-                          Manage
-                        </label>
-                      </div>
+                      {rowHasBase && (
+                        <div className="flex shrink-0 items-center gap-5">
+                          <label
+                            className={`flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 ${
+                              disabled ? '' : 'cursor-pointer'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={canView}
+                              disabled={disabled}
+                              onChange={(checked: boolean) => toggleView(module.key, checked)}
+                            />
+                            View
+                          </label>
+                          <label
+                            className={`flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 ${
+                              disabled ? '' : 'cursor-pointer'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={canManage}
+                              disabled={disabled}
+                              onChange={(checked: boolean) => toggleManage(module.key, checked)}
+                            />
+                            Manage
+                          </label>
+                        </div>
+                      )}
                     </div>
 
-                    {module.special.length > 0 && canView && (
+                    {showSpecials && (
                       <div className="mt-3 space-y-2 border-l-2 border-primary-200 pl-3 dark:border-primary-500/30">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                          Extra abilities — not included in Manage
+                          {rowHasBase ? 'Extra abilities — not included in Manage' : 'Abilities'}
                         </p>
                         {module.special.map((ability) => (
                           <label
@@ -228,7 +260,7 @@ export const ModuleAccessGrid: React.FC<ModuleAccessGridProps> = ({
                               checked={selected.has(ability.permission)}
                               disabled={disabled}
                               onChange={(checked: boolean) =>
-                                toggleSpecial(module.key, ability.permission, checked)
+                                toggleSpecial(module, ability.permission, checked)
                               }
                             />
                             <span className="min-w-0">

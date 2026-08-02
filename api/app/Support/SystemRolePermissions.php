@@ -33,10 +33,14 @@ class SystemRolePermissions
         // `roles` is the one addition: an institution has to be able to open
         // the role builder for this feature to mean anything.
         //
-        // `tala` is the second. The school-wide AI key every teacher chats
-        // through is set under `tala.configure` (in SPECIAL below), which has
-        // to sit with the two roles that run a school. `tala` itself is here so
-        // they can use the assistant as well as pay for it.
+        // `tala` is deliberately absent from every list in this file. Chatting
+        // with Tala is granted to individual teachers by an administrator and
+        // lives in `tala_access`, so no role confers it — see
+        // HasModulePermissions. What a role still carries is `tala.configure`
+        // (SPECIAL, below): the right to set the school's key and decide who
+        // gets access. Running a school and using the assistant are now two
+        // different things, and an administrator who wants to chat grants it to
+        // themselves on the same screen.
         'institution-administrator' => [
             'announcements', 'class-sections', 'subjects', 'timetable',
             'grading-scales', 'consolidated-grades', 'proficiency', 'school-days',
@@ -46,7 +50,7 @@ class SystemRolePermissions
             'attendance-logs', 'attendance-requests', 'payroll', 'biometric-devices',
             'zk-users', 'sms-gateways', 'sms-messages', 'sms-settings',
             'roles', 'departments', 'settings', 'certificate-builder', 'form-builder',
-            'id-card-builder', 'receipt-templates', 'tala',
+            'id-card-builder', 'receipt-templates',
         ],
 
         'principal' => [
@@ -58,7 +62,7 @@ class SystemRolePermissions
             'attendance-logs', 'attendance-requests', 'payroll', 'biometric-devices',
             'zk-users', 'sms-gateways', 'sms-messages', 'sms-settings',
             'roles', 'departments', 'settings', 'certificate-builder', 'form-builder',
-            'id-card-builder', 'receipt-templates', 'tala',
+            'id-card-builder', 'receipt-templates',
         ],
 
         // Finance ran the money screens, the announcement board and the three
@@ -72,15 +76,11 @@ class SystemRolePermissions
         // A teacher works their own subjects: lessons, class record, grades and
         // attendance, plus the builders under Tools.
         //
-        // `tala` needs the `manage` half, not just `view`: sending a message
-        // writes a row, and EnsureModuleAccess upgrades every write verb to
-        // `manage`. `view` alone would let a teacher read old threads and
-        // nothing else. Teaching is the only role Tala ships to — widening it
-        // is one entry in this list, or a checkbox in a school's role builder.
+        // Tala used to be here, which gave it to every subject teacher at once.
+        // It is granted per teacher now, so it is not a role's to hand out.
         'subject-teacher' => [
             'announcements', 'subjects', 'consolidated-grades', 'proficiency',
             'student-attendance', 'certificate-builder', 'form-builder', 'id-card-builder',
-            'tala',
         ],
 
         'department-head' => [
