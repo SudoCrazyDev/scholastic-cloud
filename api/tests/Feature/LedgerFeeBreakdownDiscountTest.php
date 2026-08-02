@@ -152,8 +152,13 @@ class LedgerFeeBreakdownDiscountTest extends TestCase
      * The reported case: a whole-bill discount the cashier already netted out when
      * collecting. It has no fee of its own, so before it was allocated the paid-down
      * fee still reported its value as outstanding.
+     *
+     * The cashier took Tuition's whole ₱8,000 charge and put the rest on Miscellaneous,
+     * so the discount is what is left of Miscellaneous — spreading it over the charges
+     * instead would write ₱470.59 off a Tuition that a payment had already settled and
+     * leave Miscellaneous reading Partial on a bill that is paid.
      */
-    public function test_a_whole_bill_discount_is_spread_over_the_fees_it_paid_down(): void
+    public function test_a_whole_bill_discount_lands_on_what_each_fee_still_owes(): void
     {
         $this->discount(1800);
         $this->pay($this->tuition->id, 8000);
@@ -167,9 +172,52 @@ class LedgerFeeBreakdownDiscountTest extends TestCase
         $this->assertEquals(1800.0, $breakdown->sum('discount'));
         $this->assertEquals(0.0, $breakdown->sum('outstanding'));
 
-        // Proportional to each fee's charge: 8,000 / 30,600 and 22,600 / 30,600.
+        // Every row settled, not two rows off by Tuition's proportional share.
+        $this->assertEquals(0.0, $this->breakdownFor($data, $this->tuition->id)['discount']);
+        $this->assertEquals(0.0, $this->breakdownFor($data, $this->tuition->id)['outstanding']);
+        $this->assertEquals(1800.0, $this->breakdownFor($data, $this->misc->id)['discount']);
+        $this->assertEquals(0.0, $this->breakdownFor($data, $this->misc->id)['outstanding']);
+    }
+
+    /**
+     * Nothing collected yet, so every fee owes its whole charge and the discount is
+     * shared out in proportion to them: 8,000 / 30,600 and 22,600 / 30,600.
+     */
+    public function test_an_uncollected_bill_shares_the_discount_by_charge(): void
+    {
+        $this->discount(1800);
+
+        $data = $this->ledger();
+
         $this->assertEquals(470.59, $this->breakdownFor($data, $this->tuition->id)['discount']);
         $this->assertEquals(1329.41, $this->breakdownFor($data, $this->misc->id)['discount']);
+        $this->assertEquals(1800.0, collect($data['fee_breakdown'])->sum('discount'));
+    }
+
+    /**
+     * A discount larger than the bill still owes has to go somewhere: the remainder sits
+     * on charge that was already collected, so the rows read overpaid by exactly what the
+     * student is owed back rather than swallowing part of the discount.
+     */
+    public function test_a_discount_beyond_the_unpaid_balance_spills_onto_collected_charge(): void
+    {
+        $this->discount(1800);
+        $this->pay($this->tuition->id, 8000);
+        $this->pay($this->misc->id, 22000);
+
+        $data = $this->ledger();
+
+        // ₱30,000 collected against a ₱28,800 payable: ₱1,200 over.
+        $this->assertEquals(-1200.0, $data['totals']['balance']);
+
+        $breakdown = collect($data['fee_breakdown']);
+        $this->assertEquals(1800.0, $breakdown->sum('discount'));
+        $this->assertEquals(-1200.0, $breakdown->sum('outstanding'));
+
+        // Miscellaneous absorbs its remaining ₱600 first; the ₱1,200 left over is shared
+        // across the collected charge, 8,000 / 30,000 and 22,000 / 30,000.
+        $this->assertEquals(320.0, $this->breakdownFor($data, $this->tuition->id)['discount']);
+        $this->assertEquals(1480.0, $this->breakdownFor($data, $this->misc->id)['discount']);
     }
 
     /**

@@ -445,7 +445,9 @@ class StudentFinanceController extends Controller
         // A whole-bill discount carries no school_fee_id, so it has no fee of its own to
         // sit against. It was priced against the standard charges (see applyDiscounts),
         // so it is spread back over those same fees — otherwise the Fees view reports
-        // outstanding that the ledger balance has already discounted away.
+        // outstanding that the ledger balance has already discounted away. What each fee
+        // still owes is part of that spread: a cashier who collected a fee's whole charge
+        // before the discount existed left it nothing to write off.
         $unassignedDiscountTotal = (float) $activeDiscountPayloads
             ->reject(fn ($payload) => $payload['discount']->school_fee_id)
             ->sum('amount');
@@ -453,7 +455,8 @@ class StudentFinanceController extends Controller
         $unassignedShares = $this->allocateUnassignedDiscounts(
             $unassignedDiscountTotal,
             $feeDefaults,
-            $discountByFee
+            $discountByFee,
+            $paidByFee->all()
         );
 
         foreach ($unassignedShares as $feeId => $share) {
@@ -1076,57 +1079,110 @@ class StudentFinanceController extends Controller
      * Spread whole-bill discounts (no school_fee_id) across the standard fees they were
      * priced against, so the per-fee breakdown reconciles with the ledger total.
      *
-     * Each fee takes a share proportional to what it can still absorb — its charge net of
-     * any discount already tied to it specifically — with the leftover centavos handed to
-     * the largest remainders so the shares total the discount exactly.
+     * A fee can absorb at most its charge net of any discount tied to it specifically, or
+     * the whole-bill one drives the row negative. Within that ceiling the discount lands
+     * on what each fee still has unpaid first, and only spills onto already-collected
+     * charge once the unpaid room runs out. Spreading over the charge instead would write
+     * a share off a fee a payment had already settled in full, leaving that row overpaid
+     * and its neighbour reading Partial while the bill as a whole is paid.
      *
      * @param  \Illuminate\Support\Collection  $feeRows  rows exposing school_fee_id + amount
      * @param  array<string, float>  $assignedByFee  fee id => discount already tied to that fee
+     * @param  array<string, float>  $paidByFee  fee id => collections allocated to that fee
      * @return array<string, float>  fee id => its share of the unassigned total
      */
-    private function allocateUnassignedDiscounts(float $unassignedTotal, $feeRows, array $assignedByFee): array
-    {
+    private function allocateUnassignedDiscounts(
+        float $unassignedTotal,
+        $feeRows,
+        array $assignedByFee,
+        array $paidByFee = []
+    ): array {
         if ($unassignedTotal <= 0 || $feeRows->isEmpty()) {
             return [];
         }
 
-        // Only room left on a fee can absorb a share: a fee already written down to zero by
-        // a fee-specific discount must not be pushed negative by the whole-bill one.
-        $room = [];
+        // Ceiling per fee, and the part of it no payment has covered yet.
+        $capacity = [];
+        $unpaidRoom = [];
         foreach ($feeRows as $row) {
             $feeId = $row->school_fee_id;
             $available = round((float) $row->amount - (float) ($assignedByFee[$feeId] ?? 0), 2);
-            if ($available > 0) {
-                $room[$feeId] = $available;
+            if ($available <= 0) {
+                continue;
             }
-        }
-
-        $base = array_sum($room);
-        if ($base <= 0) {
-            return [];
+            $capacity[$feeId] = $available;
+            $unpaid = round($available - (float) ($paidByFee[$feeId] ?? 0), 2);
+            if ($unpaid > 0) {
+                $unpaidRoom[$feeId] = $unpaid;
+            }
         }
 
         // Discounts exceeding the charges are a data problem, not something to spread
         // further — cap at what the fees can hold rather than driving a row negative.
-        $allocatable = min($unassignedTotal, $base);
+        $allocatable = min($unassignedTotal, array_sum($capacity));
+        if ($allocatable <= 0) {
+            return [];
+        }
+
+        $shares = $this->spreadProportionally(
+            min($allocatable, array_sum($unpaidRoom)),
+            $unpaidRoom
+        );
+
+        // More discount than the fees still owe: the rest has to sit on charge a payment
+        // already covered, so the row reads overpaid rather than the discount vanishing.
+        $overflow = round($allocatable - array_sum($shares), 2);
+        if ($overflow > 0) {
+            $paidRoom = [];
+            foreach ($capacity as $feeId => $available) {
+                $left = round($available - ($shares[$feeId] ?? 0), 2);
+                if ($left > 0) {
+                    $paidRoom[$feeId] = $left;
+                }
+            }
+
+            foreach ($this->spreadProportionally($overflow, $paidRoom) as $feeId => $share) {
+                $shares[$feeId] = round(($shares[$feeId] ?? 0) + $share, 2);
+            }
+        }
+
+        return $shares;
+    }
+
+    /**
+     * Split an amount across weighted buckets, handing the leftover centavos to the
+     * largest remainders so the shares total the amount exactly — shares that merely
+     * round close leave a fee that never reads as paid.
+     *
+     * @param  array<string, float>  $weights  bucket key => its weight (all positive)
+     * @return array<string, float>  bucket key => its share
+     */
+    private function spreadProportionally(float $amount, array $weights): array
+    {
+        $base = array_sum($weights);
+        if ($amount <= 0 || $base <= 0) {
+            return [];
+        }
+
+        $amount = min($amount, $base);
 
         $shares = [];
         $remainders = [];
-        foreach ($room as $feeId => $available) {
-            $exact = $allocatable * ($available / $base);
+        foreach ($weights as $key => $weight) {
+            $exact = $amount * ($weight / $base);
             $floor = floor($exact * 100) / 100;
-            $shares[$feeId] = $floor;
-            $remainders[$feeId] = $exact - $floor;
+            $shares[$key] = $floor;
+            $remainders[$key] = $exact - $floor;
         }
 
-        $leftover = (int) round(($allocatable - array_sum($shares)) * 100);
+        $leftover = (int) round(($amount - array_sum($shares)) * 100);
         arsort($remainders);
         while ($leftover > 0) {
-            foreach (array_keys($remainders) as $feeId) {
+            foreach (array_keys($remainders) as $key) {
                 if ($leftover <= 0) {
                     break;
                 }
-                $shares[$feeId] = round($shares[$feeId] + 0.01, 2);
+                $shares[$key] = round($shares[$key] + 0.01, 2);
                 $leftover--;
             }
         }
