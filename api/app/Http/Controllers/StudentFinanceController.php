@@ -430,11 +430,35 @@ class StudentFinanceController extends Controller
             ->groupBy('student_additional_fee_id')
             ->map(fn ($group) => (float) $group->sum('amount'));
 
-        $discountByFee = $activeDiscountsWithAmount
-            ->merge($gradeLevelDiscountsWithAmount)
+        // Grade-level discounts voided for this student are already dropped from
+        // $activeGradeLevelDiscountsWithAmount — the breakdown must use that same set,
+        // or a void the totals honour still shows up against a fee.
+        $activeDiscountPayloads = $activeDiscountsWithAmount
+            ->merge($activeGradeLevelDiscountsWithAmount);
+
+        $discountByFee = $activeDiscountPayloads
             ->filter(fn ($payload) => $payload['discount']->school_fee_id)
             ->groupBy(fn ($payload) => $payload['discount']->school_fee_id)
-            ->map(fn ($group) => (float) collect($group)->sum('amount'));
+            ->map(fn ($group) => (float) collect($group)->sum('amount'))
+            ->all();
+
+        // A whole-bill discount carries no school_fee_id, so it has no fee of its own to
+        // sit against. It was priced against the standard charges (see applyDiscounts),
+        // so it is spread back over those same fees — otherwise the Fees view reports
+        // outstanding that the ledger balance has already discounted away.
+        $unassignedDiscountTotal = (float) $activeDiscountPayloads
+            ->reject(fn ($payload) => $payload['discount']->school_fee_id)
+            ->sum('amount');
+
+        $unassignedShares = $this->allocateUnassignedDiscounts(
+            $unassignedDiscountTotal,
+            $feeDefaults,
+            $discountByFee
+        );
+
+        foreach ($unassignedShares as $feeId => $share) {
+            $discountByFee[$feeId] = round(($discountByFee[$feeId] ?? 0) + $share, 2);
+        }
 
         $feeBreakdown = $feeDefaults->map(function ($default) use ($paidByFee, $discountByFee) {
             $feeId = $default->school_fee_id;
@@ -1046,6 +1070,68 @@ class StudentFinanceController extends Controller
             ->whereIn('grade_level_discount_id', $gradeLevelDiscounts->pluck('id'))
             ->get()
             ->keyBy('grade_level_discount_id');
+    }
+
+    /**
+     * Spread whole-bill discounts (no school_fee_id) across the standard fees they were
+     * priced against, so the per-fee breakdown reconciles with the ledger total.
+     *
+     * Each fee takes a share proportional to what it can still absorb — its charge net of
+     * any discount already tied to it specifically — with the leftover centavos handed to
+     * the largest remainders so the shares total the discount exactly.
+     *
+     * @param  \Illuminate\Support\Collection  $feeRows  rows exposing school_fee_id + amount
+     * @param  array<string, float>  $assignedByFee  fee id => discount already tied to that fee
+     * @return array<string, float>  fee id => its share of the unassigned total
+     */
+    private function allocateUnassignedDiscounts(float $unassignedTotal, $feeRows, array $assignedByFee): array
+    {
+        if ($unassignedTotal <= 0 || $feeRows->isEmpty()) {
+            return [];
+        }
+
+        // Only room left on a fee can absorb a share: a fee already written down to zero by
+        // a fee-specific discount must not be pushed negative by the whole-bill one.
+        $room = [];
+        foreach ($feeRows as $row) {
+            $feeId = $row->school_fee_id;
+            $available = round((float) $row->amount - (float) ($assignedByFee[$feeId] ?? 0), 2);
+            if ($available > 0) {
+                $room[$feeId] = $available;
+            }
+        }
+
+        $base = array_sum($room);
+        if ($base <= 0) {
+            return [];
+        }
+
+        // Discounts exceeding the charges are a data problem, not something to spread
+        // further — cap at what the fees can hold rather than driving a row negative.
+        $allocatable = min($unassignedTotal, $base);
+
+        $shares = [];
+        $remainders = [];
+        foreach ($room as $feeId => $available) {
+            $exact = $allocatable * ($available / $base);
+            $floor = floor($exact * 100) / 100;
+            $shares[$feeId] = $floor;
+            $remainders[$feeId] = $exact - $floor;
+        }
+
+        $leftover = (int) round(($allocatable - array_sum($shares)) * 100);
+        arsort($remainders);
+        while ($leftover > 0) {
+            foreach (array_keys($remainders) as $feeId) {
+                if ($leftover <= 0) {
+                    break;
+                }
+                $shares[$feeId] = round($shares[$feeId] + 0.01, 2);
+                $leftover--;
+            }
+        }
+
+        return array_map(fn ($share) => round($share, 2), $shares);
     }
 
     private function applyDiscounts($discounts, $feeAmountMap, float $chargesTotal)
