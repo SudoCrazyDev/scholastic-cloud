@@ -243,6 +243,78 @@ class TalaAccessTest extends TestCase
             ->assertStatus(404);
     }
 
+    /**
+     * A super-administrator belongs to no particular school, so without an
+     * explicit institution the endpoint falls back to their own membership —
+     * which is some other school entirely. That silently granted Tala into the
+     * wrong institution, and the screen looked like it had worked.
+     */
+    public function test_a_super_administrator_grants_into_the_school_they_named(): void
+    {
+        $super = User::factory()->create([
+            'email' => 'super@example.com',
+            'token' => 'super-token',
+            'token_expiry' => now()->addDay()->toDateTimeString(),
+        ]);
+        UserInstitution::factory()
+            ->role('super-administrator')
+            ->create([
+                'user_id' => $super->id,
+                // Deliberately not the school being administered.
+                'institution_id' => Institution::factory()->create()->id,
+                'is_default' => true,
+                'is_main' => true,
+            ]);
+
+        $this->assertTrue($super->fresh()->hasFullAccess(), 'the fixture must actually be unscoped');
+
+        $this->withHeader('Authorization', 'Bearer super-token')
+            ->putJson('/api/tala/access', [
+                'institution_id' => $this->institution->id,
+                'user_ids' => [$this->teacher->id],
+                'granted' => true,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('tala_access', [
+            'user_id' => $this->teacher->id,
+            'institution_id' => $this->institution->id,
+            'is_active' => true,
+        ]);
+
+        $this->assertTrue(
+            $this->teacher->fresh()->hasModuleAccess('tala', 'manage', $this->institution->id)
+        );
+    }
+
+    public function test_the_list_names_the_school_it_belongs_to(): void
+    {
+        $response = $this->withHeader('Authorization', 'Bearer admin-token')
+            ->getJson('/api/tala/access')
+            ->assertOk();
+
+        // Named rather than implied, so nobody grants into the wrong school.
+        $this->assertSame($this->institution->id, $response->json('meta.institution_id'));
+        $this->assertSame($this->institution->title, $response->json('meta.institution_name'));
+    }
+
+    public function test_an_administrator_cannot_reach_another_school(): void
+    {
+        $other = Institution::factory()->create();
+
+        $this->withHeader('Authorization', 'Bearer admin-token')
+            ->getJson('/api/tala/access?institution_id='.$other->id)
+            ->assertStatus(403);
+
+        $this->withHeader('Authorization', 'Bearer admin-token')
+            ->putJson('/api/tala/access', [
+                'institution_id' => $other->id,
+                'user_ids' => [$this->teacher->id],
+                'granted' => true,
+            ])
+            ->assertStatus(403);
+    }
+
     public function test_the_catalog_no_longer_offers_tala_as_a_role_permission(): void
     {
         $this->assertFalse(Modules::isValidPermission('tala.view'));

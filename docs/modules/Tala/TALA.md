@@ -182,15 +182,29 @@ Two consequences worth knowing:
 `EnsureModuleAccess` still upgrades every write verb to `manage`, so sending a message needs
 `tala.manage` — which is to say, needs the grant.
 
-**The sidebar gates Tala on `tala.view`, not `manage`.** For a teacher that is the same thing, since
-the grant confers both. What it additionally admits is the administrator holding `tala.configure`,
-who needs the link precisely to reach the setup screen; they get the administration panel instead of
-a composer (`can_chat` on `/tala/config` tells the two apart).
+**Both the sidebar and the route guard gate Tala on `tala.view`, not `manage`** — and they have to
+agree. For a teacher the two are the same thing, since the grant confers both. What `view`
+additionally admits is the administrator holding `tala.configure`, who needs to reach the setup
+screen; they get the administration panel instead of a composer (`can_chat` on `/tala/config` tells
+the two apart).
+
+> Guarding the *page* on `manage` while the sidebar showed it on `view` shipped once and locked
+> administrators out: the only screen that hands out access sat behind a guard demanding the access.
+> `RequireModule` bounced them to the dashboard, and there was no way back in short of a super
+> administrator. If either of those two gates is ever changed, change both.
 
 Granting is `PUT /api/tala/access` with a list of user ids, gated on `tala.configure`. Membership of
 the institution is **verified server-side** rather than trusted from the request — the ids come from a
 browser, and granting Tala to somebody at another school would spend this school's key on a stranger.
 Revoking keeps the row and clears `is_active`, so who granted, who revoked, and when all survive.
+
+**A super-administrator must name the school.** `resolveRequestedInstitution()` falls back to the
+caller's own membership when no `institution_id` is given, which is right for an administrator and
+wrong for someone unscoped: a super administrator granting Tala "here" wrote the row against
+*their own* institution, and the screen looked like it had worked. The access panel now shows an
+institution picker for wildcard holders, loads nothing until one is chosen, and writes back to the
+same institution the list was read from. Everyone else sees the school named above the roster and
+cannot pass any other id — `callerCanAccessInstitution()` 403s it.
 
 ---
 
@@ -667,6 +681,9 @@ rather than in a scratch run:
 | `PUT tala/credentials` (a teacher's own key) | **404 — the route is gone**, not merely gated |
 | `Modules::isValidPermission('tala.view' / 'tala.manage')` | False; `tala.configure` still true |
 | `Modules::expand(['tala.configure'])` | Just itself — no manufactured `tala.view` |
+| A super administrator granting with an explicit `institution_id` | Written to **that** school, not their own |
+| The access list's `meta` | Names the school (`institution_id`, `institution_name`) |
+| An administrator passing another school's `institution_id` | 403 on both read and write |
 
 Lesson attachments:
 

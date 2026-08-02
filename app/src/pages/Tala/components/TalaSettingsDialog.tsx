@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Check, ExternalLink, Info, KeyRound, Loader2, Search, Users, X } from 'lucide-react'
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../components/dialog'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { Select } from '../../../components/select'
 import { useTalaAccess, useTalaAccessMutation, useTalaKeyMutations } from '../../../hooks/useTala'
+import { usePermissions } from '../../../hooks/usePermissions'
+import { institutionService } from '../../../services/institutionService'
 import type { TalaAccessRow, TalaConfig, TalaProviderKey } from '../../../services/talaService'
 
 interface TalaSettingsDialogProps {
@@ -272,7 +275,20 @@ const AccessPanel: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const access = useTalaAccess(true, search)
+  /*
+   * A super-administrator belongs to no particular school and works across
+   * tenants, so "this institution" is not a question the server can answer for
+   * them — it falls back to their own membership, which is some other school.
+   * That granted Tala into the wrong institution once. They now choose, and
+   * nothing loads until they have.
+   */
+  const { fullAccess } = usePermissions()
+  const [institutionId, setInstitutionId] = useState<string | null>(null)
+  const institutions = useInstitutionOptions(fullAccess)
+
+  const scoped = !fullAccess || institutionId !== null
+
+  const access = useTalaAccess(scoped, search, institutionId)
   const mutation = useTalaAccessMutation()
 
   const rows = access.data?.rows ?? []
@@ -291,7 +307,15 @@ const AccessPanel: React.FC = () => {
     setNotice(null)
 
     try {
-      setNotice(await mutation.mutateAsync({ userIds, granted }))
+      // The same institution the list was read from, never the caller's default:
+      // reading one school and writing to another is the bug this avoids.
+      setNotice(
+        await mutation.mutateAsync({
+          userIds,
+          granted,
+          institutionId: access.data?.institution_id ?? institutionId,
+        })
+      )
       setSelected(new Set())
     } catch (caught: any) {
       setError(caught?.response?.data?.message ?? 'That could not be saved.')
@@ -310,6 +334,39 @@ const AccessPanel: React.FC = () => {
         </span>
       </div>
 
+      {fullAccess && (
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-zinc-700">School</label>
+          <Select
+            value={institutionId ?? ''}
+            onChange={event => {
+              setInstitutionId(event.target.value || null)
+              setSelected(new Set())
+              setNotice(null)
+            }}
+            options={[
+              { value: '', label: 'Choose a school…' },
+              ...institutions.map(entry => ({ value: entry.id, label: entry.title })),
+            ]}
+          />
+          <p className="mt-1.5 text-xs text-zinc-500">
+            You administer every school, so Tala cannot guess which one you mean.
+          </p>
+        </div>
+      )}
+
+      {!fullAccess && access.data?.institution_name && (
+        <p className="text-xs text-zinc-500">
+          Staff of <span className="font-medium text-zinc-700">{access.data.institution_name}</span>.
+        </p>
+      )}
+
+      {!scoped && (
+        <p className="py-6 text-sm text-zinc-500">Pick a school to see its staff.</p>
+      )}
+
+      {scoped && (
+        <>
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400" />
@@ -401,8 +458,32 @@ const AccessPanel: React.FC = () => {
           />
         ))}
       </div>
+        </>
+      )}
     </div>
   )
+}
+
+/**
+ * Schools a super-administrator may administer Tala for.
+ *
+ * Only fetched for someone who actually needs to choose — an ordinary
+ * administrator has exactly one school and the server resolves it from their
+ * membership, so asking them to pick would be a question with one answer.
+ */
+function useInstitutionOptions(enabled: boolean): Array<{ id: string; title: string }> {
+  const { data } = useQuery({
+    queryKey: ['tala', 'access', 'institutions'],
+    queryFn: () => institutionService.getInstitutions({ limit: 200 }),
+    enabled,
+    refetchOnWindowFocus: false,
+  })
+
+  const list = (data as any)?.data ?? data ?? []
+
+  return Array.isArray(list)
+    ? list.map((entry: any) => ({ id: entry.id, title: entry.title ?? entry.name ?? entry.id }))
+    : []
 }
 
 const StaffRow: React.FC<{

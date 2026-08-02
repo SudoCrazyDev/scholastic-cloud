@@ -89,6 +89,9 @@ export interface TalaAccessList {
   rows: TalaAccessRow[]
   granted_count: number
   staff_count: number
+  /** Which school this list belongs to, so nobody grants into the wrong one. */
+  institution_id: string | null
+  institution_name: string | null
 }
 
 export interface TalaConversationSummary {
@@ -203,25 +206,42 @@ export const talaService = {
     return res.data.data
   },
 
-  /** The staff roster with each person's Tala access. Needs `tala.configure`. */
-  async listAccess(search?: string): Promise<TalaAccessList> {
-    const res = await api.get<ApiResponse<TalaAccessRow[]> & { meta?: Record<string, number> }>(
-      '/tala/access',
-      { params: search ? { search } : undefined }
-    )
+  /**
+   * The staff roster with each person's Tala access. Needs `tala.configure`.
+   *
+   * `institutionId` is only meaningful for a super-administrator, who belongs to
+   * no particular school and must say which one they are administering. For
+   * everyone else the server resolves it from their own membership and refuses
+   * any other value.
+   */
+  async listAccess(search?: string, institutionId?: string | null): Promise<TalaAccessList> {
+    const params: Record<string, string> = {}
+    if (search) params.search = search
+    if (institutionId) params.institution_id = institutionId
+
+    const res = await api.get<
+      ApiResponse<TalaAccessRow[]> & { meta?: Record<string, number | string | null> }
+    >('/tala/access', { params: Object.keys(params).length ? params : undefined })
 
     return {
       rows: res.data.data,
-      granted_count: res.data.meta?.granted_count ?? 0,
-      staff_count: res.data.meta?.staff_count ?? 0,
+      granted_count: Number(res.data.meta?.granted_count ?? 0),
+      staff_count: Number(res.data.meta?.staff_count ?? 0),
+      institution_id: (res.data.meta?.institution_id as string) ?? null,
+      institution_name: (res.data.meta?.institution_name as string) ?? null,
     }
   },
 
   /** Grant or revoke for one teacher or many. Needs `tala.configure`. */
-  async setAccess(userIds: string[], granted: boolean): Promise<string> {
+  async setAccess(
+    userIds: string[],
+    granted: boolean,
+    institutionId?: string | null
+  ): Promise<string> {
     const res = await api.put<ApiResponse<unknown> & { message: string }>('/tala/access', {
       user_ids: userIds,
       granted,
+      ...(institutionId ? { institution_id: institutionId } : {}),
     })
     return res.data.message
   },

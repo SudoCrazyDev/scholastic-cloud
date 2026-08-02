@@ -117,8 +117,15 @@ function App() {
               <Route path="my-class-sections" element={<RequireModule module="subjects"><MyClassSections /></RequireModule>} />
               <Route path="my-class-sections/:id" element={<RequireModule module="subjects"><ClassSectionDetail /></RequireModule>} />
               <Route path="assigned-subjects" element={<RequireModule module="subjects"><AssignedSubjects /></RequireModule>} />
-              {/* `manage`, not `view`: chatting writes, and the API gates it that way. */}
-              <Route path="tala" element={<RequireModule module="tala" ability="manage"><TalaChat /></RequireModule>} />
+              {/*
+                `view`, not `manage`, and it has to be. Chatting needs `manage`,
+                which now comes only from a per-teacher grant — but the screen
+                that hands out those grants lives here too. Guarding the page on
+                `manage` locked the administrator out of the only place access
+                can be given, which needs `tala.configure` and confers `view`.
+                The page itself decides what to render: composer, or setup panel.
+              */}
+              <Route path="tala" element={<RequireModule module="tala" ability="view"><TalaChat /></RequireModule>} />
               <Route path="assigned-subjects/:id" element={<RequireModule module="subjects"><SubjectDetail /></RequireModule>} />
               <Route
                 path="my-assessments"

@@ -137,10 +137,10 @@ const ACCESS_KEY = ['tala', 'access'] as const
  * for it as an ordinary teacher would be a 403 on every render of the settings
  * dialog.
  */
-export function useTalaAccess(enabled: boolean, search = '') {
+export function useTalaAccess(enabled: boolean, search = '', institutionId: string | null = null) {
   return useQuery({
-    queryKey: [...ACCESS_KEY, search],
-    queryFn: () => talaService.listAccess(search),
+    queryKey: [...ACCESS_KEY, institutionId ?? 'own', search],
+    queryFn: () => talaService.listAccess(search, institutionId),
     enabled,
     refetchOnWindowFocus: false,
   })
@@ -157,8 +157,15 @@ export function useTalaAccessMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ userIds, granted }: { userIds: string[]; granted: boolean }) =>
-      talaService.setAccess(userIds, granted),
+    mutationFn: ({
+      userIds,
+      granted,
+      institutionId,
+    }: {
+      userIds: string[]
+      granted: boolean
+      institutionId?: string | null
+    }) => talaService.setAccess(userIds, granted, institutionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ACCESS_KEY })
       queryClient.invalidateQueries({ queryKey: CONFIG_KEY })

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
+use App\Models\Institution;
 use App\Models\TalaAccess;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -77,6 +78,18 @@ class TalaAccessController extends Controller
             'meta' => [
                 'granted_count' => $rows->where('granted', true)->count(),
                 'staff_count' => $rows->count(),
+
+                /*
+                 * Which school this list belongs to, named rather than implied.
+                 *
+                 * A super-administrator is unscoped and works across tenants, so
+                 * without an explicit `institution_id` this endpoint falls back
+                 * to their own membership — which is not the school they think
+                 * they are looking at. That silently granted Tala into the wrong
+                 * institution once; the screen now states the answer.
+                 */
+                'institution_id' => $institutionId,
+                'institution_name' => Institution::whereKey($institutionId)->value('title'),
             ],
         ]);
     }
