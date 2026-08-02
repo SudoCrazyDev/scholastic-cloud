@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { PencilSquareIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
@@ -8,17 +8,45 @@ import { Select } from '../../../components/select'
 import { ConfirmationModal } from '../../../components'
 import { payrollService } from '../../../services/payrollService'
 import type {
+  PayrollBracketAmountType,
+  PayrollDeductionBracket,
   PayrollDeductionCalculationType,
   PayrollDeductionPercentBasis,
   PayrollDeductionType,
   SavePayrollDeductionTypeData,
 } from '../../../types'
-import { BASIS_OPTIONS, errorMessage, numberOrZero, peso, rateLabel } from './helpers'
+import {
+  BASIS_LABELS,
+  BASIS_OPTIONS,
+  bracketShareLabel,
+  errorMessage,
+  numberOrZero,
+  peso,
+  rangeLabel,
+  rateLabel,
+} from './helpers'
 
 const CALCULATION_OPTIONS = [
   { value: 'fixed', label: 'Fixed amount (₱) — the same every period' },
   { value: 'percentage', label: 'Percentage of salary (%)' },
+  { value: 'bracket', label: 'Salary ranges — a table of brackets (SSS, PhilHealth)' },
 ]
+
+const AMOUNT_TYPE_OPTIONS = [
+  { value: 'fixed', label: '₱' },
+  { value: 'percentage', label: '%' },
+]
+
+// One range as it is being typed. Blank is meaningful on the ceiling — it is
+// the open-ended top range — so the fields stay strings until they are saved.
+interface BracketRow {
+  key: string
+  min_salary: string
+  max_salary: string
+  amount_type: PayrollBracketAmountType
+  employee: string
+  employer: string
+}
 
 interface FormState {
   name: string
@@ -31,7 +59,32 @@ interface FormState {
   percent_basis: PayrollDeductionPercentBasis
   is_active: boolean
   apply_to_all_staff: boolean
+  brackets: BracketRow[]
 }
+
+let bracketKeySeq = 0
+const newBracketRow = (min = ''): BracketRow => ({
+  key: `bracket-${bracketKeySeq++}`,
+  min_salary: min,
+  max_salary: '',
+  amount_type: 'fixed',
+  employee: '',
+  employer: '',
+})
+
+const bracketRowsFrom = (brackets: PayrollDeductionBracket[]): BracketRow[] =>
+  brackets.map((bracket) => ({
+    key: `bracket-${bracketKeySeq++}`,
+    min_salary: String(bracket.min_salary),
+    max_salary: bracket.max_salary === null ? '' : String(bracket.max_salary),
+    amount_type: bracket.amount_type,
+    employee: String(
+      bracket.amount_type === 'percentage' ? bracket.employee_rate_percent : bracket.employee_amount
+    ),
+    employer: String(
+      bracket.amount_type === 'percentage' ? bracket.employer_rate_percent : bracket.employer_amount
+    ),
+  }))
 
 const emptyForm = (): FormState => ({
   name: '',
@@ -44,11 +97,27 @@ const emptyForm = (): FormState => ({
   percent_basis: 'basic_pay',
   is_active: true,
   apply_to_all_staff: false,
+  brackets: [newBracketRow('0')],
 })
 
-// How a type's employee/employer figure reads in the list.
+// How a type's employee/employer figure reads in the list. A bracket type has
+// no single figure — the salary picks one — so the range count stands in for
+// it and the table itself is shown underneath.
 const figureLabel = (type: PayrollDeductionType, employer: boolean): React.ReactNode => {
   if (employer && !type.has_employer_share) return '—'
+
+  if (type.calculation_type === 'bracket') {
+    if (type.brackets.length === 0) {
+      return <span className="text-xs text-gray-400">no ranges yet</span>
+    }
+    return employer ? (
+      <span className="text-xs text-gray-400">per range</span>
+    ) : (
+      <span className="text-xs text-gray-500">
+        {type.brackets.length} {type.brackets.length === 1 ? 'range' : 'ranges'}
+      </span>
+    )
+  }
 
   if (type.calculation_type === 'percentage') {
     const rate = employer ? type.employer_rate_percent : type.rate_percent
@@ -61,6 +130,35 @@ const figureLabel = (type: PayrollDeductionType, employer: boolean): React.React
   return employer ? <span className="text-xs text-gray-400">shared, no default</span> : '—'
 }
 
+// The range table under a bracket type's row, so the schedule can be read at a
+// glance without opening the editor.
+const BracketSummary: React.FC<{ type: PayrollDeductionType }> = ({ type }) => (
+  <table className="mt-2 w-full max-w-lg text-xs">
+    <thead>
+      <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400">
+        <th className="py-1 pr-3 font-medium">Salary range ({BASIS_LABELS[type.percent_basis]})</th>
+        <th className="py-1 pr-3 text-right font-medium">Employee</th>
+        {type.has_employer_share && <th className="py-1 text-right font-medium">Employer</th>}
+      </tr>
+    </thead>
+    <tbody>
+      {type.brackets.map((bracket, index) => (
+        <tr key={bracket.id || index} className="text-gray-600">
+          <td className="py-0.5 pr-3 tabular-nums">
+            {rangeLabel(bracket.min_salary, bracket.max_salary)}
+          </td>
+          <td className="py-0.5 pr-3 text-right tabular-nums">
+            {bracketShareLabel(bracket, false)}
+          </td>
+          {type.has_employer_share && (
+            <td className="py-0.5 text-right tabular-nums">{bracketShareLabel(bracket, true)}</td>
+          )}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+)
+
 const DeductionTypesTab: React.FC = () => {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
@@ -70,6 +168,10 @@ const DeductionTypesTab: React.FC = () => {
   const [deleting, setDeleting] = useState<PayrollDeductionType | null>(null)
 
   const isPercentage = form.calculation_type === 'percentage'
+  const isBracket = form.calculation_type === 'bracket'
+  // Both of these read a salary — one to take a percentage of, one to look up
+  // in the table — so they share the "percentage of what?" question.
+  const readsSalary = isPercentage || isBracket
 
   const typesQuery = useQuery({
     queryKey: ['payroll-deduction-types'],
@@ -135,26 +237,56 @@ const DeductionTypesTab: React.FC = () => {
       percent_basis: type.percent_basis,
       is_active: type.is_active,
       apply_to_all_staff: false,
+      brackets: type.brackets.length > 0 ? bracketRowsFrom(type.brackets) : [newBracketRow('0')],
     })
     setEditingId(type.id)
     setFormError(null)
     setShowForm(true)
   }
 
+  const setBracket = (index: number, patch: Partial<BracketRow>) =>
+    setForm((prev) => ({
+      ...prev,
+      brackets: prev.brackets.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+    }))
+
+  // A new range starts where the last one left off, which is the way the
+  // schedules are read off a table and saves retyping the boundary.
+  //
+  // The row — and with it the key — is minted out here rather than inside the
+  // updater: an updater has to be pure, and one that bumps a counter every
+  // time React replays it hands two rows the same key.
+  const addBracket = () => {
+    const row = newBracketRow()
+    setForm((prev) => {
+      const last = prev.brackets[prev.brackets.length - 1]
+      const nextMin =
+        last && last.max_salary.trim() !== '' ? String(numberOrZero(last.max_salary) + 0.01) : ''
+      return { ...prev, brackets: [...prev.brackets, { ...row, min_salary: nextMin }] }
+    })
+  }
+
+  const removeBracket = (index: number) =>
+    setForm((prev) => ({ ...prev, brackets: prev.brackets.filter((_, i) => i !== index) }))
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    // The server ignores the half that does not apply, but sending zeroes
+    if (isBracket && form.brackets.length === 0) {
+      setFormError('Add at least one salary range.')
+      return
+    }
+    // The server ignores everything that does not apply, but sending zeroes
     // keeps the payload honest about what was actually filled in.
     saveMutation.mutate({
       id: editingId,
       data: {
         name: form.name.trim(),
         calculation_type: form.calculation_type,
-        default_amount: isPercentage ? 0 : numberOrZero(form.default_amount),
+        default_amount: isPercentage || isBracket ? 0 : numberOrZero(form.default_amount),
         rate_percent: isPercentage ? numberOrZero(form.rate_percent) : 0,
         has_employer_share: form.has_employer_share,
         default_employer_amount:
-          !isPercentage && form.has_employer_share
+          !isPercentage && !isBracket && form.has_employer_share
             ? numberOrZero(form.default_employer_amount)
             : 0,
         employer_rate_percent:
@@ -164,6 +296,23 @@ const DeductionTypesTab: React.FC = () => {
         percent_basis: form.percent_basis,
         is_active: form.is_active,
         apply_to_all_staff: editingId ? form.apply_to_all_staff : undefined,
+        brackets: isBracket
+          ? form.brackets.map((row) => {
+              const percentage = row.amount_type === 'percentage'
+              return {
+                min_salary: numberOrZero(row.min_salary),
+                // Blank is the open-ended top range, not zero.
+                max_salary: row.max_salary.trim() === '' ? null : numberOrZero(row.max_salary),
+                amount_type: row.amount_type,
+                employee_amount: percentage ? 0 : numberOrZero(row.employee),
+                employee_rate_percent: percentage ? numberOrZero(row.employee) : 0,
+                employer_amount:
+                  !percentage && form.has_employer_share ? numberOrZero(row.employer) : 0,
+                employer_rate_percent:
+                  percentage && form.has_employer_share ? numberOrZero(row.employer) : 0,
+              }
+            })
+          : undefined,
       },
     })
   }
@@ -175,9 +324,11 @@ const DeductionTypesTab: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-900">Deduction Types</h2>
           <p className="text-sm text-gray-500">
             The deductions your institution uses — e.g. SSS, Pag-IBIG, PhilHealth, Cash Advance.
-            Each one is either a fixed peso amount or a percentage of salary (SSS at 5% of basic
-            pay). A type saved with a default is applied to every employee's rates right away, so
-            you never add it one by one. Individual figures can still be adjusted in Employee Rates.
+            Each one is a fixed peso amount, a percentage of salary (5% of basic pay), or a table of
+            salary ranges where the salary picks the bracket and the bracket says what the employee
+            and the employer each pay. A type saved with a default is applied to every employee's
+            rates right away, so you never add it one by one. Individual figures can still be
+            adjusted in Employee Rates.
           </p>
         </div>
         <Button size="sm" onClick={openCreate}>
@@ -213,13 +364,21 @@ const DeductionTypesTab: React.FC = () => {
               </tr>
             ) : (
               types.map((type) => (
-                <tr key={type.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                <tr key={type.id} className="border-b border-gray-50 align-top hover:bg-gray-50/50">
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {type.name}
                     {type.calculation_type === 'percentage' && (
                       <span className="ml-2 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
                         % of salary
                       </span>
+                    )}
+                    {type.calculation_type === 'bracket' && (
+                      <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        salary ranges
+                      </span>
+                    )}
+                    {type.calculation_type === 'bracket' && type.brackets.length > 0 && (
+                      <BracketSummary type={type} />
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{figureLabel(type, false)}</td>
@@ -268,7 +427,9 @@ const DeductionTypesTab: React.FC = () => {
           onClick={() => setShowForm(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-white shadow-xl"
+            className={`max-h-[90vh] w-full overflow-y-auto rounded-xl bg-white shadow-xl ${
+              isBracket ? 'max-w-3xl' : 'max-w-md'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-gray-200 px-6 py-4">
@@ -307,45 +468,46 @@ const DeductionTypesTab: React.FC = () => {
                   }
                 />
               </div>
-              {isPercentage ? (
-                <>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">
-                      Rate — employee's share (%)
-                    </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.001"
-                      value={form.rate_percent}
-                      onChange={(e) => setForm((prev) => ({ ...prev, rate_percent: e.target.value }))}
-                      placeholder="e.g. 5"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">
-                      Percentage of what?
-                    </label>
-                    <Select
-                      options={BASIS_OPTIONS}
-                      value={form.percent_basis}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          percent_basis: e.target.value as PayrollDeductionPercentBasis,
-                        }))
-                      }
-                    />
-                    <p className="mt-1 text-xs text-gray-400">
-                      Basic pay is the daily rate for every scheduled working day, whether or not it
-                      was worked — so the contribution doesn't shrink because somebody was late or
-                      absent. Pick salary earned only if the deduction should follow what was
-                      actually paid out.
-                    </p>
-                  </div>
-                </>
-              ) : (
+              {isPercentage && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Rate — employee's share (%)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.001"
+                    value={form.rate_percent}
+                    onChange={(e) => setForm((prev) => ({ ...prev, rate_percent: e.target.value }))}
+                    placeholder="e.g. 5"
+                  />
+                </div>
+              )}
+              {readsSalary && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    {isBracket ? 'Which salary picks the range?' : 'Percentage of what?'}
+                  </label>
+                  <Select
+                    options={BASIS_OPTIONS}
+                    value={form.percent_basis}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        percent_basis: e.target.value as PayrollDeductionPercentBasis,
+                      }))
+                    }
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    Basic pay is the daily rate for every scheduled working day, whether or not it
+                    was worked — so the contribution doesn't shrink because somebody was late or
+                    absent. Pick salary earned only if the deduction should follow what was
+                    actually paid out.
+                  </p>
+                </div>
+              )}
+              {!isPercentage && !isBracket && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">
                     Default amount — employee's share (₱)
@@ -371,7 +533,14 @@ const DeductionTypesTab: React.FC = () => {
                 />
                 Shared by employer (adds an employer counterpart, shown under Other Benefits)
               </label>
+              {form.has_employer_share && isBracket && (
+                <p className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs text-gray-500">
+                  The employer's share is set per range in the table below — that is the whole point
+                  of a schedule, since the two sides rarely pay the same figure in the same bracket.
+                </p>
+              )}
               {form.has_employer_share &&
+                !isBracket &&
                 (isPercentage ? (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -409,6 +578,127 @@ const DeductionTypesTab: React.FC = () => {
                     />
                   </div>
                 ))}
+              {isBracket && (
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">Salary ranges</p>
+                    <Button type="button" variant="outline" size="sm" onClick={addBracket}>
+                      <PlusIcon className="h-4 w-4" />
+                      Add range
+                    </Button>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-gray-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-xs font-medium text-gray-500">
+                          <th className="px-3 py-2">Salary from (₱)</th>
+                          <th className="px-3 py-2">Salary to (₱)</th>
+                          <th className="w-28 px-3 py-2">₱ / %</th>
+                          <th className="px-3 py-2">Employee</th>
+                          <th className="px-3 py-2">Employer</th>
+                          <th className="px-3 py-2 w-8" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {form.brackets.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-6 text-center text-xs text-gray-400">
+                              No ranges yet — add the first one.
+                            </td>
+                          </tr>
+                        ) : (
+                          form.brackets.map((row, index) => {
+                            const percentage = row.amount_type === 'percentage'
+                            const shareProps = percentage
+                              ? { max: '100', step: '0.001', placeholder: '0' }
+                              : { step: '0.01', placeholder: '0.00' }
+                            return (
+                              <tr key={row.key} className="border-b border-gray-50 last:border-0">
+                                <td className="px-3 py-2">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    size="sm"
+                                    required
+                                    value={row.min_salary}
+                                    onChange={(e) => setBracket(index, { min_salary: e.target.value })}
+                                    placeholder="0.00"
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    size="sm"
+                                    value={row.max_salary}
+                                    onChange={(e) => setBracket(index, { max_salary: e.target.value })}
+                                    placeholder="no limit"
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Select
+                                    inputSize="sm"
+                                    options={AMOUNT_TYPE_OPTIONS}
+                                    value={row.amount_type}
+                                    onChange={(e) =>
+                                      setBracket(index, {
+                                        amount_type: e.target.value as PayrollBracketAmountType,
+                                      })
+                                    }
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    size="sm"
+                                    value={row.employee}
+                                    onChange={(e) => setBracket(index, { employee: e.target.value })}
+                                    {...shareProps}
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  {form.has_employer_share ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      size="sm"
+                                      value={row.employer}
+                                      onChange={(e) => setBracket(index, { employer: e.target.value })}
+                                      {...shareProps}
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-gray-400">not shared</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <button
+                                    type="button"
+                                    title="Remove range"
+                                    onClick={() => removeBracket(index)}
+                                    className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <XMarkIcon className="h-4 w-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    The staff member's {BASIS_LABELS[form.percent_basis]} for the period picks one
+                    range, and that range says what each side pays. Leave the last "salary to" blank
+                    for an open-ended top range. Ranges must not overlap; a salary below the first
+                    range contributes at the first one, and one above the last at the last. Pick %
+                    on a range to charge a percentage of the salary instead of a peso figure.
+                  </p>
+                </div>
+              )}
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -418,7 +708,14 @@ const DeductionTypesTab: React.FC = () => {
                 />
                 Active (available on rates and payslips)
               </label>
-              {editingId ? (
+              {isBracket ? (
+                <p className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs text-gray-500">
+                  The table applies to every employee as it stands — there is no per-employee figure
+                  to hand out, since each salary picks its own range. Employee Rates can still take
+                  an individual off this deduction. Already-generated payslips keep the figures they
+                  were generated with until they are regenerated.
+                </p>
+              ) : editingId ? (
                 <label className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
                   <input
                     type="checkbox"

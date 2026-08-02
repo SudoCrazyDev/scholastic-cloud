@@ -10,6 +10,7 @@ use App\Models\PayrollDeductionType;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
 use App\Models\PayslipDay;
+use App\Models\PayslipDeduction;
 use App\Models\StaffAttendanceRequest;
 use App\Models\StaffCalendarEvent;
 use App\Models\StaffScheduleAssignment;
@@ -80,7 +81,8 @@ class PayrollService
         // The institution's deduction catalog. A type carrying a default
         // amount applies to every staff member who has no amount of their own,
         // so a new deduction reaches payroll without being typed per employee.
-        $deductionTypes = PayrollDeductionType::where('institution_id', $institutionId)
+        $deductionTypes = PayrollDeductionType::with('brackets')
+            ->where('institution_id', $institutionId)
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -594,11 +596,15 @@ class PayrollService
      * payroll on the next generate without being entered per employee.
      *
      * A percentage type resolves a rate instead of an amount, and the peso is
-     * computed from $basis. A fixed type behaves exactly as it always has.
+     * computed from $basis. A bracket type resolves neither: the salary picks
+     * a range out of the type's table and the range names both figures. A
+     * fixed type behaves exactly as it always has.
      *
      * A staff row of 0 against a type that *does* carry a default is an
      * exemption and stays at 0 — somebody set that deliberately in Employee
-     * Rates. Lines that resolve to nothing on both sides are skipped.
+     * Rates. A bracket type has no figure to zero, so its exemption is the
+     * row's `is_exempt` flag instead. Lines that resolve to nothing on both
+     * sides are skipped.
      *
      * @param  \Illuminate\Support\Collection<int, PayrollDeductionType>  $deductionTypes
      * @param  array<string, float>|null  $basis  salary figures keyed by PayrollDeductionType::BASIS_*.
@@ -619,9 +625,11 @@ class PayrollService
 
             $own = $staffAmounts->get($type->id);
 
-            $line = $type->isPercentage()
-                ? $this->percentageLine($type, $own, $basis)
-                : $this->fixedLine($type, $own);
+            $line = match (true) {
+                $type->isBracket() => $this->bracketLine($type, $own, $basis),
+                $type->isPercentage() => $this->percentageLine($type, $own, $basis),
+                default => $this->fixedLine($type, $own),
+            };
 
             if ($line === null) {
                 continue;
@@ -662,6 +670,8 @@ class PayrollService
             'employer_rate_percent' => 0,
             'percent_basis' => null,
             'basis_amount' => 0,
+            'bracket_min' => null,
+            'bracket_max' => null,
         ];
     }
 
@@ -698,6 +708,74 @@ class PayrollService
             'employer_rate_percent' => $employerRate,
             'percent_basis' => $type->percent_basis,
             'basis_amount' => $basisAmount,
+            'bracket_min' => null,
+            'bracket_max' => null,
+        ];
+    }
+
+    /**
+     * The salary picks one range out of the type's table, and that range says
+     * what each side pays. Nothing per-staff is read but the exemption: the
+     * whole point of a schedule is that the same table applies to everybody,
+     * and what differs between two employees is their salary, not their rate.
+     *
+     * With no payslip yet (the rates preview) there is no salary to match on,
+     * so the line comes back at 0 with no range named — the caller shows the
+     * table itself rather than a figure that would only be a guess.
+     *
+     * @param  array<string, float>|null  $basis
+     * @return array<string, mixed>|null null when the type applies to nobody
+     */
+    private function bracketLine(PayrollDeductionType $type, ?PayrollCompensationDeduction $own, ?array $basis): ?array
+    {
+        if ($own?->is_exempt) {
+            return null;
+        }
+
+        $empty = [
+            'calculation_type' => PayrollDeductionType::CALC_BRACKET,
+            'amount' => 0,
+            'rate_percent' => 0,
+            'employer_amount' => 0,
+            'employer_rate_percent' => 0,
+            'percent_basis' => $type->percent_basis,
+            'basis_amount' => 0,
+            'bracket_min' => null,
+            'bracket_max' => null,
+        ];
+
+        // A type whose table was never filled in deducts nothing at all — it
+        // is not a ₱0 line on every payslip in the school.
+        if ($type->brackets->isEmpty()) {
+            return null;
+        }
+
+        if ($basis === null) {
+            return $empty;
+        }
+
+        $basisAmount = round((float) ($basis[$type->percent_basis] ?? 0), 2);
+        $bracket = $type->bracketFor($basisAmount);
+
+        if ($bracket === null) {
+            return null;
+        }
+
+        return [
+            'calculation_type' => PayrollDeductionType::CALC_BRACKET,
+            'amount' => $bracket->employeeShare($basisAmount),
+            // Carried only when the range is quoted as a percentage, so the
+            // payslip can print "3% of ₱15,000" the way it does for a
+            // percentage type. A peso range leaves them at 0.
+            'rate_percent' => $bracket->isPercentage() ? (float) $bracket->employee_rate_percent : 0,
+            'employer_amount' => $type->has_employer_share ? $bracket->employerShare($basisAmount) : 0,
+            'employer_rate_percent' => ($type->has_employer_share && $bracket->isPercentage())
+                ? (float) $bracket->employer_rate_percent
+                : 0,
+            'percent_basis' => $type->percent_basis,
+            'basis_amount' => $basisAmount,
+            'bracket_min' => (float) $bracket->min_salary,
+            'bracket_max' => $bracket->max_salary !== null ? (float) $bracket->max_salary : null,
         ];
     }
 
@@ -737,22 +815,39 @@ class PayrollService
     }
 
     /**
-     * Re-price the payslip's percentage lines against the salary they are
+     * Re-price the payslip's salary-driven lines against the salary they are
      * taken from, so a corrected punch or an edited daily rate moves them too.
+     * A percentage line keeps its rate and recomputes its peso; a bracket line
+     * is re-matched against the table, because a changed salary may well land
+     * in a different range.
      *
      * Only lines already on the payslip are touched — one a payroll manager
-     * deleted stays deleted.
+     * deleted stays deleted. A bracket line whose type has since been deleted
+     * keeps the figures it was generated with: the snapshot is all that is
+     * left to go on.
      *
      * @param  array<string, float>  $basis
      */
-    private function repricePercentageDeductions(Payslip $payslip, array $basis): void
+    private function repriceSalaryDrivenDeductions(Payslip $payslip, array $basis): void
     {
         $lines = $payslip->deductions()
-            ->where('calculation_type', PayrollDeductionType::CALC_PERCENTAGE)
+            ->whereIn('calculation_type', [PayrollDeductionType::CALC_PERCENTAGE, PayrollDeductionType::CALC_BRACKET])
             ->get();
+
+        if ($lines->isEmpty()) {
+            return;
+        }
+
+        $bracketTypes = $this->bracketTypesFor($lines);
 
         foreach ($lines as $line) {
             $basisAmount = round((float) ($basis[$line->percent_basis] ?? $basis[PayrollDeductionType::BASIS_BASIC_PAY]), 2);
+
+            if ($line->isBracket()) {
+                $this->repriceBracketLine($line, $bracketTypes->get($line->deduction_type_id), $basisAmount);
+
+                continue;
+            }
 
             $line->update([
                 'basis_amount' => $basisAmount,
@@ -760,6 +855,55 @@ class PayrollService
                 'employer_amount' => round($basisAmount * (float) $line->employer_rate_percent / 100, 2),
             ]);
         }
+    }
+
+    /**
+     * The catalog entries, tables and all, behind this payslip's bracket lines.
+     *
+     * @param  \Illuminate\Support\Collection<int, PayslipDeduction>  $lines
+     * @return \Illuminate\Support\Collection<string, PayrollDeductionType>
+     */
+    private function bracketTypesFor(\Illuminate\Support\Collection $lines): \Illuminate\Support\Collection
+    {
+        $typeIds = $lines
+            ->filter(fn (PayslipDeduction $line) => $line->isBracket())
+            ->pluck('deduction_type_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($typeIds->isEmpty()) {
+            return collect();
+        }
+
+        return PayrollDeductionType::with('brackets')->whereIn('id', $typeIds)->get()->keyBy('id');
+    }
+
+    private function repriceBracketLine(PayslipDeduction $line, ?PayrollDeductionType $type, float $basisAmount): void
+    {
+        $bracket = $type?->bracketFor($basisAmount);
+
+        if ($bracket === null) {
+            // Nothing left to re-match against. The salary it was taken from
+            // still moved, so record that much and leave the figures alone.
+            $line->update(['basis_amount' => $basisAmount]);
+
+            return;
+        }
+
+        $sharesEmployer = (bool) $type->has_employer_share;
+
+        $line->update([
+            'basis_amount' => $basisAmount,
+            'amount' => $bracket->employeeShare($basisAmount),
+            'rate_percent' => $bracket->isPercentage() ? (float) $bracket->employee_rate_percent : 0,
+            'employer_amount' => $sharesEmployer ? $bracket->employerShare($basisAmount) : 0,
+            'employer_rate_percent' => ($sharesEmployer && $bracket->isPercentage())
+                ? (float) $bracket->employer_rate_percent
+                : 0,
+            'bracket_min' => (float) $bracket->min_salary,
+            'bracket_max' => $bracket->max_salary !== null ? (float) $bracket->max_salary : null,
+        ]);
     }
 
     /**
@@ -816,9 +960,9 @@ class PayrollService
         $basis = $this->deductionBasis($payslip, $days);
         $gross = $basis[PayrollDeductionType::BASIS_GROSS_PAY];
 
-        // Percentage lines follow the salary, so they are re-priced before
-        // the total is summed.
-        $this->repricePercentageDeductions($payslip, $basis);
+        // Percentage and bracket lines follow the salary, so they are
+        // re-priced before the total is summed.
+        $this->repriceSalaryDrivenDeductions($payslip, $basis);
 
         $totalDeductions = round((float) $payslip->deductions()->sum('amount'), 2);
 

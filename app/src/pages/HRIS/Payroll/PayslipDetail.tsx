@@ -14,7 +14,17 @@ import type {
   PayrollDeductionType,
   UpdatePayslipData,
 } from '../../../types'
-import { dayLabel, errorMessage, numberOrZero, percent, peso, rateLabel, time12 } from './helpers'
+import {
+  BASIS_LABELS,
+  dayLabel,
+  errorMessage,
+  numberOrZero,
+  percent,
+  peso,
+  rangeLabel,
+  rateLabel,
+  time12,
+} from './helpers'
 import PayslipPrintModal from './PayslipPrintModal'
 import PayslipSlipPrintModal from './PayslipSlipPrintModal'
 
@@ -64,6 +74,9 @@ interface DeductionRow {
   percent_basis: PayrollDeductionPercentBasis | null
   // What the percentage was last taken from, for the "5% of ₱15,000" hint.
   basis_amount: number
+  // Which salary range a bracket row landed in, for the same kind of hint.
+  bracket_min: number | null
+  bracket_max: number | null
 }
 
 const ratesFromPayslip = (payslip: Payslip): RatesForm => ({
@@ -80,10 +93,14 @@ const deductionsFromPayslip = (payslip: Payslip): DeductionRow[] =>
       deduction_type_id: deduction.deduction_type_id,
       name: deduction.name,
       calculation_type: deduction.calculation_type,
+      // A bracket row shows the peso the table produced, but does not let it
+      // be typed over — the schedule is what decides it.
       amount: String(percentage ? deduction.rate_percent : deduction.amount),
       employer_amount: String(percentage ? deduction.employer_rate_percent : deduction.employer_amount),
       percent_basis: deduction.percent_basis,
       basis_amount: deduction.basis_amount,
+      bracket_min: deduction.bracket_min,
+      bracket_max: deduction.bracket_max,
     }
   })
 
@@ -183,6 +200,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
           employer_amount: '',
           percent_basis: null,
           basis_amount: 0,
+          bracket_min: null,
+          bracket_max: null,
         },
       ])
       return
@@ -190,6 +209,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
     const type = activeTypes.find((t) => t.id === value)
     if (!type) return
     const percentage = type.calculation_type === 'percentage'
+    const bracket = type.calculation_type === 'bracket'
     setDeductionRows((prev) => [
       ...prev,
       {
@@ -197,13 +217,18 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
         deduction_type_id: type.id,
         name: type.name,
         calculation_type: type.calculation_type,
-        amount: String((percentage ? type.rate_percent : type.default_amount) || ''),
-        employer_amount: type.has_employer_share
-          ? String((percentage ? type.employer_rate_percent : type.default_employer_amount) || '')
-          : '',
-        percent_basis: percentage ? type.percent_basis : null,
+        // A bracket row has nothing to prefill — the server looks the salary
+        // up in the table on save.
+        amount: bracket ? '' : String((percentage ? type.rate_percent : type.default_amount) || ''),
+        employer_amount:
+          type.has_employer_share && !bracket
+            ? String((percentage ? type.employer_rate_percent : type.default_employer_amount) || '')
+            : '',
+        percent_basis: percentage || bracket ? type.percent_basis : null,
         // Filled in by the server on save, once it knows the salary.
         basis_amount: 0,
+        bracket_min: null,
+        bracket_max: null,
       },
     ])
   }
@@ -218,16 +243,18 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
         .filter((row) => row.name.trim() !== '')
         .map((row) => {
           const percentage = row.calculation_type === 'percentage'
+          const bracket = row.calculation_type === 'bracket'
           return {
             deduction_type_id: row.deduction_type_id,
             name: row.name.trim(),
             calculation_type: row.calculation_type,
-            // The server recomputes a percentage row's pesos from these rates.
-            amount: percentage ? 0 : numberOrZero(row.amount),
-            employer_amount: percentage ? 0 : numberOrZero(row.employer_amount),
+            // The server recomputes a percentage row's pesos from these rates,
+            // and a bracket row's from its table.
+            amount: percentage || bracket ? 0 : numberOrZero(row.amount),
+            employer_amount: percentage || bracket ? 0 : numberOrZero(row.employer_amount),
             rate_percent: percentage ? numberOrZero(row.amount) : 0,
             employer_rate_percent: percentage ? numberOrZero(row.employer_amount) : 0,
-            percent_basis: percentage ? row.percent_basis || 'basic_pay' : undefined,
+            percent_basis: percentage || bracket ? row.percent_basis || 'basic_pay' : undefined,
           }
         }),
     })
@@ -244,13 +271,15 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
         id: type.id,
         label: type.name,
         description:
-          type.calculation_type === 'percentage'
-            ? type.rate_percent > 0
-              ? rateLabel(type.rate_percent, type.percent_basis)
-              : undefined
-            : type.default_amount > 0
-              ? peso(type.default_amount)
-              : undefined,
+          type.calculation_type === 'bracket'
+            ? `${type.brackets.length} salary ranges`
+            : type.calculation_type === 'percentage'
+              ? type.rate_percent > 0
+                ? rateLabel(type.rate_percent, type.percent_basis)
+                : undefined
+              : type.default_amount > 0
+                ? peso(type.default_amount)
+                : undefined,
       })),
     { id: 'custom', label: 'Custom deduction…' },
   ]
@@ -540,8 +569,15 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     const rowType = row.deduction_type_id
                       ? activeTypes.find((t) => t.id === row.deduction_type_id)
                       : null
-                    const employerDisabled = readOnly || (rowType ? !rowType.has_employer_share : false)
                     const percentage = row.calculation_type === 'percentage'
+                    // The table decides a bracket row, so neither figure on it
+                    // is typed here — remove the line to override it.
+                    const bracket = row.calculation_type === 'bracket'
+                    // A dash means the school pays no counterpart at all. A
+                    // bracket row does have one — it just isn't typed here —
+                    // so it keeps the input and shows the figure, greyed.
+                    const employerShared = rowType ? rowType.has_employer_share : true
+                    const employerDisabled = readOnly || bracket || !employerShared
                     // Percent and peso share the two inputs; only the step and
                     // placeholder differ.
                     const figureProps = percentage
@@ -567,7 +603,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             min="0"
                             size="sm"
                             value={row.amount}
-                            disabled={readOnly}
+                            disabled={readOnly || bracket}
                             onChange={(e) =>
                               setDeductionRows((prev) =>
                                 prev.map((r, i) => (i === index ? { ...r, amount: e.target.value } : r))
@@ -575,7 +611,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             }
                             {...figureProps}
                           />
-                          {employerDisabled && !readOnly ? (
+                          {!employerShared && !readOnly ? (
                             <span className="text-center text-xs text-gray-400">—</span>
                           ) : (
                             <Input
@@ -614,6 +650,15 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             {percent(numberOrZero(row.amount))} of{' '}
                             {row.percent_basis === 'gross_pay' ? 'salary earned' : 'basic pay'} (
                             {peso(row.basis_amount)}) — recomputed on save
+                          </p>
+                        )}
+                        {bracket && (
+                          <p className="mt-0.5 px-0.5 text-[11px] text-gray-400">
+                            {row.bracket_min === null
+                              ? 'From the salary-range table'
+                              : `Salary range ${rangeLabel(row.bracket_min, row.bracket_max)}`}{' '}
+                            — matched on {BASIS_LABELS[row.percent_basis || 'basic_pay']} of{' '}
+                            {peso(row.basis_amount)}, recomputed on save
                           </p>
                         )}
                       </div>
@@ -689,6 +734,14 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                         title={`${rateLabel(deduction.rate_percent, deduction.percent_basis)} (${peso(deduction.basis_amount)})`}
                       >
                         ({percent(deduction.rate_percent)})
+                      </span>
+                    )}
+                    {deduction.calculation_type === 'bracket' && deduction.bracket_min !== null && (
+                      <span
+                        className="ml-1 text-xs text-gray-400"
+                        title={`Salary range ${rangeLabel(deduction.bracket_min, deduction.bracket_max)}, matched on ${BASIS_LABELS[deduction.percent_basis || 'basic_pay']} of ${peso(deduction.basis_amount)}`}
+                      >
+                        (bracket)
                       </span>
                     )}
                   </dt>

@@ -2390,9 +2390,27 @@ export interface CreateAnnouncementData {
 // Payroll (HRIS)
 // =====================
 
-// How a deduction arrives at its peso figure: a flat amount, or a percentage
-// of the salary named by `percent_basis`.
-export type PayrollDeductionCalculationType = 'fixed' | 'percentage';
+// How a deduction arrives at its peso figure: a flat amount, a percentage
+// of the salary named by `percent_basis`, or a table of salary ranges that
+// same salary is looked up in.
+export type PayrollDeductionCalculationType = 'fixed' | 'percentage' | 'bracket';
+
+// Whether one salary range quotes its two shares in pesos or as rates.
+export type PayrollBracketAmountType = 'fixed' | 'percentage';
+
+// One salary range of a bracket deduction type: the salaries it covers, and
+// what the employee and the employer each pay inside it. A null max_salary is
+// the open-ended top range ("₱30,000 and above").
+export interface PayrollDeductionBracket {
+  id?: string;
+  min_salary: number;
+  max_salary: number | null;
+  amount_type: PayrollBracketAmountType;
+  employee_amount: number;
+  employee_rate_percent: number;
+  employer_amount: number;
+  employer_rate_percent: number;
+}
 
 // What a percentage deduction is taken from.
 // 'basic_pay'  — daily rate × scheduled working days, before any late,
@@ -2410,9 +2428,12 @@ export interface PayrollDeductionType {
   has_employer_share: boolean;
   default_employer_amount: number;
   employer_rate_percent: number;
+  // Also the salary a bracket type's table is looked up on.
   percent_basis: PayrollDeductionPercentBasis;
   is_active: boolean;
   sort_order: number;
+  // Bracket types only; empty for the other two.
+  brackets: PayrollDeductionBracket[];
   updated_at?: string;
 }
 
@@ -2426,6 +2447,8 @@ export interface SavePayrollDeductionTypeData {
   employer_rate_percent?: number;
   percent_basis?: PayrollDeductionPercentBasis;
   is_active?: boolean;
+  // Required for a bracket type, ignored for the other two.
+  brackets?: PayrollDeductionBracket[];
   // Edit only: overwrite every staff member's own amount with these defaults.
   // New types are handed to all staff automatically.
   apply_to_all_staff?: boolean;
@@ -2460,6 +2483,9 @@ export interface PayrollCompensation {
   overtime_rate_per_minute: number | null;
   effective_overtime_rate: number;
   deductions: PayrollCompensationDeduction[];
+  // Bracket types this staff member is off entirely. They are absent from
+  // `deductions` — nothing is deducted — so this is the only record of it.
+  exempt_deduction_type_ids: string[];
   deductions_total: number;
   employer_share_total: number;
   updated_at?: string;
@@ -2488,6 +2514,9 @@ export interface SavePayrollCompensationData {
     // Read instead of the amounts when the type is a percentage one.
     rate_percent?: number;
     employer_rate_percent?: number;
+    // The only thing read for a bracket type — its table works the figures
+    // out from the salary, so all a staff row can say is "not this one".
+    is_exempt?: boolean;
   }[];
 }
 
@@ -2716,6 +2745,10 @@ export interface PayslipDeduction {
   employer_rate_percent: number;
   percent_basis: PayrollDeductionPercentBasis | null;
   basis_amount: number;
+  // Which salary range a bracket line landed in, snapshotted so a reprint can
+  // still explain the figure after the table has been revised.
+  bracket_min: number | null;
+  bracket_max: number | null;
 }
 
 export interface UpdatePayslipData {

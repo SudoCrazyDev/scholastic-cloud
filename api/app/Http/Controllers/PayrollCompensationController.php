@@ -119,6 +119,9 @@ class PayrollCompensationController extends Controller
             // Only read for a percentage type; percent, not a fraction.
             'deductions.*.rate_percent' => 'nullable|numeric|min:0|max:100',
             'deductions.*.employer_rate_percent' => 'nullable|numeric|min:0|max:100',
+            // A bracket type has no per-staff figure — the table works one out
+            // from the salary — so all a staff row can say is "not this one".
+            'deductions.*.is_exempt' => 'nullable|boolean',
         ], [
             'user_id.exists' => 'This staff member does not belong to your institution.',
             'deductions.*.deduction_type_id.exists' => 'One of the deductions does not belong to your institution.',
@@ -143,6 +146,22 @@ class PayrollCompensationController extends Controller
 
             foreach ($validated['deductions'] ?? [] as $deduction) {
                 $default = $defaults->get($deduction['deduction_type_id']);
+
+                // A bracket type is decided entirely by the table and the
+                // staff member's salary, so the only row worth storing is one
+                // that takes them off it. Anything else would just be a copy
+                // of figures payroll never reads.
+                if ($default?->isBracket()) {
+                    if ($deduction['is_exempt'] ?? false) {
+                        $compensation->deductions()->create([
+                            'deduction_type_id' => $deduction['deduction_type_id'],
+                            'is_exempt' => true,
+                        ]);
+                    }
+
+                    continue;
+                }
+
                 $isPercentage = $default?->isPercentage() ?? false;
 
                 // A percentage type is carried per staff member as a rate; the
@@ -202,7 +221,8 @@ class PayrollCompensationController extends Controller
      */
     private function activeDeductionTypes(string $institutionId): Collection
     {
-        return PayrollDeductionType::where('institution_id', $institutionId)
+        return PayrollDeductionType::with('brackets')
+            ->where('institution_id', $institutionId)
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -218,7 +238,7 @@ class PayrollCompensationController extends Controller
      */
     private function deductionDefaults(string $institutionId): Collection
     {
-        return PayrollDeductionType::where('institution_id', $institutionId)->get()->keyBy('id');
+        return PayrollDeductionType::with('brackets')->where('institution_id', $institutionId)->get()->keyBy('id');
     }
 
     /**
@@ -259,6 +279,14 @@ class PayrollCompensationController extends Controller
             'overtime_rate_per_minute' => $compensation->overtime_rate_per_minute !== null ? (float) $compensation->overtime_rate_per_minute : null,
             'effective_overtime_rate' => $compensation->effectiveOvertimeRate($defaultOvertimeRate),
             'deductions' => $effective->values(),
+            // Bracket types this staff member is off entirely. They are absent
+            // from `deductions` by design — nothing is deducted — but the
+            // rates editor still has to show the exemption as set, or saving
+            // the form again would quietly put them back on it.
+            'exempt_deduction_type_ids' => $compensation->deductions
+                ->filter(fn ($row) => (bool) $row->is_exempt)
+                ->pluck('deduction_type_id')
+                ->values(),
             'deductions_total' => round((float) $effective->sum('amount'), 2),
             'employer_share_total' => round((float) $effective->sum('employer_amount'), 2),
             'updated_at' => $compensation->updated_at?->toIso8601String(),

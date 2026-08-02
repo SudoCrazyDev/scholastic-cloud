@@ -443,22 +443,31 @@ class PayslipController extends Controller
                 // Deduction lines are fully replaced on every save.
                 $payslip->deductions()->delete();
                 foreach ($deductions as $deduction) {
-                    $isPercentage = ($deduction['calculation_type'] ?? PayrollDeductionType::CALC_FIXED)
-                        === PayrollDeductionType::CALC_PERCENTAGE;
+                    $calculationType = $deduction['calculation_type'] ?? PayrollDeductionType::CALC_FIXED;
+                    $isPercentage = $calculationType === PayrollDeductionType::CALC_PERCENTAGE;
+                    // A bracket line carries no editable figure of its own:
+                    // recomputeTotals looks the salary up in the table and
+                    // fills in both shares. With the type gone there is no
+                    // table left to look up, so what the manager typed is all
+                    // there is and the line goes back to being a flat amount.
+                    $isBracket = $calculationType === PayrollDeductionType::CALC_BRACKET
+                        && ($deduction['deduction_type_id'] ?? null) !== null;
+                    if ($calculationType === PayrollDeductionType::CALC_BRACKET && ! $isBracket) {
+                        $calculationType = PayrollDeductionType::CALC_FIXED;
+                    }
+                    $salaryDriven = $isPercentage || $isBracket;
 
                     $payslip->deductions()->create([
                         'deduction_type_id' => $deduction['deduction_type_id'] ?? null,
                         'name' => $deduction['name'],
-                        'calculation_type' => $isPercentage
-                            ? PayrollDeductionType::CALC_PERCENTAGE
-                            : PayrollDeductionType::CALC_FIXED,
-                        // A percentage line's pesos are overwritten by
+                        'calculation_type' => $calculationType,
+                        // A salary-driven line's pesos are overwritten by
                         // recomputeTotals below, from the rates saved here.
-                        'amount' => $isPercentage ? 0 : $deduction['amount'],
+                        'amount' => $salaryDriven ? 0 : $deduction['amount'],
                         'rate_percent' => $isPercentage ? ($deduction['rate_percent'] ?? 0) : 0,
-                        'employer_amount' => $isPercentage ? 0 : ($deduction['employer_amount'] ?? 0),
+                        'employer_amount' => $salaryDriven ? 0 : ($deduction['employer_amount'] ?? 0),
                         'employer_rate_percent' => $isPercentage ? ($deduction['employer_rate_percent'] ?? 0) : 0,
-                        'percent_basis' => $isPercentage
+                        'percent_basis' => $salaryDriven
                             ? ($deduction['percent_basis'] ?? PayrollDeductionType::BASIS_BASIC_PAY)
                             : null,
                         'basis_amount' => 0,
@@ -624,6 +633,8 @@ class PayslipController extends Controller
                 'employer_rate_percent' => (float) $deduction->employer_rate_percent,
                 'percent_basis' => $deduction->percent_basis,
                 'basis_amount' => (float) $deduction->basis_amount,
+                'bracket_min' => $deduction->bracket_min !== null ? (float) $deduction->bracket_min : null,
+                'bracket_max' => $deduction->bracket_max !== null ? (float) $deduction->bracket_max : null,
             ])->values(),
             'employer_share_total' => round((float) $payslip->deductions->sum('employer_amount'), 2),
             'total_deductions' => (float) $payslip->total_deductions,

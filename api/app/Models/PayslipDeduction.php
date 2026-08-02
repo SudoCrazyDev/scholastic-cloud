@@ -21,6 +21,8 @@ class PayslipDeduction extends Model
         'employer_rate_percent',
         'percent_basis',
         'basis_amount',
+        'bracket_min',
+        'bracket_max',
     ];
 
     protected $casts = [
@@ -29,11 +31,18 @@ class PayslipDeduction extends Model
         'employer_amount' => 'decimal:2',
         'employer_rate_percent' => 'decimal:3',
         'basis_amount' => 'decimal:2',
+        'bracket_min' => 'decimal:2',
+        'bracket_max' => 'decimal:2',
     ];
 
     public function isPercentage(): bool
     {
         return $this->calculation_type === PayrollDeductionType::CALC_PERCENTAGE;
+    }
+
+    public function isBracket(): bool
+    {
+        return $this->calculation_type === PayrollDeductionType::CALC_BRACKET;
     }
 
     public function payslip(): BelongsTo

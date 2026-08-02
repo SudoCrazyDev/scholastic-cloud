@@ -1,4 +1,4 @@
-import type { PayrollDeductionPercentBasis } from '../../../types'
+import type { PayrollDeductionBracket, PayrollDeductionPercentBasis } from '../../../types'
 
 export const peso = (amount: number | null | undefined) =>
   new Intl.NumberFormat('en-PH', {
@@ -72,3 +72,15 @@ export const BASIS_OPTIONS = [
 // "5% of basic pay"
 export const rateLabel = (rate: number, basis: PayrollDeductionPercentBasis | null) =>
   `${percent(rate)} of ${BASIS_LABELS[basis || 'basic_pay']}`
+
+// "₱10,000.00 – ₱14,999.99" / "₱30,000.00 and above"
+export const rangeLabel = (min: number, max: number | null): string =>
+  max === null ? `${peso(min)} and above` : `${peso(min)} – ${peso(max)}`
+
+// What one side of a salary range pays, as it reads in the table.
+export const bracketShareLabel = (bracket: PayrollDeductionBracket, employer: boolean): string => {
+  if (bracket.amount_type === 'percentage') {
+    return percent(employer ? bracket.employer_rate_percent : bracket.employee_rate_percent)
+  }
+  return peso(employer ? bracket.employer_amount : bracket.employee_amount)
+}

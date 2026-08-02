@@ -17,6 +17,7 @@ class PayrollCompensationDeduction extends Model
         'rate_percent',
         'employer_amount',
         'employer_rate_percent',
+        'is_exempt',
     ];
 
     protected $casts = [
@@ -24,6 +25,7 @@ class PayrollCompensationDeduction extends Model
         'rate_percent' => 'decimal:3',
         'employer_amount' => 'decimal:2',
         'employer_rate_percent' => 'decimal:3',
+        'is_exempt' => 'boolean',
     ];
 
     public function compensation(): BelongsTo

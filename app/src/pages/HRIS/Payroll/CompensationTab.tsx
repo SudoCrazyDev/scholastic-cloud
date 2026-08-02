@@ -10,7 +10,7 @@ import type {
   PayrollStaffCompensation,
   SavePayrollCompensationData,
 } from '../../../types'
-import { errorMessage, numberOrZero, peso, rateLabel } from './helpers'
+import { BASIS_LABELS, errorMessage, numberOrZero, peso, rateLabel } from './helpers'
 
 interface CompensationForm {
   designation: string
@@ -19,9 +19,12 @@ interface CompensationForm {
   hours_per_day: string
   overtime_rate: string
   // deduction_type_id -> the figure as entered: pesos for a fixed type,
-  // percent for a percentage one.
+  // percent for a percentage one. A bracket type has no figure here — its
+  // table works one out from the salary — only the exemption below.
   deductions: Record<string, string>
   employerDeductions: Record<string, string>
+  // deduction_type_id -> this staff member is off that bracket deduction.
+  exemptions: Record<string, boolean>
 }
 
 const emptyForm = (): CompensationForm => ({
@@ -32,6 +35,7 @@ const emptyForm = (): CompensationForm => ({
   overtime_rate: '',
   deductions: {},
   employerDeductions: {},
+  exemptions: {},
 })
 
 const CompensationTab: React.FC = () => {
@@ -92,7 +96,13 @@ const CompensationTab: React.FC = () => {
     const c = row.compensation
     const deductionAmounts: Record<string, string> = {}
     const employerAmounts: Record<string, string> = {}
+    const exemptions: Record<string, boolean> = {}
+    const exemptIds = new Set(c?.exempt_deduction_type_ids || [])
     for (const type of activeTypes) {
+      if (type.calculation_type === 'bracket') {
+        exemptions[type.id] = exemptIds.has(type.id)
+        continue
+      }
       const existing = c?.deductions.find((d) => d.deduction_type_id === type.id)
       const percentage = type.calculation_type === 'percentage'
       // The staff member's own figure wins; otherwise they inherit the type's
@@ -112,6 +122,7 @@ const CompensationTab: React.FC = () => {
       overtime_rate: c?.overtime_rate_per_minute != null ? String(c.overtime_rate_per_minute) : '',
       deductions: deductionAmounts,
       employerDeductions: employerAmounts,
+      exemptions,
     })
     setFormError(null)
     setEditing(row)
@@ -130,6 +141,16 @@ const CompensationTab: React.FC = () => {
         overtime_rate_per_minute:
           form.overtime_rate.trim() === '' ? null : numberOrZero(form.overtime_rate),
         deductions: activeTypes.map((type) => {
+          // A bracket type carries no figure per employee; the only thing this
+          // form can say about one is whether they are on it at all.
+          if (type.calculation_type === 'bracket') {
+            return {
+              deduction_type_id: type.id,
+              amount: 0,
+              is_exempt: !!form.exemptions[type.id],
+            }
+          }
+
           const percentage = type.calculation_type === 'percentage'
           const own = numberOrZero(form.deductions[type.id] ?? '')
           const employer = type.has_employer_share
@@ -214,10 +235,13 @@ const CompensationTab: React.FC = () => {
                 const c = row.compensation
                 // A percentage line has no peso yet — there is no payroll
                 // period here to take a percentage of — so it counts as
-                // applied on its rate instead.
-                const appliedDeductions = (c?.deductions || []).filter((d) =>
-                  d.calculation_type === 'percentage' ? d.rate_percent > 0 : d.amount > 0
-                )
+                // applied on its rate instead. A bracket line has neither
+                // until a payslip names a salary, and its presence in the list
+                // is already the answer: the employee is on the table.
+                const appliedDeductions = (c?.deductions || []).filter((d) => {
+                  if (d.calculation_type === 'bracket') return true
+                  return d.calculation_type === 'percentage' ? d.rate_percent > 0 : d.amount > 0
+                })
                 const percentageDeductions = appliedDeductions.filter(
                   (d) => d.calculation_type === 'percentage'
                 )
@@ -262,14 +286,16 @@ const CompensationTab: React.FC = () => {
                         appliedDeductions.length > 0 ? (
                           <span
                             title={appliedDeductions
-                              .map(
-                                (d) =>
-                                  `${d.name}: ${
-                                    d.calculation_type === 'percentage'
-                                      ? rateLabel(d.rate_percent, d.percent_basis)
-                                      : peso(d.amount)
-                                  }${d.from_default ? ' (type default)' : ''}`
-                              )
+                              .map((d) => {
+                                if (d.calculation_type === 'bracket') {
+                                  return `${d.name}: salary-range table on ${BASIS_LABELS[d.percent_basis || 'basic_pay']}`
+                                }
+                                const figure =
+                                  d.calculation_type === 'percentage'
+                                    ? rateLabel(d.rate_percent, d.percent_basis)
+                                    : peso(d.amount)
+                                return `${d.name}: ${figure}${d.from_default ? ' (type default)' : ''}`
+                              })
                               .join(', ')}
                           >
                             <span className="tabular-nums font-medium">{peso(c.deductions_total)}</span>
@@ -413,6 +439,42 @@ const CompensationTab: React.FC = () => {
                       </thead>
                       <tbody>
                         {activeTypes.map((type) => {
+                          if (type.calculation_type === 'bracket') {
+                            const exempt = !!form.exemptions[type.id]
+                            return (
+                              <tr key={type.id} className="border-b border-gray-50 last:border-0">
+                                <td className="px-3 py-2 font-medium text-gray-700">
+                                  {type.name}
+                                  <span className="block text-xs font-normal text-gray-400">
+                                    {type.brackets.length}-range table on{' '}
+                                    {BASIS_LABELS[type.percent_basis]}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2" colSpan={2}>
+                                  <label className="flex items-center gap-2 text-xs text-gray-600">
+                                    <input
+                                      type="checkbox"
+                                      checked={exempt}
+                                      onChange={(e) =>
+                                        setForm((prev) => ({
+                                          ...prev,
+                                          exemptions: {
+                                            ...prev.exemptions,
+                                            [type.id]: e.target.checked,
+                                          },
+                                        }))
+                                      }
+                                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    />
+                                    {exempt
+                                      ? 'Exempt — this deduction is not applied'
+                                      : 'Exempt this employee from this deduction'}
+                                  </label>
+                                </td>
+                              </tr>
+                            )
+                          }
+
                           const percentage = type.calculation_type === 'percentage'
                           // Percent and peso want different steps and hints,
                           // but the same two inputs.
@@ -464,7 +526,9 @@ const CompensationTab: React.FC = () => {
                   Figures start from each type's default and apply to this staff member on the next
                   payroll generate. A percentage type takes a rate (%) here, not a peso amount — its
                   amount is worked out per payslip from the salary. Set one to 0 to exempt them from
-                  that deduction. Employer shares appear under Other Benefits on the printed record.
+                  that deduction. A salary-range type has no figure to set: its table already works
+                  one out from this employee's salary, so all it offers is the exemption. Employer
+                  shares appear under Other Benefits on the printed record.
                 </p>
               </div>
 
