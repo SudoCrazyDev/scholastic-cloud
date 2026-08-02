@@ -2645,6 +2645,46 @@ export interface PayrollSheet {
   rows: PayrollSheetRow[];
 }
 
+// =====================
+// Payroll period report (what a finished period cost, totalled)
+// =====================
+
+// One deduction line totalled across the period. The employee and employer
+// sides stay apart: remittance forms want them in separate columns, and only
+// the employee side ever came out of anyone's pay.
+export interface PayrollReportDeductionLine {
+  key: string;
+  name: string;
+  employee_count: number; // staff the line actually charged
+  employee_amount: number;
+  employer_amount: number;
+  total_amount: number;
+}
+
+export interface PayrollPeriodReport {
+  period: {
+    id: string;
+    name: string;
+    date_from: string;
+    date_to: string;
+    status: PayrollPeriodStatus;
+    paid_on: string | null;
+  };
+  institution: {
+    name: string | null;
+    address: string | null;
+  };
+  summary: {
+    employee_count: number;
+    gross_total: number; // salary earned, already net of late/undertime/absences
+    employee_deduction_total: number;
+    employer_contribution_total: number; // a cost on top of salaries, not a deduction
+    net_total: number; // the cash paid out to staff
+    payroll_cost_total: number; // gross + employer share
+  };
+  deductions: PayrollReportDeductionLine[];
+}
+
 // How a payslip day is priced once any exception is taken into account.
 // 'full_day' guarantees the daily rate regardless of hours worked.
 export type PayslipDayPayPolicy = 'normal' | 'full_day' | 'no_pay';

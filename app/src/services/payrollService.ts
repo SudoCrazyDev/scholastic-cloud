@@ -6,6 +6,7 @@ import type {
   PayrollCompensation,
   PayrollDeductionType,
   PayrollPeriod,
+  PayrollPeriodReport,
   PayrollPeriodSaveResponse,
   PayrollSettings,
   PayrollSheet,
@@ -155,6 +156,14 @@ class PayrollService {
   async getPeriodSheet(periodId: string) {
     const response = await api.get<ApiResponse<PayrollSheet>>(
       `/payroll-periods/${periodId}/sheet`
+    )
+    return response.data
+  }
+
+  // What the period cost, totalled — payout, both sides of every deduction.
+  async getPeriodReport(periodId: string) {
+    const response = await api.get<ApiResponse<PayrollPeriodReport>>(
+      `/payroll-periods/${periodId}/report`
     )
     return response.data
   }

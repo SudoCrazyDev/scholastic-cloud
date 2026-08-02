@@ -591,6 +591,7 @@ Route::middleware('auth.token')->group(function () {
     Route::post('payroll-periods/{id}/reopen', [\App\Http\Controllers\PayrollPeriodController::class, 'reopen'])->middleware('module:payroll,release');
     Route::get('payroll-periods/{periodId}/payslips', [\App\Http\Controllers\PayslipController::class, 'indexByPeriod'])->middleware('module:payroll,view');
     Route::get('payroll-periods/{periodId}/sheet', [\App\Http\Controllers\PayslipController::class, 'sheetByPeriod'])->middleware('module:payroll,view');
+    Route::get('payroll-periods/{periodId}/report', [\App\Http\Controllers\PayrollReportController::class, 'periodSummary'])->middleware('module:payroll,view');
     Route::apiResource('payroll-periods', \App\Http\Controllers\PayrollPeriodController::class)->middleware('module:payroll,view');
     Route::apiResource('payslip-templates', \App\Http\Controllers\PayslipTemplateController::class)->middleware('module:payroll,view');
     // A staff member opens their own payslip here; the controller checks

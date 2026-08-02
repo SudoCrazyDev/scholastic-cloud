@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import {
   BanknotesIcon,
   CalendarDaysIcon,
+  ChartBarSquareIcon,
   Cog6ToothIcon,
   PaintBrushIcon,
   ReceiptPercentIcon,
@@ -12,9 +13,10 @@ import CompensationTab from './CompensationTab'
 import DeductionTypesTab from './DeductionTypesTab'
 import PayslipDesignerTab from './PayslipDesignerTab'
 import PeriodsTab from './PeriodsTab'
+import ReportsTab from './ReportsTab'
 import SettingsTab from './SettingsTab'
 
-type Tab = 'periods' | 'rates' | 'deductions' | 'designer' | 'settings'
+type Tab = 'periods' | 'reports' | 'rates' | 'deductions' | 'designer' | 'settings'
 
 const Payroll: React.FC = () => {
   const [tab, setTab] = useState<Tab>('periods')
@@ -46,6 +48,10 @@ const Payroll: React.FC = () => {
         <button type="button" onClick={() => setTab('periods')} className={tabClass(tab === 'periods')}>
           <CalendarDaysIcon className="h-4 w-4" />
           Payroll Periods
+        </button>
+        <button type="button" onClick={() => setTab('reports')} className={tabClass(tab === 'reports')}>
+          <ChartBarSquareIcon className="h-4 w-4" />
+          Reports
         </button>
         <button type="button" onClick={() => setTab('rates')} className={tabClass(tab === 'rates')}>
           <BanknotesIcon className="h-4 w-4" />
@@ -79,6 +85,8 @@ const Payroll: React.FC = () => {
 
       {tab === 'periods' ? (
         <PeriodsTab />
+      ) : tab === 'reports' ? (
+        <ReportsTab />
       ) : tab === 'rates' ? (
         <CompensationTab />
       ) : tab === 'deductions' ? (
