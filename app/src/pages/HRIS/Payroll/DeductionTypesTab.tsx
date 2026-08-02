@@ -1,5 +1,11 @@
 import React, { useMemo, useState } from 'react'
-import { PencilSquareIcon, PlusIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import {
+  ChevronRightIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  TrashIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { Button } from '../../../components/button'
@@ -19,6 +25,7 @@ import {
   BASIS_LABELS,
   BASIS_OPTIONS,
   bracketShareLabel,
+  bracketSpanLabel,
   errorMessage,
   numberOrZero,
   peso,
@@ -101,22 +108,17 @@ const emptyForm = (): FormState => ({
 })
 
 // How a type's employee/employer figure reads in the list. A bracket type has
-// no single figure — the salary picks one — so the range count stands in for
-// it and the table itself is shown underneath.
+// no single figure — the salary picks one — so the column spans the table
+// instead, and the table itself folds out underneath the name.
 const figureLabel = (type: PayrollDeductionType, employer: boolean): React.ReactNode => {
   if (employer && !type.has_employer_share) return '—'
 
   if (type.calculation_type === 'bracket') {
-    if (type.brackets.length === 0) {
+    const span = bracketSpanLabel(type.brackets, employer)
+    if (span === null) {
       return <span className="text-xs text-gray-400">no ranges yet</span>
     }
-    return employer ? (
-      <span className="text-xs text-gray-400">per range</span>
-    ) : (
-      <span className="text-xs text-gray-500">
-        {type.brackets.length} {type.brackets.length === 1 ? 'range' : 'ranges'}
-      </span>
-    )
+    return span
   }
 
   if (type.calculation_type === 'percentage') {
@@ -130,34 +132,62 @@ const figureLabel = (type: PayrollDeductionType, employer: boolean): React.React
   return employer ? <span className="text-xs text-gray-400">shared, no default</span> : '—'
 }
 
-// The range table under a bracket type's row, so the schedule can be read at a
-// glance without opening the editor.
-const BracketSummary: React.FC<{ type: PayrollDeductionType }> = ({ type }) => (
-  <table className="mt-2 w-full max-w-lg text-xs">
-    <thead>
-      <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400">
-        <th className="py-1 pr-3 font-medium">Salary range ({BASIS_LABELS[type.percent_basis]})</th>
-        <th className="py-1 pr-3 text-right font-medium">Employee</th>
-        {type.has_employer_share && <th className="py-1 text-right font-medium">Employer</th>}
-      </tr>
-    </thead>
-    <tbody>
-      {type.brackets.map((bracket, index) => (
-        <tr key={bracket.id || index} className="text-gray-600">
-          <td className="py-0.5 pr-3 tabular-nums">
-            {rangeLabel(bracket.min_salary, bracket.max_salary)}
-          </td>
-          <td className="py-0.5 pr-3 text-right tabular-nums">
-            {bracketShareLabel(bracket, false)}
-          </td>
-          {type.has_employer_share && (
-            <td className="py-0.5 text-right tabular-nums">{bracketShareLabel(bracket, true)}</td>
-          )}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-)
+// The range table under a bracket type's row, so the schedule can be read
+// without opening the editor.
+//
+// Folded away by default: a real contribution schedule runs to twenty-odd
+// rows, and spilling every one of them into the list would bury the other
+// deductions under a single type's table.
+const BracketSummary: React.FC<{ type: PayrollDeductionType }> = ({ type }) => {
+  const [open, setOpen] = useState(false)
+  const count = type.brackets.length
+
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className="-ml-1 flex items-center gap-1 rounded px-1 py-0.5 text-xs font-normal text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+      >
+        <ChevronRightIcon
+          className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`}
+        />
+        {count} {count === 1 ? 'range' : 'ranges'}
+      </button>
+      {open && (
+        <table className="mt-1.5 w-full max-w-lg text-xs">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400">
+              <th className="py-1 pr-3 font-medium">
+                Salary range ({BASIS_LABELS[type.percent_basis]})
+              </th>
+              <th className="py-1 pr-3 text-right font-medium">Employee</th>
+              {type.has_employer_share && <th className="py-1 text-right font-medium">Employer</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {type.brackets.map((bracket, index) => (
+              <tr key={bracket.id || index} className="text-gray-600">
+                <td className="py-0.5 pr-3 tabular-nums">
+                  {rangeLabel(bracket.min_salary, bracket.max_salary)}
+                </td>
+                <td className="py-0.5 pr-3 text-right tabular-nums">
+                  {bracketShareLabel(bracket, false)}
+                </td>
+                {type.has_employer_share && (
+                  <td className="py-0.5 text-right tabular-nums">
+                    {bracketShareLabel(bracket, true)}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
 
 const DeductionTypesTab: React.FC = () => {
   const queryClient = useQueryClient()

@@ -84,3 +84,33 @@ export const bracketShareLabel = (bracket: PayrollDeductionBracket, employer: bo
   }
   return peso(employer ? bracket.employer_amount : bracket.employee_amount)
 }
+
+// What one side pays across a whole table, as a span: "₱275.00 – ₱700.00".
+// This is the honest one-line answer to "how much is this deduction?" when
+// there is no single figure. Peso and percentage ranges in the same table have
+// no common unit to span, so a mixed one says so rather than inventing one.
+export const bracketSpanLabel = (
+  brackets: PayrollDeductionBracket[],
+  employer: boolean
+): string | null => {
+  if (brackets.length === 0) return null
+
+  const asPercent = brackets.every((bracket) => bracket.amount_type === 'percentage')
+  const asPeso = brackets.every((bracket) => bracket.amount_type === 'fixed')
+  if (!asPercent && !asPeso) return 'varies by range'
+
+  const values = brackets.map((bracket) =>
+    asPercent
+      ? employer
+        ? bracket.employer_rate_percent
+        : bracket.employee_rate_percent
+      : employer
+        ? bracket.employer_amount
+        : bracket.employee_amount
+  )
+  const format = asPercent ? percent : peso
+  const low = Math.min(...values)
+  const high = Math.max(...values)
+
+  return low === high ? format(low) : `${format(low)} – ${format(high)}`
+}
