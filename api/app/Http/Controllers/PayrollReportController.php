@@ -6,7 +6,6 @@ use App\Auth\StudentPortalUser;
 use App\Models\PayrollDeductionType;
 use App\Models\PayrollPeriod;
 use App\Models\Payslip;
-use App\Models\PayslipDeduction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -66,12 +65,12 @@ class PayrollReportController extends Controller
             // member from being counted twice against the same deduction.
             $byKey = [];
             foreach ($payslip->deductions as $deduction) {
-                $key = $this->lineKey($deduction);
+                $key = $deduction->groupingKey();
 
                 if (! isset($lines[$key])) {
                     $lines[$key] = [
                         'key' => $key,
-                        'name' => $deduction->name,
+                        'name' => $deduction->groupingLabel(),
                         // Ad-hoc lines (no catalog type) trail behind the catalog ones.
                         'position' => $deduction->deduction_type_id !== null
                             ? ($catalogPosition[$deduction->deduction_type_id] ?? 9998)
@@ -146,15 +145,6 @@ class PayrollReportController extends Controller
                 'deductions' => $deductions,
             ],
         ]);
-    }
-
-    /**
-     * Which report row a deduction line belongs to. Lines off the same catalog
-     * type share a row; ad-hoc lines group by name.
-     */
-    private function lineKey(PayslipDeduction $deduction): string
-    {
-        return $deduction->deduction_type_id ?: 'name:'.mb_strtolower(trim($deduction->name));
     }
 
     private function resolveInstitutionId(Request $request): ?string

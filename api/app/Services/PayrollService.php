@@ -13,6 +13,7 @@ use App\Models\PayslipDay;
 use App\Models\PayslipDeduction;
 use App\Models\StaffAttendanceRequest;
 use App\Models\StaffCalendarEvent;
+use App\Models\StaffLoanInstallment;
 use App\Models\StaffScheduleAssignment;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\DB;
 
 class PayrollService
 {
+    public function __construct(private readonly StaffLoanService $loans) {}
+
     /**
      * Punches are stored as local wall-clock times, and config/app.php pins the
      * application to UTC — so "today" for payroll has to be asked for in the
@@ -88,6 +91,12 @@ class PayrollService
             ->orderBy('name')
             ->get();
 
+        // Approved staff loans falling due by the end of this period. Unlike a
+        // catalog deduction these run out: each one is a numbered installment
+        // off a schedule, and after the last one the loan stops taking money by
+        // itself.
+        $loanInstallments = $this->loans->dueForPeriod($institutionId, $userIds, $period);
+
         $calendarEntries = StaffCalendarEvent::where('institution_id', $institutionId)
             ->whereBetween('event_date', [$from->toDateString(), $to->toDateString()])
             ->get();
@@ -128,7 +137,7 @@ class PayrollService
         // generation crossing midnight cannot price two payslips differently.
         $assumeFrom = $this->assumeFrom();
 
-        DB::transaction(function () use ($period, $compensations, $deductionTypes, $assignments, $punches, $holidayDates, $dayPolicies, $staffExceptions, $lateRate, $undertimeRate, $defaultOvertimeRate, $assumeFrom, &$generated) {
+        DB::transaction(function () use ($period, $compensations, $deductionTypes, $loanInstallments, $assignments, $punches, $holidayDates, $dayPolicies, $staffExceptions, $lateRate, $undertimeRate, $defaultOvertimeRate, $assumeFrom, &$generated) {
             $period->payslips()->delete();
 
             foreach ($compensations as $compensation) {
@@ -138,6 +147,7 @@ class PayrollService
                     $period,
                     $compensation,
                     $deductionTypes,
+                    $loanInstallments->get($compensation->user_id) ?? collect(),
                     $assignments->get($compensation->user_id),
                     $punches[$compensation->user_id] ?? [],
                     $holidayDates,
@@ -351,6 +361,7 @@ class PayrollService
 
     /**
      * @param  \Illuminate\Support\Collection<int, PayrollDeductionType>  $deductionTypes  the institution's active catalog
+     * @param  \Illuminate\Support\Collection<int, StaffLoanInstallment>  $loanInstallments  this staff member's loan collections falling due
      * @param  array<string, array>  $dayPolicies  institution-wide policy keyed by Y-m-d
      * @param  array<string, array>  $userExceptions  this staff member's approved exceptions keyed by Y-m-d
      */
@@ -358,6 +369,7 @@ class PayrollService
         PayrollPeriod $period,
         PayrollCompensation $compensation,
         \Illuminate\Support\Collection $deductionTypes,
+        \Illuminate\Support\Collection $loanInstallments,
         ?StaffScheduleAssignment $assignment,
         array $userPunches,
         \Illuminate\Support\Collection $holidayDates,
@@ -515,9 +527,56 @@ class PayrollService
             $payslip->deductions()->create($line);
         }
 
+        foreach ($this->loanLines($loanInstallments) as $line) {
+            $payslip->deductions()->create($line);
+        }
+
         $this->recomputeTotals($payslip);
 
         return $payslip;
+    }
+
+    /**
+     * The loan collections falling due on this payslip, as deduction lines.
+     *
+     * One line per installment, named with the loan's reference and how far
+     * through the schedule it is — "Loan LN-0007 (3/12)". That name is a
+     * snapshot like every other deduction name, so a payslip reprinted after
+     * the loan has been paid off and archived still says what it was for.
+     *
+     * Two installments of the same loan can land together when a payroll run
+     * was skipped. They stay as two lines rather than one summed one, because a
+     * staff member seeing double the usual figure is owed the reason.
+     *
+     * @param  \Illuminate\Support\Collection<int, StaffLoanInstallment>  $installments
+     * @return array<int, array<string, mixed>>
+     */
+    private function loanLines(\Illuminate\Support\Collection $installments): array
+    {
+        return $installments->map(fn (StaffLoanInstallment $installment) => [
+            'deduction_type_id' => null,
+            'staff_loan_id' => $installment->staff_loan_id,
+            'staff_loan_installment_id' => $installment->id,
+            'name' => sprintf(
+                'Loan %s (%d/%d)',
+                $installment->loan->reference_no,
+                $installment->sequence,
+                $installment->loan->term_months
+            ),
+            // A loan installment is a flat peso figure for the period: the
+            // schedule already decided it, and no salary re-pricing may move it.
+            'calculation_type' => PayrollDeductionType::CALC_FIXED,
+            'amount' => (float) $installment->amount,
+            'rate_percent' => 0,
+            // The school is being repaid, not co-paying. Nothing under Other
+            // Benefits.
+            'employer_amount' => 0,
+            'employer_rate_percent' => 0,
+            'percent_basis' => null,
+            'basis_amount' => 0,
+            'bracket_min' => null,
+            'bracket_max' => null,
+        ])->values()->all();
     }
 
     /**

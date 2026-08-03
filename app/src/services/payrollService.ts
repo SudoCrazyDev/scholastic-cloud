@@ -16,6 +16,12 @@ import type {
   SavePayrollCompensationData,
   SavePayrollDeductionTypeData,
   SavePayslipTemplateData,
+  SaveStaffLoanData,
+  StaffLoan,
+  StaffLoanBorrower,
+  StaffLoanListResponse,
+  StaffLoanQuote,
+  StaffLoanTerms,
   UpdatePayslipData,
   UpdatePayslipDayData,
 } from '../types'
@@ -183,6 +189,74 @@ class PayrollService {
       `/payslips/${payslipId}/days/${dayId}`,
       payload
     )
+    return response.data
+  }
+
+  // --- Staff loans ---
+
+  async getStaffLoans(params?: { status?: string; search?: string; user_id?: string }) {
+    const query = new URLSearchParams()
+    if (params?.status) query.append('status', params.status)
+    if (params?.search) query.append('search', params.search)
+    if (params?.user_id) query.append('user_id', params.user_id)
+    const url = `/staff-loans${query.toString() ? `?${query.toString()}` : ''}`
+    const response = await api.get<StaffLoanListResponse>(url)
+    return response.data
+  }
+
+  // Staff payroll already knows a rate for — the only ones a loan can be
+  // collected off.
+  async getStaffLoanBorrowers() {
+    const response = await api.get<ApiResponse<StaffLoanBorrower[]>>('/staff-loans/borrowers')
+    return response.data
+  }
+
+  // Price a set of terms without saving. The form previews the same arithmetic
+  // locally as it is typed; this is the authoritative answer.
+  async quoteStaffLoan(payload: StaffLoanTerms) {
+    const response = await api.post<ApiResponse<StaffLoanQuote>>('/staff-loans/quote', payload)
+    return response.data
+  }
+
+  async getStaffLoan(id: string) {
+    const response = await api.get<ApiResponse<StaffLoan>>(`/staff-loans/${id}`)
+    return response.data
+  }
+
+  async createStaffLoan(payload: SaveStaffLoanData) {
+    const response = await api.post<ApiResponse<StaffLoan>>('/staff-loans', payload)
+    return response.data
+  }
+
+  async updateStaffLoan(id: string, payload: SaveStaffLoanData) {
+    const response = await api.put<ApiResponse<StaffLoan>>(`/staff-loans/${id}`, payload)
+    return response.data
+  }
+
+  async deleteStaffLoan(id: string) {
+    const response = await api.delete<ApiResponse<null>>(`/staff-loans/${id}`)
+    return response.data
+  }
+
+  async approveStaffLoan(id: string, reviewNote?: string) {
+    const response = await api.post<ApiResponse<StaffLoan>>(`/staff-loans/${id}/approve`, {
+      review_note: reviewNote || null,
+    })
+    return response.data
+  }
+
+  async rejectStaffLoan(id: string, reviewNote: string) {
+    const response = await api.post<ApiResponse<StaffLoan>>(`/staff-loans/${id}/reject`, {
+      review_note: reviewNote,
+    })
+    return response.data
+  }
+
+  // Stops an approved loan. What has already come off payslips stays off.
+  async cancelStaffLoan(id: string, reviewNote: string) {
+    const response = await api.post<ApiResponse<StaffLoan>>(`/staff-loans/${id}/cancel`, {
+      review_note: reviewNote,
+    })
     return response.data
   }
 }

@@ -124,11 +124,11 @@ class PayslipController extends Controller
         $lines = [];
         foreach ($payslips as $payslip) {
             foreach ($payslip->deductions as $deduction) {
-                $key = $this->sheetLineKey($deduction);
+                $key = $deduction->groupingKey();
                 if (! isset($lines[$key])) {
                     $lines[$key] = [
                         'key' => $key,
-                        'label' => $deduction->name,
+                        'label' => $deduction->groupingLabel(),
                         // Ad-hoc lines (no catalog type) trail behind the catalog ones.
                         'position' => $deduction->deduction_type_id !== null
                             ? ($catalogPosition[$deduction->deduction_type_id] ?? 9998)
@@ -158,7 +158,7 @@ class PayslipController extends Controller
             // same ad-hoc name) — the sheet shows their sum.
             $byKey = [];
             foreach ($payslip->deductions as $deduction) {
-                $key = $this->sheetLineKey($deduction);
+                $key = $deduction->groupingKey();
                 $byKey[$key] = [
                     'amount' => ($byKey[$key]['amount'] ?? 0) + (float) $deduction->amount,
                     'employer_amount' => ($byKey[$key]['employer_amount'] ?? 0) + (float) $deduction->employer_amount,
@@ -217,15 +217,6 @@ class PayslipController extends Controller
                 'rows' => $rows,
             ],
         ]);
-    }
-
-    /**
-     * Which sheet column a deduction line belongs to. Lines off the same
-     * catalog type share a column; ad-hoc lines group by name.
-     */
-    private function sheetLineKey(PayslipDeduction $deduction): string
-    {
-        return $deduction->deduction_type_id ?: 'name:'.mb_strtolower(trim($deduction->name));
     }
 
     /**
@@ -440,8 +431,13 @@ class PayslipController extends Controller
             }
 
             if ($deductions !== null) {
-                // Deduction lines are fully replaced on every save.
-                $payslip->deductions()->delete();
+                // Deduction lines are fully replaced on every save — except the
+                // loan collections. Those are not the payroll manager's to type
+                // over: each one is a numbered installment off an approved
+                // schedule, and a save that dropped them would quietly stop
+                // collecting a loan the school signed off on. The editor
+                // renders them read-only and never sends them back.
+                $payslip->deductions()->whereNull('staff_loan_installment_id')->delete();
                 foreach ($deductions as $deduction) {
                     $calculationType = $deduction['calculation_type'] ?? PayrollDeductionType::CALC_FIXED;
                     $isPercentage = $calculationType === PayrollDeductionType::CALC_PERCENTAGE;
@@ -625,6 +621,9 @@ class PayslipController extends Controller
             'deductions' => $payslip->deductions->map(fn (PayslipDeduction $deduction) => [
                 'id' => $deduction->id,
                 'deduction_type_id' => $deduction->deduction_type_id,
+                // Set on a loan collection. The editor locks the row: the
+                // figure came off an approved schedule, not off this payslip.
+                'staff_loan_id' => $deduction->staff_loan_id,
                 'name' => $deduction->name,
                 'calculation_type' => $deduction->calculation_type,
                 'amount' => (float) $deduction->amount,

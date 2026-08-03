@@ -2777,6 +2777,9 @@ export interface PayslipAttendanceCharges {
 export interface PayslipDeduction {
   id?: string;
   deduction_type_id: string | null;
+  // Set when the line is one installment of an approved staff loan. Those
+  // figures come off the loan's schedule, so the payslip editor locks them.
+  staff_loan_id?: string | null;
   name: string;
   calculation_type: PayrollDeductionCalculationType;
   amount: number;
@@ -2813,6 +2816,145 @@ export interface UpdatePayslipDayData {
   time_in: string | null;
   time_out: string | null;
   overtime_minutes?: number; // approved OT minutes for the day
+}
+
+// =====================
+// Staff loans
+// =====================
+
+// How interest is charged on a staff loan.
+// 'none'        — the school is lending, not earning.
+// 'add_on'      — flat interest on the whole principal for the whole term, then
+//                 split evenly. Every installment is identical.
+// 'diminishing' — interest on what is still owed, with a level monthly payment.
+//                 The principal/interest split shifts month to month.
+export type StaffLoanInterestMethod = 'none' | 'add_on' | 'diminishing';
+
+// Whether the quoted rate is per month or per year.
+export type StaffLoanRatePeriod = 'monthly' | 'annual';
+
+export type StaffLoanStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'completed';
+
+export type StaffLoanInstallmentStatus = 'scheduled' | 'collected' | 'cancelled';
+
+// One row of the amortization schedule. Written out in full when the loan is
+// priced, so a rate change later can never rewrite what was already collected.
+export interface StaffLoanInstallment {
+  id: string;
+  sequence: number;
+  due_date: string;
+  amount: number;
+  principal_component: number;
+  interest_component: number;
+  // Principal still owed before and after this collection.
+  opening_balance: number;
+  closing_balance: number;
+  status: StaffLoanInstallmentStatus;
+  collected_amount: number;
+  collected_at: string | null;
+  payslip_id: string | null;
+}
+
+// One line of the loan's history — who did what, and when.
+export interface StaffLoanEvent {
+  id: string;
+  action:
+    | 'created'
+    | 'updated'
+    | 'approved'
+    | 'rejected'
+    | 'cancelled'
+    | 'collected'
+    | 'released'
+    | 'completed';
+  actor_name: string | null;
+  amount: number | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface StaffLoan {
+  id: string;
+  reference_no: string;
+  user_id: string;
+  staff_name: string | null;
+  purpose: string | null;
+  principal_amount: number;
+  interest_method: StaffLoanInterestMethod;
+  interest_rate_percent: number;
+  rate_period: StaffLoanRatePeriod;
+  term_months: number;
+  interest_amount: number;
+  total_payable: number;
+  // The level per-month figure. The last installment can differ by a centavo.
+  installment_amount: number;
+  amount_paid: number;
+  balance: number;
+  installments_paid: number;
+  first_deduction_date: string;
+  next_due_date: string | null;
+  status: StaffLoanStatus;
+  // Who encoded the deduction, and who signed it off.
+  requested_by: string | null;
+  requested_by_name: string | null;
+  requested_at: string | null;
+  reviewed_by: string | null;
+  reviewed_by_name: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  completed_at: string | null;
+  // Detail view only.
+  installments?: StaffLoanInstallment[];
+  events?: StaffLoanEvent[];
+}
+
+// A staff member a loan can be written against: payroll already knows a rate
+// for them, so a payslip exists to collect it off.
+export interface StaffLoanBorrower {
+  user_id: string;
+  staff_name: string | null;
+  email: string;
+  daily_rate: number;
+  outstanding_balance: number;
+}
+
+// The terms half of a loan — what the quote endpoint prices.
+export interface StaffLoanTerms {
+  principal_amount: number;
+  interest_method: StaffLoanInterestMethod;
+  interest_rate_percent: number;
+  rate_period: StaffLoanRatePeriod;
+  term_months: number;
+  first_deduction_date: string;
+}
+
+export interface SaveStaffLoanData extends StaffLoanTerms {
+  user_id: string;
+  purpose?: string | null;
+}
+
+// What a set of terms works out to, before anything is saved.
+export interface StaffLoanQuote {
+  principal: number;
+  interest: number;
+  total: number;
+  installment: number;
+  installments: {
+    sequence: number;
+    due_date: string;
+    amount: number;
+    principal_component: number;
+    interest_component: number;
+    opening_balance: number;
+    closing_balance: number;
+  }[];
+}
+
+export interface StaffLoanListResponse {
+  success: boolean;
+  message?: string;
+  data: StaffLoan[];
+  meta?: { can_approve: boolean; can_manage: boolean };
 }
 
 // =====================

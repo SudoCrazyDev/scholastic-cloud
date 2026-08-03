@@ -224,6 +224,10 @@ const PeriodsTab: React.FC = () => {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['payroll-periods'] })
     queryClient.invalidateQueries({ queryKey: ['payroll-payslips'] })
+    // Finalising a period collects loan installments and reopening it gives
+    // them back, so the balances on the Loans tab moved with this.
+    queryClient.invalidateQueries({ queryKey: ['staff-loans'] })
+    queryClient.invalidateQueries({ queryKey: ['staff-loan'] })
   }
 
   const saveMutation = useMutation({

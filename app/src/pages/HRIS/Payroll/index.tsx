@@ -5,18 +5,20 @@ import {
   CalendarDaysIcon,
   ChartBarSquareIcon,
   Cog6ToothIcon,
+  HandRaisedIcon,
   PaintBrushIcon,
   ReceiptPercentIcon,
 } from '@heroicons/react/24/outline'
 import { Banknote } from 'lucide-react'
 import CompensationTab from './CompensationTab'
 import DeductionTypesTab from './DeductionTypesTab'
+import LoansTab from './LoansTab'
 import PayslipDesignerTab from './PayslipDesignerTab'
 import PeriodsTab from './PeriodsTab'
 import ReportsTab from './ReportsTab'
 import SettingsTab from './SettingsTab'
 
-type Tab = 'periods' | 'reports' | 'rates' | 'deductions' | 'designer' | 'settings'
+type Tab = 'periods' | 'reports' | 'rates' | 'deductions' | 'loans' | 'designer' | 'settings'
 
 const Payroll: React.FC = () => {
   const [tab, setTab] = useState<Tab>('periods')
@@ -65,6 +67,10 @@ const Payroll: React.FC = () => {
           <ReceiptPercentIcon className="h-4 w-4" />
           Deduction Types
         </button>
+        <button type="button" onClick={() => setTab('loans')} className={tabClass(tab === 'loans')}>
+          <HandRaisedIcon className="h-4 w-4" />
+          Staff Loans
+        </button>
         <button
           type="button"
           onClick={() => setTab('designer')}
@@ -91,6 +97,8 @@ const Payroll: React.FC = () => {
         <CompensationTab />
       ) : tab === 'deductions' ? (
         <DeductionTypesTab />
+      ) : tab === 'loans' ? (
+        <LoansTab />
       ) : tab === 'designer' ? (
         <PayslipDesignerTab />
       ) : (

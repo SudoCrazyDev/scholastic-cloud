@@ -138,13 +138,15 @@ class SystemRolePermissions
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
-            'consolidated-grades.approve', 'payroll.release', 'tala.configure',
+            'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
+            'tala.configure',
         ],
         'principal' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
-            'consolidated-grades.approve', 'payroll.release', 'tala.configure',
+            'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
+            'tala.configure',
         ],
         // Finance both raises and reviews void requests, but does not skip the
         // queue — a void it raises from the ledger still becomes a pending

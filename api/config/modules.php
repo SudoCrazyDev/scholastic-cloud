@@ -248,11 +248,15 @@ return [
                 ],
                 'payroll' => [
                     'label' => 'Payroll',
-                    'description' => 'Payroll periods, compensation, deductions and payslips.',
+                    'description' => 'Payroll periods, compensation, deductions, loans and payslips.',
                     'special' => [
                         'release' => [
                             'label' => 'Release payslips',
                             'description' => 'Finalise a payroll period and publish payslips to staff.',
+                        ],
+                        'approve-loan' => [
+                            'label' => 'Approve staff loans',
+                            'description' => 'Sign off a staff loan so it starts coming off payroll, or call one back.',
                         ],
                     ],
                 ],

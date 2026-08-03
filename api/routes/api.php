@@ -600,6 +600,17 @@ Route::middleware('auth.token')->group(function () {
     Route::put('payslips/{id}', [\App\Http\Controllers\PayslipController::class, 'update'])->middleware('module:payroll,manage');
     Route::put('payslips/{id}/days/{dayId}', [\App\Http\Controllers\PayslipController::class, 'updateDay'])->middleware('module:payroll,manage');
 
+    // HRIS — Staff loans. Encoding one is ordinary payroll work; signing it off
+    // so it starts coming out of a salary is its own ability.
+    Route::get('staff-loans/borrowers', [\App\Http\Controllers\StaffLoanController::class, 'borrowers'])->middleware('module:payroll,view');
+    Route::post('staff-loans/quote', [\App\Http\Controllers\StaffLoanController::class, 'quote'])->middleware('module:payroll,manage');
+    Route::post('staff-loans/{id}/approve', [\App\Http\Controllers\StaffLoanController::class, 'approve'])->middleware('module:payroll,approve-loan');
+    Route::post('staff-loans/{id}/reject', [\App\Http\Controllers\StaffLoanController::class, 'reject'])->middleware('module:payroll,approve-loan');
+    Route::post('staff-loans/{id}/cancel', [\App\Http\Controllers\StaffLoanController::class, 'cancel'])->middleware('module:payroll,approve-loan');
+    Route::apiResource('staff-loans', \App\Http\Controllers\StaffLoanController::class)
+        ->only(['index', 'store', 'show', 'update', 'destroy'])
+        ->middleware('module:payroll,view');
+
     // HRIS — Biometric devices
     Route::get('biometric/devices', [BiometricDeviceController::class, 'index'])->middleware('module:biometric-devices,view');
     Route::post('biometric/devices', [BiometricDeviceController::class, 'store'])->middleware('module:biometric-devices,manage');

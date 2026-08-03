@@ -65,6 +65,9 @@ interface RatesForm {
 interface DeductionRow {
   key: string
   deduction_type_id: string | null
+  // Set on a loan collection. The row is read-only and never sent back: the
+  // figure came off an approved schedule, not off this payslip.
+  staff_loan_id: string | null
   name: string
   calculation_type: PayrollDeductionCalculationType
   // Pesos on a fixed row, percent on a percentage one — the input swaps with
@@ -91,6 +94,7 @@ const deductionsFromPayslip = (payslip: Payslip): DeductionRow[] =>
     return {
       key: deduction.id || `row-${index}`,
       deduction_type_id: deduction.deduction_type_id,
+      staff_loan_id: deduction.staff_loan_id ?? null,
       name: deduction.name,
       calculation_type: deduction.calculation_type,
       // A bracket row shows the peso the table produced, but does not let it
@@ -194,6 +198,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
         {
           key: `new-${Date.now()}-${prev.length}`,
           deduction_type_id: null,
+          staff_loan_id: null,
           name: '',
           calculation_type: 'fixed',
           amount: '',
@@ -215,6 +220,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
       {
         key: `new-${Date.now()}-${prev.length}`,
         deduction_type_id: type.id,
+        staff_loan_id: null,
         name: type.name,
         calculation_type: type.calculation_type,
         // A bracket row has nothing to prefill — the server looks the salary
@@ -240,7 +246,10 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
       daily_rate: numberOrZero(form.daily_rate),
       hourly_rate: numberOrZero(form.hourly_rate),
       deductions: deductionRows
-        .filter((row) => row.name.trim() !== '')
+        // Loan collections are left out entirely. They belong to an approved
+        // schedule, and the server keeps them on the payslip regardless of what
+        // this save sends — sending them back would only invite a mismatch.
+        .filter((row) => row.staff_loan_id === null && row.name.trim() !== '')
         .map((row) => {
           const percentage = row.calculation_type === 'percentage'
           const bracket = row.calculation_type === 'bracket'
@@ -573,11 +582,16 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     // The table decides a bracket row, so neither figure on it
                     // is typed here — remove the line to override it.
                     const bracket = row.calculation_type === 'bracket'
+                    // A loan installment is off an approved schedule. It cannot
+                    // be edited, renamed or removed here: the way to stop it is
+                    // to cancel the loan under Staff Loans, which is somebody
+                    // else's decision and leaves a record.
+                    const loan = row.staff_loan_id !== null
                     // A dash means the school pays no counterpart at all. A
                     // bracket row does have one — it just isn't typed here —
                     // so it keeps the input and shows the figure, greyed.
-                    const employerShared = rowType ? rowType.has_employer_share : true
-                    const employerDisabled = readOnly || bracket || !employerShared
+                    const employerShared = rowType ? rowType.has_employer_share : !loan
+                    const employerDisabled = readOnly || bracket || loan || !employerShared
                     // Percent and peso share the two inputs; only the step and
                     // placeholder differ.
                     const figureProps = percentage
@@ -591,7 +605,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             size="sm"
                             value={row.name}
                             placeholder="Deduction name"
-                            disabled={readOnly || row.deduction_type_id !== null}
+                            disabled={readOnly || loan || row.deduction_type_id !== null}
                             onChange={(e) =>
                               setDeductionRows((prev) =>
                                 prev.map((r, i) => (i === index ? { ...r, name: e.target.value } : r))
@@ -603,7 +617,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             min="0"
                             size="sm"
                             value={row.amount}
-                            disabled={readOnly || bracket}
+                            disabled={readOnly || bracket || loan}
                             onChange={(e) =>
                               setDeductionRows((prev) =>
                                 prev.map((r, i) => (i === index ? { ...r, amount: e.target.value } : r))
@@ -630,7 +644,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                               {...figureProps}
                             />
                           )}
-                          {!readOnly ? (
+                          {!readOnly && !loan ? (
                             <button
                               type="button"
                               title="Remove deduction"
@@ -645,6 +659,12 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                             <span />
                           )}
                         </div>
+                        {loan && (
+                          <p className="mt-0.5 px-0.5 text-[11px] text-gray-400">
+                            One installment of an approved staff loan — cancel the loan under Staff
+                            Loans to stop it.
+                          </p>
+                        )}
                         {percentage && (
                           <p className="mt-0.5 px-0.5 text-[11px] text-gray-400">
                             {percent(numberOrZero(row.amount))} of{' '}

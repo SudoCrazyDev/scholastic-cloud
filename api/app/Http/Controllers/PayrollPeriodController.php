@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
 use App\Models\PayrollPeriod;
+use App\Models\User;
 use App\Services\PayrollService;
+use App\Services\StaffLoanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -248,7 +250,7 @@ class PayrollPeriodController extends Controller
         );
     }
 
-    public function finalize(Request $request, string $id): JsonResponse
+    public function finalize(Request $request, string $id, StaffLoanService $loans): JsonResponse
     {
         if (! $this->isPayrollManager($request)) {
             return $this->payrollForbidden();
@@ -280,6 +282,12 @@ class PayrollPeriodController extends Controller
             'paid_on' => $validated['paid_on'] ?? now()->toDateString(),
         ]);
 
+        // Releasing the period is the moment the money actually leaves the
+        // salary, so it is the moment a loan installment counts as collected.
+        // A payslip in a draft period has paid nothing down yet — it can still
+        // be regenerated away.
+        $loans->collectForPeriod($period, $this->loanActor($request));
+
         return response()->json([
             'success' => true,
             'message' => 'Payroll period finalized',
@@ -287,7 +295,7 @@ class PayrollPeriodController extends Controller
         ]);
     }
 
-    public function reopen(Request $request, string $id): JsonResponse
+    public function reopen(Request $request, string $id, StaffLoanService $loans): JsonResponse
     {
         if (! $this->isPayrollManager($request)) {
             return $this->payrollForbidden();
@@ -308,11 +316,28 @@ class PayrollPeriodController extends Controller
             'paid_on' => null,
         ]);
 
+        // The payout is being taken back, so the loan balances it moved go back
+        // with it — otherwise a period reopened and regenerated would collect
+        // the same installment twice.
+        $loans->releaseForPeriod($period, $this->loanActor($request));
+
         return response()->json([
             'success' => true,
             'message' => 'Payroll period reopened for editing',
             'data' => $this->serialize($period->loadCount('payslips')),
         ]);
+    }
+
+    /**
+     * Whose name goes against a loan collection. A student cannot reach payroll
+     * at all, but the loan trail is typed to a staff user, so the narrowing is
+     * done rather than trusted.
+     */
+    private function loanActor(Request $request): ?User
+    {
+        $user = $request->user();
+
+        return $user instanceof User ? $user : null;
     }
 
     private function validatePayload(Request $request, string $institutionId, ?string $ignoreId = null): array
