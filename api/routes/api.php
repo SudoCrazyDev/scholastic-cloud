@@ -193,6 +193,9 @@ Route::middleware('auth.token')->group(function () {
     // write side is gated.
     Route::get('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'show']);
     Route::put('institution-theme', [\App\Http\Controllers\InstitutionThemeController::class, 'update'])->middleware('module:settings,manage');
+    // Temporarily close the student portal for the caller's own institution.
+    Route::get('student-portal-access', [\App\Http\Controllers\StudentPortalAccessController::class, 'show'])->middleware('module:settings,view');
+    Route::put('student-portal-access', [\App\Http\Controllers\StudentPortalAccessController::class, 'update'])->middleware('module:settings,manage');
     Route::get('institutions/{id}/academic-years', [InstitutionController::class, 'getAcademicYears']);
     Route::put('institutions/{id}/academic-years/grading-periods', [InstitutionController::class, 'updateAcademicYearGradingPeriods'])->middleware('module:settings,manage');
     // Resolved quarter-vs-term structure for the signed-in user's institution.

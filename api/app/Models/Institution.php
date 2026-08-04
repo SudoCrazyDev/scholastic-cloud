@@ -14,6 +14,9 @@ class Institution extends Model
 {
     use HasFactory, HasUuids;
 
+    /** Shown to students while the portal is closed and no notice was written. */
+    public const STUDENT_PORTAL_DISABLED_MESSAGE = 'Student access is temporarily unavailable. Please contact your school.';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -32,6 +35,8 @@ class Institution extends Model
         'default_department_id',
         'current_academic_year',
         'admission_form_open',
+        'student_portal_enabled',
+        'student_portal_disabled_message',
         'late_penalty_per_minute',
         'undertime_penalty_per_minute',
         'overtime_rate_per_minute',
@@ -46,6 +51,7 @@ class Institution extends Model
         'subscription_id' => 'string',
         'theme' => 'array',
         'admission_form_open' => 'boolean',
+        'student_portal_enabled' => 'boolean',
         'late_penalty_per_minute' => 'decimal:2',
         'undertime_penalty_per_minute' => 'decimal:2',
         'overtime_rate_per_minute' => 'decimal:2',
@@ -67,6 +73,18 @@ class Institution extends Model
 
         // Legacy: full URL (e.g. /storage/...) or existing public URL
         return $value;
+    }
+
+    /**
+     * What a student is told while this school's portal is closed. A school can
+     * word it themselves ("Portal reopens Monday after report cards"); blank
+     * falls back to the generic notice.
+     */
+    public function studentPortalNotice(): string
+    {
+        $custom = trim((string) $this->student_portal_disabled_message);
+
+        return $custom !== '' ? $custom : self::STUDENT_PORTAL_DISABLED_MESSAGE;
     }
 
     /**

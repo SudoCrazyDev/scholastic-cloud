@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Student;
 use App\Models\StudentAuth;
 use App\Support\GradingPeriods;
+use App\Support\StudentPortalAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -78,6 +79,13 @@ class AuthController extends Controller
                 return response()->json([
                     'message' => 'Student is not assigned to any institution. Please contact your school.',
                 ], 403);
+            }
+
+            // The school may have closed the portal for everyone — exam week,
+            // report cards being finalized. Credentials stay valid; only the way
+            // in is shut, and it reopens with a flick of the same switch.
+            if ($portalNotice = StudentPortalAccess::blockedNoticeFor($student)) {
+                return response()->json(['message' => $portalNotice], 403);
             }
 
             $studentAuth->update([

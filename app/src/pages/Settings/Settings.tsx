@@ -13,6 +13,7 @@ import { Alert } from '../../components/alert'
 import { Building2, CalendarDays } from 'lucide-react'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import AppearanceSettings from './components/AppearanceSettings'
+import StudentAccessSettings from './components/StudentAccessSettings'
 import type { GradingPeriodType, UpdateInstitutionData } from '../../types'
 
 const GRADING_PERIOD_OPTIONS: { value: GradingPeriodType; label: string }[] = [
@@ -452,6 +453,9 @@ const Settings: React.FC = () => {
 
       {/* Appearance & Branding (institution admins) */}
       {institution && <AppearanceSettings />}
+
+      {/* Student portal access */}
+      {institution && <StudentAccessSettings />}
 
       {/* Form */}
       {institution && (
