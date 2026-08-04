@@ -9,7 +9,27 @@ interface CollectionsViewProps {
   defaultAcademicYear: string
 }
 
+// The month/quarter summary above the report is parked for now: only the
+// Detailed Collection Report is wanted on this page. The summary is kept whole
+// in CollectionsSummary below — flip this to bring it back.
+const SHOW_COLLECTIONS_SUMMARY = false
+
 const CollectionsView: React.FC<CollectionsViewProps> = ({
+  academicYearOptions,
+  defaultAcademicYear,
+}) => (
+  <div className="space-y-6">
+    {SHOW_COLLECTIONS_SUMMARY && (
+      <CollectionsSummary
+        academicYearOptions={academicYearOptions}
+        defaultAcademicYear={defaultAcademicYear}
+      />
+    )}
+    <CollectionReportView />
+  </div>
+)
+
+const CollectionsSummary: React.FC<CollectionsViewProps> = ({
   academicYearOptions,
   defaultAcademicYear,
 }) => {
@@ -214,8 +234,6 @@ const CollectionsView: React.FC<CollectionsViewProps> = ({
           </div>
         </>
       )}
-
-      <CollectionReportView />
     </div>
   )
 }
