@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
-import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { institutionService } from '../../services/institutionService'
 import { departmentService } from '../../services/departmentService'
 import { Input } from '../../components/input'
@@ -22,11 +20,13 @@ const GRADING_PERIOD_OPTIONS: { value: GradingPeriodType; label: string }[] = [
   { value: 'term', label: '3 Terms' },
 ]
 
+// Access is the `settings` module permission, checked by the route's
+// RequireModule guard and again by the API. This page holds no gate of its own:
+// the list of role slugs that used to sit here turned away every role a school
+// built itself, however its access was set.
 const Settings: React.FC = () => {
   const { user, refreshProfile } = useAuth()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { hasAccess } = useRoleAccess(['principal', 'institution-administrator'])
   const [academicYearInput, setAcademicYearInput] = useState('')
   const [academicYearError, setAcademicYearError] = useState('')
   // Structure applied when setting a year that does not exist yet. DepEd's newer
@@ -58,7 +58,7 @@ const Settings: React.FC = () => {
   } = useQuery({
     queryKey: ['institution', institutionId],
     queryFn: () => institutionService.getInstitution(institutionId!),
-    enabled: !!institutionId && hasAccess,
+    enabled: !!institutionId,
   })
 
   const institution = institutionResponse?.data
@@ -91,7 +91,7 @@ const Settings: React.FC = () => {
   const { data: academicYears = [], refetch: refetchAcademicYears } = useQuery({
     queryKey: ['institution-academic-years', institutionId],
     queryFn: () => institutionService.getAcademicYears(institutionId!),
-    enabled: !!institutionId && hasAccess,
+    enabled: !!institutionId,
   })
 
   // Academic year mutation. The grading period structure is only sent when the
@@ -129,13 +129,6 @@ const Settings: React.FC = () => {
       toast.error(msg)
     },
   })
-
-  // Redirect if user doesn't have access
-  useEffect(() => {
-    if (!hasAccess) {
-      navigate('/dashboard')
-    }
-  }, [hasAccess, navigate])
 
   // Populate form when institution is loaded
   useEffect(() => {
@@ -252,10 +245,6 @@ const Settings: React.FC = () => {
       submitData.logo = formData.logo
     }
     updateMutation.mutate(submitData)
-  }
-
-  if (!hasAccess) {
-    return null
   }
 
   if (loading) {

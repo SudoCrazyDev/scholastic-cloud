@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { useRoleAccess } from '../../hooks/useRoleAccess';
 import { useClassSections } from '../../hooks/useClassSections';
 import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods';
 import { ConsolidatedGradesHeader, ConsolidatedGradesGrid } from './components';
-import { Navigate } from 'react-router-dom';
 
+// Access is the `consolidated-grades` module permission, checked by the route's
+// RequireModule guard and again by the API. This page holds no gate of its own:
+// the list of role slugs that used to sit here turned away every role a school
+// built itself, however its access was set.
 export default function ConsolidatedGrades() {
-  const { hasAccess } = useRoleAccess(['principal', 'curriculum-head', 'assistant-principal']);
   const [selectedQuarter, setSelectedQuarter] = useState('1');
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025-2026');
 
@@ -25,10 +26,6 @@ export default function ConsolidatedGrades() {
   const filteredSections = classSections.filter(section => 
     section.academic_year === selectedAcademicYear
   );
-
-  if (!hasAccess) {
-    return <Navigate to="/dashboard" replace />;
-  }
 
   const quarters = gradingPeriods.periods.map((period) => ({
     value: period.value,

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useRoleAccess } from '../../hooks/useRoleAccess';
 import { useClassSections } from '../../hooks/useClassSections';
 import { useGradeLevels } from '../../hooks/useGradeLevels';
 import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods';
@@ -12,17 +11,16 @@ import {
   type ProficiencyBySectionRow,
 } from '../../services/proficiencyService';
 import { Select } from '../../components/select';
-import { Navigate } from 'react-router-dom';
 import { TrendingUp, LayoutGrid, Layers, HelpCircle } from 'lucide-react';
-
-/** Roles that can access the Proficiency page. Add more slugs here if needed (e.g. 'subject-teacher', 'institution-administrator'). */
-const PROFICIENCY_ALLOWED_ROLES = ['principal', 'curriculum-head', 'assistant-principal', 'institution-administrator'];
 
 type ViewMode = 'by-grade' | 'by-section';
 
+// Access is the `proficiency` module permission, checked by the route's
+// RequireModule guard and again by the API. This page holds no gate of its own:
+// the list of role slugs that used to sit here turned away every role a school
+// built itself, however its access was set.
 export default function Proficiency() {
   const { isLoading: authLoading } = useAuth();
-  const { hasAccess } = useRoleAccess(PROFICIENCY_ALLOWED_ROLES);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025-2026');
   const [selectedGradeLevel, setSelectedGradeLevel] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('by-grade');
@@ -146,10 +144,6 @@ export default function Proficiency() {
       </div>
     );
   }
-  if (!hasAccess) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const academicYears = availableAcademicYears.length > 0
     ? availableAcademicYears
     : ['2025-2026', '2024-2025', '2023-2024'];

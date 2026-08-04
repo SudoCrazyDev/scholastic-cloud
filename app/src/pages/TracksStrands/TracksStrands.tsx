@@ -1,9 +1,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
-import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { trackService } from '../../services/trackService'
 import { strandService } from '../../services/strandService'
 import { Loader2, Plus, Pencil, Trash2, Route, Layers } from 'lucide-react'
@@ -13,10 +11,12 @@ import { TrackModal } from './TrackModal'
 import { StrandModal } from './StrandModal'
 import type { Track, Strand } from '../../types'
 
+// Access is the `tracks-strands` module permission, checked by the route's
+// RequireModule guard and again by the API. This page holds no gate of its own:
+// the list of role slugs that used to sit here turned away every role a school
+// built itself, however its access was set.
 const TracksStrands: React.FC = () => {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { hasAccess } = useRoleAccess(['principal', 'institution-administrator'])
 
   // Track state
   const [trackModalOpen, setTrackModalOpen] = useState(false)
@@ -30,22 +30,16 @@ const TracksStrands: React.FC = () => {
   const [deleteStrandTarget, setDeleteStrandTarget] = useState<{ id: string; title: string } | null>(null)
   const [isDeletingStrand, setIsDeletingStrand] = useState(false)
 
-  React.useEffect(() => {
-    if (!hasAccess) navigate('/dashboard')
-  }, [hasAccess, navigate])
-
   // Queries
   const { data: tracksResponse, isLoading: tracksLoading } = useQuery({
     queryKey: ['tracks'],
     queryFn: () => trackService.getTracks(),
-    enabled: hasAccess,
   })
   const tracks: Track[] = tracksResponse?.data ?? []
 
   const { data: strandsResponse, isLoading: strandsLoading } = useQuery({
     queryKey: ['strands'],
     queryFn: () => strandService.getStrands(),
-    enabled: hasAccess,
   })
   const strands: Strand[] = strandsResponse?.data ?? []
 
@@ -157,8 +151,6 @@ const TracksStrands: React.FC = () => {
       setIsDeletingStrand(false)
     }
   }
-
-  if (!hasAccess) return null
 
   const trackModalLoading = createTrack.isPending || updateTrack.isPending
   const strandModalLoading = createStrand.isPending || updateStrand.isPending

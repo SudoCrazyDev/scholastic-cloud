@@ -1,7 +1,5 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
-import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { useDisbursements } from '../../hooks/useDisbursements'
 import { Wallet, Tags, BarChart3 } from 'lucide-react'
 import { DisbursementsListTab } from './DisbursementsListTab'
@@ -14,22 +12,17 @@ const tabs = [
   { id: 'report', name: 'Reporting', icon: BarChart3 },
 ]
 
+/**
+ * Who may open this screen is decided by the `disbursements` module permission,
+ * enforced by the route's RequireModule guard and again by the API on every
+ * request. This page deliberately holds no gate of its own: the earlier check
+ * here listed role slugs, which turned away any role a school built itself —
+ * a custom "Finance Officer" granted Disbursements was bounced to the dashboard
+ * because its slug was not one of the four hard-coded names.
+ */
 const Disbursements: React.FC = () => {
-  const navigate = useNavigate()
-  const { hasAccess } = useRoleAccess([
-    'super-administrator',
-    'principal',
-    'institution-administrator',
-    'finance',
-  ])
   const dm = useDisbursements()
   const [activeTab, setActiveTab] = React.useState('list')
-
-  React.useEffect(() => {
-    if (!hasAccess) navigate('/dashboard')
-  }, [hasAccess, navigate])
-
-  if (!hasAccess) return null
 
   return (
     <motion.div

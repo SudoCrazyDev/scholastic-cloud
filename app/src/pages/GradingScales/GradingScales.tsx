@@ -1,7 +1,5 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
-import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { useGradingScales, useGradingScaleMutations } from '../../hooks/useGradingScales'
 import { Loader2, Plus, Pencil, Trash2, ListChecks } from 'lucide-react'
 import { Button } from '../../components/button'
@@ -9,19 +7,17 @@ import { GradingScaleModal } from './GradingScaleModal'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import type { GradingScale, CreateGradingScaleData } from '../../types'
 
+// Access is the `grading-scales` module permission, checked by the route's
+// RequireModule guard and again by the API. This page holds no gate of its own:
+// the list of role slugs that used to sit here turned away every role a school
+// built itself, however its access was set.
 const GradingScales: React.FC = () => {
-  const navigate = useNavigate()
-  const { hasAccess } = useRoleAccess(['super-administrator', 'principal', 'institution-administrator'])
   const { gradingScales, loading, error } = useGradingScales()
   const { createMutation, updateMutation, deleteMutation } = useGradingScaleMutations()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editing, setEditing] = useState<GradingScale | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
-
-  React.useEffect(() => {
-    if (!hasAccess) navigate('/dashboard')
-  }, [hasAccess, navigate])
 
   const handleCreate = () => {
     setEditing(null)
@@ -57,8 +53,6 @@ const GradingScales: React.FC = () => {
       // Error already toasted
     }
   }
-
-  if (!hasAccess) return null
 
   return (
     <motion.div

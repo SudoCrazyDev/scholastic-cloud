@@ -1,7 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Navigate } from 'react-router-dom'
-import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { useSchoolDays } from '../../hooks/useSchoolDays'
 import { useAuth } from '../../hooks/useAuth'
 import { useDepartments } from '../../hooks/useDepartments'
@@ -28,8 +26,11 @@ const ACADEMIC_MONTHS = [
   { value: 5, label: 'May' },
 ]
 
+// Access is `school-days.manage`, checked by the route's RequireModule guard and
+// again by the API. This page holds no gate of its own: the list of role slugs
+// that used to sit here turned away every role a school built itself, however
+// its access was set.
 const SchoolDays: React.FC = () => {
-  const { hasAccess } = useRoleAccess(['principal', 'institution-administrator'])
   const { user } = useAuth()
   const currentYear = new Date().getFullYear()
 
@@ -117,10 +118,6 @@ const SchoolDays: React.FC = () => {
       // Error is handled in the hook
     }
   }, [schoolDaysData, institutionId, selectedDepartmentId, selectedAcademicYear, bulkUpsert, refetch])
-
-  if (!hasAccess) {
-    return <Navigate to="/dashboard" replace />
-  }
 
   if (!institutionId) {
     return (

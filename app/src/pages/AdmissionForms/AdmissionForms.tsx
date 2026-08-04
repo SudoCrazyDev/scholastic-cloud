@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { ClipboardList } from 'lucide-react'
 import { admissionFormService } from '../../services/admissionFormService'
 import { Switch } from '../../components/switch'
 import { useAuth } from '../../hooks/useAuth'
-import { useRoleAccess } from '../../hooks/useRoleAccess'
 import type { AdmissionFormPayload, AdmissionFormSubmissionListItem } from '../../types'
 import { AdmissionSubmissionDetailView } from './AdmissionSubmissionDetailView'
 import { AcceptModal } from './AcceptModal'
@@ -42,11 +40,11 @@ function StatusBadge({ status }: { status: AdmissionFormSubmissionListItem['stat
   )
 }
 
-const ADMISSION_FORMS_ROLES = ['principal', 'institution-administrator', 'registrar']
-
+// Access is the `admission-forms` module permission, checked by the route's
+// RequireModule guard and again by the API. This page holds no gate of its own:
+// the list of role slugs that used to sit here turned away every role a school
+// built itself, however its access was set.
 export default function AdmissionForms() {
-  const navigate = useNavigate()
-  const { hasAccess } = useRoleAccess(ADMISSION_FORMS_ROLES)
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
@@ -62,10 +60,6 @@ export default function AdmissionForms() {
   const institutionId =
     user?.user_institutions?.find((ui: { is_default?: boolean }) => ui.is_default)?.institution_id
     ?? user?.user_institutions?.[0]?.institution_id
-
-  useEffect(() => {
-    if (!hasAccess) navigate('/dashboard')
-  }, [hasAccess, navigate])
 
   const publicFormUrl = useMemo(() => {
     if (!institutionId || typeof window === 'undefined') return ''
@@ -84,13 +78,13 @@ export default function AdmissionForms() {
         institution_id: institutionId,
         status: statusFilter,
       }),
-    enabled: hasAccess && !!institutionId,
+    enabled: !!institutionId,
   })
 
   const { data: settingsRes } = useQuery({
     queryKey: ['admission-form-settings', institutionId],
     queryFn: () => admissionFormService.getSettings(),
-    enabled: hasAccess && !!institutionId,
+    enabled: !!institutionId,
   })
 
   const formOpen = settingsRes?.data.admission_form_open ?? true
@@ -167,8 +161,6 @@ export default function AdmissionForms() {
       setRejecting(false)
     }
   }
-
-  if (!hasAccess) return null
 
   return (
     <div className="min-h-screen bg-gray-50">

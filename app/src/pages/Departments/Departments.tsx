@@ -1,16 +1,16 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
-import { useRoleAccess } from '../../hooks/useRoleAccess'
 import { useDepartments } from '../../hooks/useDepartments'
 import { Loader2, Plus, Pencil, Trash2, Building2 } from 'lucide-react'
 import { Button } from '../../components/button'
 import { DepartmentModal } from './DepartmentModal'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 
+// Access is the `departments` module permission, checked by the route's
+// RequireModule guard and again by the API. This page holds no gate of its own:
+// the list of role slugs that used to sit here turned away every role a school
+// built itself, however its access was set.
 const Departments: React.FC = () => {
-  const navigate = useNavigate()
-  const { hasAccess } = useRoleAccess(['principal', 'institution-administrator'])
   const {
     departments,
     isLoading,
@@ -28,10 +28,6 @@ const Departments: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; title: string } | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
 
-  React.useEffect(() => {
-    if (!hasAccess) navigate('/dashboard')
-  }, [hasAccess, navigate])
-
   const onDeleteClick = (id: string, title: string) => setDeleteTarget({ id, title })
   const onDeleteConfirm = async () => {
     if (!deleteTarget) return
@@ -45,8 +41,6 @@ const Departments: React.FC = () => {
       setIsDeleting(false)
     }
   }
-
-  if (!hasAccess) return null
 
   return (
     <motion.div
