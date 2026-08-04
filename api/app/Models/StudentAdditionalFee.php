@@ -48,6 +48,7 @@ class StudentAdditionalFee extends Model
         'description',
         'billing_type',
         'source',
+        'payment_plan_id',
         'installment_sequence',
         'late_fee_stage',
         'assessed_on',
@@ -92,6 +93,15 @@ class StudentAdditionalFee extends Model
     public function studentFee()
     {
         return $this->belongsTo(StudentFee::class);
+    }
+
+    /**
+     * The payment plan a surcharge was assessed under. Only late fees carry one: the
+     * schedule is what produced them, so a change of plan supersedes them.
+     */
+    public function paymentPlan()
+    {
+        return $this->belongsTo(PaymentPlan::class);
     }
 
     public function payments()

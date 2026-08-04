@@ -32,6 +32,10 @@ use Illuminate\Support\Collection;
  *    are part of the carried balance, so the charge compounds while the account stays
  *    delinquent. See applyCarryOver() for the walk.
  *
+ * Every row records the plan it was assessed under. Moving a student to a different plan
+ * therefore re-assesses the year: the rows the old schedule booked are discarded and the
+ * plan now in force charges what its own periods have incurred. See discardSuperseded().
+ *
  * Finance can waive one by deleting the row, or adjust it by editing the amount,
  * through the existing additional-fee endpoints.
  */
@@ -44,7 +48,8 @@ class LateFeeService
      * @param  array  $installments  Schedule from PaymentPlanService::buildInstallments(),
      *                               built from principal charges only (no surcharges).
      * @param  StudentPaymentPlan|null  $plan  The student's selected plan, which decides the
-     *                               mode. Omit for the per-installment behaviour.
+     *                               mode and which surcharges are still the current schedule's.
+     *                               Omit for the per-installment behaviour.
      * @param  iterable|null  $principalPayments  Non-voided payments settling plan principal
      *                               (surcharge collections excluded). Carry-over needs their
      *                               dates to know what was unpaid at each assessment.
@@ -66,7 +71,13 @@ class LateFeeService
         $handled = $this->chargedFor($institutionId, $studentId, $academicYear, withWaived: true);
         $collections = $this->collectionsAgainst($handled);
 
+        // A surcharge belongs to the schedule that produced it. Once the student is moved to
+        // another plan, the rows the old one booked are obsolete and must not stand in the
+        // way of the new plan's own assessment.
+        $handled = $this->discardSuperseded($handled, $plan, $collections);
+
         $context = compact('institutionId', 'studentId', 'academicYear');
+        $context['paymentPlanId'] = $plan?->payment_plan_id;
 
         $handled = $plan?->paymentPlan?->carriesOverSurcharge()
             ? $this->applyCarryOver($context, $installments, $handled, $collections, $principalPayments, $downpayment)
@@ -111,6 +122,59 @@ class LateFeeService
     }
 
     /**
+     * Drop the surcharges a change of payment plan left behind, so the plan now in force
+     * can assess the year as its own schedule sees it.
+     *
+     * A surcharge is derived from a schedule: its base is an installment amount, its rate
+     * and its assessment date come from that installment's template. Change the plan and
+     * none of that describes anything any more — the periods are different, and often there
+     * are fewer or more of them. Keeping the row would both suppress the new plan's charge
+     * for that slot (it reads as already handled) and leave the old rate re-based onto an
+     * amount from a schedule it never belonged to.
+     *
+     * Two rows are never discarded. One with money received against it is settled business:
+     * the collection has to stay attributable to a real charge, so it stands as collected
+     * and keeps its slot rather than being repriced under the new plan. And one with no plan
+     * recorded predates this bookkeeping — it is treated as belonging to whatever is in
+     * force, exactly as it was before.
+     *
+     * A waived row does go. The waiver forgave a charge on a schedule the student is no
+     * longer on; it is not a standing instruction to suppress whatever the next plan
+     * assesses for the same period. The plan change is itself recorded in
+     * student_payment_plan_changes, so the reason the row is gone remains on file.
+     *
+     * @param  Collection<string, StudentAdditionalFee>  $handled
+     * @param  array<string, array{total: float, rows: array}>  $collections
+     * @return Collection<string, StudentAdditionalFee>
+     */
+    private function discardSuperseded(
+        Collection $handled,
+        ?StudentPaymentPlan $plan,
+        array $collections
+    ): Collection {
+        $currentPlanId = $plan?->payment_plan_id;
+        if (! $currentPlanId) {
+            return $handled;
+        }
+
+        return $handled->reject(function (StudentAdditionalFee $fee) use ($currentPlanId, $collections) {
+            if ($fee->payment_plan_id === null || $fee->payment_plan_id === $currentPlanId) {
+                return false;
+            }
+
+            if ($this->collectedTotal($collections, $fee->id) > 0) {
+                return false;
+            }
+
+            // Force-deleted, not waived: a waiver keeps the slot, and the slot is what the
+            // new schedule needs. Nothing was collected, so no money loses its charge.
+            $fee->forceDelete();
+
+            return true;
+        });
+    }
+
+    /**
      * One surcharge per installment, on the installment's own amount.
      *
      * @param  Collection<string, StudentAdditionalFee>  $handled
@@ -135,7 +199,7 @@ class LateFeeService
 
             if ($existing) {
                 // A waived fee is settled business; only a standing one tracks its base.
-                if (! $existing->trashed()) {
+                if (! $existing->trashed() && $this->tracksCurrentPlan($existing, $context)) {
                     $this->rebase(
                         $existing,
                         round((float) ($installment['amount'] ?? 0), 2),
@@ -213,7 +277,9 @@ class LateFeeService
 
             if ($existing) {
                 if (! $existing->trashed()) {
-                    $this->rebase($existing, $base, $event, $this->collectedTotal($collections, $existing->id));
+                    if ($this->tracksCurrentPlan($existing, $context)) {
+                        $this->rebase($existing, $base, $event, $this->collectedTotal($collections, $existing->id));
+                    }
                     $standing[] = ['date' => $event['date'], 'fee' => $existing];
                 }
 
@@ -408,6 +474,23 @@ class LateFeeService
     }
 
     /**
+     * Whether a standing surcharge was assessed under the schedule now in force.
+     *
+     * Only the ones that were track their base. A row that survived a change of plan because
+     * money was collected against it describes a schedule that no longer exists, so re-basing
+     * it would move it onto an installment amount it was never charged from — at the old
+     * plan's rate, since the rate is fixed on the row. It stays as it was collected.
+     */
+    private function tracksCurrentPlan(StudentAdditionalFee $fee, array $context): bool
+    {
+        $currentPlanId = $context['paymentPlanId'] ?? null;
+
+        return $currentPlanId === null
+            || $fee->payment_plan_id === null
+            || $fee->payment_plan_id === $currentPlanId;
+    }
+
+    /**
      * Keep a standing surcharge in step with the base it was charged against.
      *
      * The fee is booked the first time the ledger is loaded past the assessment date, which
@@ -599,6 +682,9 @@ class LateFeeService
                 'name' => $this->name($event),
                 'description' => $this->describe($base, $percentage, $event),
                 'source' => StudentAdditionalFee::SOURCE_LATE_FEE,
+                // The schedule this was assessed under, so a later change of plan can tell
+                // it apart from a row the new plan would have produced.
+                'payment_plan_id' => $context['paymentPlanId'] ?? null,
                 'installment_sequence' => $event['sequence'],
                 'late_fee_stage' => $event['stage'],
                 'assessed_on' => $event['date']->toDateString(),
