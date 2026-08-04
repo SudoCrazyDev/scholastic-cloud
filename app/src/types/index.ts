@@ -1133,6 +1133,7 @@ export interface CollectionReportResponse {
   };
   by_method: CollectionReportBreakdownRow[];
   by_fee: CollectionReportBreakdownRow[];
+  by_student_fee: CollectionReportBreakdownRow[];
   by_cashier: CollectionReportBreakdownRow[];
   by_day: CollectionReportDailyRow[];
   transactions: CollectionReportTransaction[];

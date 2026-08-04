@@ -190,6 +190,7 @@ function buildPrintHtml(report: CollectionReportResponse): string {
   ${voidedNote}
   ${breakdownTable('By Payment Method', report.by_method, true)}
   ${breakdownTable('By Fee Type', report.by_fee, false)}
+  ${breakdownTable('By Student Fee', report.by_student_fee ?? [], false)}
   ${breakdownTable('By Cashier', report.by_cashier, true)}
   ${dailyTable}
   ${txnTable}
@@ -345,6 +346,7 @@ const CollectionReportView: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <BreakdownTable title="Payment Method" rows={report.by_method} showTxns />
               <BreakdownTable title="Fee Type" rows={report.by_fee} />
+              <BreakdownTable title="Student Fee" rows={report.by_student_fee ?? []} />
               <BreakdownTable title="Cashier" rows={report.by_cashier} showTxns />
               <DailyTable rows={report.by_day} />
             </div>

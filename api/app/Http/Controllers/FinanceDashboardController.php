@@ -398,6 +398,9 @@ class FinanceDashboardController extends Controller
         $payments = StudentPayment::with([
             'student:id,lrn,first_name,middle_name,last_name,ext_name',
             'schoolFee:id,name',
+            // Waiving a student fee soft-deletes it while the payments against it
+            // stay on the books, so the name has to survive the delete to label them.
+            'additionalFee' => fn ($query) => $query->withTrashed()->select('id', 'name'),
             'receivedBy:id,first_name,last_name',
             'paymentTransaction:id,or_number,receipt_number,payment_method',
         ])
@@ -413,7 +416,8 @@ class FinanceDashboardController extends Controller
         $voidedAmount = 0.0;
 
         $byMethod = [];   // method => ['entries' => n, 'amount' => x, 'txns' => Set]
-        $byFee = [];      // fee name => ['entries' => n, 'amount' => x]
+        $byFee = [];      // school fee name => ['entries' => n, 'amount' => x]
+        $byStudentFee = []; // student fee name => ['entries' => n, 'amount' => x]
         $byDay = [];      // Y-m-d => ['entries' => n, 'amount' => x, 'txns' => Set]
         $byCashier = [];  // name => ['entries' => n, 'amount' => x, 'txns' => Set]
 
@@ -437,6 +441,11 @@ class FinanceDashboardController extends Controller
             $txnKey = $txnId ?: 'entry:' . $payment->id;
             $method = $payment->payment_method
                 ?: ($payment->paymentTransaction?->payment_method ?: 'Unspecified');
+            // An entry settles either a school fee or a student fee, never both, so
+            // it belongs to exactly one of the two fee breakdowns.
+            $studentFeeName = $payment->student_additional_fee_id
+                ? ($payment->additionalFee?->name ?: 'Unnamed Student Fee')
+                : null;
             $feeName = $payment->schoolFee?->name ?: 'General / Other';
             $cashier = $payment->receivedBy
                 ? trim($payment->receivedBy->first_name . ' ' . $payment->receivedBy->last_name)
@@ -455,9 +464,15 @@ class FinanceDashboardController extends Controller
             $byMethod[$method]['amount'] += $amount;
             $byMethod[$method]['txns'][$txnKey] = true;
 
-            $byFee[$feeName] ??= ['entries' => 0, 'amount' => 0.0];
-            $byFee[$feeName]['entries']++;
-            $byFee[$feeName]['amount'] += $amount;
+            if ($studentFeeName !== null) {
+                $byStudentFee[$studentFeeName] ??= ['entries' => 0, 'amount' => 0.0];
+                $byStudentFee[$studentFeeName]['entries']++;
+                $byStudentFee[$studentFeeName]['amount'] += $amount;
+            } else {
+                $byFee[$feeName] ??= ['entries' => 0, 'amount' => 0.0];
+                $byFee[$feeName]['entries']++;
+                $byFee[$feeName]['amount'] += $amount;
+            }
 
             $byDay[$dateKey] ??= ['entries' => 0, 'amount' => 0.0, 'txns' => []];
             $byDay[$dateKey]['entries']++;
@@ -559,6 +574,7 @@ class FinanceDashboardController extends Controller
                 ],
                 'by_method' => $formatBreakdown($byMethod),
                 'by_fee' => $formatBreakdown($byFee, false),
+                'by_student_fee' => $formatBreakdown($byStudentFee, false),
                 'by_cashier' => $formatBreakdown($byCashier),
                 'by_day' => $dailyRows,
                 'transactions' => $transactionRows,
