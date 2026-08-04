@@ -22,10 +22,15 @@ use Illuminate\Support\Collection;
  * The charge is a snapshot of the base it was assessed on, so it is kept in step with
  * that base on later loads — see rebase() for the limits.
  *
+ * Every base is the balance as it stood on the assessment date, rebuilt from payment dates
+ * rather than read off today's figures. So the ledger books the same surcharges whether it
+ * is opened the day an installment falls overdue or months later, and paying late is
+ * surcharged even though the installment is settled by the time anyone looks.
+ *
  * Two modes, chosen per payment plan:
  *
- *  - `per_installment` (the default, and how every plan behaved before carry-over
- *    existed): each installment is surcharged once, on its own amount.
+ *  - `per_installment` (the default): each installment is surcharged once, on what it still
+ *    owed when its grace window elapsed.
  *  - `carry_over`: the unpaid balance rolls forward, so a period is assessed twice —
  *    once when it opens, against everything already delinquent behind it, and once when
  *    its own grace window elapses, against its own unpaid principal. Earlier surcharges
@@ -81,7 +86,7 @@ class LateFeeService
 
         $handled = $plan?->paymentPlan?->carriesOverSurcharge()
             ? $this->applyCarryOver($context, $installments, $handled, $collections, $principalPayments, $downpayment)
-            : $this->applyPerInstallment($context, $installments, $handled, $collections);
+            : $this->applyPerInstallment($context, $installments, $handled, $collections, $principalPayments, $downpayment);
 
         return $handled
             ->reject(fn ($fee) => $fee->trashed())
@@ -175,18 +180,39 @@ class LateFeeService
     }
 
     /**
-     * One surcharge per installment, on the installment's own amount.
+     * One surcharge per installment, on what that installment still owed when its grace
+     * window elapsed.
+     *
+     * The base is rebuilt from the payment dates, not read off today's totals. Being late is
+     * something that happened on a date: a student who settled three days after the due date
+     * was late by three days, and stays late however long afterwards the ledger is next
+     * opened. Reading the balance as it stands today instead made the charge depend on
+     * somebody having viewed the page inside that window — miss it and the installment was
+     * already settled by the time anyone looked, so `is_overdue` was false and the surcharge
+     * was never booked at all. Which is how a July payment against a 10 July due date went
+     * unsurcharged for a whole tenant of accounts.
+     *
+     * It also means only what was actually outstanding is surcharged: money that arrived in
+     * time comes off the base, so a student who paid most of an installment early owes the
+     * surcharge on the remainder rather than on the whole period. Same rule the carry-over
+     * mode already applies to a period's own principal.
      *
      * @param  Collection<string, StudentAdditionalFee>  $handled
      * @param  array<string, array{total: float, rows: array}>  $collections
+     * @param  iterable|null  $principalPayments  Non-voided payments settling plan principal
      * @return Collection<string, StudentAdditionalFee>
      */
     private function applyPerInstallment(
         array $context,
         array $installments,
         Collection $handled,
-        array $collections
+        array $collections,
+        $principalPayments,
+        float $downpayment
     ): Collection {
+        $today = Carbon::today();
+        $payments = $this->paymentRows($principalPayments);
+
         foreach ($installments as $installment) {
             $sequence = (int) ($installment['sequence'] ?? 0);
             if ($sequence < 1) {
@@ -194,6 +220,7 @@ class LateFeeService
             }
 
             $event = $this->installmentEvent($installment);
+            $base = $this->unpaidPrincipal($installments, $sequence, $event['date'], $payments, $downpayment);
             $key = $this->stageKey($sequence, StudentAdditionalFee::LATE_FEE_STAGE_INSTALLMENT);
             $existing = $handled->get($key);
 
@@ -202,7 +229,7 @@ class LateFeeService
                 if (! $existing->trashed() && $this->tracksCurrentPlan($existing, $context)) {
                     $this->rebase(
                         $existing,
-                        round((float) ($installment['amount'] ?? 0), 2),
+                        $base,
                         $event,
                         $this->collectedTotal($collections, $existing->id)
                     );
@@ -211,11 +238,13 @@ class LateFeeService
                 continue;
             }
 
-            if (! $this->shouldCharge($installment)) {
+            // A grace window is the payer's to use in full, so the surcharge is incurred
+            // only once the overdue date has passed.
+            if (! $this->incurred($event, $today) || $base <= 0 || $event['percentage'] <= 0) {
                 continue;
             }
 
-            $fee = $this->createFee($context, round((float) $installment['amount'], 2), $event);
+            $fee = $this->createFee($context, $base, $event);
             if ($fee) {
                 $handled->put($key, $fee);
             }
@@ -456,21 +485,6 @@ class LateFeeService
         return $event['stage'] === StudentAdditionalFee::LATE_FEE_STAGE_CARRY_OVER
             ? ! $event['date']->greaterThan($today)
             : $today->greaterThan($event['date']);
-    }
-
-    /**
-     * The fee is charged once: the installment is past its grace window, still owes
-     * money, and carries a late-fee percentage. Whether it is settled afterwards no
-     * longer matters — the charge has already been booked.
-     */
-    private function shouldCharge(array $installment): bool
-    {
-        $percentage = (float) ($installment['late_fee_percentage'] ?? 0);
-        $amount = (float) ($installment['amount'] ?? 0);
-
-        return ! empty($installment['is_overdue'])
-            && $percentage > 0
-            && $amount > 0;
     }
 
     /**

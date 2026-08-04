@@ -212,6 +212,157 @@ class LateFeeChargeTest extends TestCase
             ])->assertCreated();
     }
 
+    private function pay(float $amount, string $date): void
+    {
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->postJson('/api/student-payments', [
+                'student_id' => $this->student->id,
+                'academic_year' => self::YEAR,
+                'payment_date' => $date,
+                'items' => [
+                    ['school_fee_id' => $this->tuitionFee->id, 'amount' => $amount],
+                ],
+            ])->assertCreated();
+    }
+
+    public function test_a_late_payment_is_surcharged_even_if_the_ledger_was_never_opened_in_between(): void
+    {
+        // The account is settled in full, three days after the grace window closed, and
+        // nobody looks at the ledger until now. Whether the fee is charged cannot depend
+        // on somebody having happened to open the page inside those three days.
+        $this->pay(5000, '2026-08-19');
+
+        $data = $this->ledger();
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(5000.0, (float) $fee->base_amount, 'The installment was unpaid on 16 August.');
+        $this->assertEquals(150.0, (float) $fee->amount);
+        $this->assertSame('2026-08-16', $fee->assessed_on->toDateString());
+
+        $this->assertEquals(150.0, $data['totals']['late_fees']);
+        $first = collect($data['installments'])->firstWhere('sequence', 1);
+        $this->assertSame('paid', $first['status'], 'The principal is settled...');
+        $this->assertEquals(150.0, $first['late_fee_amount'], '...but it was settled late.');
+    }
+
+    public function test_paying_inside_the_grace_window_is_never_surcharged(): void
+    {
+        $this->pay(5000, '2026-08-14');
+
+        $data = $this->ledger();
+
+        $this->assertSame(0, StudentAdditionalFee::lateFees()->count());
+        $this->assertEquals(0.0, $data['totals']['late_fees']);
+        $this->assertEquals(0.0, collect($data['installments'])->firstWhere('sequence', 1)['late_fee_amount']);
+    }
+
+    public function test_only_what_was_still_owed_when_the_grace_elapsed_is_surcharged(): void
+    {
+        // 2,000 arrives in time, so only the remaining 3,000 was late.
+        $this->pay(2000, '2026-08-10');
+
+        $data = $this->ledger();
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(3000.0, (float) $fee->base_amount);
+        $this->assertEquals(90.0, (float) $fee->amount);
+        $this->assertEquals(90.0, $data['totals']['late_fees']);
+    }
+
+    public function test_the_figures_do_not_depend_on_when_the_ledger_was_opened(): void
+    {
+        // One school opens the ledger while the installment is overdue and unpaid, then
+        // takes the payment. Another never opens it until both are in the past. Neither
+        // the charge nor the base may come out differently.
+        Carbon::setTestNow('2026-08-18 08:00:00');
+        $watched = $this->ledger();
+        $this->pay(5000, '2026-08-19');
+        Carbon::setTestNow('2026-09-30 08:00:00');
+        $watched = $this->ledger();
+
+        $this->assertEquals(150.0, $watched['totals']['late_fees']);
+        $this->assertEquals(5000.0, (float) StudentAdditionalFee::lateFees()->sole()->base_amount);
+    }
+
+    public function test_a_payment_dated_before_the_schedule_opens_is_a_downpayment_not_a_late_settlement(): void
+    {
+        // The prod case behind this: a May receipt against a July-to-March plan. It is a
+        // downpayment, so it shrinks every installment instead of settling the first one —
+        // and what is left of the first installment is still late.
+        $plan = StudentPaymentPlan::where('student_id', $this->student->id)->sole();
+        PaymentPlan::whereKey($plan->payment_plan_id)
+            ->update(['advance_payment_mode' => PaymentPlan::ADVANCE_NET_OF_DOWNPAYMENT]);
+
+        $this->pay(4000, '2026-05-20');
+
+        $data = $this->ledger();
+
+        // 10,000 less the 4,000 downpayment, split 50/50: 3,000 an installment.
+        $first = collect($data['installments'])->firstWhere('sequence', 1);
+        $this->assertEquals(3000.0, $first['amount']);
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(3000.0, (float) $fee->base_amount, 'The downpayment does not settle the installment.');
+        $this->assertEquals(90.0, (float) $fee->amount);
+    }
+
+    /**
+     * The account that surfaced this, figure for figure: 30,600 of Grade 3 charges on a
+     * nine-month plan due on the 10th at 3%, net of downpayment. 8,100 came in on 20 May,
+     * before the plan's July opening, so it is a downpayment and every installment is
+     * 2,500. The 2,500 that settles July arrived on the 13th — three days late — and the
+     * ledger was not opened until August, by which time July looked paid and nothing was
+     * ever charged.
+     */
+    public function test_the_reported_account_is_surcharged_for_settling_july_on_the_thirteenth(): void
+    {
+        Carbon::setTestNow('2026-08-04 08:00:00');
+
+        SchoolFeeDefault::where('school_fee_id', $this->tuitionFee->id)->update(['amount' => 30600]);
+
+        $monthly = PaymentPlan::create([
+            'institution_id' => $this->institution->id,
+            'name' => 'Monthly',
+            'advance_payment_mode' => PaymentPlan::ADVANCE_NET_OF_DOWNPAYMENT,
+            'is_active' => true,
+            'sort_order' => 2,
+        ]);
+        foreach ([7, 8, 9, 10, 11, 12, 1, 2, 3] as $index => $month) {
+            PaymentPlanInstallment::create([
+                'payment_plan_id' => $monthly->id,
+                'sequence' => $index + 1,
+                'label' => Carbon::create(2026, $month, 1)->format('F') . ' FEES',
+                'due_month' => $month,
+                'due_day' => 10,
+                'grace_period_days' => 0,
+                'late_fee_percentage' => 3,
+            ]);
+        }
+        StudentPaymentPlan::where('student_id', $this->student->id)
+            ->update(['payment_plan_id' => $monthly->id]);
+
+        $this->pay(8100, '2026-05-20');
+        $this->pay(2500, '2026-07-13');
+
+        $data = $this->ledger();
+
+        // 30,600 less the 8,100 downpayment over nine months.
+        $july = collect($data['installments'])->firstWhere('sequence', 1);
+        $this->assertEquals(2500.0, $july['amount']);
+        $this->assertSame('paid', $july['status']);
+        $this->assertEquals(75.0, $july['late_fee_amount'], 'July was settled on the 13th, due on the 10th.');
+
+        $fee = StudentAdditionalFee::lateFees()->sole();
+        $this->assertEquals(2500.0, (float) $fee->base_amount);
+        $this->assertEquals(75.0, (float) $fee->amount);
+        $this->assertSame('2026-07-10', $fee->assessed_on->toDateString());
+
+        // August is not due until the 10th, so it earns nothing yet.
+        $this->assertEquals(0.0, collect($data['installments'])->firstWhere('sequence', 2)['late_fee_amount']);
+        $this->assertEquals(75.0, $data['totals']['late_fees']);
+        $this->assertEquals(20075.0, $data['totals']['balance']);
+    }
+
     public function test_reloading_the_ledger_does_not_duplicate_the_charge(): void
     {
         $this->ledger();
