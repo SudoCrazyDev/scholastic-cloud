@@ -226,6 +226,27 @@ class StudentPortalPasswordResetTest extends TestCase
             ->assertForbidden();
     }
 
+    /**
+     * The modal decides what to offer from this call, so a teacher who cannot
+     * read it is shown the "no login yet" dead end for a student who has one.
+     */
+    public function test_a_subject_teacher_can_read_whether_a_student_has_a_login(): void
+    {
+        $this->asTeacherA()
+            ->getJson("/api/students/{$this->studentA->id}/auth")
+            ->assertOk()
+            ->assertJsonPath('data.email', 'student-a@reset.test');
+    }
+
+    public function test_reading_a_student_without_a_login_is_a_404_not_a_403(): void
+    {
+        $noLogin = $this->makeStudent($this->schoolA, 'unused@reset.test', withLogin: false);
+
+        $this->asTeacherA()
+            ->getJson("/api/students/{$noLogin->id}/auth")
+            ->assertNotFound();
+    }
+
     public function test_a_principal_keeps_both_paths(): void
     {
         $this->makeStaff($this->schoolA, 'principal', 'principal@reset.test', 'principal-token');
