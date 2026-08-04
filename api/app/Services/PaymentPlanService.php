@@ -134,6 +134,7 @@ class PaymentPlanService
                 'late_fee_amount' => 0.0,
                 'late_fee_applied' => false,
                 'late_fee_id' => null,
+                'late_fee_charges' => [],
                 'amount' => $amount,
                 'original_amount' => $originalAmount,
                 'discount_amount' => $discountAmount,
@@ -219,33 +220,49 @@ class PaymentPlanService
     }
 
     /**
-     * Stamp each installment with the late fee actually charged against it, so the
-     * schedule shows the booked amount rather than a recomputed guess. A fee stays
+     * Stamp each installment with the surcharges actually charged against it, so the
+     * schedule shows the booked amounts rather than a recomputed guess. A fee stays
      * visible after the installment is settled (and after a waiver it disappears,
      * because the charge row is gone).
      *
-     * @param  \Illuminate\Support\Collection<int, \App\Models\StudentAdditionalFee>  $lateFees
-     *         keyed by installment sequence
+     * A `carry_over` plan can charge a period twice — once for the balance rolled into it,
+     * once for its own overdue principal — so `late_fee_amount` is the total for the period
+     * and `late_fee_charges` itemizes it. `late_fee_id` and `late_fee_percentage` describe
+     * the surcharge on the period's own principal, which is the only one a per-installment
+     * plan ever has.
+     *
+     * @param  iterable<\App\Models\StudentAdditionalFee>  $lateFees  in schedule order
      */
     public function withLateFees(array $installments, $lateFees): array
     {
-        $lateFees = collect($lateFees);
-        if ($lateFees->isEmpty()) {
+        $bySequence = collect($lateFees)->groupBy(fn ($fee) => (int) $fee->installment_sequence);
+        if ($bySequence->isEmpty()) {
             return $installments;
         }
 
-        return array_map(function (array $installment) use ($lateFees) {
-            $fee = $lateFees->get((int) $installment['sequence']);
-            if (! $fee) {
+        return array_map(function (array $installment) use ($bySequence) {
+            $fees = $bySequence->get((int) $installment['sequence']);
+            if (! $fees || $fees->isEmpty()) {
                 return $installment;
             }
 
-            $installment['late_fee_amount'] = (float) $fee->amount;
+            $own = $fees->first(fn ($fee) => ! $fee->isCarriedSurcharge()) ?? $fees->first();
+
+            $installment['late_fee_amount'] = round((float) $fees->sum(fn ($fee) => (float) $fee->amount), 2);
             $installment['late_fee_applied'] = true;
-            $installment['late_fee_id'] = $fee->id;
-            if ($fee->late_fee_percentage !== null) {
-                $installment['late_fee_percentage'] = (float) $fee->late_fee_percentage;
+            $installment['late_fee_id'] = $own->id;
+            if ($own->late_fee_percentage !== null) {
+                $installment['late_fee_percentage'] = (float) $own->late_fee_percentage;
             }
+            $installment['late_fee_charges'] = $fees->map(fn ($fee) => [
+                'id' => $fee->id,
+                'stage' => $fee->lateFeeStage(),
+                'name' => $fee->name,
+                'amount' => (float) $fee->amount,
+                'base_amount' => $fee->base_amount !== null ? (float) $fee->base_amount : null,
+                'percentage' => $fee->late_fee_percentage !== null ? (float) $fee->late_fee_percentage : null,
+                'assessed_on' => $fee->assessed_on?->toDateString(),
+            ])->values()->all();
 
             return $installment;
         }, $installments);
@@ -273,6 +290,8 @@ class PaymentPlanService
                 ?? ($plan->plan_type ? ucfirst((string) $plan->plan_type) : null),
             'advance_payment_mode' => $definition?->advance_payment_mode
                 ?? PaymentPlan::ADVANCE_EQUAL_SPLIT,
+            'surcharge_mode' => $definition?->surcharge_mode
+                ?? PaymentPlan::SURCHARGE_PER_INSTALLMENT,
             'installment_count' => $installmentCount,
             'selected_at' => $plan->selected_at?->toIso8601String(),
             'selected_by_student' => (bool) $plan->selected_by_student,

@@ -520,6 +520,13 @@ export type StudentPaymentPlanType = 'monthly' | 'quarterly';
 //                          so every installment is smaller.
 export type AdvancePaymentMode = 'equal_split' | 'net_of_downpayment';
 
+// How a plan assesses the late-fee percentages its installments carry.
+//   'per_installment' — each installment is surcharged once, on its own amount (the default).
+//   'carry_over'      — the unpaid balance rolls forward and is surcharged again each period,
+//                       on top of that period's own overdue surcharge. Earlier surcharges are
+//                       part of the carried balance, so the charge compounds.
+export type SurchargeMode = 'per_installment' | 'carry_over';
+
 export interface StudentPaymentPlan {
   id: string;
   academic_year: string;
@@ -527,6 +534,7 @@ export interface StudentPaymentPlan {
   name?: string | null;
   plan_type?: StudentPaymentPlanType | null;
   advance_payment_mode?: AdvancePaymentMode;
+  surcharge_mode?: SurchargeMode;
   installment_count: number;
   selected_at?: string | null;
   selected_by_student: boolean;
@@ -550,6 +558,7 @@ export interface PaymentPlan {
   name: string;
   description?: string | null;
   advance_payment_mode?: AdvancePaymentMode;
+  surcharge_mode?: SurchargeMode;
   is_active: boolean;
   sort_order: number;
   installment_count: number;
@@ -562,6 +571,7 @@ export interface CreatePaymentPlanData {
   name: string;
   description?: string | null;
   advance_payment_mode?: AdvancePaymentMode;
+  surcharge_mode?: SurchargeMode;
   is_active?: boolean;
   sort_order?: number;
   installments: Array<Omit<PaymentPlanInstallmentTemplate, 'id' | 'sequence'> & { sequence?: number }>;
@@ -780,6 +790,19 @@ export interface MyTimesheet {
   days: TimesheetDay[];
 }
 
+// One surcharge booked against an installment.
+//   'installment' — assessed on the period's own unpaid principal when its grace elapsed.
+//   'carry_over'  — assessed on the balance rolled into the period when it opened.
+export interface InstallmentSurcharge {
+  id: string;
+  stage: 'installment' | 'carry_over';
+  name: string;
+  amount: number;
+  base_amount?: number | null;
+  percentage?: number | null;
+  assessed_on?: string | null;
+}
+
 export interface StudentInstallment {
   sequence: number;
   label: string;
@@ -788,10 +811,15 @@ export interface StudentInstallment {
   overdue_date: string;
   is_overdue: boolean;
   late_fee_percentage: number;
-  // Amount actually charged for this installment's late fee (0 when none was booked).
+  // Every surcharge charged against this period, totalled (0 when none was booked). A
+  // carry-over plan can charge a period twice — once for the balance rolled into it, once
+  // for its own overdue principal — so `late_fee_charges` itemizes what makes it up.
   late_fee_amount: number;
   late_fee_applied?: boolean;
+  // The surcharge on this period's own principal, which is the only kind a
+  // per-installment plan ever charges.
   late_fee_id?: string | null;
+  late_fee_charges?: InstallmentSurcharge[];
   amount: number;
   original_amount: number;
   discount_amount: number;

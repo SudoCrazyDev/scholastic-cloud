@@ -17,6 +17,20 @@ class StudentAdditionalFee extends Model
     /** Materialized by LateFeeService when a payment-plan installment went overdue. */
     public const SOURCE_LATE_FEE = 'late_fee';
 
+    /** Surcharge on an installment's own unpaid principal, assessed when its grace elapses. */
+    public const LATE_FEE_STAGE_INSTALLMENT = 'installment';
+
+    /**
+     * Surcharge on the balance rolled into this period from the ones before it, assessed
+     * when the period opens. Only `carry_over` plans produce these.
+     */
+    public const LATE_FEE_STAGE_CARRY_OVER = 'carry_over';
+
+    public const LATE_FEE_STAGES = [
+        self::LATE_FEE_STAGE_INSTALLMENT,
+        self::LATE_FEE_STAGE_CARRY_OVER,
+    ];
+
     /** Collected on its own, outside the payment plan. The default. */
     public const BILLING_CASH = 'cash';
 
@@ -35,6 +49,8 @@ class StudentAdditionalFee extends Model
         'billing_type',
         'source',
         'installment_sequence',
+        'late_fee_stage',
+        'assessed_on',
         'late_fee_percentage',
         'base_amount',
         'amount',
@@ -48,6 +64,7 @@ class StudentAdditionalFee extends Model
         'base_amount' => 'decimal:2',
         'late_fee_percentage' => 'float',
         'installment_sequence' => 'integer',
+        'assessed_on' => 'date',
     ];
 
     public function institution()
@@ -85,6 +102,21 @@ class StudentAdditionalFee extends Model
     public function isLateFee(): bool
     {
         return $this->source === self::SOURCE_LATE_FEE;
+    }
+
+    /** A surcharge on the balance carried into a period rather than on the period itself. */
+    public function isCarriedSurcharge(): bool
+    {
+        return $this->late_fee_stage === self::LATE_FEE_STAGE_CARRY_OVER;
+    }
+
+    /**
+     * The stage that produced this surcharge. Rows written before carry-over existed have
+     * no stage recorded and are installment surcharges by definition.
+     */
+    public function lateFeeStage(): string
+    {
+        return $this->late_fee_stage ?: self::LATE_FEE_STAGE_INSTALLMENT;
     }
 
     /**

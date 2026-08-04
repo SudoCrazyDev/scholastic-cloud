@@ -260,13 +260,28 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   // A late fee is a booked charge, so the note stays after the installment is settled —
   // only 'Overdue' drops off once it is paid. It disappears entirely if finance waives
   // the fee, because the charge row is gone.
+  //
+  // A carry-over plan can charge a period twice: once for the balance rolled into it when
+  // it opened, once for its own overdue amount. Naming the carried part is the difference
+  // between a figure a parent can check and one they have to query.
   const lateFeeNote = (installment: StudentInstallment) => {
     const parts: string[] = []
     if (installment.is_overdue) {
       parts.push('Overdue')
     }
     if (installment.late_fee_amount > 0) {
-      parts.push(`${formatAmount(installment.late_fee_amount)} late fee charged`)
+      const charges = installment.late_fee_charges ?? []
+      const carried = charges.find((charge) => charge.stage === 'carry_over')
+      if (!carried) {
+        parts.push(`${formatAmount(installment.late_fee_amount)} late fee charged`)
+      } else if (charges.length > 1) {
+        parts.push(
+          `${formatAmount(installment.late_fee_amount)} late fee charged ` +
+            `(${formatAmount(carried.amount)} carried over)`
+        )
+      } else {
+        parts.push(`${formatAmount(carried.amount)} late fee carried over`)
+      }
     }
 
     return parts.length > 0 ? parts.join(' · ') : null

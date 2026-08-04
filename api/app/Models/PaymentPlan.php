@@ -21,11 +21,27 @@ class PaymentPlan extends Model
         self::ADVANCE_NET_OF_DOWNPAYMENT,
     ];
 
+    /** Each installment is surcharged once, on its own amount, when it goes overdue. */
+    public const SURCHARGE_PER_INSTALLMENT = 'per_installment';
+
+    /**
+     * The unpaid balance rolls forward and is surcharged again every period, on top of the
+     * period's own overdue surcharge. Earlier surcharges are part of the balance that gets
+     * surcharged, so the charge compounds while the account stays delinquent.
+     */
+    public const SURCHARGE_CARRY_OVER = 'carry_over';
+
+    public const SURCHARGE_MODES = [
+        self::SURCHARGE_PER_INSTALLMENT,
+        self::SURCHARGE_CARRY_OVER,
+    ];
+
     protected $fillable = [
         'institution_id',
         'name',
         'description',
         'advance_payment_mode',
+        'surcharge_mode',
         'is_active',
         'sort_order',
         'created_by',
@@ -39,6 +55,11 @@ class PaymentPlan extends Model
     public function deductsDownpayment(): bool
     {
         return $this->advance_payment_mode === self::ADVANCE_NET_OF_DOWNPAYMENT;
+    }
+
+    public function carriesOverSurcharge(): bool
+    {
+        return $this->surcharge_mode === self::SURCHARGE_CARRY_OVER;
     }
 
     public function institution()

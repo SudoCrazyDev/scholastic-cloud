@@ -126,11 +126,11 @@ class StudentFinanceController extends Controller
         // Late fees are additional-fee rows materialized from overdue installments
         // (source `late_fee`). They are kept apart from ad-hoc fees because they must
         // not feed the installment split, and payments settling one must not fill
-        // installment principal.
+        // installment principal. A carry-over plan charges a period more than once, so
+        // these are held as a plain list — keying by installment would lose a row, and
+        // its collections would then be mistaken for principal.
         $manualAdditionalFees = $additionalFees->reject(fn ($fee) => $fee->isLateFee())->values();
-        $chargedLateFees = $additionalFees
-            ->filter(fn ($fee) => $fee->isLateFee())
-            ->keyBy(fn ($fee) => (int) $fee->installment_sequence);
+        $chargedLateFees = $additionalFees->filter(fn ($fee) => $fee->isLateFee())->values();
 
         // An ad-hoc fee declares whether it is amortized or collected on its own. Only the
         // installment-based ones join the principal the plan divides; a cash-basis fee is a
@@ -163,7 +163,7 @@ class StudentFinanceController extends Controller
         $paymentsTotal = (float) $activePayments->sum('amount');
         // Money collected against a late fee or a cash-basis fee settles that charge, not
         // the installments — both sit outside the schedule.
-        $offScheduleFees = $chargedLateFees->values()->toBase()->merge($cashAdditionalFees);
+        $offScheduleFees = $chargedLateFees->toBase()->merge($cashAdditionalFees);
         $lateFeePaymentsTotal = (float) $this->paymentsForFees($activePayments, $chargedLateFees)->sum('amount');
         $cashPaymentsTotal = round((float) $this->paymentsForFees($activePayments, $cashAdditionalFees)->sum('amount'), 2);
         $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal - $cashPaymentsTotal, 2));
@@ -205,14 +205,18 @@ class StudentFinanceController extends Controller
             $principalPaymentRows
         );
 
-        // Book a real charge for any installment that has newly gone overdue, then work
-        // from the charged rows. Once booked the fee stays — settling the installment no
-        // longer erases it, and finance can waive it by deleting the charge.
+        // Book a real charge for anything newly surcharged — an installment past its grace
+        // window, and on a carry-over plan the balance rolled into a period that has opened
+        // — then work from the charged rows. Once booked the fee stays: settling the
+        // installment no longer erases it, and finance can waive it by deleting the charge.
         $chargedLateFees = $this->lateFeeService->apply(
             $institutionId,
             $studentId,
             $academicYear,
-            $installments
+            $installments,
+            $paymentPlan,
+            $principalPaymentRows,
+            (float) $downpayment['amount']
         );
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
 
@@ -225,21 +229,26 @@ class StudentFinanceController extends Controller
             ->map(fn ($inst) => $inst['overdue_date'] ?? null);
 
         $lateFeeEntries = $chargedLateFees
-            ->sortBy(fn ($fee) => (int) $fee->installment_sequence)
             ->map(function ($fee) use ($overdueDatesBySequence) {
                 $sequence = (int) $fee->installment_sequence;
                 $pct = $this->lateFeeService->formatPercentage((float) $fee->late_fee_percentage);
+                $reason = $fee->isCarriedSurcharge() ? '% carried over' : '% overdue';
 
                 return [
                     'type' => 'charge',
-                    'description' => $fee->name . ' (' . $pct . '% overdue)',
+                    'description' => $fee->name . ' (' . $pct . $reason . ')',
                     'amount' => (float) $fee->amount,
-                    // Dated when the fee was incurred, not when the row happened to be written.
-                    'date' => $overdueDatesBySequence->get($sequence) ?? $fee->created_at?->toDateString(),
+                    // Dated when the fee was incurred, not when the row happened to be
+                    // written. Surcharges booked before assessment dates were recorded fall
+                    // back to the installment's overdue date, which is what they were.
+                    'date' => $fee->assessed_on?->toDateString()
+                        ?? $overdueDatesBySequence->get($sequence)
+                        ?? $fee->created_at?->toDateString(),
                     'fee_id' => $fee->id,
                     'fee_name' => $fee->name,
                     'source' => StudentAdditionalFee::SOURCE_LATE_FEE,
                     'installment_sequence' => $sequence,
+                    'late_fee_stage' => $fee->lateFeeStage(),
                     'late_fee_percentage' => (float) $fee->late_fee_percentage,
                 ];
             })
@@ -481,10 +490,10 @@ class StudentFinanceController extends Controller
                 'outstanding' => round($charge - $discount - $paid, 2),
             ];
         })->toBase()->merge(
-            // Ad-hoc fees first, then the late fees charged for overdue installments —
-            // each its own collectible line, in installment order.
+            // Ad-hoc fees first, then the surcharges charged against the schedule — each
+            // its own collectible line, already in installment order.
             $manualAdditionalFees
-                ->merge($chargedLateFees->sortBy(fn ($fee) => (int) $fee->installment_sequence)->values())
+                ->merge($chargedLateFees)
                 ->map(function ($af) use ($paidByAdditionalFee, $discountByFee) {
                     $charge = (float) $af->amount;
                     $discount = (float) ($discountByFee[$af->id] ?? 0);
@@ -502,6 +511,7 @@ class StudentFinanceController extends Controller
                             ? StudentAdditionalFee::BILLING_CASH
                             : StudentAdditionalFee::BILLING_INSTALLMENT,
                         'installment_sequence' => $af->installment_sequence,
+                        'late_fee_stage' => $af->isLateFee() ? $af->lateFeeStage() : null,
                         'charge' => round($charge, 2),
                         'discount' => round($discount, 2),
                         'paid' => round($paid, 2),
@@ -651,9 +661,7 @@ class StudentFinanceController extends Controller
         // Same split as the ledger: late fees are charges in their own right, and are
         // excluded from the principal the installment schedule is divided from.
         $manualAdditionalFees = $additionalFees->reject(fn ($fee) => $fee->isLateFee())->values();
-        $chargedLateFees = $additionalFees
-            ->filter(fn ($fee) => $fee->isLateFee())
-            ->keyBy(fn ($fee) => (int) $fee->installment_sequence);
+        $chargedLateFees = $additionalFees->filter(fn ($fee) => $fee->isLateFee())->values();
 
         // And the same split by basis: only amortized ad-hoc fees are divided by the plan.
         $installmentAdditionalFees = $manualAdditionalFees
@@ -670,7 +678,7 @@ class StudentFinanceController extends Controller
         $gradeLevelDiscountsWithAmount = $this->applyDiscounts($gradeLevelDiscounts, $feeAmountMap, $standardCharges);
         $discountsTotal = (float) $discountsWithAmount->sum('amount') + (float) $gradeLevelDiscountsWithAmount->sum('amount');
         $paymentsTotal = (float) $payments->sum('amount');
-        $offScheduleFees = $chargedLateFees->values()->toBase()->merge($cashAdditionalFees);
+        $offScheduleFees = $chargedLateFees->toBase()->merge($cashAdditionalFees);
         $lateFeePaymentsTotal = (float) $this->paymentsForFees($payments, $chargedLateFees)->sum('amount');
         $cashPaymentsTotal = round((float) $this->paymentsForFees($payments, $cashAdditionalFees)->sum('amount'), 2);
         $principalPayments = max(0.0, round($paymentsTotal - $lateFeePaymentsTotal - $cashPaymentsTotal, 2));
@@ -705,13 +713,16 @@ class StudentFinanceController extends Controller
             $principalPaymentRows
         );
 
-        // The notice of account books newly-overdue late fees just like the ledger, so a
+        // The notice of account books newly-incurred surcharges just like the ledger, so a
         // printed NOA and the on-screen balance can never disagree about them.
         $chargedLateFees = $this->lateFeeService->apply(
             $institutionId,
             $studentId,
             $academicYear,
-            $installments
+            $installments,
+            $paymentPlan,
+            $principalPaymentRows,
+            (float) $downpayment['amount']
         );
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
 
@@ -759,7 +770,7 @@ class StudentFinanceController extends Controller
             ];
         })->toBase()->merge(
             $manualAdditionalFees
-                ->merge($chargedLateFees->sortBy(fn ($fee) => (int) $fee->installment_sequence)->values())
+                ->merge($chargedLateFees)
                 ->map(function ($af) {
                     return [
                         'fee_id' => $af->id,
@@ -771,6 +782,7 @@ class StudentFinanceController extends Controller
                             ? StudentAdditionalFee::BILLING_CASH
                             : StudentAdditionalFee::BILLING_INSTALLMENT,
                         'installment_sequence' => $af->installment_sequence,
+                        'late_fee_stage' => $af->isLateFee() ? $af->lateFeeStage() : null,
                     ];
                 })
         );

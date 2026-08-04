@@ -15,7 +15,12 @@ import { Select } from '../../components/select'
 import { MonthDayPicker } from '../../components/month-day-picker'
 import { MONTH_NAMES } from '../../utils/monthNames'
 import { paymentPlanService } from '../../services/paymentPlanService'
-import type { AdvancePaymentMode, CreatePaymentPlanData, PaymentPlan } from '../../types'
+import type {
+  AdvancePaymentMode,
+  CreatePaymentPlanData,
+  PaymentPlan,
+  SurchargeMode,
+} from '../../types'
 
 const monthName = (month: number) => MONTH_NAMES[month - 1] ?? String(month)
 
@@ -34,6 +39,24 @@ const ADVANCE_MODE_OPTIONS: Array<{ value: AdvancePaymentMode; label: string; hi
       'Anything collected before the first installment’s month is deducted from the amount ' +
       'being divided, so the monthly figure itself drops. Paying ₱8,100 up front on ₱30,600 ' +
       'over 9 installments gives ₱2,500 a month instead of ₱3,400.',
+  },
+]
+
+const SURCHARGE_MODE_OPTIONS: Array<{ value: SurchargeMode; label: string; hint: string }> = [
+  {
+    value: 'per_installment',
+    label: 'Charged once per installment',
+    hint:
+      'Each installment is surcharged once, on its own amount, when its grace period ends ' +
+      'unpaid. An unpaid ₱2,500 at 3% adds ₱75 and stops there, however long it stays unpaid.',
+  },
+  {
+    value: 'carry_over',
+    label: 'Carried over and charged again each period',
+    hint:
+      'The unpaid balance rolls into the next period and is surcharged again when that ' +
+      'period opens, on top of the surcharge that period’s own overdue amount earns. Unpaid ' +
+      'July at ₱2,575 adds ₱77.25 on 1 August, then August’s own ₱2,500 adds ₱75 on the 10th.',
   },
 ]
 
@@ -62,6 +85,7 @@ const emptyForm = () => ({
   name: '',
   description: '',
   advance_payment_mode: 'equal_split' as AdvancePaymentMode,
+  surcharge_mode: 'per_installment' as SurchargeMode,
   is_active: true,
   installments: [emptyInstallment()],
 })
@@ -142,8 +166,10 @@ const PaymentPlansView: React.FC = () => {
         name: plan.name,
         description: plan.description,
         // Carried through, otherwise a disable/enable would silently reset the plan
-        // to the default split and change every student's installment amounts.
+        // to the default split and change every student's installment amounts — or
+        // to the default surcharge rule and change what they owe on an overdue one.
         advance_payment_mode: plan.advance_payment_mode ?? 'equal_split',
+        surcharge_mode: plan.surcharge_mode ?? 'per_installment',
         is_active: !plan.is_active,
         sort_order: plan.sort_order,
         installments: plan.installments.map((inst) => ({
@@ -173,6 +199,7 @@ const PaymentPlansView: React.FC = () => {
       name: plan.name,
       description: plan.description || '',
       advance_payment_mode: plan.advance_payment_mode ?? 'equal_split',
+      surcharge_mode: plan.surcharge_mode ?? 'per_installment',
       is_active: plan.is_active,
       installments: plan.installments.length
         ? plan.installments.map((inst) => ({
@@ -256,6 +283,7 @@ const PaymentPlansView: React.FC = () => {
       name: form.name.trim(),
       description: form.description.trim() || null,
       advance_payment_mode: form.advance_payment_mode,
+      surcharge_mode: form.surcharge_mode,
       is_active: form.is_active,
       installments: form.installments.map((inst) => ({
         label: inst.label.trim() || null,
@@ -361,6 +389,55 @@ const PaymentPlansView: React.FC = () => {
                 )
               })}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Late fees on an installment that stays unpaid
+            </label>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {SURCHARGE_MODE_OPTIONS.map((option) => {
+                const selected = form.surcharge_mode === option.value
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      selected
+                        ? 'border-primary-400 bg-primary-50/50 ring-1 ring-primary-200'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                    } ${isSaving ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="surcharge_mode"
+                      className="mt-0.5 h-4 w-4 shrink-0 text-primary-600 focus:ring-primary-500"
+                      value={option.value}
+                      checked={selected}
+                      onChange={() =>
+                        setForm((prev) => ({ ...prev, surcharge_mode: option.value }))
+                      }
+                      disabled={isSaving}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-gray-900">{option.label}</span>
+                      <span className="block text-xs text-gray-500 mt-1">{option.hint}</span>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+            {form.surcharge_mode === 'carry_over' && (
+              <p className="mt-2 text-xs text-gray-500">
+                Each period uses its own late fee percentage for both charges, and a period set
+                to 0% is skipped in both directions. Nothing is carried past the last
+                installment — the balance stops compounding once the schedule ends.
+              </p>
+            )}
+            {!form.installments.some((inst) => Number(inst.late_fee) > 0) && (
+              <p className="mt-2 text-xs text-gray-500">
+                No installment below charges a late fee yet, so this setting has no effect.
+              </p>
+            )}
           </div>
 
           <div>
@@ -524,6 +601,15 @@ const PaymentPlansView: React.FC = () => {
                           title="Payments received before the first installment's month are deducted from the amount being divided."
                         >
                           Net of downpayment
+                        </span>
+                      )}
+                      {plan.surcharge_mode === 'carry_over'
+                        && plan.installments.some((inst) => Number(inst.late_fee_percentage) > 0) && (
+                        <span
+                          className="inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
+                          title="An unpaid balance rolls into the next period and is surcharged again when it opens, on top of that period's own overdue late fee. Earlier late fees are part of what gets carried, so the charge compounds."
+                        >
+                          Carried late fees
                         </span>
                       )}
                       {!plan.installments.some((inst) => Number(inst.late_fee_percentage) > 0) && (
