@@ -152,7 +152,7 @@ return [
                     'special' => [
                         'reset-portal-password' => [
                             'label' => 'Reset a student portal password',
-                            'description' => 'Issue a new portal password to a student who already has a login, without being able to change the email it belongs to or create one for a student who has none. Manage already includes this; tick it for a role that should help a student sign in but not edit student records.',
+                            'description' => 'Set up a student portal login, and issue a new password for one that exists, without being able to move an existing login to a different email address. Manage already includes this; tick it for a role that should help a student sign in but not edit student records.',
                         ],
                     ],
                 ],

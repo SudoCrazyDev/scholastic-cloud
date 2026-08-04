@@ -64,12 +64,14 @@ type AuthState = 'loading' | 'none' | 'exists'
 /**
  * Two permissions reach this modal and they are not the same size.
  *
- * `students.manage` owns the login: create one, change the email it belongs to,
- * reset the password. `students.reset-portal-password` owns only the last of
- * those — it is what a subject teacher holds, so they can help a student who
- * cannot sign in without being able to point that login at a different email.
- * The email field is read-only for them, and a student with no login yet is
- * something they have to hand on rather than fix.
+ * `students.manage` owns the login outright: create one, reset the password,
+ * and move it to a different email. `students.reset-portal-password` — what a
+ * subject teacher holds — covers everything a student who cannot sign in needs:
+ * setting a login up when there is none, and issuing a new password for one that
+ * exists. What it stops short of is the third thing. Once a login exists, its
+ * email is fixed as far as this role is concerned, because an account that can be
+ * pointed at a new address is an account that can be taken over. So the email
+ * field is editable while creating and read-only afterwards.
  */
 export function StudentPasswordResetModal({
   isOpen,
@@ -130,14 +132,19 @@ export function StudentPasswordResetModal({
     }
   }, [isOpen, student?.id])
 
+  // A reset-only role creating a login goes through the same endpoint as anyone
+  // else — the email is being named for the first time, not moved.
+  const isResetOfExisting = canResetOnly && authState === 'exists'
+
   const handleGenerate = async () => {
     if (!student) return
 
     const trimmed = email.trim()
 
-    // Only the path that writes the email needs one validated. A reset sends the
-    // password alone and leaves the address the server already holds.
-    if (!canResetOnly) {
+    // Only the path that writes the email needs one validated. Resetting an
+    // existing login sends the password alone and leaves the address the server
+    // already holds — creating one always names the address, whoever is doing it.
+    if (!isResetOfExisting) {
       if (!trimmed) {
         setEmailError('Email is required.')
         return
@@ -154,9 +161,10 @@ export function StudentPasswordResetModal({
     const newPassword = generatePassword(12)
 
     try {
-      // Whoever manages students keeps the single call that writes both fields —
-      // it is the only one that can create a login or move it to another email.
-      if (canResetOnly) {
+      // The narrow endpoint is for resetting a login that already exists; the
+      // one that writes both fields is what creates it, and both permissions
+      // reach that while there is nothing there yet.
+      if (isResetOfExisting) {
         await studentService.resetStudentPortalPassword(student.id, newPassword)
       } else {
         await studentService.createOrUpdateStudentAuth(student.id, {
@@ -197,11 +205,6 @@ export function StudentPasswordResetModal({
   const confirmLabel = authState === 'none'
     ? (submitting ? 'Generating...' : 'Generate')
     : (submitting ? 'Resetting...' : emailChanged && !canResetOnly ? 'Change email & reset' : 'Reset password')
-
-  // Creating a login means choosing the email it belongs to, which is the part a
-  // reset-only role does not hold. Say so plainly instead of offering a form that
-  // would come back 404.
-  const cannotCreate = authState === 'none' && canResetOnly
 
   const history = logs.length > 0 && (
     <div className="mt-6 border-t border-gray-100 pt-4">
@@ -251,24 +254,11 @@ export function StudentPasswordResetModal({
           <div className="py-4 text-center text-gray-500">Checking student login...</div>
         )}
 
-        {cannotCreate && (
-          <>
-            <p className="text-sm text-gray-600">
-              <strong>{name}</strong> does not have a portal login yet. Creating one means choosing
-              the email address it belongs to, which someone who manages student records has to do.
-            </p>
-            <DialogActions className="mt-6">
-              <Button onClick={handleClose}>Close</Button>
-            </DialogActions>
-            {history}
-          </>
-        )}
-
-        {(authState === 'none' || authState === 'exists') && !generatedPassword && !cannotCreate && (
+        {(authState === 'none' || authState === 'exists') && !generatedPassword && (
           <>
             <p className="text-sm text-gray-600 mb-4">
               {authState === 'none' ? (
-                <>This student does not have portal login yet. Enter their email and generate a password.</>
+                <><strong>{name}</strong> does not have a portal login yet. Enter the email address it should belong to and generate a password.</>
               ) : canResetOnly ? (
                 <>Generate a new portal password for <strong>{name}</strong>. They will need it to sign in, and will be asked to set their own. The email their login uses does not change.</>
               ) : (
@@ -283,8 +273,8 @@ export function StudentPasswordResetModal({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="student@example.com"
                 className="w-full"
-                disabled={submitting || canResetOnly}
-                readOnly={canResetOnly}
+                disabled={submitting || isResetOfExisting}
+                readOnly={isResetOfExisting}
               />
               {emailError && <p className="text-sm text-red-600">{emailError}</p>}
             </div>

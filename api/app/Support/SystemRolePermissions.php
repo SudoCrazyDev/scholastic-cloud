@@ -164,10 +164,11 @@ class SystemRolePermissions
         'registrar' => ['students.reset-portal-password'],
 
         // A subject teacher is the person a student actually tells when they
-        // cannot sign in, so they may issue a new password. They hold `students`
-        // read-only (VIEW, above) and that does not change: the email the login
-        // belongs to, and creating a login for a student who has none, stay with
-        // whoever manages student records.
+        // cannot sign in, so they may set a portal login up and issue new
+        // passwords for it. They hold `students` read-only (VIEW, above) and that
+        // does not change; the one thing the grant stops short of is moving a
+        // login that already exists to a different email address, which is how
+        // you would point a student's account at your own inbox.
         'subject-teacher' => ['students.reset-portal-password'],
     ];
 

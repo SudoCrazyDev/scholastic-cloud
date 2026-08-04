@@ -38,6 +38,19 @@ class StudentAuthController extends Controller
             return $deny;
         }
 
+        return $this->denyUnlessSharesInstitution($request, $studentId);
+    }
+
+    /**
+     * Deny unless the caller belongs to a school this student is enrolled at.
+     *
+     * Split from the permission check because a request that accepts either of
+     * two permissions still gets scoped to one school, and doing the membership
+     * check once keeps the reported reason honest: a teacher at another school is
+     * told about the school, not about a module they may well hold.
+     */
+    private function denyUnlessSharesInstitution(Request $request, string $studentId): ?JsonResponse
+    {
         if ($request->user()->hasFullAccess()) {
             return null;
         }
@@ -55,13 +68,49 @@ class StudentAuthController extends Controller
     }
 
     /**
+     * Deny unless the caller may create a login for a student who has none.
+     *
+     * Either grant is enough here, so the narrower one is tried second and its
+     * denial is the one reported — a role holding neither is told about the
+     * bigger permission, which is the one an administrator would grant.
+     */
+    private function denyUnlessCanCreateLogin(Request $request, string $studentId): ?JsonResponse
+    {
+        $deny = $this->denyUnlessModule($request, 'students', 'manage');
+
+        if ($deny !== null && $this->denyUnlessModule($request, 'students', 'reset-portal-password') !== null) {
+            return $deny;
+        }
+
+        return $this->denyUnlessSharesInstitution($request, $studentId);
+    }
+
+    /**
      * Create or update login credentials for a student.
      * POST /students/{student}/auth with email, password, is_new (optional).
      * Every change is recorded in student_auth_logs with the acting staff user.
+     *
+     * Two grants reach this. `students.manage` may do either half: create a
+     * login, or move an existing one to a different email.
+     * `students.reset-portal-password` may only create — a subject teacher is
+     * who a student without a login actually tells, so they can set one up, but
+     * an existing login stays where it is. Redirecting one to an address the
+     * caller controls and then resetting the password against it is how you sign
+     * in as somebody else, and a reset-only role has resetPassword() for the
+     * thing they legitimately need.
      */
     public function store(Request $request, string $student): JsonResponse
     {
-        if ($deny = $this->denyUnlessManagesStudent($request, $student, 'manage')) {
+        $existing = StudentAuth::where('student_id', $student)->first();
+
+        // A create is permitted by either grant; touching a login that already
+        // exists is not. Checked before validation so the answer does not depend
+        // on whether the payload happened to be well-formed.
+        if ($existing) {
+            if ($deny = $this->denyUnlessManagesStudent($request, $student, 'manage')) {
+                return $deny;
+            }
+        } elseif ($deny = $this->denyUnlessCanCreateLogin($request, $student)) {
             return $deny;
         }
 
@@ -80,7 +129,6 @@ class StudentAuthController extends Controller
             return response()->json(['message' => 'Student not found'], 404);
         }
 
-        $existing = StudentAuth::where('student_id', $student)->first();
         $oldEmail = $existing?->email;
         $newEmail = $request->email;
 
@@ -132,16 +180,17 @@ class StudentAuthController extends Controller
      *
      * POST /students/{student}/auth/reset-password with password.
      *
-     * This is deliberately narrower than store(): it is the one thing a subject
-     * teacher may do, and a teacher is the person a student who cannot sign in
-     * actually tells. store() also writes the email, and an email is the account
-     * — someone who can change it to their own can then reset the password
-     * against it and sign in as that student. So the two are separate endpoints
-     * on separate permissions rather than one endpoint that sometimes ignores
-     * part of its payload.
+     * Narrower than store() on purpose: this one cannot touch the email, and
+     * moving an existing login to another address is the part a reset-only role
+     * does not hold — an email is the account, so someone who can point it at
+     * their own can then reset the password against it and sign in as that
+     * student. Keeping them as separate endpoints is what makes that line
+     * enforceable, rather than one endpoint that sometimes ignores part of its
+     * payload.
      *
-     * A student with no login yet is refused rather than created: choosing the
-     * email a login belongs to is the part this permission does not grant.
+     * A student with no login yet is a 404 here, not an implicit create: there is
+     * no password to reset and no email to reset it against. Creating the login
+     * is store(), which both grants reach.
      */
     public function resetPassword(Request $request, string $student): JsonResponse
     {
@@ -158,7 +207,7 @@ class StudentAuthController extends Controller
         if (! $auth) {
             return response()->json([
                 'success' => false,
-                'message' => 'This student does not have a portal login yet. Someone who manages student records has to create one before it can be reset.',
+                'message' => 'This student does not have a portal login yet. Create one with an email address first, then it can be reset.',
             ], 404);
         }
 

@@ -256,7 +256,10 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('user-learning-development', [\App\Http\Controllers\UserLearningDevelopmentController::class, 'destroy']);
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists'])->middleware('module:students,view');
-    Route::post('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'store'])->middleware('module:students,manage');
+    // Two kinds of role get in here and the controller separates what they may
+    // do: whoever manages students can also move an existing login to another
+    // email, while a reset-only role may create a login and nothing more.
+    Route::post('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'store'])->middleware('module:students,manage|reset-portal-password');
     // Narrower than the line above on purpose: a new password, not a new login.
     // Held by roles that manage students and, separately, by subject teachers.
     Route::post('students/{student}/auth/reset-password', [App\Http\Controllers\StudentAuthController::class, 'resetPassword'])->middleware('module:students,reset-portal-password');

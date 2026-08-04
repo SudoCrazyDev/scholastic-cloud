@@ -14,6 +14,15 @@ use Illuminate\Http\Request;
  *   Route::middleware('module:finance,manage') -> needs finance.manage
  *   Route::middleware('module:finance,approve-void')
  *
+ * Abilities may be `|`-separated when either one is enough:
+ *
+ *   Route::middleware('module:students,manage|reset-portal-password')
+ *
+ * That is for an endpoint two different kinds of role reach for two different
+ * reasons — the one that edits student records, and the narrower one that only
+ * helps a student sign in. The controller still decides how much each may do;
+ * this only keeps the route declaration honest about who gets in at all.
+ *
  * A third `shared` argument marks an endpoint the student portal also calls:
  *
  *   Route::middleware('module:students,view,shared')
@@ -38,6 +47,8 @@ class EnsureModuleAccess
             ], 401);
         }
 
+        $abilities = array_values(array_filter(explode('|', $ability), fn (string $a) => $a !== ''));
+
         if ($audience === 'shared' && $user instanceof StudentPortalUser) {
             // `shared` says students may reach this route — not that they may
             // do anything to it. A resource group declared `view,shared` for
@@ -48,7 +59,7 @@ class EnsureModuleAccess
             // Routes that genuinely accept a student write say so by declaring
             // `manage,shared` (uploading a document, starting a checkout), and
             // those still pass.
-            if ($ability === 'manage' || $request->isMethodSafe()) {
+            if (in_array('manage', $abilities, true) || $request->isMethodSafe()) {
                 return $next($request);
             }
 
@@ -61,19 +72,26 @@ class EnsureModuleAccess
         // Write verbs on a route declared `view` still require `manage`. This
         // keeps the route declarations short — a resource group can be marked
         // `view` once — while making sure a read-only role cannot POST to it.
-        if ($ability === 'view' && ! $request->isMethodSafe()) {
-            $ability = 'manage';
+        if (! $request->isMethodSafe()) {
+            $abilities = array_map(fn (string $a) => $a === 'view' ? 'manage' : $a, $abilities);
         }
 
-        if (! $user->hasModuleAccess($module, $ability)) {
-            return response()->json([
-                'message' => $this->denialMessage($module, $ability),
-                'error' => 'forbidden',
-                'required_permission' => "{$module}.{$ability}",
-            ], 403);
+        foreach ($abilities as $candidate) {
+            if ($user->hasModuleAccess($module, $candidate)) {
+                return $next($request);
+            }
         }
 
-        return $next($request);
+        return response()->json([
+            // The first ability is the primary one, so a route listing
+            // alternatives still explains itself in terms of the main grant.
+            'message' => $this->denialMessage($module, $abilities[0]),
+            'error' => 'forbidden',
+            'required_permission' => implode(' or ', array_map(
+                fn (string $a) => "{$module}.{$a}",
+                $abilities,
+            )),
+        ], 403);
     }
 
     /**
