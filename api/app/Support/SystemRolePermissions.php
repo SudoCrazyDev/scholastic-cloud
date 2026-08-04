@@ -139,14 +139,14 @@ class SystemRolePermissions
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
-            'tala.configure',
+            'tala.configure', 'students.reset-portal-password',
         ],
         'principal' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
-            'tala.configure',
+            'tala.configure', 'students.reset-portal-password',
         ],
         // Finance both raises and reviews void requests, but does not skip the
         // queue — a void it raises from the ledger still becomes a pending
@@ -156,6 +156,19 @@ class SystemRolePermissions
         // queue behind it, and these three are the roles the discount
         // controllers hardcoded before the ability existed.
         'finance' => ['finance.request-void', 'finance.approve-void', 'discounts.void'],
+
+        // Registrar and the two institution-wide roles already manage students,
+        // which has always carried the power to reset a portal login; the
+        // ability is listed for them so the role builder shows it ticked rather
+        // than implying they lost something.
+        'registrar' => ['students.reset-portal-password'],
+
+        // A subject teacher is the person a student actually tells when they
+        // cannot sign in, so they may issue a new password. They hold `students`
+        // read-only (VIEW, above) and that does not change: the email the login
+        // belongs to, and creating a login for a student who has none, stay with
+        // whoever manages student records.
+        'subject-teacher' => ['students.reset-portal-password'],
     ];
 
     /**

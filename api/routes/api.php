@@ -257,6 +257,9 @@ Route::middleware('auth.token')->group(function () {
     // Student routes - specific routes first to avoid conflicts
     Route::post('students/exists', [App\Http\Controllers\StudentController::class, 'exists'])->middleware('module:students,view');
     Route::post('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'store'])->middleware('module:students,manage');
+    // Narrower than the line above on purpose: a new password, not a new login.
+    // Held by roles that manage students and, separately, by subject teachers.
+    Route::post('students/{student}/auth/reset-password', [App\Http\Controllers\StudentAuthController::class, 'resetPassword'])->middleware('module:students,reset-portal-password');
     Route::get('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'show'])->middleware('module:students,view');
     Route::get('students/{student}/auth/logs', [App\Http\Controllers\StudentAuthController::class, 'logs'])->middleware('module:students,view');
     // Ledger, notice of account and payment plan are read by the student's own

@@ -128,6 +128,75 @@ class StudentAuthController extends Controller
     }
 
     /**
+     * Issue a new portal password, leaving the email alone.
+     *
+     * POST /students/{student}/auth/reset-password with password.
+     *
+     * This is deliberately narrower than store(): it is the one thing a subject
+     * teacher may do, and a teacher is the person a student who cannot sign in
+     * actually tells. store() also writes the email, and an email is the account
+     * — someone who can change it to their own can then reset the password
+     * against it and sign in as that student. So the two are separate endpoints
+     * on separate permissions rather than one endpoint that sometimes ignores
+     * part of its payload.
+     *
+     * A student with no login yet is refused rather than created: choosing the
+     * email a login belongs to is the part this permission does not grant.
+     */
+    public function resetPassword(Request $request, string $student): JsonResponse
+    {
+        if ($deny = $this->denyUnlessManagesStudent($request, $student, 'reset-portal-password')) {
+            return $deny;
+        }
+
+        $request->validate([
+            'password' => 'required|string|min:6',
+        ]);
+
+        $auth = StudentAuth::where('student_id', $student)->first();
+
+        if (! $auth) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This student does not have a portal login yet. Someone who manages student records has to create one before it can be reset.',
+            ], 404);
+        }
+
+        $auth->update([
+            'password' => Hash::make($request->password),
+            // The student is signing in with a password someone else picked, so
+            // the portal should make them set their own.
+            'is_new' => true,
+            // Sessions issued against the old password must stop working, or a
+            // reset does nothing to whoever is already signed in.
+            'token' => null,
+            'token_expiry' => null,
+        ]);
+
+        $actor = $request->user();
+        StudentAuthLog::create([
+            'student_id' => $student,
+            'performed_by' => $actor instanceof User ? $actor->id : null,
+            'performed_by_name' => $this->actorName($actor),
+            'action' => 'reset_password',
+            // The email did not move; recording it on both sides keeps the log
+            // readable next to entries that did change it.
+            'old_email' => $auth->email,
+            'new_email' => $auth->email,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student portal password reset.',
+            'data' => [
+                'student_id' => $auth->student_id,
+                'email' => $auth->email,
+                'is_new' => $auth->is_new,
+            ],
+        ]);
+    }
+
+    /**
      * Get student auth info (email, is_new only; no password).
      */
     public function show(Request $request, string $student): JsonResponse

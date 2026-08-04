@@ -190,6 +190,22 @@ class StudentService {
     return response.data
   }
 
+  /**
+   * Issue a new portal password without touching the email.
+   *
+   * Separate from createOrUpdateStudentAuth because it is separately permitted:
+   * `students.reset-portal-password` reaches this, while writing the email needs
+   * `students.manage`. 404 when the student has no portal login yet.
+   */
+  async resetStudentPortalPassword(studentId: string, password: string) {
+    const response = await api.post<{
+      success: boolean
+      message: string
+      data: { student_id: string; email: string; is_new: boolean }
+    }>(`${this.baseUrl}/${studentId}/auth/reset-password`, { password })
+    return response.data
+  }
+
   /** Get the portal access change history (who reset/changed access, when). */
   async getStudentAuthLogs(studentId: string) {
     const response = await api.get<{

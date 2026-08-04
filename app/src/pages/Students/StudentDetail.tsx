@@ -30,6 +30,7 @@ import { studentService } from '../../services/studentService'
 import { studentDocumentService } from '../../services/studentDocumentService'
 import { useAuth } from '../../hooks/useAuth'
 import { useRoleAccess } from '../../hooks/useRoleAccess'
+import { usePermissions } from '../../hooks/usePermissions'
 import { toast } from 'react-hot-toast'
 import { formatDateOnly } from '../../utils/date'
 import { calculateAge } from '../../utils/gradeUtils'
@@ -65,6 +66,12 @@ export default function StudentDetail() {
   const [isStartingImpersonation, setIsStartingImpersonation] = useState(false)
   const { assumeStudent } = useAuth()
   const { hasAccess: canImpersonate } = useRoleAccess(['institution-administrator', 'super-administrator'])
+
+  // A subject teacher reaches this page on `students.view` and may reset a portal
+  // password, so the button cannot be tied to managing student records — but it
+  // must not show for a role holding neither, which is what it did before.
+  const { canManage, can } = usePermissions()
+  const canResetPortal = canManage('students') || can('students', 'reset-portal-password')
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -651,14 +658,16 @@ export default function StudentDetail() {
                   {isStartingImpersonation ? 'Starting…' : 'View as Student'}
                 </Button>
               )}
-              <Button
-                onClick={() => setIsPortalResetOpen(true)}
-                variant="outline"
-                className="border-amber-600 text-amber-600 hover:bg-amber-50"
-              >
-                <KeyIcon className="w-4 h-4 mr-2" />
-                Reset Portal
-              </Button>
+              {canResetPortal && (
+                <Button
+                  onClick={() => setIsPortalResetOpen(true)}
+                  variant="outline"
+                  className="border-amber-600 text-amber-600 hover:bg-amber-50"
+                >
+                  <KeyIcon className="w-4 h-4 mr-2" />
+                  Reset Portal
+                </Button>
+              )}
               <Button
                 onClick={() => handleEdit(student)}
                 className="bg-primary-600 hover:bg-primary-700 text-white"

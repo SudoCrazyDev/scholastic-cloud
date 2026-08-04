@@ -149,6 +149,12 @@ return [
                 'students' => [
                     'label' => 'Students',
                     'description' => 'Student records, guardians, documents and health records.',
+                    'special' => [
+                        'reset-portal-password' => [
+                            'label' => 'Reset a student portal password',
+                            'description' => 'Issue a new portal password to a student who already has a login, without being able to change the email it belongs to or create one for a student who has none. Manage already includes this; tick it for a role that should help a student sign in but not edit student records.',
+                        ],
+                    ],
                 ],
                 'student-attendance' => [
                     'label' => 'Student Attendance',

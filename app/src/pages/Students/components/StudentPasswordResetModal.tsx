@@ -4,6 +4,7 @@ import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { XMarkIcon, KeyIcon } from '@heroicons/react/24/outline'
 import { studentService, type StudentAuthLog } from '../../../services/studentService'
+import { usePermissions } from '../../../hooks/usePermissions'
 import type { Student } from '../../../types'
 
 function generatePassword(length = 12): string {
@@ -60,11 +61,24 @@ interface StudentPasswordResetModalProps {
 
 type AuthState = 'loading' | 'none' | 'exists'
 
+/**
+ * Two permissions reach this modal and they are not the same size.
+ *
+ * `students.manage` owns the login: create one, change the email it belongs to,
+ * reset the password. `students.reset-portal-password` owns only the last of
+ * those — it is what a subject teacher holds, so they can help a student who
+ * cannot sign in without being able to point that login at a different email.
+ * The email field is read-only for them, and a student with no login yet is
+ * something they have to hand on rather than fix.
+ */
 export function StudentPasswordResetModal({
   isOpen,
   onClose,
   student,
 }: StudentPasswordResetModalProps) {
+  const { canManage, can } = usePermissions()
+  const canManageStudents = canManage('students')
+  const canResetOnly = !canManageStudents && can('students', 'reset-portal-password')
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [existingEmail, setExistingEmail] = useState<string>('')
   const [email, setEmail] = useState('')
@@ -120,14 +134,19 @@ export function StudentPasswordResetModal({
     if (!student) return
 
     const trimmed = email.trim()
-    if (!trimmed) {
-      setEmailError('Email is required.')
-      return
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(trimmed)) {
-      setEmailError('Enter a valid email address.')
-      return
+
+    // Only the path that writes the email needs one validated. A reset sends the
+    // password alone and leaves the address the server already holds.
+    if (!canResetOnly) {
+      if (!trimmed) {
+        setEmailError('Email is required.')
+        return
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(trimmed)) {
+        setEmailError('Enter a valid email address.')
+        return
+      }
     }
     setEmailError('')
 
@@ -135,13 +154,19 @@ export function StudentPasswordResetModal({
     const newPassword = generatePassword(12)
 
     try {
-      await studentService.createOrUpdateStudentAuth(student.id, {
-        email: trimmed,
-        password: newPassword,
-        is_new: true,
-      })
+      // Whoever manages students keeps the single call that writes both fields —
+      // it is the only one that can create a login or move it to another email.
+      if (canResetOnly) {
+        await studentService.resetStudentPortalPassword(student.id, newPassword)
+      } else {
+        await studentService.createOrUpdateStudentAuth(student.id, {
+          email: trimmed,
+          password: newPassword,
+          is_new: true,
+        })
+        setExistingEmail(trimmed)
+      }
       setGeneratedPassword(newPassword)
-      setExistingEmail(trimmed)
       loadLogs(student.id)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
@@ -171,7 +196,12 @@ export function StudentPasswordResetModal({
   const emailChanged = authState === 'exists' && email.trim() !== existingEmail
   const confirmLabel = authState === 'none'
     ? (submitting ? 'Generating...' : 'Generate')
-    : (submitting ? 'Resetting...' : emailChanged ? 'Change email & reset' : 'Reset password')
+    : (submitting ? 'Resetting...' : emailChanged && !canResetOnly ? 'Change email & reset' : 'Reset password')
+
+  // Creating a login means choosing the email it belongs to, which is the part a
+  // reset-only role does not hold. Say so plainly instead of offering a form that
+  // would come back 404.
+  const cannotCreate = authState === 'none' && canResetOnly
 
   const history = logs.length > 0 && (
     <div className="mt-6 border-t border-gray-100 pt-4">
@@ -221,11 +251,26 @@ export function StudentPasswordResetModal({
           <div className="py-4 text-center text-gray-500">Checking student login...</div>
         )}
 
-        {(authState === 'none' || authState === 'exists') && !generatedPassword && (
+        {cannotCreate && (
+          <>
+            <p className="text-sm text-gray-600">
+              <strong>{name}</strong> does not have a portal login yet. Creating one means choosing
+              the email address it belongs to, which someone who manages student records has to do.
+            </p>
+            <DialogActions className="mt-6">
+              <Button onClick={handleClose}>Close</Button>
+            </DialogActions>
+            {history}
+          </>
+        )}
+
+        {(authState === 'none' || authState === 'exists') && !generatedPassword && !cannotCreate && (
           <>
             <p className="text-sm text-gray-600 mb-4">
               {authState === 'none' ? (
                 <>This student does not have portal login yet. Enter their email and generate a password.</>
+              ) : canResetOnly ? (
+                <>Generate a new portal password for <strong>{name}</strong>. They will need it to sign in, and will be asked to set their own. The email their login uses does not change.</>
               ) : (
                 <>Reset portal access for <strong>{name}</strong>. You can update their email below; a new password will be generated. They will need the new password to sign in.</>
               )}
@@ -238,7 +283,8 @@ export function StudentPasswordResetModal({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="student@example.com"
                 className="w-full"
-                disabled={submitting}
+                disabled={submitting || canResetOnly}
+                readOnly={canResetOnly}
               />
               {emailError && <p className="text-sm text-red-600">{emailError}</p>}
             </div>
