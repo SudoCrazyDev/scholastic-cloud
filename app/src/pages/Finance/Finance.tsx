@@ -85,6 +85,10 @@ const SETUP_VIEWS: FinanceView[] = [
   'receipt-builder',
 ]
 
+// Collections is built but parked for now: the tab is dropped from the nav and
+// /finance/collections falls back to the dashboard. Flip this to bring it back.
+const SHOW_COLLECTIONS = false
+
 interface FinanceNavItem {
   label: string
   to: string
@@ -92,13 +96,20 @@ interface FinanceNavItem {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   views: FinanceView[]
   requiresVoidAccess?: boolean
+  hidden?: boolean
 }
 
 const PRIMARY_NAV: FinanceNavItem[] = [
   { label: 'Dashboard', to: '/finance', end: true, icon: ChartPieIcon, views: ['dashboard'] },
   { label: 'Cashiering', to: '/finance/cashiering', icon: BanknotesIcon, views: ['cashiering'] },
   { label: 'Ledger', to: '/finance/ledger', icon: BookOpenIcon, views: ['ledger'] },
-  { label: 'Collections', to: '/finance/collections', icon: ChartBarIcon, views: ['collections'] },
+  {
+    label: 'Collections',
+    to: '/finance/collections',
+    icon: ChartBarIcon,
+    views: ['collections'],
+    hidden: !SHOW_COLLECTIONS,
+  },
   {
     label: 'Receipt Approvals',
     to: '/finance/receipt-approvals',
@@ -151,7 +162,7 @@ const Finance: React.FC = () => {
     if (pathname.endsWith('/student-fees')) return 'student-fees'
     if (pathname.endsWith('/cashiering')) return 'cashiering'
     if (pathname.endsWith('/ledger')) return 'ledger'
-    if (pathname.endsWith('/collections')) return 'collections'
+    if (pathname.endsWith('/collections')) return SHOW_COLLECTIONS ? 'collections' : 'dashboard'
     if (pathname.endsWith('/default-discounts')) return 'default-discounts'
     if (pathname.endsWith('/sibling-discounts')) return 'sibling-discounts'
     if (pathname.endsWith('/discounts')) return 'discounts'
@@ -1196,7 +1207,9 @@ const Finance: React.FC = () => {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <nav aria-label="Finance sections" className="flex flex-wrap gap-1 p-2">
-          {PRIMARY_NAV.filter((item) => !item.requiresVoidAccess || canRequestVoid).map((item) => {
+          {PRIMARY_NAV.filter(
+            (item) => !item.hidden && (!item.requiresVoidAccess || canRequestVoid)
+          ).map((item) => {
             const isActive = item.views.includes(view)
             const Icon = item.icon
             return (
