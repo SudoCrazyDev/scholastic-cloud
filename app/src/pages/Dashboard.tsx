@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Megaphone, Pin, ChevronRight } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { announcementService } from '../services/announcementService';
-import MyTimeLog from '../components/attendance/MyTimeLog';
+import MyDTR from '../components/attendance/MyDTR';
 
 const formatAnnouncementDate = (value: string | null): string => {
   if (!value) return '';
@@ -82,7 +82,7 @@ const Dashboard: React.FC = () => {
     return <Navigate to="/finance" replace />;
   }
 
-  // Students are not on payroll, so they have no punches to reconcile.
+  // Students are not on payroll, so they have no DTR to reconcile.
   const isStaff = user?.role?.slug !== 'student';
 
   const containerVariants = {
@@ -132,17 +132,17 @@ const Dashboard: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* My biometric punches — staff only */}
-      {isStaff && (
-        <motion.div variants={itemVariants}>
-          <MyTimeLog />
-        </motion.div>
-      )}
-
-      {/* Recent Announcements */}
+      {/* Recent Announcements — kept above the DTR so it is read first */}
       <motion.div variants={itemVariants}>
         <RecentAnnouncements />
       </motion.div>
+
+      {/* My DTR — staff only */}
+      {isStaff && (
+        <motion.div variants={itemVariants}>
+          <MyDTR />
+        </motion.div>
+      )}
     </motion.div>
   );
 };

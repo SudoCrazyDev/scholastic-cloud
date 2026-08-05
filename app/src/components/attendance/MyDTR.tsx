@@ -3,13 +3,19 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, ChevronRight, Clock, RefreshCw } from 'lucide-react'
 import { Button } from '../button'
+import { Select } from '../select'
 import FileAttendanceRequestModal, { type AttendanceRequestPrefill } from './FileAttendanceRequestModal'
 import { myTimesheetService } from '../../services/myTimesheetService'
 import { shortDate, time12 } from '../../pages/HRIS/Payroll/helpers'
 import type { AttendanceRequestKind, TimesheetDay, TimesheetIssue } from '../../types'
 
-/** Days shown before the "show all" toggle — roughly a working week. */
-const COLLAPSED_ROWS = 7
+/** How many past years the year filter reaches back. */
+const YEARS_BACK = 2
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 const ISSUE_META: Record<TimesheetIssue, { label: string; chip: string; kind: AttendanceRequestKind }> = {
   no_punch: { label: 'No punch', chip: 'bg-red-100 text-red-700', kind: 'forgot_punch' },
@@ -22,6 +28,16 @@ const REQUEST_STATUS_CHIP: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   approved: 'bg-green-50 text-green-700 ring-1 ring-green-200',
 }
+
+const pad2 = (value: number): string => String(value).padStart(2, '0')
+
+/** The whole selected month, as the two dates the timesheet endpoint takes. */
+const monthRange = (year: number, month: number): { from: string; to: string } => ({
+  from: `${year}-${pad2(month)}-01`,
+  // Day 0 of the next month is the last day of this one, so February needs no
+  // leap-year special case.
+  to: `${year}-${pad2(month)}-${pad2(new Date(year, month, 0).getDate())}`,
+})
 
 const issueLabel = (day: TimesheetDay): string => {
   if (!day.issue) return ''
@@ -73,35 +89,73 @@ const TimeCell: React.FC<{ time: string | null; credited: boolean }> = ({ time, 
 }
 
 /**
- * The staff member's own punches for the month so far, so a punch the
- * biometric never recorded is found while there is still time to file for it
- * — and filed straight from the row it was found on.
+ * The staff member's own daily time record for a whole month at a time, so a
+ * punch the biometric never recorded is found while there is still time to file
+ * for it — and filed straight from the row it was found on.
+ *
+ * The filter is deliberately month-and-year only: a DTR is read a month at a
+ * time, the same period payroll pays on.
  */
-const MyTimeLog: React.FC = () => {
-  const [showAll, setShowAll] = useState(false)
+const MyDTR: React.FC = () => {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+
+  const [year, setYear] = useState(currentYear)
+  const [month, setMonth] = useState(currentMonth)
   const [filing, setFiling] = useState<TimesheetDay | null>(null)
 
+  const yearOptions = useMemo(
+    () =>
+      Array.from({ length: YEARS_BACK + 1 }, (_, index) => {
+        const value = currentYear - index
+        return { value: String(value), label: String(value) }
+      }),
+    [currentYear]
+  )
+
+  // A month that has not happened yet has nothing to show, so it is not offered
+  // — the endpoint would answer with today's date under next month's heading.
+  const monthOptions = useMemo(() => {
+    const lastMonth = year === currentYear ? currentMonth : 12
+    return MONTH_NAMES.slice(0, lastMonth).map((label, index) => ({
+      value: String(index + 1),
+      label,
+    }))
+  }, [year, currentYear, currentMonth])
+
+  const handleYearChange = (nextYear: number) => {
+    setYear(nextYear)
+    // Rolling back to the current year from a past one can leave the month
+    // pointing at a month that has not arrived yet.
+    if (nextYear === currentYear && month > currentMonth) {
+      setMonth(currentMonth)
+    }
+  }
+
+  const range = monthRange(year, month)
+
   const timesheetQuery = useQuery({
-    queryKey: ['my-timesheet'],
-    queryFn: () => myTimesheetService.get(),
+    // Prefixed with 'my-timesheet' so filing a request still invalidates it.
+    queryKey: ['my-timesheet', range.from, range.to],
+    queryFn: () => myTimesheetService.get(range),
   })
 
   const timesheet = timesheetQuery.data?.data
 
   // A rest day nobody punched on is not worth a row; one that was worked is.
   const days = useMemo(
-    () => (timesheet?.days ?? []).filter((day) => !day.is_rest_day || day.punch_count > 0).reverse(),
+    () => (timesheet?.days ?? []).filter((day) => !day.is_rest_day || day.punch_count > 0),
     [timesheet]
   )
 
   const issueCount = days.filter((day) => day.issue && !day.request).length
-  const visibleDays = showAll ? days : days.slice(0, COLLAPSED_ROWS)
 
   // Punches that stopped arriving read exactly like a week of absences, so
   // say the logs are behind rather than let anyone file against a sync gap.
   const staleSince = useMemo(() => {
     if (!timesheet) return null
-    const lastWorkday = days.find((day) => !day.is_today && !day.is_rest_day && !day.is_holiday)
+    const lastWorkday = [...days].reverse().find((day) => !day.is_today && !day.is_rest_day && !day.is_holiday)
     if (!lastWorkday) return null
     if (timesheet.last_attendance_date && timesheet.last_attendance_date >= lastWorkday.date) return null
     return timesheet.last_attendance_date
@@ -109,18 +163,34 @@ const MyTimeLog: React.FC = () => {
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+      <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="inline-flex items-center gap-2 text-base font-semibold text-gray-900">
-            <Clock className="h-5 w-5 text-primary-600" /> My Time Log
+            <Clock className="h-5 w-5 text-primary-600" /> My DTR
           </h3>
           <p className="mt-0.5 text-xs text-gray-500">
             {issueCount > 0
               ? `${issueCount} day${issueCount === 1 ? '' : 's'} payroll would not pay in full — file a request to fix it.`
-              : 'Your biometric punches for the month so far.'}
+              : `Your biometric punches for ${MONTH_NAMES[month - 1]} ${year}.`}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <Select
+            aria-label="Month"
+            inputSize="sm"
+            className="w-36"
+            options={monthOptions}
+            value={String(month)}
+            onChange={(event) => setMonth(Number(event.target.value))}
+          />
+          <Select
+            aria-label="Year"
+            inputSize="sm"
+            className="w-24"
+            options={yearOptions}
+            value={String(year)}
+            onChange={(event) => handleYearChange(Number(event.target.value))}
+          />
           <button
             type="button"
             onClick={() => timesheetQuery.refetch()}
@@ -131,7 +201,7 @@ const MyTimeLog: React.FC = () => {
           </button>
           <Link
             to="/hris/attendance-requests"
-            className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700"
+            className="inline-flex shrink-0 items-center text-sm font-medium text-primary-600 hover:text-primary-700"
           >
             My requests <ChevronRight className="h-4 w-4" />
           </Link>
@@ -149,26 +219,28 @@ const MyTimeLog: React.FC = () => {
       )}
 
       {timesheetQuery.isLoading ? (
-        <div className="p-6 text-center text-sm text-gray-500">Loading your time log…</div>
+        <div className="p-6 text-center text-sm text-gray-500">Loading your DTR…</div>
       ) : days.length === 0 ? (
         <div className="p-8 text-center">
           <Clock className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-          <p className="text-sm text-gray-500">No punches recorded this month.</p>
+          <p className="text-sm text-gray-500">
+            No punches recorded for {MONTH_NAMES[month - 1]} {year}.
+          </p>
         </div>
       ) : (
-        <>
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                 <th className="px-5 py-2">Day</th>
-                <th className="px-3 py-2">In</th>
-                <th className="px-3 py-2">Out</th>
+                <th className="px-3 py-2">Time In</th>
+                <th className="px-3 py-2">Time Out</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-5 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {visibleDays.map((day) => (
+              {days.map((day) => (
                 <tr key={day.date} className={day.issue && !day.request ? 'bg-red-50/30' : undefined}>
                   <td className="px-5 py-2.5">
                     <div className="font-medium text-gray-800">{dayLabel(day)}</div>
@@ -215,7 +287,7 @@ const MyTimeLog: React.FC = () => {
                       </span>
                     ) : day.issue ? (
                       <Button size="sm" variant="outline" onClick={() => setFiling(day)}>
-                        Request fix
+                        Request Fix
                       </Button>
                     ) : null}
                   </td>
@@ -223,17 +295,7 @@ const MyTimeLog: React.FC = () => {
               ))}
             </tbody>
           </table>
-
-          {days.length > COLLAPSED_ROWS && (
-            <button
-              type="button"
-              onClick={() => setShowAll((prev) => !prev)}
-              className="w-full border-t border-gray-100 py-2 text-xs font-medium text-primary-600 hover:bg-gray-50"
-            >
-              {showAll ? 'Show less' : `Show all ${days.length} days`}
-            </button>
-          )}
-        </>
+        </div>
       )}
 
       {filing && (
@@ -248,4 +310,4 @@ const MyTimeLog: React.FC = () => {
   )
 }
 
-export default MyTimeLog
+export default MyDTR
