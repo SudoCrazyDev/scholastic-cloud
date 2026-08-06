@@ -14,9 +14,6 @@ use Illuminate\Support\Str;
 
 class PaymentReceiptSubmissionController extends Controller
 {
-    /** Roles that may review (approve/reject) uploaded receipts. */
-    private const REVIEWER_ROLES = ['finance', 'institution-administrator', 'principal', 'super-administrator'];
-
     /**
      * List receipt submissions.
      *
@@ -56,7 +53,7 @@ class PaymentReceiptSubmissionController extends Controller
             }
             $query->where('student_id', $studentId);
         } else {
-            if (!$this->canReview($request)) {
+            if (!$this->canSeeQueue($request)) {
                 return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
             }
             if (!empty($filters['student_id'])) {
@@ -261,16 +258,42 @@ class PaymentReceiptSubmissionController extends Controller
         ]);
     }
 
+    /**
+     * Who may open the institution's queue: whoever can read Finance.
+     *
+     * The route already says as much (`module:finance,view`); this repeats it
+     * because the same method also serves a student's own list, and the two
+     * branches must not be able to drift apart.
+     */
+    private function canSeeQueue(Request $request): bool
+    {
+        return $this->hasFinanceAbility($request, 'view');
+    }
+
+    /**
+     * Who may approve or reject: whoever can change Finance.
+     *
+     * This used to be a hardcoded list of four built-in role slugs, which meant
+     * a school's own role — a "Cashier" built in the role builder and ticked
+     * for Finance — was handed the screen by the router and then refused by the
+     * controller. The queue rendered as empty rather than as denied, so a
+     * receipt a student had really uploaded looked like it had never arrived.
+     * The permission is the authority, the same as everywhere else in Finance.
+     */
     private function canReview(Request $request): bool
+    {
+        return $this->hasFinanceAbility($request, 'manage');
+    }
+
+    private function hasFinanceAbility(Request $request, string $ability): bool
     {
         $user = $request->user();
         if (!$user || $user instanceof StudentPortalUser) {
             return false;
         }
 
-        $slug = method_exists($user, 'getRole') ? $user->getRole()?->slug : null;
-
-        return $slug !== null && in_array($slug, self::REVIEWER_ROLES, true);
+        return method_exists($user, 'hasModuleAccess')
+            && $user->hasModuleAccess('finance', $ability);
     }
 
     private function isStudentActor(Request $request): bool

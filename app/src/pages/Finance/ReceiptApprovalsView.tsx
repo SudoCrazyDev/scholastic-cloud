@@ -164,7 +164,20 @@ const ReceiptApprovalsView: React.FC = () => {
                 </td>
               </tr>
             )}
+            {/* A failed load must not read as an empty queue — a receipt the
+                student really uploaded would look like it never arrived. */}
+            {!submissionsQuery.isLoading && submissionsQuery.isError && (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-red-600">
+                  {extractErrorMessage(
+                    submissionsQuery.error,
+                    'Failed to load receipt submissions.'
+                  )}
+                </td>
+              </tr>
+            )}
             {!submissionsQuery.isLoading &&
+              !submissionsQuery.isError &&
               submissions.map((submission) => (
                 <tr key={submission.id}>
                   <td className="px-4 py-3 text-sm text-gray-700">{studentName(submission)}</td>
@@ -222,7 +235,7 @@ const ReceiptApprovalsView: React.FC = () => {
                   </td>
                 </tr>
               ))}
-            {!submissionsQuery.isLoading && !submissions.length && (
+            {!submissionsQuery.isLoading && !submissionsQuery.isError && !submissions.length && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   No {statusFilter} receipt submissions.
