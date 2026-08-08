@@ -3126,3 +3126,83 @@ export interface SmsSettings {
   created_at: string;
   updated_at: string;
 }
+
+// ---- Finance data clearing ----
+
+/**
+ * A `year` group is deleted for the selected academic year only. A `catalog`
+ * group's tables carry no academic year, so clearing one empties it for the
+ * whole institution — the screen has to say so before it is ticked.
+ */
+export type FinanceDataClearScope = 'year' | 'catalog';
+
+export interface FinanceDataClearGroup {
+  key: string;
+  label: string;
+  description: string;
+  scope: FinanceDataClearScope;
+  tables: string[];
+}
+
+export interface FinanceDataClearCatalog {
+  groups: FinanceDataClearGroup[];
+  /** Areas the clear never touches, named so the UI can state them outright. */
+  excluded: string[];
+}
+
+export interface FinanceDataClearGroupPreview {
+  key: string;
+  label: string;
+  description: string;
+  scope: FinanceDataClearScope;
+  total: number;
+  tables: Record<string, number>;
+}
+
+/**
+ * A reason the clear would destroy data outside the selected year. Every
+ * foreign key into the finance tables is CASCADE or SET NULL, so the database
+ * would not refuse — it would silently strand these rows.
+ */
+export interface FinanceDataClearBlocker {
+  group: string;
+  group_label: string;
+  table: string;
+  column: string;
+  blocking_table: string;
+  rule: 'set_null' | 'cascade';
+  count: number;
+  message: string;
+}
+
+export interface FinanceDataClearPreview {
+  academic_year: string;
+  groups: FinanceDataClearGroupPreview[];
+  total: number;
+  blockers: FinanceDataClearBlocker[];
+  clearable: boolean;
+}
+
+export interface FinanceDataClearResult {
+  log_id: string | null;
+  academic_year: string;
+  groups: string[];
+  deleted_counts: Record<string, number>;
+  total_deleted: number;
+  files_deleted: number;
+  files_failed: number;
+}
+
+export interface FinanceDataClearLogEntry {
+  id: string;
+  academic_year: string;
+  groups: string[];
+  group_labels: string[];
+  deleted_counts: Record<string, number>;
+  total_deleted: number;
+  files_deleted: number;
+  files_failed: number;
+  cleared_by_name: string | null;
+  cleared_by_role: string | null;
+  created_at: string;
+}

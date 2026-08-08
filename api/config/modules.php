@@ -196,6 +196,10 @@ return [
                             'label' => 'Void without approval',
                             'description' => 'Void a payment outright, skipping the request queue.',
                         ],
+                        'clear-data' => [
+                            'label' => 'Clear Finance data',
+                            'description' => 'Permanently delete a year\'s payments, charges, discounts and fee setup. Payment plans, finance announcements and disbursements are never touched. This cannot be undone — grant it only to the people who would be asked to authorise it.',
+                        ],
                     ],
                 ],
                 'school-fees' => [

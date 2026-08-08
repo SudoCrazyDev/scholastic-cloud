@@ -2,7 +2,7 @@
 
 > Context doc for working on or integrating with the **Finance** module — the staff-facing money
 > side of the app: fee setup, cashiering (POS), student ledgers, collections reporting, discounts,
-> receipt templates, and payment-void approvals. Use the [file map](#file-map) to jump straight to
+> receipt templates, payment-void approvals, and data clearing. Use the [file map](#file-map) to jump straight to
 > whatever a new feature touches, and [Adding a new Finance view](#adding-a-new-finance-view) for
 > the exact steps to extend the page.
 
@@ -19,9 +19,9 @@ routes — only `auth.token` plus in-controller checks (see [Roles & permissions
 
 ---
 
-## Page architecture: one component, ten URLs
+## Page architecture: one component, eleven URLs
 
-`app/src/pages/Finance/Finance.tsx` is a single ~3,000-line component that renders one of ten
+`app/src/pages/Finance/Finance.tsx` is a single ~4,000-line component that renders one of eleven
 **views** based on `location.pathname` (the `view` memo near the top of the component). Every
 `/finance/*` path in `src/App.tsx` renders the same `<Finance />`; the URL is the tab state, so
 views are bookmarkable and there is no tab state to persist.
@@ -32,7 +32,8 @@ Navigation is **two-level** (data-driven constants at the top of `Finance.tsx`):
   **Receipt Approvals**, **Void Requests** (only when `canRequestVoid`), and **Setup**.
 - `SETUP_NAV` — a sub-row that appears only while a setup view is active: **School Fees**,
   **School Fees Amounts**, **Student Fees**, **Grade Level Discounts**, **Default Discounts**,
-  **Sibling Discounts**, **Receipt Builder**.
+  **Sibling Discounts**, **Receipt Builder**, **Data Clearing** (only when
+  `canClearFinanceData`, via the `requiresClearData` flag on the nav entry).
   The "Setup" primary item links to `/finance/school-fees` and is highlighted whenever `view` is
   in `SETUP_VIEWS`.
 - `VIEW_SUBTITLES` — per-view one-liner shown under the page `h1`.
@@ -51,6 +52,7 @@ Navigation is **two-level** (data-driven constants at the top of `Finance.tsx`):
 | `discounts` | `/finance/discounts` | Setup: bulk discounts for a whole grade level |
 | `default-discounts` | `/finance/default-discounts` | Setup: reusable discount templates |
 | `receipt-builder` | `/finance/receipt-builder` | Setup: drag-and-drop receipt layout |
+| `data-clearing` | `/finance/data-clearing` | Setup: permanently delete a year's finance records (ability-gated) |
 
 Each view's queries carry `enabled: view === '<name>'` so switching tabs never fires the other
 views' requests.
@@ -178,16 +180,19 @@ views' requests.
   top; `view` memo maps pathname → view).
 - Sub-view components (same folder): `CollectionsView.tsx`, `DiscountsView.tsx` (grade-level),
   `DefaultDiscountsView.tsx`, `ReceiptBuilderView.tsx`, `ReceiptPrintModal.tsx`,
-  `DashboardCharts.tsx` (Recharts, presentational), `PaymentPlansView.tsx` (standalone page).
+  `DataClearingView.tsx`, `DashboardCharts.tsx` (Recharts, presentational),
+  `PaymentPlansView.tsx` (standalone page).
 - Shared PDF: `src/components/StudentNOAPDF.tsx`.
 - Services (`src/services/`): `schoolFeeService.ts`, `schoolFeeDefaultService.ts`,
   `financeDashboardService.ts`, `studentPaymentService.ts`, `studentFinanceService.ts`,
   `studentDiscountService.ts`, `defaultDiscountService.ts`, `gradeLevelDiscountService.ts`,
   `studentAdditionalFeeService.ts`, `paymentVoidService.ts`, `paymentPlanService.ts`,
-  `receiptTemplateService.ts`, plus `studentService.ts` for student search.
+  `receiptTemplateService.ts`, `financeDataClearService.ts`, plus `studentService.ts` for student
+  search.
 - Types: `src/types/index.ts` (`SchoolFee`, `SchoolFeeDefault`, `PaymentTransaction`,
   `StudentLedgerEntry`, `CreateStudentDiscountData`, `DefaultDiscount`, `PaymentVoidStatus`, …).
-- Routes: `src/App.tsx` — `finance` + nine `finance/*` routes all render `<Finance />`;
+- Routes: `src/App.tsx` — `finance` + ten `finance/*` routes all render `<Finance />`
+  (`finance/data-clearing` is additionally guarded `ability="clear-data"`);
   `payment-plans` renders `<PaymentPlansView />` directly, as does `finance-announcements`
   (`FinanceAnnouncementsView.tsx`, a separate module — see
   [Finance Announcements](Announcements/FINANCE_ANNOUNCEMENTS.md)). Sidebar:
@@ -199,18 +204,25 @@ views' requests.
   payment-transactions (~306–311), student-discounts (+`/void`) (~316–321), default-discounts
   apiResource (~324), grade-level-discounts (~327–331), student-additional-fees (~334–338),
   payment-void-requests (~341–344), receipt-templates apiResource (~347), and the
-  student-scoped ledger/NOA/payment-plan routes (~177–182).
+  student-scoped ledger/NOA/payment-plan routes (~177–182), and the four
+  `finance/data-clear*` routes behind `module:finance,clear-data` (just after receipt-templates).
 - Controllers (`app/Http/Controllers/`): `SchoolFeeController`, `SchoolFeeDefaultController`,
   `FinanceDashboardController` (`summary`, `collections`), `StudentPaymentController` (store =
   create transaction + lines), `PaymentTransactionController`, `StudentDiscountController`,
   `DefaultDiscountController`, `GradeLevelDiscountController`, `StudentAdditionalFeeController`,
   `PaymentVoidRequestController`, `StudentFinanceController` (`ledger`, `noticeOfAccount`),
   `StudentPaymentPlanController`, `StudentPaymentPlanChangeController`, `PaymentPlanController`,
-  `ReceiptTemplateController`.
+  `ReceiptTemplateController`, `FinanceDataClearController` (`groups`, `preview`, `store`,
+  `history`).
+- Data clearing internals: `app/Support/FinanceDataGroups.php` (the group catalog — what is
+  clearable, year-scoped vs catalog, and the `dependents()` hazard map) and
+  `app/Services/Finance/FinanceDataCleaner.php` (counting, the blocker guard, the transactional
+  delete, R2 cleanup). Both run on the **query builder, not Eloquent** — a soft-deleted late fee is
+  invisible to a model query and would survive a clear that claimed to have taken it.
 - Models (`app/Models/`): `SchoolFee`, `SchoolFeeDefault`, `StudentPayment`,
   `PaymentTransaction`, `StudentDiscount`, `DefaultDiscount`, `GradeLevelDiscount`,
   `StudentAdditionalFee`, `PaymentVoidRequest`, `PaymentPlan`, `PaymentPlanInstallment`,
-  `StudentPaymentPlan`, `StudentPaymentPlanChange`.
+  `StudentPaymentPlan`, `StudentPaymentPlanChange`, `FinanceDataClearLog`.
 
 ---
 
@@ -302,6 +314,66 @@ Drag-and-drop (dnd-kit) template designer with a palette of ~17 element types (i
 logo/name/address, receipt number, student fields, fee/amount rows, signature line, custom text,
 divider, spacer…). CRUD via `/receipt-templates`. `ReceiptPrintModal` renders the active template.
 
+### Setup → Data Clearing (`/finance/data-clearing`) — `DataClearingView.tsx`
+Permanently deletes a school's finance records. **Gated on `finance.clear-data`**, a special
+ability outside `finance.manage` — running the cashier does not carry the power to erase what it
+recorded. Held by `institution-administrator` and `principal` by default; **not** by `finance`.
+
+Three things are **never** clearable and have no group at all: **payment plans**
+(`payment_plans`, `payment_plan_installments`, `student_payment_plans`,
+`student_payment_plan_changes`), **finance announcements**, and **disbursements**
+(`disbursements`, `disbursement_types`, `disbursement_receipts`).
+
+**Groups** are declared once in `App\Support\FinanceDataGroups` and consumed by the preview, the
+delete and the UI, so the count shown can never describe a different operation from the one that
+runs. Each is one of two scopes:
+
+| Group | Scope | Tables (delete order) |
+|---|---|---|
+| `payments` | year | `payment_receipt_submissions`, `payment_void_requests`, `student_online_payment_transactions`, `student_payments`, `payment_transactions` |
+| `additional_fees` | year | `student_additional_fees` (**including soft-deleted/waived rows**) |
+| `applied_discounts` | year | `grade_level_discount_student_voids`, `student_discounts`, `grade_level_discounts` |
+| `fee_amounts` | year | `school_fee_defaults` |
+| `school_fee_catalog` | catalog | `school_fees` |
+| `student_fee_catalog` | catalog | `student_fees` |
+| `discount_templates` | catalog | `default_discounts` |
+| `sibling_groups` | catalog | `sibling_group_members`, `sibling_groups` |
+| `receipt_templates` | catalog | `receipt_templates` |
+
+- **year** — filtered to the selected `academic_year`; other years are untouched.
+- **catalog** — the table has no `academic_year`, so the group empties it for the whole
+  institution. Badged **"All years"** in the UI and grouped under its own heading, because the
+  year selector otherwise implies a limit that does not apply.
+
+**Blockers — the important part.** Every foreign key into these tables is `CASCADE` or `SET NULL`;
+**not one is `RESTRICT`**. So none of this ever *fails* — it succeeds and quietly damages rows the
+operator did not select. Clearing `school_fees` while last year's payments are on file nulls their
+`school_fee_id` and turns every fee-attributed receipt into a "General / Other" line, and cascades
+away every other year's `school_fee_defaults`. `FinanceDataGroups::dependents()` declares those
+relationships and `FinanceDataCleaner::blockers()` counts the rows that would **survive** the run
+while pointing at something it deleted; a non-empty result **refuses the whole operation** (422)
+rather than corrupting them. The fix is to tick the referencing groups too, or leave the catalog
+group unticked — the message says which.
+
+**Flow**: pick year + groups → `POST /finance/data-clear/preview` returns per-table counts plus
+blockers → confirm dialog lists the totals and requires the **academic year typed back** →
+`POST /finance/data-clear`. The confirmation is re-checked server-side, and so are the blockers
+(the preview may be minutes old, and a payment posted since is exactly what a guard protects).
+
+**Audit**: every completed clear writes a `finance_data_clear_logs` row in the same transaction as
+the deletes — per-table counts, group keys, and the operator's id/name/role **snapshotted**. Once
+the rows are gone this is the only record they existed, so it is never cleared by any group and is
+surfaced as a "Clearing history" table on the page. A `Log::warning` is also emitted.
+
+**Uploaded receipt files** (`payment_receipt_submissions.file_path` on R2) are collected before the
+delete and removed **after the transaction commits** — an object-store delete cannot be rolled
+back. Failures are counted onto the log (`files_failed`, shown as an "orphaned file(s)" badge)
+rather than failing an already-committed clear.
+
+Covered by `tests/Feature/FinanceDataClearTest.php` (year isolation, payment-plan/disbursement
+survival, waived late fees, both blocker directions, confirmation, `finance.manage` refusal, audit
+entry, cross-institution isolation).
+
 ### Payment Plans (`/payment-plans`) — `PaymentPlansView.tsx`, **outside the shell**
 Manages installment plans: per-plan installment rows (label, due month/day, share %, grace days,
 late fee) via `/payment-plans`. Only month+day are persisted; the backend resolves the year from
@@ -326,6 +398,7 @@ the academic year. Routed as a sibling of `/finance` in `App.tsx` with its own s
 | `paymentReceiptService` | GET/POST `/payment-receipt-submissions` (POST is student multipart upload), POST `…/{id}/approve`, POST `…/{id}/reject` |
 | `paymentPlanService` | CRUD `/payment-plans`, GET `/payment-plan-changes` |
 | `receiptTemplateService` | CRUD `/receipt-templates` |
+| `financeDataClearService` | GET `/finance/data-clear/groups`, GET `/finance/data-clear/history`, POST `/finance/data-clear/preview`, POST `/finance/data-clear` (all behind `module:finance,clear-data`) |
 
 All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 
@@ -347,6 +420,7 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 | `payment_receipt_submissions` | Student-uploaded receipt: `installment_sequence/label`, R2 `file_path`, `status` pending/approved/rejected, `review_note`, `amount` (verified), `student_payment_id` (set on approval) |
 | `payment_plans` / `payment_plan_installments` | Plans + installment rows (sequence, label, due_month/day, share_percentage, grace, late fee) |
 | `student_payment_plans` | Student's chosen plan, unique(institution, student, year); changes audited in `student_payment_plan_changes` |
+| `finance_data_clear_logs` | One completed data clear: `academic_year`, `groups` (json), `deleted_counts` (json, per table), `total_deleted`, `files_deleted`/`files_failed`, `cleared_by` + snapshotted name/role. Written in the clear's own transaction; never cleared by it |
 
 ---
 
@@ -370,6 +444,15 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
     `APPROVER_ROLES`, `SELF_APPROVING_ROLES`) for payments, and in the `module:discounts,void`
     middleware + `canVoid()` for discounts; other finance controllers rely on institution
     scoping only, **not** roles — keep that in mind before exposing new endpoints.
+- **Data clearing**: `finance.clear-data` ("Clear Finance data"), a special ability listed under
+  Finance in the role builder. Held by `institution-administrator` and `principal`; deliberately
+  **not** by `finance` — the cashier runs the money screens all day, and the one irreversible action
+  among them should need a second person. `finance.manage` does **not** imply it (special abilities
+  are exact permission strings; see `HasModulePermissions::hasModuleAccess`). Enforced on all four
+  `finance/data-clear*` routes, re-checked in `Finance.tsx` (`canClearFinanceData`) and again by the
+  `RequireModule module="finance" ability="clear-data"` route guard. Existing tenants were granted it
+  by `2026_08_08_120100_grant_finance_clear_data_permission`, which goes **by role slug** rather than
+  off `finance.manage` — inferring it from manage would have handed the delete to every cashier.
 
 ---
 
@@ -417,6 +500,11 @@ Changing ledger/NOA response shapes or payment/discount semantics breaks these:
 - The mutation `onError` handlers use `error: any` throughout — pre-existing lint errors
   (`@typescript-eslint/no-explicit-any`) that predate current work; match local style but don't
   add new ones in fresh files.
+- **Every foreign key between the finance tables is `CASCADE` or `SET NULL` — none is `RESTRICT`.**
+  Deleting a `school_fees` row does not fail while payments reference it; it nulls their
+  `school_fee_id` and they silently become "General / Other" lines. Any new bulk-delete or cleanup
+  path needs the same survivor check Data Clearing does
+  (`FinanceDataGroups::dependents()`), because the database will not catch it.
 - **Not yet wired**: no export (CSV/print) on Collections or the Dashboard; no backend role
   middleware on finance routes beyond the void controller; frontend routes aren't role-guarded
   (sidebar-only gating).

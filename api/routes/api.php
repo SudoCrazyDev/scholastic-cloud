@@ -16,6 +16,7 @@ use App\Http\Controllers\GateSmsSettingController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DisbursementController;
 use App\Http\Controllers\DisbursementTypeController;
+use App\Http\Controllers\FinanceDataClearController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\DefaultDiscountController;
@@ -512,6 +513,14 @@ Route::middleware('auth.token')->group(function () {
 
     // Receipt templates
     Route::apiResource('receipt-templates', ReceiptTemplateController::class)->middleware('module:receipt-templates,view');
+
+    // Finance data clearing. Behind its own ability rather than `finance,manage`:
+    // running the POS must not carry the power to delete what it recorded.
+    // `preview` is a POST only because it takes an array of groups — it reads.
+    Route::get('finance/data-clear/groups', [FinanceDataClearController::class, 'groups'])->middleware('module:finance,clear-data');
+    Route::get('finance/data-clear/history', [FinanceDataClearController::class, 'history'])->middleware('module:finance,clear-data');
+    Route::post('finance/data-clear/preview', [FinanceDataClearController::class, 'preview'])->middleware('module:finance,clear-data');
+    Route::post('finance/data-clear', [FinanceDataClearController::class, 'store'])->middleware('module:finance,clear-data');
 
     // Disbursement types (dynamic expense categories)
     Route::get('disbursement-types', [DisbursementTypeController::class, 'index'])->middleware('module:disbursements,view');

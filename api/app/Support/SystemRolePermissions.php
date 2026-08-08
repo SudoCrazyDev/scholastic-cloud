@@ -136,6 +136,7 @@ class SystemRolePermissions
     public const SPECIAL = [
         'institution-administrator' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
+            'finance.clear-data',
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
@@ -143,6 +144,7 @@ class SystemRolePermissions
         ],
         'principal' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
+            'finance.clear-data',
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
@@ -155,6 +157,11 @@ class SystemRolePermissions
         // `discounts.void` is direct either way: a discount has no approval
         // queue behind it, and these three are the roles the discount
         // controllers hardcoded before the ability existed.
+        //
+        // `finance.clear-data` is deliberately withheld. Finance runs the money
+        // screens all day, and the one irreversible action among them — deleting
+        // a year's receipts outright — should need a second person. A school
+        // that wants its cashier to hold it can tick it in the role builder.
         'finance' => ['finance.request-void', 'finance.approve-void', 'discounts.void'],
 
         // Registrar and the two institution-wide roles already manage students,
