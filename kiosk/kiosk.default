@@ -1,0 +1,35 @@
+# ── ScholasticCloud kiosk ───────────────────────────────────────────────────
+# Installed to /etc/default/kiosk. Read by /usr/local/bin/kiosk.sh at every
+# boot. Edit here, then:  systemctl reboot   (or:  pkill chromium)
+#
+# This file is sourced by bash — quote values, no spaces around `=`.
+
+# The page to open. THIS IS THE ONE YOU MUST SET.
+KIOSK_URL="https://example.com"
+
+# Where Chromium keeps its kiosk profile (cookies, logins, cache).
+# Delete this directory to reset the kiosk to a signed-out state.
+#KIOSK_PROFILE="$HOME/.config/chromium-kiosk"
+
+# Wait for the network (and for the URL's host to answer) before starting, so
+# the kiosk doesn't land on a DNS error page at boot. Capped by the timeout.
+#KIOSK_WAIT_FOR_NETWORK=1
+#KIOSK_WAIT_FOR_URL=1
+#KIOSK_WAIT_TIMEOUT=90
+
+# Relaunch Chromium if it crashes or someone manages to close it.
+#KIOSK_RESPAWN=1
+
+# Keep the display awake (stops swayidle blanking the screen).
+#KIOSK_DISABLE_BLANKING=1
+
+# Auto-grant camera/microphone with no permission prompt. Set to 1 if the page
+# scans QR codes or barcodes with the camera. Only do this on a locked-down
+# kiosk — it grants the camera to whatever page is loaded, no questions asked.
+#KIOSK_ALLOW_CAMERA=0
+
+# Any extra Chromium flags, space separated. Examples:
+#   --force-device-scale-factor=1.25   scale up a small/high-DPI panel
+#   --window-size=1920,1080            when not running true fullscreen
+#   --incognito                        never persist anything between sessions
+#KIOSK_EXTRA_FLAGS=""
