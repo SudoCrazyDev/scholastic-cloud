@@ -25,6 +25,21 @@ export interface SmsMessageFilters {
   page?: number
 }
 
+export interface SmsGatewayLogLine {
+  seq: number
+  ts: string
+  level: 'debug' | 'info' | 'warn' | 'error'
+  text: string
+}
+
+export interface SmsGatewayLogs {
+  /** Changes when the agent restarts — a signal to clear and start over. */
+  run_id: string | null
+  lines: SmsGatewayLogLine[]
+  updated_at: string | null
+  agent_online: boolean
+}
+
 export interface GateSmsSettingsResponse {
   success: boolean
   data: GateSmsSetting[]
@@ -65,6 +80,30 @@ class SmsService {
   async refreshPairingCode(id: string) {
     const response = await api.post<ApiResponse<{ pairing_code: string; expires_at: string }>>(
       `/sms/gateways/${id}/refresh-pairing-code`,
+    )
+    return response.data
+  }
+
+  /**
+   * Ask the kiosk to re-check its modem. The portal cannot reach a kiosk
+   * directly, so this only queues the request; the agent picks it up on its
+   * next poll (≈5s) and reports back. Poll the gateway list and wait for
+   * `modem_checked_at` to move.
+   */
+  async refreshGatewayStatus(id: string) {
+    const response = await api.post<ApiResponse<{ agent_online: boolean; checked_at: string | null }>>(
+      `/sms/gateways/${id}/refresh-status`,
+    )
+    return response.data
+  }
+
+  /**
+   * The kiosk agent's recent log lines. Polling this is also what keeps the
+   * agent pushing, so call it on an interval while the viewer is open.
+   */
+  async getGatewayLogs(id: string, sinceSeq = 0) {
+    const response = await api.get<ApiResponse<SmsGatewayLogs>>(
+      `/sms/gateways/${id}/logs?since_seq=${sinceSeq}`,
     )
     return response.data
   }

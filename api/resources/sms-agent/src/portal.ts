@@ -1,9 +1,19 @@
-import { log } from './logger.js'
+import { log, type LogLine } from './logger.js'
 
 export interface OutboxMessage {
   id: string
   to_number: string
   body: string
+}
+
+/**
+ * Work handed back on an outbox poll. The portal can never push to a kiosk, so
+ * `commands` is how an admin clicking a button in the browser reaches the
+ * modem: the poll the agent already makes every few seconds carries it.
+ */
+export interface OutboxResult {
+  messages: OutboxMessage[]
+  commands: string[]
 }
 
 export interface PairResult {
@@ -45,9 +55,18 @@ export class Portal {
     return this.request('POST', '/sms-gateway/heartbeat', payload).then(() => undefined)
   }
 
-  async claimOutbox(limit: number): Promise<OutboxMessage[]> {
-    const res = await this.request<{ data: OutboxMessage[] }>('GET', `/sms-gateway/outbox?limit=${limit}`)
-    return res.data ?? []
+  async claimOutbox(limit: number): Promise<OutboxResult> {
+    const res = await this.request<{ data: OutboxMessage[]; commands?: string[] }>(
+      'GET',
+      `/sms-gateway/outbox?limit=${limit}`,
+    )
+    return { messages: res.data ?? [], commands: res.commands ?? [] }
+  }
+
+  /** Ship recent log lines so the portal can show them live. Fire-and-forget. */
+  pushLogs(runId: string, lines: LogLine[]): Promise<void> {
+    if (!lines.length) return Promise.resolve()
+    return this.request('POST', '/sms-gateway/logs', { run_id: runId, lines }).then(() => undefined)
   }
 
   reportStatus(results: unknown[]): Promise<void> {

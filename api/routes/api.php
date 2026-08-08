@@ -96,6 +96,7 @@ Route::middleware('auth.sms.token')->group(function () {
     Route::post('/sms-gateway/outbox/status', [SmsBridgeController::class, 'outboxStatus']);
     Route::post('/sms-gateway/delivery-reports', [SmsBridgeController::class, 'deliveryReports']);
     Route::post('/sms-gateway/inbox', [SmsBridgeController::class, 'inbox']);
+    Route::post('/sms-gateway/logs', [SmsBridgeController::class, 'logs']);
 });
 
 // Public routes (no authentication required)
@@ -655,6 +656,9 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('sms/gateways/{id}', [SmsGatewayController::class, 'destroy'])->middleware('module:sms-gateways,manage');
     Route::post('sms/gateways/{id}/refresh-pairing-code', [SmsGatewayController::class, 'refreshPairingCode'])->middleware('module:sms-gateways,manage');
     Route::get('sms/gateways/{id}/installer', [SmsGatewayController::class, 'installer'])->middleware('module:sms-gateways,manage');
+    // Read-only diagnostics: ask the kiosk to re-check its modem, and watch its log tail.
+    Route::post('sms/gateways/{id}/refresh-status', [SmsGatewayController::class, 'refreshStatus'])->middleware('module:sms-gateways,view');
+    Route::get('sms/gateways/{id}/logs', [SmsGatewayController::class, 'logs'])->middleware('module:sms-gateways,view');
 
     // SMS Gateway — messages
     Route::get('sms/messages', [SmsMessageController::class, 'index'])->middleware('module:sms-messages,view');

@@ -1,6 +1,6 @@
 {
   "name": "scholasticcloud-sms-gateway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Headless on-prem SMS kiosk agent for ScholasticCloud. Sends and receives SMS through a USB GSM modem via AT commands, driven entirely by the ScholasticCloud portal.",
   "type": "module",

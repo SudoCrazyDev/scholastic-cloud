@@ -101,7 +101,9 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const modem = new Modem(path, config.serialBaud, config.smsMode)
+  // Auto-detect on reconnect too, unless the port was pinned in .env — a
+  // re-plugged modem often comes back on a different path.
+  const modem = new Modem(path, config.serialBaud, config.smsMode, !config.serialPort)
   await modem.open()
   log.info(`Serial open on ${path} @ ${config.serialBaud} (${config.smsMode} mode)`)
 

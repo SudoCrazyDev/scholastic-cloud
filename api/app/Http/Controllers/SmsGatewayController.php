@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmsGateway;
+use App\Support\GatewayRuntime;
 use App\Support\ZipBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -97,8 +98,75 @@ class SmsGatewayController extends Controller
         }
 
         $gateway->delete();
+        GatewayRuntime::forget($gateway->id);
 
         return response()->json(['success' => true, 'message' => 'Gateway removed']);
+    }
+
+    /**
+     * Ask the kiosk to re-check its modem now. Nothing can be pushed to a
+     * kiosk, so this only queues the request — the agent collects it on its
+     * next outbox poll (≈5s) and answers with an out-of-band heartbeat. The
+     * caller polls the gateway list and watches `modem_checked_at` advance.
+     */
+    public function refreshStatus(Request $request, string $id): JsonResponse
+    {
+        $gateway = $this->findScoped($request, $id);
+        if (! $gateway) {
+            return response()->json(['success' => false, 'message' => 'Gateway not found'], 404);
+        }
+
+        if (! $gateway->sms_token_hash) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gateway is not paired yet, so there is nothing to ask.',
+            ], 422);
+        }
+
+        GatewayRuntime::requestRefresh($gateway->id);
+
+        $health = GatewayRuntime::health($gateway->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => $gateway->is_online
+                ? 'Checking the modem…'
+                : 'Requested — but this kiosk has not checked in recently, so it may not answer.',
+            'data' => [
+                'agent_online' => $gateway->is_online,
+                // What to compare against: the check is done once this moves on.
+                'checked_at' => $health['checked_at'] ?? null,
+            ],
+        ], 202);
+    }
+
+    /**
+     * The kiosk agent's recent log output — the portal's stand-in for running
+     * `npm run logs` on the device. Reading also renews the agent's standing
+     * request to keep pushing, so the tail stays live while this is polled and
+     * goes quiet on its own once nobody is watching.
+     */
+    public function logs(Request $request, string $id): JsonResponse
+    {
+        $gateway = $this->findScoped($request, $id);
+        if (! $gateway) {
+            return response()->json(['success' => false, 'message' => 'Gateway not found'], 404);
+        }
+
+        GatewayRuntime::requestLogStream($gateway->id);
+
+        $since = max(0, (int) $request->query('since_seq', 0));
+        $logs = GatewayRuntime::logs($gateway->id, $since);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'run_id' => $logs['run_id'],
+                'lines' => $logs['lines'],
+                'updated_at' => $logs['updated_at'],
+                'agent_online' => $gateway->is_online,
+            ],
+        ]);
     }
 
     public function refreshPairingCode(Request $request, string $id): JsonResponse
@@ -254,7 +322,15 @@ ENV;
 
     private function formatGateway(SmsGateway $gateway): array
     {
+        // Modem health is live state, not a stored column — see GatewayRuntime.
+        $health = GatewayRuntime::health($gateway->id);
+
         return [
+            'modem_connected' => $health['connected'] ?? null,
+            'modem_error' => $health['error'] ?? null,
+            'modem_port' => $health['port'] ?? null,
+            'modem_checked_at' => $health['checked_at'] ?? null,
+            'refresh_pending' => GatewayRuntime::refreshPending($gateway->id),
             'id' => $gateway->id,
             'institution_id' => $gateway->institution_id,
             'name' => $gateway->name,

@@ -1,13 +1,15 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import {
   Smartphone, Plus, Trash2, RefreshCw, Wifi, WifiOff, HelpCircle, Copy, Check, Signal, Download,
+  Usb, Unplug, Terminal, X,
 } from 'lucide-react'
-import { smsService } from '../../services/smsService'
+import { smsService, type SmsGatewayLogLine } from '../../services/smsService'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
+import { Dialog } from '../../components/dialog'
 import type { SmsGateway } from '../../types'
 
 const StatusBadge: React.FC<{ status: SmsGateway['status'] }> = ({ status }) => {
@@ -29,6 +31,184 @@ const StatusBadge: React.FC<{ status: SmsGateway['status'] }> = ({ status }) => 
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
       <HelpCircle className="w-3 h-3" /> Unknown
     </span>
+  )
+}
+
+/**
+ * Whether the USB modem itself answered its last check — a different question
+ * from whether the kiosk is online. A running agent with an unplugged dongle
+ * reports Online + Disconnected, which is exactly the case worth spotting.
+ */
+const ModemBadge: React.FC<{ gateway: SmsGateway; checking: boolean }> = ({ gateway, checking }) => {
+  if (checking) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600">
+        <RefreshCw className="w-3 h-3 animate-spin" /> Checking…
+      </span>
+    )
+  }
+  if (gateway.modem_connected === true) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+        <Usb className="w-3 h-3" /> Connected
+      </span>
+    )
+  }
+  if (gateway.modem_connected === false) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700"
+        title={gateway.modem_error ?? undefined}
+      >
+        <Unplug className="w-3 h-3" /> Disconnected
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500"
+      title="No modem check reported yet. Agents older than 0.2.0 do not send one."
+    >
+      <HelpCircle className="w-3 h-3" /> Unknown
+    </span>
+  )
+}
+
+const LEVEL_CLASS: Record<SmsGatewayLogLine['level'], string> = {
+  debug: 'text-zinc-500',
+  info: 'text-zinc-300',
+  warn: 'text-amber-300',
+  error: 'text-red-400',
+}
+
+/**
+ * Live tail of the kiosk agent's log — what `npm run logs` shows on the device,
+ * without needing a shell on it. Nothing is stored: the agent keeps its last
+ * few hundred lines in memory and pushes them only while this is open, and the
+ * server holds them in a short-lived cache entry.
+ */
+const LogViewer: React.FC<{ gateway: SmsGateway; onClose: () => void }> = ({ gateway, onClose }) => {
+  const [lines, setLines] = useState<SmsGatewayLogLine[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [agentOnline, setAgentOnline] = useState(true)
+  const [follow, setFollow] = useState(true)
+  const runIdRef = useRef<string | null>(null)
+  const sinceRef = useRef(0)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Polling is also what keeps the agent pushing — the server treats each read
+  // as "someone is watching" and stops asking ~45s after this closes.
+  useEffect(() => {
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const res = await smsService.getGatewayLogs(gateway.id, sinceRef.current)
+        if (cancelled) return
+        const payload = res.data
+        setAgentOnline(payload.agent_online)
+
+        // A restarted agent numbers its lines from 1 again, so start over
+        // rather than stitching the new run onto the tail of the old one.
+        if (payload.run_id && runIdRef.current && payload.run_id !== runIdRef.current) {
+          runIdRef.current = payload.run_id
+          sinceRef.current = 0
+          setLines([])
+          return
+        }
+        runIdRef.current = payload.run_id
+
+        if (payload.lines.length) {
+          sinceRef.current = payload.lines[payload.lines.length - 1].seq
+          setLines((prev) => [...prev, ...payload.lines].slice(-500))
+        }
+      } catch {
+        /* transient — the next tick retries */
+      } finally {
+        if (!cancelled) setLoaded(true)
+      }
+    }
+
+    void tick()
+    const timer = setInterval(tick, 3000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [gateway.id])
+
+  useEffect(() => {
+    if (follow && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [lines, follow])
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 40)
+  }
+
+  return (
+    <Dialog open size="4xl" onClose={onClose}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-indigo-600" /> Agent log — {gateway.name}
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Live tail from the kiosk, refreshed every few seconds. Not stored — closing this stops it.
+          </p>
+        </div>
+        <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Close">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {!agentOnline && (
+        <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          This kiosk has not checked in recently. You are seeing whatever it sent last, if anything.
+        </p>
+      )}
+
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="mt-3 h-96 overflow-auto rounded-lg bg-zinc-900 p-3 font-mono text-xs leading-relaxed"
+      >
+        {lines.length === 0 && (
+          <p className="text-zinc-500">
+            {loaded
+              ? 'Waiting for the kiosk to send its log tail — it pushes within a few seconds of this opening.'
+              : 'Loading…'}
+          </p>
+        )}
+        {lines.map((line) => (
+          <div key={`${line.seq}-${line.ts}`} className="whitespace-pre-wrap break-words">
+            <span className="text-zinc-600">{new Date(line.ts).toLocaleTimeString()} </span>
+            <span className={LEVEL_CLASS[line.level]}>
+              [{line.level.toUpperCase()}] {line.text}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+        <span>
+          {lines.length} line{lines.length === 1 ? '' : 's'}
+          {!follow && ' · scrolled up, auto-follow paused'}
+        </span>
+        <button
+          onClick={() => {
+            setLines([])
+            setFollow(true)
+          }}
+          className="text-indigo-600 hover:underline"
+        >
+          Clear view
+        </button>
+      </div>
+    </Dialog>
   )
 }
 
@@ -81,14 +261,55 @@ const Gateways: React.FC = () => {
   const [newLocation, setNewLocation] = useState('')
   const [newResult, setNewResult] = useState<{ pairing_code: string; expires_at: string | null } | null>(null)
   const [refreshedCode, setRefreshedCode] = useState<{ id: string; code: string; expires_at: string | null } | null>(null)
+  const [logsFor, setLogsFor] = useState<SmsGateway | null>(null)
+  // Gateways we've asked to re-check their modem, with the timestamp we're
+  // waiting to see move. The kiosk answers on its own poll, so this is a wait,
+  // not a request/response.
+  const [checking, setChecking] = useState<Record<string, { since: string | null; startedAt: number }>>({})
+
+  const isChecking = Object.keys(checking).length > 0
 
   const { data, isLoading } = useQuery({
     queryKey: ['sms-gateways'],
     queryFn: () => smsService.getGateways(),
-    refetchInterval: 30_000,
+    // Poll hard only while waiting on a modem check.
+    refetchInterval: isChecking ? 2_000 : 30_000,
   })
 
-  const gateways: SmsGateway[] = data?.data ?? []
+  // Memoized so the wait-for-check effect below isn't retriggered by every
+  // render handing it a fresh empty array.
+  const gateways: SmsGateway[] = useMemo(() => data?.data ?? [], [data])
+
+  // A check is done when the kiosk reports a newer reading; give up after 30s
+  // (roughly six outbox polls — long enough that a busy kiosk still answers).
+  useEffect(() => {
+    const waiting = Object.keys(checking)
+    if (!waiting.length) return
+
+    const settled = waiting.filter((id) => {
+      const gateway = gateways.find((g) => g.id === id)
+      const answered = gateway && gateway.modem_checked_at !== checking[id].since
+      return answered || Date.now() - checking[id].startedAt > 30_000
+    })
+    if (!settled.length) return
+
+    settled.forEach((id) => {
+      const gateway = gateways.find((g) => g.id === id)
+      if (gateway && gateway.modem_checked_at !== checking[id].since) {
+        toast.success(
+          gateway.modem_connected ? `${gateway.name}: modem responding` : `${gateway.name}: modem not responding`,
+        )
+      } else {
+        toast.error('The kiosk did not answer. Check that the agent service is running.')
+      }
+    })
+
+    setChecking((prev) => {
+      const next = { ...prev }
+      settled.forEach((id) => delete next[id])
+      return next
+    })
+  }, [gateways, checking])
 
   const createMutation = useMutation({
     mutationFn: ({ name, location }: { name: string; location: string }) =>
@@ -123,6 +344,18 @@ const Gateways: React.FC = () => {
       toast.success('New pairing code generated')
     },
     onError: () => toast.error('Could not refresh pairing code (already paired?)'),
+  })
+
+  const checkModemMutation = useMutation({
+    mutationFn: (gateway: SmsGateway) => smsService.refreshGatewayStatus(gateway.id),
+    onSuccess: (res, gateway) => {
+      setChecking((prev) => ({
+        ...prev,
+        [gateway.id]: { since: gateway.modem_checked_at, startedAt: Date.now() },
+      }))
+      toast.success(res.message ?? 'Checking the modem…')
+    },
+    onError: () => toast.error('Could not ask this kiosk to check its modem'),
   })
 
   const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sms-gateway'
@@ -197,6 +430,7 @@ const Gateways: React.FC = () => {
             <tr>
               <th className="text-left px-4 py-3">Name</th>
               <th className="text-left px-4 py-3">Status</th>
+              <th className="text-left px-4 py-3">Modem</th>
               <th className="text-left px-4 py-3">Signal</th>
               <th className="text-left px-4 py-3">Operator</th>
               <th className="text-left px-4 py-3">SIM #</th>
@@ -208,10 +442,10 @@ const Gateways: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {isLoading && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
             )}
             {!isLoading && gateways.length === 0 && (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No gateways yet. Add one to get started.</td></tr>
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">No gateways yet. Add one to get started.</td></tr>
             )}
             {gateways.map((g) => (
               <React.Fragment key={g.id}>
@@ -222,6 +456,14 @@ const Gateways: React.FC = () => {
                     {!g.is_paired && <span className="text-xs text-amber-600">Not paired</span>}
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={g.status} /></td>
+                  <td className="px-4 py-3">
+                    <ModemBadge gateway={g} checking={!!checking[g.id]} />
+                    {g.modem_connected === false && g.modem_error && (
+                      <div className="text-xs text-red-500 mt-0.5 max-w-52 truncate" title={g.modem_error}>
+                        {g.modem_error}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><SignalIndicator csq={g.signal_strength} /></td>
                   <td className="px-4 py-3 text-gray-600">{g.network_operator ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{g.sim_msisdn ?? '—'}</td>
@@ -232,6 +474,25 @@ const Gateways: React.FC = () => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      {g.is_paired && (
+                        <>
+                          <button
+                            onClick={() => checkModemMutation.mutate(g)}
+                            disabled={!!checking[g.id]}
+                            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-40"
+                            title="Check the modem now"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${checking[g.id] ? 'animate-spin' : ''}`} />
+                          </button>
+                          <button
+                            onClick={() => setLogsFor(g)}
+                            className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+                            title="View the agent log"
+                          >
+                            <Terminal className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                       <button
                         onClick={() => handleDownloadInstaller(g)}
                         className="p-1.5 rounded hover:bg-gray-100 text-indigo-600"
@@ -262,7 +523,7 @@ const Gateways: React.FC = () => {
                 </tr>
                 {refreshedCode?.id === g.id && (
                   <tr>
-                    <td colSpan={9} className="px-4 pb-4 bg-gray-50">
+                    <td colSpan={10} className="px-4 pb-4 bg-gray-50">
                       <PairingCodeDisplay code={refreshedCode.code} expiresAt={refreshedCode.expires_at} />
                     </td>
                   </tr>
@@ -272,6 +533,8 @@ const Gateways: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {logsFor && <LogViewer gateway={logsFor} onClose={() => setLogsFor(null)} />}
     </div>
   )
 }

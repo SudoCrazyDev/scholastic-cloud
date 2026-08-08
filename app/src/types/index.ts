@@ -3062,6 +3062,17 @@ export interface SmsGateway {
   imei: string | null;
   modem_model: string | null;
   agent_version: string | null;
+  /**
+   * Modem presence, reported on each heartbeat and held only in the server's
+   * cache — null means no agent running 0.2.0+ has reported yet. Distinct from
+   * `status`, which is about the agent, not the USB dongle.
+   */
+  modem_connected: boolean | null;
+  modem_error: string | null;
+  modem_port: string | null;
+  modem_checked_at: string | null;
+  /** A refresh has been queued but the kiosk has not collected it yet. */
+  refresh_pending: boolean;
   last_seen_at: string | null;
   pairing_code?: string;
   pairing_code_expires_at: string | null;

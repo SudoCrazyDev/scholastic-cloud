@@ -24,7 +24,21 @@ export class Modem {
   private promptWaiters: (() => void)[] = []
   private busy: Promise<unknown> = Promise.resolve()
 
-  constructor(private path: string, private baud: number, private mode: 'pdu' | 'text') {}
+  constructor(
+    private path: string,
+    private baud: number,
+    private mode: 'pdu' | 'text',
+    /** True when the port was auto-detected, so a reconnect may pick a new one. */
+    private allowAutoDetect = false,
+  ) {}
+
+  get portPath(): string {
+    return this.path
+  }
+
+  get isOpen(): boolean {
+    return this.port !== null
+  }
 
   async open(): Promise<void> {
     await new Promise<void>((resolve, reject) => {
@@ -33,13 +47,27 @@ export class Modem {
         else resolve()
       })
     })
-    this.port!.on('data', (chunk: Buffer) => this.onData(chunk))
-    this.port!.on('error', (err) => log.error('serial error', err.message))
+    const opened = this.port!
+    opened.on('data', (chunk: Buffer) => this.onData(chunk))
+    opened.on('error', (err) => log.error('serial error', err.message))
+    // Unplugging the USB modem closes the port under us. Drop the handle so
+    // `isOpen` tells the truth and commands fail fast instead of timing out.
+    opened.on('close', () => {
+      if (this.port === opened) {
+        this.port = null
+        log.warn(`serial port ${this.path} closed (modem unplugged?)`)
+      }
+    })
   }
 
   close(): void {
-    this.port?.close()
+    const open = this.port
     this.port = null
+    try {
+      open?.close()
+    } catch {
+      /* already gone */
+    }
   }
 
   private onData(chunk: Buffer): void {
@@ -141,6 +169,47 @@ export class Modem {
       /* not all SIMs expose own number */
     }
     return { imei, model, ownNumber }
+  }
+
+  /**
+   * Is the modem still there and answering? A bare `AT` is the cheapest proof
+   * that the SIM dongle is plugged in, powered, and in command mode. Short
+   * timeout: this runs on the heartbeat, so it must not stall it.
+   */
+  async ping(timeoutMs = 4000): Promise<boolean> {
+    if (!this.port) return false
+    try {
+      await this.command('AT', timeoutMs)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Reopen the serial link after the modem dropped off — a yanked cable, a USB
+   * re-enumeration, or a modem that reset itself. Without this the agent would
+   * keep running against a dead port until someone restarted the service.
+   * Auto-detects again when the port wasn't pinned in .env, since a re-plugged
+   * modem often comes back on a different path.
+   */
+  async reconnect(): Promise<void> {
+    this.close()
+    this.buffer = ''
+    this.lineWaiters = []
+    this.promptWaiters = []
+    this.busy = Promise.resolve()
+
+    if (this.allowAutoDetect) {
+      const found = await autoDetectPort(this.baud)
+      if (found && found !== this.path) {
+        log.info(`Modem moved to ${found}`)
+        this.path = found
+      }
+    }
+
+    await this.open()
+    await this.init()
   }
 
   /** Signal quality: AT+CSQ -> rssi 0..31 (99 = unknown). */

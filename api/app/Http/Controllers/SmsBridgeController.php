@@ -7,6 +7,7 @@ use App\Models\SmsMessage;
 use App\Models\SmsOptOut;
 use App\Models\SmsSetting;
 use App\Services\SmsService;
+use App\Support\GatewayRuntime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,9 +81,22 @@ class SmsBridgeController extends Controller
             'modem_model' => 'nullable|string|max:128',
             'platform' => 'nullable|in:linux,windows,unknown',
             'agent_version' => 'nullable|string|max:64',
+            // Modem presence is separate from agent presence: the daemon can be
+            // perfectly healthy while the USB dongle is unplugged.
+            'modem_connected' => 'nullable|boolean',
+            'modem_error' => 'nullable|string|max:255',
+            'modem_port' => 'nullable|string|max:128',
         ]);
 
         $online = $validated['online'] ?? true;
+
+        if (array_key_exists('modem_connected', $validated)) {
+            GatewayRuntime::putHealth($gateway->id, [
+                'connected' => (bool) $validated['modem_connected'],
+                'error' => $validated['modem_error'] ?? null,
+                'port' => $validated['modem_port'] ?? null,
+            ]);
+        }
 
         $gateway->update([
             'last_seen_at' => now(),
@@ -113,6 +127,11 @@ class SmsBridgeController extends Controller
         $requested = (int) $request->query('limit', 10);
         $requested = max(1, min($requested, 50));
 
+        // The portal cannot push, so anything an admin asked for rides back on
+        // this poll. Resolved before any early return, or a rate-limited gateway
+        // would never receive a refresh request.
+        $commands = GatewayRuntime::takeCommands($gateway->id);
+
         // Resolve anything a previous run claimed but never reported on. Does not gate
         // this poll — `sending` rows never blocked the claim, which only selects `queued`.
         // Runs here so the module needs no cron to self-heal.
@@ -132,7 +151,7 @@ class SmsBridgeController extends Controller
         $limit = min($requested, $remaining);
 
         if ($limit <= 0) {
-            return response()->json(['success' => true, 'data' => []]);
+            return response()->json(['success' => true, 'data' => [], 'commands' => $commands]);
         }
 
         $claimed = DB::transaction(function () use ($gateway, $limit) {
@@ -163,7 +182,32 @@ class SmsBridgeController extends Controller
             'body' => $m->body,
         ]);
 
-        return response()->json(['success' => true, 'data' => $data]);
+        return response()->json(['success' => true, 'data' => $data, 'commands' => $commands]);
+    }
+
+    /**
+     * Kiosk pushes the tail of its agent log so the portal can show what
+     * `npm run logs` would show on the device. Kept in the file cache only —
+     * this is a live view, not an audit trail, and never hits the database.
+     * Body: {run_id, lines: [{seq, ts, level, text}]}
+     */
+    public function logs(Request $request): JsonResponse
+    {
+        /** @var SmsGateway $gateway */
+        $gateway = $request->attributes->get('sms_gateway');
+
+        $validated = $request->validate([
+            'run_id' => 'required|string|max:64',
+            'lines' => 'present|array|max:200',
+            'lines.*.seq' => 'required|integer|min:1',
+            'lines.*.ts' => 'nullable|string|max:40',
+            'lines.*.level' => 'required|in:debug,info,warn,error',
+            'lines.*.text' => 'present|string',
+        ]);
+
+        GatewayRuntime::appendLogs($gateway->id, $validated['run_id'], $validated['lines']);
+
+        return response()->json(['success' => true, 'stored' => count($validated['lines'])]);
     }
 
     /**

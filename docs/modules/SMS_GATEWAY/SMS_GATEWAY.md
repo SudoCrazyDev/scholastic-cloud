@@ -71,7 +71,9 @@ repo-relative; line numbers drift — search the symbol if it has moved.
   - `app/Services/GateSmsNotifier.php` — the Gate Entries **producer**; turns an `rfid_scan_logs`
     row into a queued SMS. Called from `RfidScanLogController::scan|kioskScan`.
 - Middleware: `app/Http/Middleware/AuthenticateSmsToken.php` — alias `auth.sms.token`, registered in `bootstrap/app.php`.
-- Support: `app/Support/ZipBuilder.php` — dependency-free STORE-method ZIP writer (no `ext-zip` on shared hosting).
+- Support: `app/Support/ZipBuilder.php` — dependency-free STORE-method ZIP writer (no `ext-zip` on shared hosting);
+  `app/Support/GatewayRuntime.php` — **cache-only** live state (modem health, log tail, queued commands).
+  See [Live diagnostics](#live-diagnostics-modem-health-and-logs).
 - Console: `app/Console/Commands/BundleSmsAgent.php` — `php artisan sms:bundle-agent`;
   `app/Console/Commands/ReapStuckSmsMessages.php` — `php artisan sms:reap-stuck`.
 - Vendored agent snapshot: `api/resources/sms-agent/**` — a committed copy of `sms_gateway/` the installer
@@ -123,6 +125,10 @@ repo-relative; line numbers drift — search the symbol if it has moved.
 `is_online` (model accessor) = a heartbeat within the last **150s** (2.5× the ~60s interval).
 `computed_status` returns `unknown` until the first heartbeat, else `online`/`offline`.
 `sms_token_hash` and `pairing_code` are in the model's `$hidden`.
+
+**`status` is about the agent, not the modem.** A kiosk whose USB dongle was unplugged keeps
+heartbeating and stays `online`. Whether the modem itself answers is reported separately and is
+**not stored in this table** — see [Live diagnostics](#live-diagnostics-modem-health-and-logs).
 
 ### `sms_messages` — outbound + inbound
 | column | type | notes |
@@ -216,8 +222,9 @@ Agent endpoints return `{ success, data? }` and authenticate with the gateway to
 | method | path | body | notes |
 |---|---|---|---|
 | POST | `/api/sms-gateway/pair` | `{ pairing_code, imei?, modem_model?, platform?, agent_version? }` | **public**; returns `{ token, gateway_id }` once |
-| POST | `/api/sms-gateway/heartbeat` | `{ online?, signal_strength?, network_operator?, sim_msisdn?, sim_balance?, imei?, modem_model?, platform?, agent_version? }` | updates presence + telemetry |
-| GET | `/api/sms-gateway/outbox?limit=` | — | atomically claims ≤`limit` queued rows → `sending`; honors rate limit; returns `[{id,to_number,body}]` |
+| POST | `/api/sms-gateway/heartbeat` | `{ online?, signal_strength?, network_operator?, sim_msisdn?, sim_balance?, imei?, modem_model?, platform?, agent_version?, modem_connected?, modem_error?, modem_port? }` | updates presence + telemetry; the `modem_*` trio goes to the cache, not the table |
+| GET | `/api/sms-gateway/outbox?limit=` | — | atomically claims ≤`limit` queued rows → `sending`; honors rate limit; returns `{data: [{id,to_number,body}], commands: []}` |
+| POST | `/api/sms-gateway/logs` | `{ run_id, lines:[{seq,ts,level,text}] }` (≤200 lines) | agent log tail for the portal viewer; cache-only |
 | POST | `/api/sms-gateway/outbox/status` | `{ results:[{id,status:sent\|failed,provider_ref?,segments?,error?,sent_at?}] }` | idempotent; terminal rows untouched |
 | POST | `/api/sms-gateway/delivery-reports` | `{ reports:[{provider_ref,status:delivered\|failed,delivered_at?}] }` | matches outbound by `provider_ref` |
 | POST | `/api/sms-gateway/inbox` | `{ messages:[{from,body,received_at?}] }` | deduped; opt-out keywords recorded |
@@ -233,6 +240,48 @@ Two things about the cap that surprise people:
   move up to 3 × the configured rate.
 - **The count keys on `updated_at`**, so a delivery report landing later re-counts that message against
   the current minute — the effective rate runs slightly *under* the configured one.
+
+### Live diagnostics: modem health and logs
+
+Two questions an admin asks that the tables above cannot answer: *is the modem actually plugged in?*
+and *what is the agent doing right now?* Both are answered without a single new row.
+
+**Nothing here is persisted.** `App\Support\GatewayRuntime` keeps all of it in the **`file` cache
+store**, named explicitly — the app default is `database`, and routing log output into a table
+nobody prunes is exactly what this avoids. Everything is re-reported by the agent within one
+heartbeat, so a cache clear costs seconds of staleness and nothing more. TTLs: health 15 min,
+log tail 30 min, a queued refresh 2 min, a log-stream request 45 s.
+
+> **Single-node assumption.** The web node that answers the admin must be the same one the kiosk
+> posted to. ScholasticCloud runs single-node; behind a load balancer this needs a shared store
+> (Redis) — change the one `Cache::store('file')` in `GatewayRuntime`.
+
+**How a button in the browser reaches a modem.** It doesn't, directly — the server can never push
+to a kiosk. Requests are parked in the cache and handed back on the **outbox poll the agent already
+makes every 5s**, as a `commands` array on that response. Two commands exist:
+
+| command | queued by | agent does | consumed? |
+|---|---|---|---|
+| `refresh` | **Refresh** button (`refresh-status`) | probes the modem and sends an out-of-band heartbeat immediately | yes, one-shot |
+| `logs` | any read of `GET .../logs` | pushes its log tail to `/sms-gateway/logs` | no — lapses 45s after the last read |
+
+So the log viewer streams *because it is being watched*: each poll renews the request, and the agent
+stops pushing on its own once the drawer closes. No traffic when nobody is looking.
+
+**Modem health.** Every heartbeat now runs a bare `AT` first (`modem.ping()`, 4s). The result rides
+along as `modem_connected` / `modem_error` / `modem_port`, and `formatGateway` merges it into the
+admin payload. This is why the Gateways table has **two** status columns — *Status* (agent) and
+*Modem* (dongle). Online + Disconnected is the interesting case: service healthy, cable out.
+
+**Reconnect.** A failed probe is not just reported, it is repaired: after **two consecutive misses**
+(or immediately on a `refresh`, since an admin pressing it has usually just re-seated the cable) the
+agent closes the port, re-runs auto-detection unless `SERIAL_PORT` pins it, reopens and re-`init`s.
+Without this a modem that was unplugged and plugged back in stayed dead until someone restarted the
+service — and the *Modem* column would have been permanently red, which is worse than not having it.
+
+**Latency to expect:** ≤5s for the kiosk to collect a command, plus the probe itself (longer when a
+`USSD_BALANCE_CODE` is configured — that query alone can take 15s). The UI waits 30s before giving
+up and telling the admin the kiosk never answered.
 
 ### Retries and the reaper
 
@@ -272,6 +321,7 @@ It runs from two places:
 | One send attempt before giving up on that number | **30s** (`CMGS timeout`, then ESC-abort) | `modem.ts` `enqueuePromptCommand` |
 | Gap before the next number in the batch | **none** — tight `for` loop | `agent.ts` `sendBatch` |
 | Plain `AT` command timeout (`CSQ`, `COPS`) | 8s | `modem.ts` `command` |
+| Modem liveness probe on each heartbeat | 4s | `modem.ts` `ping` |
 | Idle wait between outbox polls | 5s (`OUTBOX_POLL_MS`) | `config.ts` |
 | Messages claimed per poll | 10 (`OUTBOX_BATCH`), capped by the rate budget | `config.ts` |
 | Before a never-reported row is failed | 10 min (`STUCK_AFTER_MINUTES`) — bookkeeping only | `SmsService` |
@@ -294,6 +344,8 @@ Two details worth preserving if you touch this:
 | PATCH | `/api/sms/gateways/{id}` | `{ name?, location? }` | |
 | DELETE | `/api/sms/gateways/{id}` | — | unguarded (also the re-provision escape hatch) |
 | POST | `/api/sms/gateways/{id}/refresh-pairing-code` | — | **422 if already paired** |
+| POST | `/api/sms/gateways/{id}/refresh-status` | — | queues a modem re-check (`202`); **422 if not paired**. Does *not* wait for the kiosk |
+| GET | `/api/sms/gateways/{id}/logs` | `?since_seq=` | agent log tail; reading also keeps the agent pushing |
 | GET | `/api/sms/gateways/{id}/installer` | — | streams `sms-gateway-<slug>.zip` (agent + prefilled env) |
 | GET | `/api/sms/messages` | `?direction=&status=&gateway_id=&search=&date` | |
 | POST | `/api/sms/messages` | `{ numbers:string[], body, gateway_id?, scheduled_at? }` | compose + queue (one row per number); `body` ≤1600 |
@@ -309,9 +361,13 @@ Two details worth preserving if you touch this:
 
 ## Frontend
 
-- **Gateways** (`pages/SMS/Gateways.tsx`) — table of kiosks (status/signal/operator/SIM/balance/last-seen/
-  platform). *Add gateway* shows the `PairingCodeDisplay`; per-row **Download installer** (blob → `.zip`),
-  **Refresh code** (only when not paired), delete. Polls with `refetchInterval`.
+- **Gateways** (`pages/SMS/Gateways.tsx`) — table of kiosks (status/**modem**/signal/operator/SIM/balance/
+  last-seen/platform). *Add gateway* shows the `PairingCodeDisplay`; per-row **Check modem** and
+  **Agent log** (paired only), **Download installer** (blob → `.zip`), **Refresh code** (only when not
+  paired), delete. Polls every 30s — dropping to 2s while waiting on a modem check, since the answer
+  arrives via the kiosk's own poll and the page has to watch `modem_checked_at` move to know it landed.
+  `LogViewer` polls `/logs` every 3s with a `since_seq` cursor and resets when `run_id` changes
+  (the agent restarted and its sequence numbers began again).
 - **Messages** (`pages/SMS/Messages.tsx`) — Outbound/Inbound tabs, filters, **Compose** modal
   (recipients as manual/comma-separated numbers in V1, GSM-7 segment counter, gateway picker, optional schedule).
 - **Settings** (`pages/SMS/Settings.tsx`) — default gateway, rate limit, send window, opt-out keywords, sender name.
@@ -334,11 +390,16 @@ on Windows) under the `smsgw` service user, which must be in the `dialout` group
   exist). `reloadConfig()` re-reads with dotenv `override`. `persistToken()` writes the token back.
 - **`modem.ts`** — AT layer. **Auto-detects** the modem by ranking USB vendor IDs and probing with
   `AT`/`AT+CGMM`. Tolerant `>` prompt detection for `AT+CMGS` (some modems omit the trailing space);
-  ESC-abort recovery on send timeout.
+  ESC-abort recovery on send timeout. `ping()` is the liveness probe; `reconnect()` reopens the link
+  (re-detecting the port) after the modem drops off.
 - **`pdu.ts`** — PDU codec (GSM-7 + UCS2, concatenation UDH, DELIVER/STATUS-REPORT). Self-test via `pdu.selftest.ts`.
-- **`agent.ts`** — the three loops: **heartbeat** (`AT+CSQ`/`AT+COPS?`/balance → `/heartbeat`),
-  **outbound** (`/outbox` → `AT+CMGS` per message → `/outbox/status`), **inbound** (`+CMTI` read →
-  `/inbox`; `+CDS` → `/delivery-reports`).
+- **`agent.ts`** — the three loops: **heartbeat** (`ping` → `AT+CSQ`/`AT+COPS?`/balance → `/heartbeat`;
+  skips the telemetry commands when the modem didn't answer, since each would just burn its timeout),
+  **outbound** (`/outbox` → `AT+CMGS` per message → `/outbox/status`, plus any `commands` on the
+  response), **inbound** (`+CMTI` read → `/inbox`; `+CDS` → `/delivery-reports`).
+- **`logger.ts`** — console output *and* an in-memory ring of the last **500** lines with monotonic
+  `seq` numbers and a per-process `run_id`, which is what the portal's log viewer displays. Respects
+  `LOG_LEVEL`: to see AT traffic in the portal, set `LOG_LEVEL=debug` on the kiosk. Never written to disk.
 - **`portal.ts`** — HTTP client (`withRetry` backoff on the loops).
 
 **Service commands** (`scripts/ctl.mjs`): `npm run pair -- <CODE>` · `npm run enable-start` ·
@@ -452,3 +513,10 @@ its next `outbox` poll, so a parent's text arrives seconds after the scan, not i
   so parents can get "entered at 7:32" at 7:57, and gate traffic shares one FIFO with announcements and
   finance. There is no per-gate cap and no max-age drop for stale messages.
 - Inbound is stored and opt-out-aware but has **no conversation/threading UI** — it's a flat Inbound list.
+- **Modem health and the log viewer need agent ≥ 0.2.0.** A kiosk still on 0.1.0 heartbeats fine but
+  never reports `modem_connected` (Modem column reads *Unknown*) and ignores `commands`, so Refresh
+  times out and the log viewer stays empty. Re-download the installer on those kiosks. There is no
+  auto-update.
+- **Log history is deliberately short-lived** — 500 lines in the agent, 500 on the server, gone 30 min
+  after the last push and on any cache clear. It is a live window, not an audit trail; if you ever need
+  retention, that is a new decision to make explicitly, not a TTL to quietly raise.
