@@ -953,8 +953,16 @@ export interface FinanceDashboardStudent {
   grade_level: string;
   section_id: string;
   section: string;
+  // The two halves of `charges`: what the grade bills every student, and what this student
+  // was charged on their own (ad-hoc fees, cash-basis fees and late fees).
+  school_fees: number;
+  student_fees: number;
   charges: number;
   discounts: number;
+  // `total_payable` disassembled. Discounts only ever price against school fees, so they come
+  // off that side alone; these three add up to `total_payable` exactly.
+  school_fees_payable: number;
+  student_fees_payable: number;
   balance_forward: number;
   total_payable: number;
   total_paid: number;

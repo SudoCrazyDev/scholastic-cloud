@@ -250,7 +250,16 @@ class FinanceDashboardController extends Controller
             );
 
             $charges = round($standardCharges + $additionalCharges, 2);
-            $totalPayable = round($balanceForward + $charges - $discountTotal, 2);
+
+            // Total payable, disassembled. Every discount is priced against the grade's
+            // standard fees — a discount can name a school fee but never an additional one —
+            // so the whole discount comes off the school-fee side and the student-fee side is
+            // its charges as billed. A school a discount overshoots reads negative here rather
+            // than being clamped: the parts have to keep adding up to the total, and a
+            // write-off larger than the fee it is against is worth seeing.
+            $schoolFeesPayable = round($standardCharges - $discountTotal, 2);
+            $studentFeesPayable = round($additionalCharges, 2);
+            $totalPayable = round($balanceForward + $schoolFeesPayable + $studentFeesPayable, 2);
             $paid = round($paymentsByStudentYear[$studentId][$academicYear] ?? 0.0, 2);
 
             $rows[] = [
@@ -264,8 +273,18 @@ class FinanceDashboardController extends Controller
                 'grade_level' => $gradeLevel,
                 'section_id' => $placement['section_id'],
                 'section' => $placement['section'],
+                // What was charged, split into what the grade bills everyone and what this
+                // student was charged on their own. Late fees count as student fees: they are
+                // booked as the same kind of row and are listed with them, so the two always
+                // add back up to `charges`.
+                'school_fees' => round($standardCharges, 2),
+                'student_fees' => round($additionalCharges, 2),
                 'charges' => $charges,
                 'discounts' => round($discountTotal, 2),
+                // …and the same split of what is owed. These three are exactly `total_payable`,
+                // so a row can be read across and seen to add up.
+                'school_fees_payable' => $schoolFeesPayable,
+                'student_fees_payable' => $studentFeesPayable,
                 'balance_forward' => $balanceForward,
                 'total_payable' => $totalPayable,
                 'total_paid' => $paid,

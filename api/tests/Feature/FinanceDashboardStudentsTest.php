@@ -261,9 +261,23 @@ class FinanceDashboardStudentsTest extends TestCase
 
         $row = $this->fetch('totals-token')->assertOk()->json('data.students.0');
 
-        $this->assertEquals(26500, $row['charges']);      // 20000 + 5000 + 1500
+        // The grade's fees and the student's own are reported apart, and still add back up.
+        $this->assertEquals(25000, $row['school_fees']);  // 20000 + 5000
+        $this->assertEquals(1500, $row['student_fees']);  // Laboratory Fee
+        $this->assertEquals(26500, $row['charges']);
         $this->assertEquals(2500, $row['discounts']);     // 2000 + 500
+
+        // Total payable, disassembled: every discount comes off the school-fee side, the
+        // student-fee side is its charges as billed, and the parts are the total.
+        $this->assertEquals(22500, $row['school_fees_payable']);  // 25000 - 2500
+        $this->assertEquals(1500, $row['student_fees_payable']);
+        $this->assertEquals(0, $row['balance_forward']);
         $this->assertEquals(24000, $row['total_payable']);
+        $this->assertEquals(
+            $row['total_payable'],
+            $row['school_fees_payable'] + $row['student_fees_payable'] + $row['balance_forward']
+        );
+
         $this->assertEquals(8000, $row['total_paid']);
         $this->assertEquals(16000, $row['remaining_balance']);
         $this->assertEquals(1, $row['other_fee_count']);
@@ -308,6 +322,9 @@ class FinanceDashboardStudentsTest extends TestCase
         $this->assertEquals(2000, $row['balance_forward']);
         $this->assertEquals(12000, $row['total_payable']);
         $this->assertEquals(12000, $row['remaining_balance']);
+        // What was carried in is its own part of the payable, not folded into either fee side.
+        $this->assertEquals(10000, $row['school_fees_payable']);
+        $this->assertEquals(0, $row['student_fees_payable']);
     }
 
     public function test_grade_level_discount_applies_unless_voided_for_the_student(): void
@@ -341,8 +358,10 @@ class FinanceDashboardStudentsTest extends TestCase
 
         $this->assertEquals(1000, $rows[$shared->id]['discounts']);
         $this->assertEquals(14000, $rows[$shared->id]['total_payable']);
+        $this->assertEquals(14000, $rows[$shared->id]['school_fees_payable']);
         $this->assertEquals(0, $rows[$exempt->id]['discounts']);
         $this->assertEquals(15000, $rows[$exempt->id]['total_payable']);
+        $this->assertEquals(15000, $rows[$exempt->id]['school_fees_payable']);
     }
 
     public function test_filters_narrow_the_list_without_narrowing_the_filter_options(): void

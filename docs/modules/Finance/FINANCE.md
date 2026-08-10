@@ -234,9 +234,24 @@ grade-level / section filters →
 (`financeDashboardService.getStudentBalances`). Response `data` carries `students` (one row per
 student enrolled that year, already ordered by grade level then surname), plus `grade_levels`
 and `sections` for the filter dropdowns — both built from the whole year, so filtering on one
-never hides the others. Rows are listed as `LAST NAME, FIRST NAME M.` with total payable and
-remaining balance; the name search filters the fetched rows client-side (every word typed must
-appear in the name or LRN, in any order).
+never hides the others. The name search filters the fetched rows client-side (every word typed
+must appear in the name or LRN, in any order).
+
+Columns: name (`LAST NAME, FIRST NAME M.`), LRN, section, then **Total Payable disassembled**
+under a spanning header — **School Fees** (`school_fees_payable`), **Student Fees**
+(`student_fees_payable`), **Balance Forward**, **Total** — and **Remaining Balance**. The three
+parts always sum to `total_payable` exactly, because the total is assembled from them rather than
+computed alongside them. How the split falls out:
+
+- **School Fees** = the grade's fee defaults **less every discount**. Discounts are only ever
+  priced against the standard fees — a `student_discounts`/`grade_level_discounts` row can name a
+  `school_fee_id` but there is no column pointing at an additional fee — so the whole discount
+  comes off this side. A discount larger than the fee it is against reads negative rather than
+  being clamped, so the row still adds up and the data problem is visible.
+- **Student Fees** = that student's own additional fees as billed (ad-hoc, cash-basis, and late
+  fees, which are the same kind of row and are listed with them).
+- **Balance Forward** = what earlier enrolled years left owing. Kept as its own part rather than
+  folded into either fee side, since it is neither.
 
 Each row's figures are built exactly as `StudentFinanceController::ledger()` builds its totals —
 charges (grade fee defaults + the student's own additional fees), less student and grade-level
@@ -245,7 +260,9 @@ agree. The one difference: the listing does **not** materialize new late fees (t
 and this reads the whole school), so a surcharge only booked when the ledger is next opened is
 not yet counted.
 
-Selecting a row expands it: four tiles (charges, discounts, balance forward, total paid) and an
+Selecting a row expands it into the derivation behind those columns: five tiles (school fees
+charged, student fees charged, discounts, balance forward, total paid — gross, where the columns
+are net) and an
 **Other Fees** table — the student's ad-hoc charges, cash-basis fees and late fees with
 charge / discount / paid / outstanding, read from that student's `GET /students/{id}/ledger`
 `fee_breakdown` (`is_additional` lines). Read-only.

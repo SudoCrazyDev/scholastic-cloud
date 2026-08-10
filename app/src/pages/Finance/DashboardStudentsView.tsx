@@ -118,14 +118,19 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
     return byGrade
   }, [visibleStudents])
 
+  // Column totals for whatever is on screen. The same disassembly as the rows, so the strip
+  // adds up the same way: school fees + student fees + balance forward = total payable.
   const totals = useMemo(
     () =>
       visibleStudents.reduce(
         (acc, student) => ({
+          schoolFees: acc.schoolFees + student.school_fees_payable,
+          studentFees: acc.studentFees + student.student_fees_payable,
+          balanceForward: acc.balanceForward + student.balance_forward,
           payable: acc.payable + student.total_payable,
           balance: acc.balance + student.remaining_balance,
         }),
-        { payable: 0, balance: 0 }
+        { schoolFees: 0, studentFees: 0, balanceForward: 0, payable: 0, balance: 0 }
       ),
     [visibleStudents]
   )
@@ -215,6 +220,26 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                 student{visibleStudents.length === 1 ? '' : 's'}
               </span>
               <span className="text-gray-600">
+                School fees{' '}
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(totals.schoolFees)}
+                </span>
+              </span>
+              <span className="text-gray-600">
+                Student fees{' '}
+                <span className="font-semibold text-gray-900">
+                  {formatCurrency(totals.studentFees)}
+                </span>
+              </span>
+              {totals.balanceForward !== 0 && (
+                <span className="text-gray-600">
+                  Balance forward{' '}
+                  <span className="font-semibold text-gray-900">
+                    {formatCurrency(totals.balanceForward)}
+                  </span>
+                </span>
+              )}
+              <span className="text-gray-600">
                 Total payable{' '}
                 <span className="font-semibold text-gray-900">{formatCurrency(totals.payable)}</span>
               </span>
@@ -226,22 +251,54 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
 
             <div className="overflow-x-auto">
               <table className="min-w-full">
+                {/* Two header rows: Total Payable spans the three parts it is made of plus
+                    its own total, so the row can be read across and seen to add up. */}
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
+                    >
                       Student
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
+                    >
                       LRN
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
+                    >
                       Section
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th
+                      colSpan={4}
+                      scope="colgroup"
+                      className="border-x border-gray-200 px-4 pt-3 pb-1 text-center text-xs font-semibold text-gray-500 uppercase"
+                    >
                       Total Payable
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase align-bottom"
+                    >
                       Remaining Balance
+                    </th>
+                  </tr>
+                  <tr>
+                    <th className="border-l border-gray-200 px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      School Fees
+                    </th>
+                    <th className="px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Student Fees
+                    </th>
+                    <th className="px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Balance Forward
+                    </th>
+                    <th className="border-r border-gray-200 px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Total
                     </th>
                   </tr>
                 </thead>
@@ -249,7 +306,7 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                   <tbody key={group.grade_level} className="divide-y divide-gray-200">
                     <tr className="bg-gray-100/70">
                       <th
-                        colSpan={5}
+                        colSpan={8}
                         scope="colgroup"
                         className="px-4 py-2 text-left text-sm font-semibold text-gray-900"
                       >
@@ -300,7 +357,22 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                             <td className="px-4 py-3 text-sm text-gray-600">
                               {student.section || '—'}
                             </td>
-                            <td className="px-4 py-3 text-right text-sm text-gray-900">
+                            <td className="border-l border-gray-200 px-4 py-3 text-right text-sm text-gray-600">
+                              {formatCurrency(student.school_fees_payable)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm text-gray-600">
+                              {formatCurrency(student.student_fees_payable)}
+                            </td>
+                            <td
+                              className={`px-4 py-3 text-right text-sm ${
+                                student.balance_forward !== 0
+                                  ? 'font-medium text-amber-700'
+                                  : 'text-gray-400'
+                              }`}
+                            >
+                              {formatCurrency(student.balance_forward)}
+                            </td>
+                            <td className="border-r border-gray-200 px-4 py-3 text-right text-sm font-medium text-gray-900">
                               {formatCurrency(student.total_payable)}
                             </td>
                             <td
@@ -313,7 +385,7 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                           </tr>
                           {isOpen && (
                             <tr>
-                              <td colSpan={5} className="bg-gray-50 px-4 py-4">
+                              <td colSpan={8} className="bg-gray-50 px-4 py-4">
                                 <StudentOtherFees
                                   student={student}
                                   academicYear={academicYear}
@@ -333,8 +405,10 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
       </div>
 
       <p className="text-xs text-gray-500">
-        Total payable is the year's charges plus any balance forward, less discounts. Remaining
-        balance is what is left of it after payments.
+        Total payable is made of school fees (the grade's fee amounts, less every discount —
+        discounts are only ever priced against these), student fees (charges added to that
+        student alone), and any balance forward from earlier years. Remaining balance is what is
+        left of the total after payments.
       </p>
     </div>
   )
@@ -359,8 +433,9 @@ const StudentOtherFees: React.FC<{
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SummaryTile label="Charges" value={student.charges} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <SummaryTile label="School Fees Charged" value={student.school_fees} />
+        <SummaryTile label="Student Fees Charged" value={student.student_fees} />
         <SummaryTile label="Discounts" value={student.discounts} />
         <SummaryTile label="Balance Forward" value={student.balance_forward} />
         <SummaryTile label="Total Paid" value={student.total_paid} />
