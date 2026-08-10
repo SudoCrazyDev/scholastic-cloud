@@ -386,6 +386,70 @@ class FinanceDashboardStudentsTest extends TestCase
         $this->assertSame(['Santos'], collect($bySection->json('data.students'))->pluck('last_name')->all());
     }
 
+    /**
+     * A late fee only exists once something books it, and only a ledger/NOA load does that.
+     * So the listing legitimately does not know about a surcharge that has just fallen due —
+     * and once opening the student books it, the next listing has to pick it up. The UI relies
+     * on exactly this: it refetches the list when a ledger reports fees the row lacked.
+     */
+    public function test_a_late_fee_reaches_the_list_once_a_ledger_load_has_booked_it(): void
+    {
+        $this->makeUser('late-fee-token');
+        $section = $this->makeSection('Grade 9', 'Lapu-Lapu');
+        $student = $this->enrol($section, 'Rita', 'Navarro');
+
+        $this->setFeeAmount($this->tuition, 'Grade 9', 10000);
+
+        // One installment, the whole bill, due long before "now" with no grace left.
+        $plan = \App\Models\PaymentPlan::create([
+            'institution_id' => $this->institution->id,
+            'name' => 'Full within June',
+            'advance_payment_mode' => \App\Models\PaymentPlan::ADVANCE_EQUAL_SPLIT,
+            'surcharge_mode' => \App\Models\PaymentPlan::SURCHARGE_PER_INSTALLMENT,
+            'is_active' => true,
+        ]);
+        \App\Models\PaymentPlanInstallment::create([
+            'payment_plan_id' => $plan->id,
+            'sequence' => 1,
+            'label' => 'June',
+            'due_month' => 6,
+            'due_day' => 15,
+            'grace_period_days' => 0,
+            'late_fee_percentage' => 2,
+            'share_percentage' => 100,
+        ]);
+        \App\Models\StudentPaymentPlan::create([
+            'institution_id' => $this->institution->id,
+            'student_id' => $student->id,
+            'academic_year' => self::YEAR,
+            'payment_plan_id' => $plan->id,
+        ]);
+
+        // Nothing has loaded this student's ledger yet, so no surcharge has been charged.
+        $before = $this->fetch('late-fee-token')->assertOk()->json('data.students.0');
+        $this->assertEquals(0, $before['student_fees']);
+        $this->assertEquals(0, $before['other_fee_count']);
+        $this->assertEquals(10000, $before['total_payable']);
+
+        // Opening the student is what books it — 2% of the overdue 10,000.
+        $ledger = $this->withHeader('Authorization', 'Bearer late-fee-token')
+            ->getJson("/api/students/{$student->id}/ledger?academic_year=" . self::YEAR)
+            ->assertOk();
+        $this->assertEquals(200, $ledger->json('data.totals.late_fees'));
+
+        // …and now the list agrees, which is what makes the refetch on open self-healing.
+        $after = $this->fetch('late-fee-token')->assertOk()->json('data.students.0');
+        $this->assertEquals(200, $after['student_fees']);
+        $this->assertEquals(200, $after['student_fees_payable']);
+        $this->assertEquals(1, $after['other_fee_count']);
+        $this->assertEquals(10200, $after['total_payable']);
+        $this->assertEquals(
+            $ledger->json('data.totals.balance'),
+            $after['remaining_balance'],
+            'Once the surcharge is booked the row and the ledger must agree.'
+        );
+    }
+
     public function test_students_not_enrolled_for_the_year_are_left_out(): void
     {
         $this->makeUser('roster-token');

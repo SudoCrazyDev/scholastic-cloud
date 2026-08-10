@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { Input } from '../../components/input'
 import { Select } from '../../components/select'
@@ -408,37 +408,70 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
         Total payable is made of school fees (the grade's fee amounts, less every discount —
         discounts are only ever priced against these), student fees (charges added to that
         student alone), and any balance forward from earlier years. Remaining balance is what is
-        left of the total after payments.
+        left of the total after payments. A late fee is charged when a student's ledger is
+        opened, so a surcharge that has only just fallen due joins their row as you select them.
       </p>
     </div>
   )
 }
 
 /**
- * The fees charged to one student on top of their grade's standard fees: ad-hoc charges,
- * cash-basis fees and late fees. Read from the student's ledger so the amounts match what
- * the cashier sees there.
+ * One student's charges as their own ledger reports them: the five tiles and the fees charged
+ * to them alone — ad-hoc charges, cash-basis fees and late fees.
+ *
+ * Every figure here is read from the ledger response rather than from the list row, so the
+ * tiles and the fee table below them can never disagree. They can differ from the row: loading
+ * a ledger *books* any late fee that has just fallen due, which the listing deliberately does
+ * not do (see FinanceDashboardController::students). Opening a student is therefore what
+ * charges their surcharge, and the row that sent us here is a moment out of date — so when the
+ * two disagree the list is refetched and catches up.
  */
 const StudentOtherFees: React.FC<{
   student: FinanceDashboardStudent
   academicYear: string
 }> = ({ student, academicYear }) => {
+  const queryClient = useQueryClient()
   const ledgerQuery = useQuery({
     queryKey: ['student-ledger', student.id, academicYear],
     queryFn: () => studentFinanceService.getLedger(student.id, academicYear),
   })
 
-  const breakdown: LedgerFeeBreakdown[] = ledgerQuery.data?.data?.fee_breakdown ?? []
+  const ledger = ledgerQuery.data?.data
+  const breakdown: LedgerFeeBreakdown[] = ledger?.fee_breakdown ?? []
   const otherFees = breakdown.filter((fee) => fee.is_additional)
+
+  const sumCharges = (fees: LedgerFeeBreakdown[]) =>
+    fees.reduce((total, fee) => total + fee.charge, 0)
+
+  const studentFeesCharged = ledger ? sumCharges(otherFees) : student.student_fees
+  const schoolFeesCharged = ledger
+    ? sumCharges(breakdown.filter((fee) => !fee.is_additional))
+    : student.school_fees
+
+  // Refetch the list once when the ledger turns out to know about charges the row did not —
+  // a late fee this very load booked. Guarded to one attempt per student so a discrepancy
+  // that cannot resolve costs a single wasted fetch instead of looping.
+  const healedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!ledger) return
+    const key = `${student.id}:${academicYear}`
+    if (healedRef.current === key) return
+    if (Math.abs(studentFeesCharged - student.student_fees) < 0.005) return
+    healedRef.current = key
+    queryClient.invalidateQueries({ queryKey: ['finance-dashboard', 'students'] })
+  }, [ledger, studentFeesCharged, student.id, student.student_fees, academicYear, queryClient])
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <SummaryTile label="School Fees Charged" value={student.school_fees} />
-        <SummaryTile label="Student Fees Charged" value={student.student_fees} />
-        <SummaryTile label="Discounts" value={student.discounts} />
-        <SummaryTile label="Balance Forward" value={student.balance_forward} />
-        <SummaryTile label="Total Paid" value={student.total_paid} />
+        <SummaryTile label="School Fees Charged" value={schoolFeesCharged} />
+        <SummaryTile label="Student Fees Charged" value={studentFeesCharged} />
+        <SummaryTile label="Discounts" value={ledger?.totals?.discounts ?? student.discounts} />
+        <SummaryTile
+          label="Balance Forward"
+          value={ledger?.totals?.balance_forward ?? student.balance_forward}
+        />
+        <SummaryTile label="Total Paid" value={ledger?.totals?.payments ?? student.total_paid} />
       </div>
 
       <div>

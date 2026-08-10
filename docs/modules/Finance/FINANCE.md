@@ -256,9 +256,26 @@ computed alongside them. How the split falls out:
 Each row's figures are built exactly as `StudentFinanceController::ledger()` builds its totals —
 charges (grade fee defaults + the student's own additional fees), less student and grade-level
 discounts, plus balance forward from earlier enrolled years — so a row and the student's ledger
-agree. The one difference: the listing does **not** materialize new late fees (that is a write,
-and this reads the whole school), so a surcharge only booked when the ledger is next opened is
-not yet counted.
+agree.
+
+**The one exception, and how the view handles it.** A late fee is not a calculation, it is a
+`student_additional_fees` row, and only a ledger/NOA load books one (`LateFeeService::apply`).
+The listing deliberately does not — that is a write, and this reads the whole school — so a
+surcharge that has just fallen due does not exist yet and cannot be counted. Consequences worth
+knowing:
+
+- A student whose ledger nobody has opened since their installment lapsed reads slightly low
+  here, and the column totals with them.
+- **Opening the row is what books it.** The drilldown fetches that student's ledger, which
+  charges the surcharge, so it appears in the Other Fees table — while the row that sent you
+  there was fetched a moment before the charge existed.
+
+So the drilldown takes all five of its tiles from the ledger response rather than from the row
+(they can never disagree with the fee table beneath them), and when the ledger reports student
+fees the row lacked, `['finance-dashboard', 'students']` is invalidated so the row, its badge and
+the column totals catch up. Guarded to one refetch per student, so a discrepancy that cannot
+resolve costs a single fetch rather than looping.
+`test_a_late_fee_reaches_the_list_once_a_ledger_load_has_booked_it` pins the whole sequence.
 
 Selecting a row expands it into the derivation behind those columns: five tiles (school fees
 charged, student fees charged, discounts, balance forward, total paid — gross, where the columns
