@@ -23,7 +23,6 @@ import { Select } from '../../components/select'
 import { Autocomplete } from '../../components/autocomplete'
 import { schoolFeeService } from '../../services/schoolFeeService'
 import { schoolFeeDefaultService } from '../../services/schoolFeeDefaultService'
-import { financeDashboardService } from '../../services/financeDashboardService'
 import { studentService } from '../../services/studentService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
@@ -39,7 +38,7 @@ import { usePermissions } from '../../hooks/usePermissions'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import { PaymentPlanPicker } from '../../components/payment-plan-picker'
 import { PaymentPlanHistoryTable } from '../../components/payment-plan-history-table'
-import DashboardCharts from './DashboardCharts'
+import DashboardStudentsView from './DashboardStudentsView'
 import CollectionsView from './CollectionsView'
 import ReceiptApprovalsView from './ReceiptApprovalsView'
 import DiscountsView from './DiscountsView'
@@ -137,7 +136,7 @@ const SETUP_NAV: {
 ]
 
 const VIEW_SUBTITLES: Record<FinanceView, string> = {
-  dashboard: 'Collections overview and outstanding balances for the academic year.',
+  dashboard: 'Total payable and remaining balance per student, by grade level.',
   cashiering: 'Search for a student, take payments, and print official receipts.',
   ledger: "Review a student's charges, payments, discounts, and running balance.",
   collections: 'View payment collections by month or quarter for the school year.',
@@ -237,7 +236,6 @@ const Finance: React.FC = () => {
     grade_level: '',
     academic_year: defaultAcademicYear,
   })
-  const [dashboardYear, setDashboardYear] = useState(defaultAcademicYear)
 
   const [studentSearchTerm, setStudentSearchTerm] = useState('')
   const [debouncedStudentSearch, setDebouncedStudentSearch] = useState('')
@@ -733,12 +731,6 @@ const Finance: React.FC = () => {
     })
   }
 
-  const dashboardQuery = useQuery({
-    queryKey: ['finance-dashboard', dashboardYear],
-    queryFn: () => financeDashboardService.getSummary(dashboardYear),
-    enabled: view === 'dashboard' && Boolean(dashboardYear),
-  })
-
   const defaultsQuery = useQuery({
     queryKey: ['school-fee-defaults', filters],
     queryFn: () =>
@@ -971,12 +963,6 @@ const Finance: React.FC = () => {
 
   const fees = feesQuery.data?.data || []
   const defaults = defaultsQuery.data?.data || []
-  const dashboardData = dashboardQuery.data?.data
-  const dashboardFees = dashboardData?.fees || []
-  const gradeSummaries = dashboardData?.grades || []
-  const hasUnassignedPayments = gradeSummaries.some(
-    (grade) => (grade.payments?.unassigned || 0) > 0
-  )
 
   useEffect(() => {
     if (!editingDefault) {
@@ -1000,11 +986,6 @@ const Finance: React.FC = () => {
     } else {
       createFeeMutation.mutate()
     }
-  }
-
-  const formatAmount = (amount?: number | null) => {
-    const value = Number(amount || 0)
-    return value.toFixed(2)
   }
 
   const formatCurrency = (amount?: number | string | null) => {
@@ -1260,150 +1241,10 @@ const Finance: React.FC = () => {
       </div>
 
       {view === 'dashboard' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">Finance Dashboard</h2>
-              <p className="text-sm text-gray-600">
-                Total Payable shows collectibles for the selected academic year.
-              </p>
-            </div>
-            <div className="w-full lg:w-64">
-              <Select
-                value={dashboardYear}
-                onChange={(event) => setDashboardYear(event.target.value)}
-                options={academicYearOptions}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Total Payable</h3>
-            {dashboardQuery.isLoading ? (
-              <p className="text-gray-500">Loading dashboard...</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Grade Level
-                      </th>
-                      {dashboardFees.map((fee) => (
-                        <th
-                          key={fee.id}
-                          className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
-                        >
-                          {fee.name}
-                        </th>
-                      ))}
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {gradeSummaries.map((grade) => (
-                      <tr key={grade.grade_level}>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {grade.grade_level}
-                        </td>
-                        {dashboardFees.map((fee) => (
-                          <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
-                            {formatAmount(grade.payable.by_fee?.[fee.id])}
-                          </td>
-                        ))}
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                          {formatAmount(grade.payable.total)}
-                        </td>
-                      </tr>
-                    ))}
-                    {!gradeSummaries.length && (
-                      <tr>
-                        <td
-                          colSpan={dashboardFees.length + 2}
-                          className="px-4 py-6 text-center text-gray-500"
-                        >
-                          No payable data found for this academic year.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <p className="text-xs text-gray-500">
-              Totals include discounts and balance forward adjustments.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Total Payment</h3>
-            {dashboardQuery.isLoading ? (
-              <p className="text-gray-500">Loading dashboard...</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Grade Level
-                      </th>
-                      {dashboardFees.map((fee) => (
-                        <th
-                          key={fee.id}
-                          className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
-                        >
-                          {fee.name}
-                        </th>
-                      ))}
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {gradeSummaries.map((grade) => (
-                      <tr key={grade.grade_level}>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {grade.grade_level}
-                        </td>
-                        {dashboardFees.map((fee) => (
-                          <td key={fee.id} className="px-4 py-3 text-sm text-right text-gray-900">
-                            {formatAmount(grade.payments.by_fee?.[fee.id])}
-                          </td>
-                        ))}
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                          {formatAmount(grade.payments.total)}
-                        </td>
-                      </tr>
-                    ))}
-                    {!gradeSummaries.length && (
-                      <tr>
-                        <td
-                          colSpan={dashboardFees.length + 2}
-                          className="px-4 py-6 text-center text-gray-500"
-                        >
-                          No payment data found for this academic year.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {hasUnassignedPayments && (
-              <p className="text-xs text-gray-500">
-                Totals include payments not tied to a specific fee.
-              </p>
-            )}
-          </div>
-
-          {!dashboardQuery.isLoading && (
-            <DashboardCharts fees={dashboardFees} grades={gradeSummaries} />
-          )}
-        </div>
+        <DashboardStudentsView
+          academicYearOptions={academicYearOptions}
+          defaultAcademicYear={defaultAcademicYear}
+        />
       )}
 
       {view === 'school-fees' && (

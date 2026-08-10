@@ -40,7 +40,7 @@ Navigation is **two-level** (data-driven constants at the top of `Finance.tsx`):
 
 | View (`FinanceView`) | URL | What it is |
 |---|---|---|
-| `dashboard` | `/finance` | Collections summary + charts for an academic year |
+| `dashboard` | `/finance` | Students per grade level: total payable + remaining balance each |
 | `cashiering` | `/finance/cashiering` | POS: take a multi-line payment, print receipt |
 | `ledger` | `/finance/ledger` | Per-student account: charges, payments, discounts, NOA |
 | `collections` | `/finance/collections` | Monthly/quarterly collections by payment method |
@@ -175,13 +175,12 @@ views' requests.
 ## File map
 
 **Frontend (`app/`)**
-- Shell + Dashboard/Cashiering/Ledger/School Fees/School Fees Amounts/Void Requests views:
+- Shell + Cashiering/Ledger/School Fees/School Fees Amounts/Void Requests views:
   `src/pages/Finance/Finance.tsx` (nav constants `PRIMARY_NAV`/`SETUP_NAV`/`VIEW_SUBTITLES` at
   top; `view` memo maps pathname → view).
-- Sub-view components (same folder): `CollectionsView.tsx`, `DiscountsView.tsx` (grade-level),
-  `DefaultDiscountsView.tsx`, `ReceiptBuilderView.tsx`, `ReceiptPrintModal.tsx`,
-  `DataClearingView.tsx`, `DashboardCharts.tsx` (Recharts, presentational),
-  `PaymentPlansView.tsx` (standalone page).
+- Sub-view components (same folder): `DashboardStudentsView.tsx`, `CollectionsView.tsx`,
+  `DiscountsView.tsx` (grade-level), `DefaultDiscountsView.tsx`, `ReceiptBuilderView.tsx`,
+  `ReceiptPrintModal.tsx`, `DataClearingView.tsx`, `PaymentPlansView.tsx` (standalone page).
 - Shared PDF: `src/components/StudentNOAPDF.tsx`.
 - Services (`src/services/`): `schoolFeeService.ts`, `schoolFeeDefaultService.ts`,
   `financeDashboardService.ts`, `studentPaymentService.ts`, `studentFinanceService.ts`,
@@ -229,10 +228,27 @@ views' requests.
 ## Views in detail
 
 ### Dashboard (`/finance`)
-Academic-year selector → `GET /finance/dashboard?academic_year=` (`financeDashboardService.getSummary`).
-Response `data` has `fees` (per-fee payable/collected) and `grades` (per-grade summaries); rendered
-as stat cards + tables + `DashboardCharts` (pie: payments by fee; bars: by grade / collectibles).
-Read-only.
+`DashboardStudentsView` — **Students Per Grade Level**. Academic-year selector +
+grade-level / section filters →
+`GET /finance/dashboard/students?academic_year=&grade_level=&section_id=`
+(`financeDashboardService.getStudentBalances`). Response `data` carries `students` (one row per
+student enrolled that year, already ordered by grade level then surname), plus `grade_levels`
+and `sections` for the filter dropdowns — both built from the whole year, so filtering on one
+never hides the others. Rows are listed as `LAST NAME, FIRST NAME M.` with total payable and
+remaining balance; the name search filters the fetched rows client-side (every word typed must
+appear in the name or LRN, in any order).
+
+Each row's figures are built exactly as `StudentFinanceController::ledger()` builds its totals —
+charges (grade fee defaults + the student's own additional fees), less student and grade-level
+discounts, plus balance forward from earlier enrolled years — so a row and the student's ledger
+agree. The one difference: the listing does **not** materialize new late fees (that is a write,
+and this reads the whole school), so a surcharge only booked when the ledger is next opened is
+not yet counted.
+
+Selecting a row expands it: four tiles (charges, discounts, balance forward, total paid) and an
+**Other Fees** table — the student's ad-hoc charges, cash-basis fees and late fees with
+charge / discount / paid / outstanding, read from that student's `GET /students/{id}/ledger`
+`fee_breakdown` (`is_additional` lines). Read-only.
 
 ### Cashiering (`/finance/cashiering`)
 The POS. Debounced student search (min 2 chars) → select a student → their ledger
@@ -387,7 +403,7 @@ the academic year. Routed as a sibling of `/finance` in `App.tsx` with its own s
 |---|---|
 | `schoolFeeService` | CRUD `/school-fees` |
 | `schoolFeeDefaultService` | CRUD `/school-fee-defaults`, POST `…/bulk-upsert`, POST `…/apply-all` |
-| `financeDashboardService` | GET `/finance/dashboard`, GET `/finance/collections` |
+| `financeDashboardService` | GET `/finance/dashboard/students`, GET `/finance/collections`, GET `/finance/collections/report` |
 | `studentPaymentService` | GET/POST `/student-payments`, GET `/student-payments/{id}[/receipt]`, GET `/payment-transactions/{id}[/receipt]` |
 | `studentFinanceService` | GET `/students/{id}/ledger`, GET `/students/{id}/noa`, GET/POST `/students/{id}/payment-plan` |
 | `studentDiscountService` | GET/POST/DELETE `/student-discounts`, POST `/student-discounts/{id}/void` |

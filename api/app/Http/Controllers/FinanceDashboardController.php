@@ -4,22 +4,29 @@ namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
 use App\Models\GradeLevelDiscount;
-use App\Models\SchoolFee;
+use App\Models\GradeLevelDiscountStudentVoid;
 use App\Models\SchoolFeeDefault;
+use App\Models\Student;
 use App\Models\StudentAdditionalFee;
 use App\Models\StudentDiscount;
 use App\Models\StudentPayment;
 use App\Models\StudentSection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class FinanceDashboardController extends Controller
 {
     /**
-     * Get finance dashboard summary for an academic year.
+     * One row per enrolled student for an academic year: what they owe for the year and
+     * what is left of it, grouped by grade level for the Finance dashboard.
+     *
+     * The figures are built the same way `StudentFinanceController::ledger()` builds its
+     * totals, so a row here and the student's own ledger agree. The one thing this does
+     * not do is materialize new late fees — booking a surcharge is a write, and a listing
+     * of the whole school must not perform hundreds of them. Surcharges already charged
+     * are counted; one that only becomes due when the ledger is next opened is not.
      */
-    public function summary(Request $request): JsonResponse
+    public function students(Request $request): JsonResponse
     {
         if ($this->isStudentUser($request)) {
             return response()->json([
@@ -38,220 +45,348 @@ class FinanceDashboardController extends Controller
 
         $validated = $request->validate([
             'academic_year' => 'required|string|max:255',
+            'grade_level' => 'nullable|string|max:255',
+            'section_id' => 'nullable|string|max:36',
         ]);
 
         $academicYear = $validated['academic_year'];
+        $gradeFilter = $validated['grade_level'] ?? null;
+        $sectionFilter = $validated['section_id'] ?? null;
 
-        $fees = SchoolFee::where('institution_id', $institutionId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $studentGradeRows = DB::table('student_sections')
-            ->join('class_sections', 'student_sections.section_id', '=', 'class_sections.id')
-            ->where('class_sections.institution_id', $institutionId)
-            ->where('student_sections.academic_year', $academicYear)
-            ->select('student_sections.student_id', 'class_sections.grade_level')
-            ->distinct()
+        // Every enrolment of the institution's students, all years at once: the requested
+        // year decides who is on the list, the earlier ones what each brought forward.
+        $enrolments = StudentSection::with('classSection')
+            ->whereHas('classSection', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            })
+            ->orderByDesc('created_at')
             ->get();
 
-        if ($studentGradeRows->isEmpty()) {
+        // student id => year => placement. First writer wins, and the rows arrive newest
+        // first, so an active enrolment beats a stale one and otherwise the latest does —
+        // the same choice the ledger makes for the year it shows.
+        $placements = [];
+        foreach ($enrolments as $enrolment) {
+            $year = $enrolment->academic_year;
+            $section = $enrolment->classSection;
+            if (!$year || !$section) {
+                continue;
+            }
+
+            $existing = $placements[$enrolment->student_id][$year] ?? null;
+            if ($existing && ($existing['is_active'] || !$enrolment->is_active)) {
+                continue;
+            }
+
+            $placements[$enrolment->student_id][$year] = [
+                'is_active' => (bool) $enrolment->is_active,
+                'grade_level' => $section->grade_level,
+                'section_id' => $section->id,
+                'section' => $section->title,
+            ];
+        }
+
+        // The roster, before the grade/section filters narrow it: the filter dropdowns are
+        // built from the whole year, or picking one would empty the list of the others.
+        $roster = [];
+        $sectionOptions = [];
+        foreach ($placements as $studentId => $years) {
+            $placement = $years[$academicYear] ?? null;
+            if (!$placement) {
+                continue;
+            }
+
+            $roster[$studentId] = $placement;
+            $sectionOptions[$placement['section_id']] = [
+                'id' => $placement['section_id'],
+                'title' => $placement['section'],
+                'grade_level' => $placement['grade_level'],
+            ];
+        }
+
+        $gradeLevels = collect($roster)->pluck('grade_level')->filter()->unique()
+            ->sortBy(fn ($grade) => $this->gradeLevelOrder($grade))
+            ->values()
+            ->all();
+
+        $sections = collect($sectionOptions)
+            ->sortBy(fn ($section) => [$this->gradeLevelOrder($section['grade_level']), $section['title']])
+            ->values()
+            ->all();
+
+        if ($gradeFilter) {
+            $roster = array_filter($roster, fn ($placement) => $placement['grade_level'] === $gradeFilter);
+        }
+        if ($sectionFilter) {
+            $roster = array_filter($roster, fn ($placement) => $placement['section_id'] === $sectionFilter);
+        }
+
+        $studentIds = array_keys($roster);
+        if (empty($studentIds)) {
             return response()->json([
                 'success' => true,
                 'data' => [
                     'academic_year' => $academicYear,
-                    'fees' => $fees,
-                    'grades' => [],
+                    'grade_levels' => $gradeLevels,
+                    'sections' => $sections,
+                    'students' => [],
                 ]
             ]);
         }
 
-        $studentGradeMap = [];
-        $gradeStudentMap = [];
-        foreach ($studentGradeRows as $row) {
-            if (!isset($studentGradeMap[$row->student_id])) {
-                $studentGradeMap[$row->student_id] = $row->grade_level;
-            }
-            $gradeStudentMap[$row->grade_level][] = $row->student_id;
-        }
-
-        foreach ($gradeStudentMap as $grade => $students) {
-            $gradeStudentMap[$grade] = array_values(array_unique($students));
-        }
-
-        $studentIds = collect(array_keys($studentGradeMap));
-
-        $studentSections = StudentSection::with('classSection')
-            ->whereIn('student_id', $studentIds)
-            ->whereHas('classSection', function ($query) use ($institutionId) {
-                $query->where('institution_id', $institutionId);
-            })
-            ->get();
-
-        $relevantYears = $studentSections->pluck('academic_year')->filter()->unique()->values();
-        if (!$relevantYears->contains($academicYear)) {
-            $relevantYears->push($academicYear);
-        }
+        // Only the years these students were actually enrolled in matter, and only those
+        // before the one on screen contribute a balance forward.
+        $relevantYears = collect($studentIds)
+            ->flatMap(fn ($studentId) => array_keys($placements[$studentId] ?? []))
+            ->push($academicYear)
+            ->unique()
+            ->values();
 
         $defaults = SchoolFeeDefault::where('institution_id', $institutionId)
             ->whereIn('academic_year', $relevantYears)
             ->get();
 
+        // year => grade => fee id => amount charged per student.
         $defaultMap = [];
-        $chargesPerStudent = [];
         foreach ($defaults as $default) {
             $defaultMap[$default->academic_year][$default->grade_level][$default->school_fee_id] = (float) $default->amount;
         }
 
-        foreach ($defaultMap as $year => $gradeDefaults) {
-            foreach ($gradeDefaults as $grade => $feeDefaults) {
-                $chargesPerStudent[$year][$grade] = array_sum($feeDefaults);
-            }
-        }
-
-        $studentYearGrade = [];
-        foreach ($studentSections as $section) {
-            $year = $section->academic_year;
-            $studentId = $section->student_id;
-            if (!$year || isset($studentYearGrade[$studentId][$year])) {
-                continue;
-            }
-            $studentYearGrade[$studentId][$year] = $section->classSection?->grade_level;
-        }
-
-        $discounts = StudentDiscount::where('institution_id', $institutionId)
+        $discountsByStudentYear = [];
+        $studentDiscounts = StudentDiscount::where('institution_id', $institutionId)
             ->whereIn('student_id', $studentIds)
             ->whereIn('academic_year', $relevantYears)
+            ->whereNull('voided_at')
             ->get();
-
-        $discountsByStudentYear = [];
-        foreach ($discounts as $discount) {
+        foreach ($studentDiscounts as $discount) {
             $discountsByStudentYear[$discount->student_id][$discount->academic_year][] = $discount;
         }
 
-        $payments = StudentPayment::where('institution_id', $institutionId)
+        // Grade-level discounts apply to the whole grade for the year on screen, less the
+        // ones voided for an individual student.
+        $gradeDiscounts = GradeLevelDiscount::where('institution_id', $institutionId)
+            ->where('academic_year', $academicYear)
+            ->whereIn('grade_level', collect($roster)->pluck('grade_level')->unique())
+            ->get();
+
+        $gradeDiscountVoids = $gradeDiscounts->isEmpty()
+            ? collect()
+            : GradeLevelDiscountStudentVoid::whereIn('student_id', $studentIds)
+                ->whereIn('grade_level_discount_id', $gradeDiscounts->pluck('id'))
+                ->get()
+                ->groupBy('student_id')
+                ->map(fn ($voids) => $voids->pluck('grade_level_discount_id')->all());
+
+        $gradeDiscountsByGrade = $gradeDiscounts->groupBy('grade_level');
+
+        // Ad-hoc charges, cash-basis fees and already-charged late fees are all owed on top
+        // of the grade's standard fees. Waived charges are soft-deleted and drop out here.
+        $additionalFeeTotals = StudentAdditionalFee::where('institution_id', $institutionId)
             ->whereIn('student_id', $studentIds)
             ->whereIn('academic_year', $relevantYears)
+            ->groupBy('student_id', 'academic_year')
+            ->selectRaw('student_id, academic_year, SUM(amount) as total, COUNT(*) as fee_count')
+            ->get();
+
+        $additionalByStudentYear = [];
+        $additionalCountByStudent = [];
+        foreach ($additionalFeeTotals as $row) {
+            $additionalByStudentYear[$row->student_id][$row->academic_year] = (float) $row->total;
+            if ($row->academic_year === $academicYear) {
+                $additionalCountByStudent[$row->student_id] = (int) $row->fee_count;
+            }
+        }
+
+        $paymentTotals = StudentPayment::where('institution_id', $institutionId)
+            ->whereIn('student_id', $studentIds)
+            ->whereIn('academic_year', $relevantYears)
+            ->whereNull('voided_at')
+            ->groupBy('student_id', 'academic_year')
+            ->selectRaw('student_id, academic_year, SUM(amount) as total')
             ->get();
 
         $paymentsByStudentYear = [];
-        $paymentsByGradeFee = [];
-        $paymentsTotalByGrade = [];
-        $paymentsUnassignedByGrade = [];
-        foreach ($payments as $payment) {
-            $studentId = $payment->student_id;
-            $year = $payment->academic_year;
-            $amount = (float) $payment->amount;
-            $paymentsByStudentYear[$studentId][$year] = ($paymentsByStudentYear[$studentId][$year] ?? 0) + $amount;
-
-            if ($year === $academicYear) {
-                $gradeLevel = $studentGradeMap[$studentId] ?? null;
-                if ($gradeLevel) {
-                    $paymentsTotalByGrade[$gradeLevel] = ($paymentsTotalByGrade[$gradeLevel] ?? 0) + $amount;
-                    if ($payment->school_fee_id) {
-                        $paymentsByGradeFee[$gradeLevel][$payment->school_fee_id] =
-                            ($paymentsByGradeFee[$gradeLevel][$payment->school_fee_id] ?? 0) + $amount;
-                    } else {
-                        $paymentsUnassignedByGrade[$gradeLevel] =
-                            ($paymentsUnassignedByGrade[$gradeLevel] ?? 0) + $amount;
-                    }
-                }
-            }
+        foreach ($paymentTotals as $row) {
+            $paymentsByStudentYear[$row->student_id][$row->academic_year] = (float) $row->total;
         }
 
-        $studentBalanceForward = [];
+        $students = Student::whereIn('id', $studentIds)
+            ->get(['id', 'lrn', 'first_name', 'middle_name', 'last_name', 'ext_name'])
+            ->keyBy('id');
+
         $targetStart = $this->extractStartYear($academicYear);
-        foreach ($studentIds as $studentId) {
-            $balance = 0.0;
-            $years = array_keys($studentYearGrade[$studentId] ?? []);
-            foreach ($years as $year) {
-                if ($year === $academicYear) {
-                    continue;
-                }
 
-                if ($targetStart !== null) {
-                    $yearStart = $this->extractStartYear($year);
-                    if ($yearStart === null || $yearStart >= $targetStart) {
-                        continue;
-                    }
-                } else {
-                    if ($year >= $academicYear) {
-                        continue;
-                    }
-                }
-
-                $gradeLevel = $studentYearGrade[$studentId][$year] ?? null;
-                if (!$gradeLevel) {
-                    continue;
-                }
-
-                $feeDefaults = $defaultMap[$year][$gradeLevel] ?? [];
-                $charges = $chargesPerStudent[$year][$gradeLevel] ?? 0.0;
-                $discountList = $discountsByStudentYear[$studentId][$year] ?? [];
-                $discountTotal = $this->calculateDiscountTotal($discountList, $feeDefaults, $charges);
-                $paymentsTotal = $paymentsByStudentYear[$studentId][$year] ?? 0.0;
-
-                $balance += ($charges - $discountTotal - $paymentsTotal);
+        $rows = [];
+        foreach ($roster as $studentId => $placement) {
+            $student = $students->get($studentId);
+            if (!$student) {
+                continue;
             }
 
-            $studentBalanceForward[$studentId] = round($balance, 2);
-        }
+            $gradeLevel = $placement['grade_level'];
+            $feeAmounts = $defaultMap[$academicYear][$gradeLevel] ?? [];
+            $standardCharges = array_sum($feeAmounts);
+            $additionalCharges = $additionalByStudentYear[$studentId][$academicYear] ?? 0.0;
 
-        $grades = [];
-        $gradeLevels = collect(array_keys($gradeStudentMap))->sort()->values()->all();
-        foreach ($gradeLevels as $gradeLevel) {
-            $students = $gradeStudentMap[$gradeLevel] ?? [];
-            $studentCount = count($students);
-            $feeDefaults = $defaultMap[$academicYear][$gradeLevel] ?? [];
-            $byFee = [];
-            $chargesTotal = 0.0;
-            foreach ($fees as $fee) {
-                $feeAmount = $feeDefaults[$fee->id] ?? 0.0;
-                $payable = $feeAmount * $studentCount;
-                $byFee[$fee->id] = round($payable, 2);
-                $chargesTotal += $payable;
-            }
+            $voidedForStudent = $gradeDiscountVoids->get($studentId, []);
+            $applicableGradeDiscounts = ($gradeDiscountsByGrade->get($gradeLevel) ?? collect())
+                ->reject(fn ($discount) => in_array($discount->id, $voidedForStudent, true));
 
-            $chargesPerStudentCurrent = $chargesPerStudent[$academicYear][$gradeLevel] ?? 0.0;
-            $discountTotal = 0.0;
-            $balanceForwardTotal = 0.0;
-            foreach ($students as $studentId) {
-                $discountList = $discountsByStudentYear[$studentId][$academicYear] ?? [];
-                $discountTotal += $this->calculateDiscountTotal($discountList, $feeDefaults, $chargesPerStudentCurrent);
-                $balanceForwardTotal += $studentBalanceForward[$studentId] ?? 0.0;
-            }
+            $discountTotal = $this->discountTotal(
+                $discountsByStudentYear[$studentId][$academicYear] ?? [],
+                $feeAmounts,
+                $standardCharges
+            ) + $this->discountTotal($applicableGradeDiscounts, $feeAmounts, $standardCharges);
 
-            $payableTotal = $chargesTotal - $discountTotal + $balanceForwardTotal;
+            $balanceForward = $this->balanceForwardFor(
+                $studentId,
+                $placements[$studentId] ?? [],
+                $academicYear,
+                $targetStart,
+                $defaultMap,
+                $discountsByStudentYear,
+                $additionalByStudentYear,
+                $paymentsByStudentYear
+            );
 
-            $paymentsByFee = [];
-            foreach ($fees as $fee) {
-                $paymentsByFee[$fee->id] = round($paymentsByGradeFee[$gradeLevel][$fee->id] ?? 0.0, 2);
-            }
+            $charges = round($standardCharges + $additionalCharges, 2);
+            $totalPayable = round($balanceForward + $charges - $discountTotal, 2);
+            $paid = round($paymentsByStudentYear[$studentId][$academicYear] ?? 0.0, 2);
 
-            $grades[] = [
+            $rows[] = [
+                'id' => $student->id,
+                'lrn' => $student->lrn,
+                'first_name' => $student->first_name,
+                'middle_name' => $student->middle_name,
+                'last_name' => $student->last_name,
+                'ext_name' => $student->ext_name,
+                'display_name' => $this->formatStudentName($student),
                 'grade_level' => $gradeLevel,
-                'student_count' => $studentCount,
-                'payable' => [
-                    'total' => round($payableTotal, 2),
-                    'by_fee' => $byFee,
-                    'balance_forward' => round($balanceForwardTotal, 2),
-                    'discounts' => round($discountTotal, 2),
-                ],
-                'payments' => [
-                    'total' => round($paymentsTotalByGrade[$gradeLevel] ?? 0.0, 2),
-                    'by_fee' => $paymentsByFee,
-                    'unassigned' => round($paymentsUnassignedByGrade[$gradeLevel] ?? 0.0, 2),
-                ],
+                'section_id' => $placement['section_id'],
+                'section' => $placement['section'],
+                'charges' => $charges,
+                'discounts' => round($discountTotal, 2),
+                'balance_forward' => $balanceForward,
+                'total_payable' => $totalPayable,
+                'total_paid' => $paid,
+                'remaining_balance' => round($totalPayable - $paid, 2),
+                // Lets the row show whether there is anything to open before it is opened.
+                'other_fee_count' => $additionalCountByStudent[$studentId] ?? 0,
             ];
         }
+
+        // Grade level first, then alphabetical by name within the grade.
+        usort($rows, function ($a, $b) {
+            return [
+                $this->gradeLevelOrder($a['grade_level']),
+                mb_strtoupper((string) $a['last_name']),
+                mb_strtoupper((string) $a['first_name']),
+                mb_strtoupper((string) $a['middle_name']),
+            ] <=> [
+                $this->gradeLevelOrder($b['grade_level']),
+                mb_strtoupper((string) $b['last_name']),
+                mb_strtoupper((string) $b['first_name']),
+                mb_strtoupper((string) $b['middle_name']),
+            ];
+        });
 
         return response()->json([
             'success' => true,
             'data' => [
                 'academic_year' => $academicYear,
-                'fees' => $fees,
-                'grades' => $grades,
+                'grade_levels' => $gradeLevels,
+                'sections' => $sections,
+                'students' => $rows,
             ]
         ]);
+    }
+
+    /**
+     * What a student carried into the year on screen: charges less discounts and payments
+     * for every earlier year they were enrolled in.
+     */
+    private function balanceForwardFor(
+        string $studentId,
+        array $studentPlacements,
+        string $academicYear,
+        ?int $targetStart,
+        array $defaultMap,
+        array $discountsByStudentYear,
+        array $additionalByStudentYear,
+        array $paymentsByStudentYear
+    ): float {
+        $balance = 0.0;
+
+        foreach ($studentPlacements as $year => $placement) {
+            if ($year === $academicYear) {
+                continue;
+            }
+
+            if ($targetStart !== null) {
+                $yearStart = $this->extractStartYear($year);
+                if ($yearStart === null || $yearStart >= $targetStart) {
+                    continue;
+                }
+            } elseif ($year >= $academicYear) {
+                continue;
+            }
+
+            $feeAmounts = $defaultMap[$year][$placement['grade_level']] ?? [];
+            $charges = array_sum($feeAmounts) + ($additionalByStudentYear[$studentId][$year] ?? 0.0);
+            $discountTotal = $this->discountTotal(
+                $discountsByStudentYear[$studentId][$year] ?? [],
+                $feeAmounts,
+                array_sum($feeAmounts)
+            );
+            $payments = $paymentsByStudentYear[$studentId][$year] ?? 0.0;
+
+            $balance += ($charges - $discountTotal - $payments);
+        }
+
+        return round($balance, 2);
+    }
+
+    /** "LAST NAME, FIRST NAME M." — the form finance lists students in. */
+    private function formatStudentName(Student $student): string
+    {
+        $middleInitial = $student->middle_name
+            ? mb_strtoupper(mb_substr(trim($student->middle_name), 0, 1)) . '.'
+            : null;
+
+        $given = trim(implode(' ', array_filter([
+            $student->first_name,
+            $middleInitial,
+            $student->ext_name,
+        ])));
+
+        $last = trim((string) $student->last_name);
+        if ($last === '') {
+            return $given;
+        }
+
+        return $given === '' ? $last : $last . ', ' . $given;
+    }
+
+    /**
+     * Sort key putting grade levels in school order (Kinder, then Grade 1–12) rather than
+     * the alphabetical order that files "Grade 10" between "Grade 1" and "Grade 2".
+     */
+    private function gradeLevelOrder(?string $gradeLevel): array
+    {
+        $label = trim((string) $gradeLevel);
+        if ($label === '') {
+            return [3, 0, ''];
+        }
+
+        if (preg_match('/^kinder\s*(\d+)?$/i', $label, $matches)) {
+            return [0, (int) ($matches[1] ?? 0), $label];
+        }
+
+        if (preg_match('/^grade\s*(\d+)/i', $label, $matches)) {
+            return [1, (int) $matches[1], $label];
+        }
+
+        return [2, 0, mb_strtoupper($label)];
     }
 
     /**
@@ -582,26 +717,31 @@ class FinanceDashboardController extends Controller
         ]);
     }
 
-    private function calculateDiscountTotal(array $discounts, array $feeDefaults, float $chargesTotal): float
+    /**
+     * Total value of a set of discounts, priced exactly as the ledger prices them
+     * (see StudentFinanceController::applyDiscounts): a discount tied to a fee is capped
+     * at that fee's charge, one tied to nothing is priced against the grade's standard
+     * charges, and a fixed amount still counts when there is no charge to cap it against.
+     *
+     * @param  iterable  $discounts  StudentDiscount or GradeLevelDiscount rows
+     * @param  array<string, float>  $feeAmounts  fee id => amount charged for the year
+     */
+    private function discountTotal($discounts, array $feeAmounts, float $chargesTotal): float
     {
         $total = 0.0;
         foreach ($discounts as $discount) {
-            $baseAmount = $chargesTotal;
-            if ($discount->school_fee_id) {
-                $baseAmount = $feeDefaults[$discount->school_fee_id] ?? 0.0;
+            $baseAmount = $discount->school_fee_id
+                ? (float) ($feeAmounts[$discount->school_fee_id] ?? 0.0)
+                : $chargesTotal;
+
+            $amount = $discount->discount_type === 'percentage'
+                ? $baseAmount * ((float) $discount->value / 100)
+                : (float) $discount->value;
+
+            if ($baseAmount > 0) {
+                $amount = min($amount, $baseAmount);
             }
 
-            if ($baseAmount <= 0) {
-                continue;
-            }
-
-            if ($discount->discount_type === 'percentage') {
-                $amount = $baseAmount * ((float) $discount->value / 100);
-            } else {
-                $amount = (float) $discount->value;
-            }
-
-            $amount = min($amount, $baseAmount);
             $total += $amount;
         }
 

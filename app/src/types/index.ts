@@ -939,31 +939,42 @@ export interface StudentReceipt {
   received_by?: User;
 }
 
-export interface FinanceDashboardFee {
+// One enrolled student on the Finance dashboard: what the academic year bills them and
+// what is left of it. Built from the same figures as their ledger.
+export interface FinanceDashboardStudent {
   id: string;
-  name: string;
-}
-
-export interface FinanceGradeSummary {
+  lrn?: string | null;
+  first_name: string;
+  middle_name?: string | null;
+  last_name?: string | null;
+  ext_name?: string | null;
+  // "LAST NAME, FIRST NAME M." — the form finance lists students in.
+  display_name: string;
   grade_level: string;
-  student_count: number;
-  payable: {
-    total: number;
-    by_fee: Record<string, number>;
-    balance_forward: number;
-    discounts: number;
-  };
-  payments: {
-    total: number;
-    by_fee: Record<string, number>;
-    unassigned: number;
-  };
+  section_id: string;
+  section: string;
+  charges: number;
+  discounts: number;
+  balance_forward: number;
+  total_payable: number;
+  total_paid: number;
+  remaining_balance: number;
+  // Ad-hoc charges, cash-basis fees and late fees booked for the year, so a row can say
+  // whether it has anything to open before it is opened.
+  other_fee_count: number;
 }
 
-export interface FinanceDashboardSummary {
+export interface FinanceDashboardSection {
+  id: string;
+  title: string;
+  grade_level: string;
+}
+
+export interface FinanceStudentBalances {
   academic_year: string;
-  fees: FinanceDashboardFee[];
-  grades: FinanceGradeSummary[];
+  grade_levels: string[];
+  sections: FinanceDashboardSection[];
+  students: FinanceDashboardStudent[];
 }
 
 // Grade-level discount types

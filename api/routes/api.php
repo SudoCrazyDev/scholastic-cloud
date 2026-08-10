@@ -443,7 +443,7 @@ Route::middleware('auth.token')->group(function () {
 
     // School fee and student finance routes
     Route::apiResource('school-fees', SchoolFeeController::class)->middleware('module:school-fees,view');
-    Route::get('finance/dashboard', [FinanceDashboardController::class, 'summary'])->middleware('module:finance-reports,view');
+    Route::get('finance/dashboard/students', [FinanceDashboardController::class, 'students'])->middleware('module:finance-reports,view');
     Route::post('school-fee-defaults/bulk-upsert', [SchoolFeeDefaultController::class, 'bulkUpsert'])->middleware('module:school-fees,manage');
     Route::post('school-fee-defaults/apply-all', [SchoolFeeDefaultController::class, 'applyToAll'])->middleware('module:school-fees,manage');
     Route::get('school-fee-defaults', [SchoolFeeDefaultController::class, 'index'])->middleware('module:school-fees,view');

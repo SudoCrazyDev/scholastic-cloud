@@ -1,13 +1,19 @@
 import { api } from '../lib/api'
-import type { ApiResponse, FinanceDashboardSummary, FinanceCollectionsResponse, CollectionReportResponse } from '../types'
+import type { ApiResponse, FinanceStudentBalances, FinanceCollectionsResponse, CollectionReportResponse } from '../types'
 
 class FinanceDashboardService {
-  async getSummary(academicYear: string) {
+  async getStudentBalances(params: {
+    academic_year: string
+    grade_level?: string
+    section_id?: string
+  }) {
     const queryParams = new URLSearchParams()
-    queryParams.append('academic_year', academicYear)
+    queryParams.append('academic_year', params.academic_year)
+    if (params.grade_level) queryParams.append('grade_level', params.grade_level)
+    if (params.section_id) queryParams.append('section_id', params.section_id)
 
-    const response = await api.get<ApiResponse<FinanceDashboardSummary>>(
-      `/finance/dashboard?${queryParams.toString()}`
+    const response = await api.get<ApiResponse<FinanceStudentBalances>>(
+      `/finance/dashboard/students?${queryParams.toString()}`
     )
     return response.data
   }
