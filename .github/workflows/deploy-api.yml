@@ -40,6 +40,16 @@ jobs:
           cd api
           composer install --optimize-autoloader --no-dev
 
+      # resources/sms-agent is a committed snapshot of sms_gateway/, served as the
+      # kiosk installer download. Regenerating it here means a deploy can never
+      # ship an agent older than the source in this commit — the tracked copy has
+      # drifted before, and a stale bundle silently hands new kiosks buggy code.
+      - name: Refresh bundled SMS agent
+        run: |
+          cd api
+          php artisan sms:bundle-agent
+          git -C .. status --short api/resources/sms-agent
+
       - name: Optimize Laravel
         run: |
           cd api

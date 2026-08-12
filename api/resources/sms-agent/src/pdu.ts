@@ -117,6 +117,15 @@ function encodeAddress(raw: string): string {
 }
 
 function decodeAddress(len: number, toa: number, body: string): string {
+  // TON=101 (alphanumeric): the address value is GSM-7 packed text, not BCD.
+  // Carrier shortcodes and promo senders ("GLOBE", "SMART") arrive this way;
+  // nibble-swapping them yields hex mush like "8381E060".
+  if ((toa & 0x70) === 0x50) {
+    const buf = Buffer.from(body, 'hex')
+    // `len` counts useful semi-octets; 4 bits per semi-octet, 7 bits per char.
+    const septetCount = Math.floor((len * 4) / 7)
+    return septetsToText(unpack7bit(buf, septetCount))
+  }
   let digits = ''
   for (let i = 0; i < body.length; i += 2) {
     digits += body[i + 1] + body[i]
@@ -268,12 +277,38 @@ function buildSubmitPdu(addr: string, payload: string, gsm7: boolean, udh: Buffe
 }
 
 // ── Decoding inbound PDUs (DELIVER) and delivery receipts (STATUS-REPORT) ────
+/** Payload alphabet named by TP-DCS. '8bit' is binary, not readable text. */
+export type Alphabet = 'gsm7' | 'ucs2' | '8bit'
+
 export interface DecodedDeliver {
   type: 'deliver'
   sender: string
+  /** Decoded message. Always empty when `encoding` is '8bit' — see `dataHex`. */
   text: string
+  encoding: Alphabet
+  /** User data with the UDH stripped, hex — populated for '8bit' only. */
+  dataHex: string | null
   timestamp: string | null
   concat: { ref: number; total: number; seq: number } | null
+}
+
+/**
+ * TP-DCS → payload alphabet (GSM 03.38 §4). Anything we cannot render as text
+ * — 8-bit payloads (WAP push, OTA config, voicemail indicators) and compressed
+ * data — reports as '8bit' so callers can skip it instead of printing mojibake.
+ */
+export function alphabetOf(dcs: number): Alphabet {
+  if ((dcs & 0xc0) === 0x00) {
+    // General data coding: bit 5 = compressed, bits 3-2 = alphabet.
+    if (dcs & 0x20) return '8bit' // compressed — unsupported, treat as binary
+    const alphabet = (dcs >> 2) & 0x03
+    if (alphabet === 0x01) return '8bit'
+    if (alphabet === 0x02) return 'ucs2'
+    return 'gsm7' // 0b00 default alphabet; 0b11 reserved → best-effort text
+  }
+  if ((dcs & 0xf0) === 0xe0) return 'ucs2' // message-waiting group, UCS2
+  if ((dcs & 0xf0) === 0xf0) return dcs & 0x04 ? '8bit' : 'gsm7' // data coding / message class
+  return 'gsm7' // remaining message-waiting + reserved groups are GSM-7
 }
 
 export interface DecodedStatus {
@@ -345,35 +380,38 @@ export function decodePdu(pduHex: string): DecodedPdu {
 
   let concat: DecodedDeliver['concat'] = null
   let text = ''
+  let dataHex: string | null = null
 
-  const isUcs2 = (dcs & 0x0c) === 0x08
+  const encoding = alphabetOf(dcs)
 
-  if (isUcs2) {
-    let offset = 0
-    if (udhi) {
-      const udhl = ud[0]
-      concat = parseConcat(ud.subarray(1, 1 + udhl))
-      offset = 1 + udhl
-    }
-    text = Buffer.from(ud.subarray(offset)).swap16().toString('utf16le')
-  } else {
-    // GSM-7
-    let fillBits = 0
-    let skipSeptets = 0
-    if (udhi) {
-      const udhl = ud[0]
-      concat = parseConcat(ud.subarray(1, 1 + udhl))
-      const udhTotal = udhl + 1
-      fillBits = (7 - ((udhTotal * 8) % 7)) % 7
-      skipSeptets = Math.ceil((udhTotal * 8) / 7)
-    }
-    const septets = unpack7bit(ud, udl, fillBits)
-    // When UDH present, udl counts udh septets too; drop them.
-    const dataSeptets = udhi ? septets.slice(skipSeptets) : septets
-    text = septetsToText(dataSeptets)
+  // The UDH is a byte-length-prefixed block whatever the alphabet is.
+  let udhTotal = 0
+  if (udhi && ud.length) {
+    const udhl = ud[0]
+    concat = parseConcat(ud.subarray(1, 1 + udhl))
+    udhTotal = udhl + 1
   }
 
-  return { type: 'deliver', sender, text, timestamp: parseScts(scts), concat }
+  if (encoding === 'gsm7') {
+    // The septet stream is padded so the text starts on a septet boundary:
+    // skipSeptets * 7 == udhTotal * 8 + fillBits. So unpacking from bit 0 and
+    // dropping skipSeptets already lands on the first real character —
+    // applying the fill bits here as well would shift text by another 1-6 bits.
+    const skipSeptets = udhi ? Math.ceil((udhTotal * 8) / 7) : 0
+    // When UDH present, udl counts the udh septets too; drop them.
+    text = septetsToText(unpack7bit(ud, udl).slice(skipSeptets))
+  } else {
+    const body = ud.subarray(udhTotal)
+    if (encoding === 'ucs2') {
+      // swap16 throws on an odd length; a truncated trailing byte is not a char.
+      const even = body.subarray(0, body.length - (body.length % 2))
+      text = Buffer.from(even).swap16().toString('utf16le')
+    } else {
+      dataHex = body.toString('hex').toUpperCase()
+    }
+  }
+
+  return { type: 'deliver', sender, text, encoding, dataHex, timestamp: parseScts(scts), concat }
 }
 
 function parseConcat(udh: Buffer): DecodedDeliver['concat'] {
