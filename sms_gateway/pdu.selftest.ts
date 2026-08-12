@@ -87,6 +87,14 @@ eq('alpha.sender', decodedParts[0].type === 'deliver' && decodedParts[0].sender,
 const national = decodePdu('000404810808' + '0000' + '20806291731400' + '03' + 'D4F29C')
 eq('national.sender', national.type === 'deliver' && national.sender, '8080')
 
+// A 7-character sender packs into exactly 7 octets, indistinguishable by length
+// from an 8-character one, so the septet count reads one octet of zero padding as
+// a trailing '@'. Same at 15 characters, and every 8 after that.
+const alpha7 = decodePdu('0004' + '0ED0' + '47E65358842201' + '0000' + '20806291731400' + '03' + 'D4F29C')
+eq('alpha.sender 7 chars', alpha7.type === 'deliver' && alpha7.sender, 'GLOBEPH')
+const alpha15 = decodePdu('0004' + '1CD0' + 'CDA034E80C5291C1E910F97C3201' + '0000' + '20806291731400' + '03' + 'D4F29C')
+eq('alpha.sender 15 chars', alpha15.type === 'deliver' && alpha15.sender, 'MARANATHASCHOOL')
+
 // 9. TP-DCS -> alphabet. Everything that is not renderable text must say '8bit'
 // so the agent drops it instead of storing mojibake.
 for (const [dcs, want] of [

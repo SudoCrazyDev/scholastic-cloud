@@ -123,8 +123,13 @@ function decodeAddress(len: number, toa: number, body: string): string {
   if ((toa & 0x70) === 0x50) {
     const buf = Buffer.from(body, 'hex')
     // `len` counts useful semi-octets; 4 bits per semi-octet, 7 bits per char.
-    const septetCount = Math.floor((len * 4) / 7)
-    return septetsToText(unpack7bit(buf, septetCount))
+    const septets = unpack7bit(buf, Math.floor((len * 4) / 7))
+    // A 7-character sender packs into exactly 7 octets — the same as an 8-character
+    // one — so the count above cannot tell them apart and hands back one septet of
+    // padding. Padding bits are zero and 0x00 is '@', which never ends a real sender
+    // ID, so a trailing NUL is padding rather than text: "GLOBEPH@" -> "GLOBEPH".
+    while (septets.length > 1 && septets[septets.length - 1] === 0) septets.pop()
+    return septetsToText(septets)
   }
   let digits = ''
   for (let i = 0; i < body.length; i += 2) {
