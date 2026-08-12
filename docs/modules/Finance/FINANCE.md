@@ -372,7 +372,8 @@ recorded. Held by `institution-administrator` and `principal` by default; **not*
 Three things are **never** clearable and have no group at all: **payment plans**
 (`payment_plans`, `payment_plan_installments`, `student_payment_plans`,
 `student_payment_plan_changes`), **finance announcements**, and **disbursements**
-(`disbursements`, `disbursement_types`, `disbursement_receipts`).
+(`disbursements`, `disbursement_types`, `disbursement_component_types`,
+`disbursement_receipts`).
 
 **Groups** are declared once in `App\Support\FinanceDataGroups` and consumed by the preview, the
 delete and the UI, so the count shown can never describe a different operation from the one that

@@ -1,5 +1,10 @@
 import { api } from '../lib/api'
-import type { Disbursement, DisbursementType, DisbursementFormData } from '../types'
+import type {
+  Disbursement,
+  DisbursementType,
+  DisbursementComponentType,
+  DisbursementFormData,
+} from '../types'
 
 interface ApiResponse<T> {
   success: boolean
@@ -14,6 +19,11 @@ function toFormData(data: DisbursementFormData): FormData {
   fd.append('amount', String(data.amount))
   fd.append('date_issued', data.date_issued)
   if (data.disbursement_type_id) fd.append('disbursement_type_id', data.disbursement_type_id)
+  // Omitted on create means "use the default component type"; on update it
+  // means the field was cleared.
+  if (data.disbursement_component_type_id) {
+    fd.append('disbursement_component_type_id', data.disbursement_component_type_id)
+  }
   if (data.in_charge_user_id) fd.append('in_charge_user_id', data.in_charge_user_id)
   ;(data.receipts ?? []).forEach((file) => fd.append('receipts[]', file))
   ;(data.remove_receipt_ids ?? []).forEach((id) => fd.append('remove_receipt_ids[]', id))
@@ -23,6 +33,7 @@ function toFormData(data: DisbursementFormData): FormData {
 class DisbursementService {
   private baseUrl = '/disbursements'
   private typesUrl = '/disbursement-types'
+  private componentTypesUrl = '/disbursement-component-types'
 
   async getDisbursements() {
     const response = await api.get<ApiResponse<Disbursement[]>>(this.baseUrl)
@@ -56,6 +67,20 @@ class DisbursementService {
 
   async deleteType(id: string) {
     await api.delete(`${this.typesUrl}/${id}`)
+  }
+
+  async getComponentTypes() {
+    const response = await api.get<ApiResponse<DisbursementComponentType[]>>(this.componentTypesUrl)
+    return response.data
+  }
+
+  async createComponentType(name: string) {
+    const response = await api.post<ApiResponse<DisbursementComponentType>>(this.componentTypesUrl, { name })
+    return response.data
+  }
+
+  async deleteComponentType(id: string) {
+    await api.delete(`${this.componentTypesUrl}/${id}`)
   }
 }
 

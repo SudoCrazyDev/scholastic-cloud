@@ -1215,6 +1215,17 @@ export interface DisbursementType {
   updated_at: string;
 }
 
+// How a disbursement was paid out (e.g. Cash Dispense, Check, Bank Transfer).
+// The row flagged is_default is what a new disbursement starts on.
+export interface DisbursementComponentType {
+  id: string;
+  institution_id: string;
+  name: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DisbursementReceipt {
   id: string;
   url: string | null;
@@ -1227,6 +1238,8 @@ export interface Disbursement {
   institution_id: string;
   disbursement_type_id: string | null;
   type_name: string | null;
+  disbursement_component_type_id: string | null;
+  component_type_name: string | null;
   title: string;
   description: string | null;
   amount: string;
@@ -1244,6 +1257,7 @@ export interface DisbursementFormData {
   amount: number;
   date_issued: string;
   disbursement_type_id?: string | null;
+  disbursement_component_type_id?: string | null;
   in_charge_user_id?: string | null;
   receipts?: File[];
   remove_receipt_ids?: string[];

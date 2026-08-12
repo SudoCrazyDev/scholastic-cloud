@@ -3,8 +3,15 @@ import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Textarea } from '../../components/textarea'
 import { Autocomplete } from '../../components/autocomplete'
+import { Select } from '../../components/select'
 import { FileText, X } from 'lucide-react'
-import type { Disbursement, DisbursementType, DisbursementFormData, User } from '../../types'
+import type {
+  Disbursement,
+  DisbursementType,
+  DisbursementComponentType,
+  DisbursementFormData,
+  User,
+} from '../../types'
 
 interface DisbursementModalProps {
   isOpen: boolean
@@ -12,6 +19,7 @@ interface DisbursementModalProps {
   onSubmit: (data: DisbursementFormData) => void
   disbursement: Disbursement | null
   types: DisbursementType[]
+  componentTypes: DisbursementComponentType[]
   users: User[]
   loading?: boolean
 }
@@ -29,6 +37,7 @@ export function DisbursementModal({
   onSubmit,
   disbursement,
   types,
+  componentTypes,
   users,
   loading = false,
 }: DisbursementModalProps) {
@@ -36,10 +45,15 @@ export function DisbursementModal({
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [typeId, setTypeId] = useState('')
+  const [componentTypeId, setComponentTypeId] = useState('')
   const [dateIssued, setDateIssued] = useState(today())
   const [inChargeId, setInChargeId] = useState('')
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [removeIds, setRemoveIds] = useState<string[]>([])
+
+  // A plain string, not the array, so a background refetch of the component
+  // types cannot re-run the reset effect and undo what the user picked.
+  const defaultComponentTypeId = componentTypes.find((t) => t.is_default)?.id ?? ''
 
   useEffect(() => {
     if (!isOpen) return
@@ -48,6 +62,7 @@ export function DisbursementModal({
       setDescription(disbursement.description ?? '')
       setAmount(String(disbursement.amount ?? ''))
       setTypeId(disbursement.disbursement_type_id ?? '')
+      setComponentTypeId(disbursement.disbursement_component_type_id ?? '')
       setDateIssued(disbursement.date_issued ?? today())
       setInChargeId(disbursement.in_charge_user_id ?? '')
     } else {
@@ -55,12 +70,14 @@ export function DisbursementModal({
       setDescription('')
       setAmount('')
       setTypeId('')
+      // New records start on the default component type ("Cash Dispense").
+      setComponentTypeId(defaultComponentTypeId)
       setDateIssued(today())
       setInChargeId('')
     }
     setNewFiles([])
     setRemoveIds([])
-  }, [isOpen, disbursement])
+  }, [isOpen, disbursement, defaultComponentTypeId])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,6 +88,7 @@ export function DisbursementModal({
       amount: Number(amount),
       date_issued: dateIssued,
       disbursement_type_id: typeId || null,
+      disbursement_component_type_id: componentTypeId || null,
       in_charge_user_id: inChargeId || null,
       receipts: newFiles,
       remove_receipt_ids: removeIds,
@@ -84,6 +102,10 @@ export function DisbursementModal({
   const selectedUser = userOptions.find((o) => o.id === inChargeId) ?? null
   const typeOptions = types.map((t) => ({ id: t.id, label: t.name }))
   const selectedType = typeOptions.find((o) => o.id === typeId) ?? null
+  const componentTypeOptions = [
+    { value: '', label: 'None' },
+    ...componentTypes.map((t) => ({ value: t.id, label: t.name })),
+  ]
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -146,6 +168,21 @@ export function DisbursementModal({
               options={typeOptions}
               placeholder="Select or search a type..."
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Component Type</label>
+            {/* A Select, not the Autocomplete used above: this field always
+                carries the default, and the Autocomplete filters its list by
+                the selected label — which would hide every other choice. */}
+            <Select
+              value={componentTypeId}
+              onChange={(e) => setComponentTypeId(e.target.value)}
+              options={componentTypeOptions}
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              How the money was paid out. Add more under Manage Types.
+            </p>
           </div>
 
           <div>

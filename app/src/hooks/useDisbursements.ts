@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { disbursementService } from '../services/disbursementService'
 import { userService } from '../services/userService'
-import type { Disbursement, DisbursementFormData } from '../types'
+import type { Disbursement, DisbursementComponentType, DisbursementFormData } from '../types'
 import { toast } from 'react-hot-toast'
 
 export function useDisbursements() {
@@ -18,6 +18,11 @@ export function useDisbursements() {
   const typesQuery = useQuery({
     queryKey: ['disbursement-types'],
     queryFn: () => disbursementService.getTypes(),
+  })
+
+  const componentTypesQuery = useQuery({
+    queryKey: ['disbursement-component-types'],
+    queryFn: () => disbursementService.getComponentTypes(),
   })
 
   // Users for the "In-Charge of" dropdown (optional field).
@@ -88,8 +93,37 @@ export function useDisbursements() {
     },
   })
 
+  const createComponentTypeMutation = useMutation({
+    mutationFn: (name: string) => disbursementService.createComponentType(name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disbursement-component-types'] })
+      toast.success('Component type added')
+    },
+    onError: (err: any) => {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.errors?.name?.[0] ||
+          'Failed to add component type'
+      )
+    },
+  })
+
+  const deleteComponentTypeMutation = useMutation({
+    mutationFn: (id: string) => disbursementService.deleteComponentType(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disbursement-component-types'] })
+      queryClient.invalidateQueries({ queryKey: ['disbursements'] })
+      toast.success('Component type deleted')
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to delete component type')
+    },
+  })
+
   const disbursements = (disbursementsQuery.data as { data?: Disbursement[] })?.data ?? []
   const types = (typesQuery.data as { data?: any[] })?.data ?? []
+  const componentTypes =
+    (componentTypesQuery.data as { data?: DisbursementComponentType[] })?.data ?? []
   const users = usersQuery.data?.data ?? []
 
   const handleCreate = () => {
@@ -115,6 +149,7 @@ export function useDisbursements() {
   return {
     disbursements,
     types,
+    componentTypes,
     users,
     isLoading: disbursementsQuery.isLoading,
     error: disbursementsQuery.error,
@@ -129,5 +164,9 @@ export function useDisbursements() {
     createType: createTypeMutation.mutateAsync,
     deleteType: deleteTypeMutation.mutateAsync,
     typeMutationLoading: createTypeMutation.isPending || deleteTypeMutation.isPending,
+    createComponentType: createComponentTypeMutation.mutateAsync,
+    deleteComponentType: deleteComponentTypeMutation.mutateAsync,
+    componentTypeMutationLoading:
+      createComponentTypeMutation.isPending || deleteComponentTypeMutation.isPending,
   }
 }

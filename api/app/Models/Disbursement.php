@@ -13,6 +13,7 @@ class Disbursement extends Model
     protected $fillable = [
         'institution_id',
         'disbursement_type_id',
+        'disbursement_component_type_id',
         'title',
         'description',
         'amount',
@@ -33,6 +34,11 @@ class Disbursement extends Model
     public function type()
     {
         return $this->belongsTo(DisbursementType::class, 'disbursement_type_id');
+    }
+
+    public function componentType()
+    {
+        return $this->belongsTo(DisbursementComponentType::class, 'disbursement_component_type_id');
     }
 
     public function inCharge()

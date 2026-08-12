@@ -15,7 +15,8 @@ namespace App\Support;
  * below: payment plans (`payment_plans`, `payment_plan_installments`,
  * `student_payment_plans`, `student_payment_plan_changes`), finance
  * announcements, and disbursements (`disbursements`, `disbursement_types`,
- * `disbursement_receipts`). They are configuration and outgoing-money records
+ * `disbursement_component_types`, `disbursement_receipts`). They are
+ * configuration and outgoing-money records
  * that outlive a year's collections, so the clear leaves them standing.
  *
  * ## Year-scoped vs catalog groups

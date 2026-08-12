@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Disbursement;
+use App\Models\DisbursementComponentType;
 use App\Models\DisbursementReceipt;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +29,7 @@ class DisbursementController extends Controller
             return response()->json(['success' => false, 'message' => 'No default institution'], 403);
         }
 
-        $disbursements = Disbursement::with(['type', 'inCharge', 'receipts'])
+        $disbursements = Disbursement::with(['type', 'componentType', 'inCharge', 'receipts'])
             ->where('institution_id', $institutionId)
             ->orderBy('date_issued', 'desc')
             ->orderBy('created_at', 'desc')
@@ -50,6 +51,9 @@ class DisbursementController extends Controller
         $disbursement = Disbursement::create([
             'institution_id' => $institutionId,
             'disbursement_type_id' => $validated['disbursement_type_id'] ?? null,
+            // Left blank, a new record is a Cash Dispense (the seeded default).
+            'disbursement_component_type_id' => $validated['disbursement_component_type_id']
+                ?? DisbursementComponentType::defaultFor($institutionId)->id,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'amount' => $validated['amount'],
@@ -61,7 +65,7 @@ class DisbursementController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->format($disbursement->load(['type', 'inCharge', 'receipts'])),
+            'data' => $this->format($disbursement->load(['type', 'componentType', 'inCharge', 'receipts'])),
         ], 201);
     }
 
@@ -74,7 +78,7 @@ class DisbursementController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->format($disbursement->load(['type', 'inCharge', 'receipts'])),
+            'data' => $this->format($disbursement->load(['type', 'componentType', 'inCharge', 'receipts'])),
         ]);
     }
 
@@ -92,6 +96,9 @@ class DisbursementController extends Controller
 
         $disbursement->update([
             'disbursement_type_id' => $validated['disbursement_type_id'] ?? null,
+            // On edit an empty value means "no component type" — the default is
+            // only applied when the record is first created.
+            'disbursement_component_type_id' => $validated['disbursement_component_type_id'] ?? null,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'amount' => $validated['amount'],
@@ -114,7 +121,7 @@ class DisbursementController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->format($disbursement->fresh()->load(['type', 'inCharge', 'receipts'])),
+            'data' => $this->format($disbursement->fresh()->load(['type', 'componentType', 'inCharge', 'receipts'])),
         ]);
     }
 
@@ -145,6 +152,10 @@ class DisbursementController extends Controller
             'disbursement_type_id' => [
                 'nullable',
                 Rule::exists('disbursement_types', 'id')->where('institution_id', $institutionId),
+            ],
+            'disbursement_component_type_id' => [
+                'nullable',
+                Rule::exists('disbursement_component_types', 'id')->where('institution_id', $institutionId),
             ],
             'in_charge_user_id' => ['nullable', Rule::exists('users', 'id')],
             'receipts' => 'nullable|array',
@@ -207,6 +218,8 @@ class DisbursementController extends Controller
             'institution_id' => $d->institution_id,
             'disbursement_type_id' => $d->disbursement_type_id,
             'type_name' => $d->type?->name,
+            'disbursement_component_type_id' => $d->disbursement_component_type_id,
+            'component_type_name' => $d->componentType?->name,
             'title' => $d->title,
             'description' => $d->description,
             'amount' => $d->amount,

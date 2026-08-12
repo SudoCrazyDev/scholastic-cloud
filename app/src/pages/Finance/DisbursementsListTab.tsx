@@ -12,6 +12,7 @@ export function DisbursementsListTab({ dm }: { dm: Dm }) {
   const {
     disbursements,
     types,
+    componentTypes,
     users,
     isLoading,
     error,
@@ -74,7 +75,8 @@ export function DisbursementsListTab({ dm }: { dm: Dm }) {
                 <th className="pb-3 font-medium text-gray-700">Date</th>
                 <th className="pb-3 font-medium text-gray-700">Title</th>
                 <th className="pb-3 font-medium text-gray-700">Type</th>
-                <th className="pb-3 font-medium text-gray-700 text-right">Amount</th>
+                <th className="pb-3 font-medium text-gray-700">Component</th>
+                <th className="pb-3 pr-6 font-medium text-gray-700 text-right">Amount</th>
                 <th className="pb-3 font-medium text-gray-700">In-Charge</th>
                 <th className="pb-3 font-medium text-gray-700">Receipt</th>
                 <th className="pb-3 font-medium text-gray-700 w-24">Actions</th>
@@ -83,7 +85,7 @@ export function DisbursementsListTab({ dm }: { dm: Dm }) {
             <tbody>
               {disbursements.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
+                  <td colSpan={8} className="py-8 text-center text-gray-500">
                     No disbursements yet. Add one to get started.
                   </td>
                 </tr>
@@ -106,7 +108,16 @@ export function DisbursementsListTab({ dm }: { dm: Dm }) {
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="py-3 text-right font-medium text-gray-900 whitespace-nowrap">
+                    <td className="py-3">
+                      {d.component_type_name ? (
+                        <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-primary-50 text-primary-700">
+                          {d.component_type_name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-6 text-right font-medium text-gray-900 whitespace-nowrap">
                       {peso(d.amount)}
                     </td>
                     <td className="py-3 text-gray-700">{d.in_charge_name || <span className="text-gray-400">—</span>}</td>
@@ -163,6 +174,7 @@ export function DisbursementsListTab({ dm }: { dm: Dm }) {
         onSubmit={handleModalSubmit}
         disbursement={editing}
         types={types}
+        componentTypes={componentTypes}
         users={users}
         loading={modalLoading}
       />

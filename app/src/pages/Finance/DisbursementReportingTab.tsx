@@ -52,6 +52,7 @@ export function DisbursementReportingTab({ dm }: { dm: Dm }) {
               <th className="pb-3 font-medium text-gray-700">Date</th>
               <th className="pb-3 font-medium text-gray-700">Title</th>
               <th className="pb-3 font-medium text-gray-700">Type</th>
+              <th className="pb-3 font-medium text-gray-700">Component</th>
               <th className="pb-3 font-medium text-gray-700">In-Charge</th>
               <th className="pb-3 font-medium text-gray-700 text-right">Amount</th>
             </tr>
@@ -59,7 +60,7 @@ export function DisbursementReportingTab({ dm }: { dm: Dm }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-gray-500">
+                <td colSpan={6} className="py-8 text-center text-gray-500">
                   No disbursements for the selected range.
                 </td>
               </tr>
@@ -69,6 +70,7 @@ export function DisbursementReportingTab({ dm }: { dm: Dm }) {
                   <td className="py-3 whitespace-nowrap text-gray-700">{formatDate(d.date_issued)}</td>
                   <td className="py-3 font-medium text-gray-900">{d.title}</td>
                   <td className="py-3 text-gray-700">{d.type_name || <span className="text-gray-400">—</span>}</td>
+                  <td className="py-3 text-gray-700">{d.component_type_name || <span className="text-gray-400">—</span>}</td>
                   <td className="py-3 text-gray-700">{d.in_charge_name || <span className="text-gray-400">—</span>}</td>
                   <td className="py-3 text-right font-medium text-gray-900 whitespace-nowrap">{peso(d.amount)}</td>
                 </tr>
@@ -78,7 +80,7 @@ export function DisbursementReportingTab({ dm }: { dm: Dm }) {
           {filtered.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-gray-200">
-                <td colSpan={4} className="py-3 font-semibold text-gray-900">
+                <td colSpan={5} className="py-3 font-semibold text-gray-900">
                   Total ({filtered.length} record{filtered.length === 1 ? '' : 's'})
                 </td>
                 <td className="py-3 text-right font-bold text-gray-900 whitespace-nowrap">{peso(total)}</td>

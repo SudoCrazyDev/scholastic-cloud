@@ -14,6 +14,7 @@ use App\Http\Controllers\SmsMessageController;
 use App\Http\Controllers\SmsSettingsController;
 use App\Http\Controllers\GateSmsSettingController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\DisbursementComponentTypeController;
 use App\Http\Controllers\DisbursementController;
 use App\Http\Controllers\DisbursementTypeController;
 use App\Http\Controllers\FinanceDataClearController;
@@ -529,6 +530,13 @@ Route::middleware('auth.token')->group(function () {
     Route::put('disbursement-types/{id}', [DisbursementTypeController::class, 'update'])->middleware('module:disbursements,manage');
     Route::patch('disbursement-types/{id}', [DisbursementTypeController::class, 'update'])->middleware('module:disbursements,manage');
     Route::delete('disbursement-types/{id}', [DisbursementTypeController::class, 'destroy'])->middleware('module:disbursements,manage');
+
+    // Disbursement component types (how the money was dispensed; default "Cash Dispense")
+    Route::get('disbursement-component-types', [DisbursementComponentTypeController::class, 'index'])->middleware('module:disbursements,view');
+    Route::post('disbursement-component-types', [DisbursementComponentTypeController::class, 'store'])->middleware('module:disbursements,manage');
+    Route::put('disbursement-component-types/{id}', [DisbursementComponentTypeController::class, 'update'])->middleware('module:disbursements,manage');
+    Route::patch('disbursement-component-types/{id}', [DisbursementComponentTypeController::class, 'update'])->middleware('module:disbursements,manage');
+    Route::delete('disbursement-component-types/{id}', [DisbursementComponentTypeController::class, 'destroy'])->middleware('module:disbursements,manage');
 
     // Disbursements / expenses (update is POST-based for multipart receipt uploads)
     Route::get('disbursements', [DisbursementController::class, 'index'])->middleware('module:disbursements,view');
