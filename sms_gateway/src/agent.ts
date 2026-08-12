@@ -2,28 +2,7 @@ import { AGENT_VERSION, type Config } from './config.js'
 import { log, logTail, logsSince, runId } from './logger.js'
 import { Modem, type ModemInfo } from './modem.js'
 import { Portal, withRetry, type OutboxMessage } from './portal.js'
-
-/** Buffers multi-part inbound SMS until every segment arrives. */
-class ConcatBuffer {
-  private store = new Map<
-    number,
-    { total: number; parts: Map<number, string>; sender: string; timestamp: string | null }
-  >()
-
-  add(ref: number, seq: number, total: number, sender: string, text: string, timestamp: string | null): string | null {
-    let entry = this.store.get(ref)
-    if (!entry) {
-      entry = { total, parts: new Map(), sender, timestamp }
-      this.store.set(ref, entry)
-    }
-    entry.parts.set(seq, text)
-    if (entry.parts.size >= entry.total) {
-      this.store.delete(ref)
-      return Array.from({ length: entry.total }, (_, i) => entry!.parts.get(i + 1) ?? '').join('')
-    }
-    return null
-  }
-}
+import { ConcatBuffer } from './concat.js'
 
 export class Agent {
   private modem: Modem
@@ -226,36 +205,87 @@ export class Agent {
         const stored = await this.modem.readStored()
         const inbound: unknown[] = []
         const reports: unknown[] = []
+        // Slots to free once the portal has taken what was in them. Fragments of
+        // an unfinished multi-part message are deliberately left out, so they
+        // survive a restart and get re-read on the next poll.
+        const inboundSlots: number[] = []
+        const otherSlots: number[] = []
+        const now = Date.now()
+
+        // The portal rejects an empty body, and one rejected entry fails the
+        // whole batch — which would strand every other message in this poll and
+        // retry forever. Drop the empty one and free its slot instead.
+        const queue = (sender: string, body: string, at: string | null, slots: number[]) => {
+          if (!body) {
+            log.debug(`dropping empty-bodied SMS from ${sender}`)
+            otherSlots.push(...slots)
+            return
+          }
+          inbound.push({ from: sender, body, received_at: at ?? undefined })
+          inboundSlots.push(...slots)
+        }
+
         for (const s of stored) {
           const decoded = this.modem.decode(s.pdu)
           if (!decoded) {
-            await this.modem.deleteStored(s.index)
+            otherSlots.push(s.index)
             continue
           }
+
           if (decoded.type === 'status') {
             reports.push({
               provider_ref: String(decoded.reference),
               status: decoded.delivered ? 'delivered' : decoded.failed ? 'failed' : 'delivered',
             })
-          } else {
-            let text: string | null = decoded.text
-            if (decoded.concat) {
-              text = this.concat.add(
-                decoded.concat.ref,
-                decoded.concat.seq,
-                decoded.concat.total,
-                decoded.sender,
-                decoded.text,
-                decoded.timestamp,
-              )
-            }
-            if (text !== null) {
-              inbound.push({ from: decoded.sender, body: text, received_at: decoded.timestamp ?? undefined })
-            }
+            otherSlots.push(s.index)
+            continue
           }
-          await this.modem.deleteStored(s.index)
+
+          // Binary SMS — WAP push, OTA settings, voicemail indicators. There is
+          // no text in these; decoding them as characters is what produced the
+          // mojibake rows in the portal inbox.
+          if (decoded.encoding === '8bit') {
+            log.debug(`ignoring binary SMS from ${decoded.sender} (${(decoded.dataHex?.length ?? 0) / 2} bytes)`)
+            otherSlots.push(s.index)
+            continue
+          }
+
+          if (decoded.concat) {
+            const done = this.concat.add(
+              decoded.concat.ref,
+              decoded.concat.seq,
+              decoded.concat.total,
+              decoded.sender,
+              decoded.text,
+              decoded.timestamp,
+              s.index,
+              now,
+            )
+            if (done) queue(done.sender, done.text, done.timestamp, done.indexes)
+            continue
+          }
+
+          queue(decoded.sender, decoded.text, decoded.timestamp, [s.index])
         }
-        if (inbound.length) await withRetry(() => this.portal.pushInbox(inbound), 'push inbox')
+
+        // Segments that never completed: forward what did arrive rather than
+        // sit on it forever and leak both memory and modem storage.
+        for (const stale of this.concat.expire(now)) {
+          log.warn(
+            `incomplete multi-part SMS from ${stale.sender} (${stale.have}/${stale.total} segments) — ` +
+              'forwarding what arrived',
+          )
+          queue(stale.sender, stale.text, stale.timestamp, stale.indexes)
+        }
+
+        // Free the slots only once the portal has the messages — deleting first
+        // means a failed push loses them for good.
+        if (inbound.length) {
+          const ok = await withRetry(() => this.portal.pushInbox(inbound).then(() => true), 'push inbox')
+          if (ok) otherSlots.push(...inboundSlots)
+        }
+        for (const index of otherSlots) await this.modem.deleteStored(index)
+
         if (reports.length) await withRetry(() => this.portal.reportDelivery(reports), 'report delivery')
       } catch (e) {
         log.warn('inbox loop error', String(e))
