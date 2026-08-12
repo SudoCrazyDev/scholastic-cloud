@@ -282,6 +282,11 @@ export class Modem {
           } catch {
             /* ignore */
           }
+          // Nothing else can be in flight (commands are serialized), so anything
+          // still buffered belongs to the send we just gave up on — including a
+          // '>' that arrived too late. Left in place it would be mis-read as a
+          // reply to the next command.
+          this.buffer = ''
           const detail = promptFired
             ? 'sent message but no +CMGS/OK from modem (check SIM balance / network registration)'
             : "modem never showed the '>' prompt"
@@ -300,16 +305,24 @@ export class Modem {
             this.lineWaiters.unshift(handler)
           }
         }
-        const cleanup = () => {
-          clearTimeout(timer)
-          const i = this.lineWaiters.indexOf(handler)
-          if (i >= 0) this.lineWaiters.splice(i, 1)
-        }
-        this.promptWaiters.push(() => {
+        const onPrompt = () => {
           promptFired = true
           this.lineWaiters.push(handler)
           this.write(payload)
-        })
+        }
+        const cleanup = () => {
+          clearTimeout(timer)
+          // Drop our prompt waiter too. Leaving it behind desynchronises the
+          // queue for good: the next send's '>' would fire *this* (dead) waiter,
+          // re-writing this message's payload, while the new send waits for a
+          // prompt that has already been consumed — so every later send fails
+          // with "never showed the '>' prompt" and earlier ones go out twice.
+          const p = this.promptWaiters.indexOf(onPrompt)
+          if (p >= 0) this.promptWaiters.splice(p, 1)
+          const i = this.lineWaiters.indexOf(handler)
+          if (i >= 0) this.lineWaiters.splice(i, 1)
+        }
+        this.promptWaiters.push(onPrompt)
         log.debug('>>', cmd)
         this.write(cmd + '\r')
       })
