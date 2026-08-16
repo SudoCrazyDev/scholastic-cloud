@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\ClassSection;
+use App\Models\StudentSection;
+use App\Models\StudentSubject;
+use App\Models\Subject;
+use App\Observers\ChatMembershipObserver;
+use App\Services\Chat\ChatSyncQueue;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +20,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One queue per request, so forty enrolment writes collapse into one
+        // re-derivation of the section instead of forty.
+        $this->app->singleton(ChatSyncQueue::class);
     }
 
     /**
@@ -23,6 +31,31 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureRateLimiting();
+        $this->configureChatMembershipSync();
+    }
+
+    /**
+     * Wire the models that decide who belongs in a group chat to the observer
+     * that re-derives it. Resolved lazily inside each closure so the per-request
+     * queue is the one that collects the marks.
+     */
+    protected function configureChatMembershipSync(): void
+    {
+        $on = fn (string $method) => fn ($model) => $this->app
+            ->make(ChatMembershipObserver::class)
+            ->{$method}($model);
+
+        ClassSection::saved($on('savedClassSection'));
+        ClassSection::deleted($on('deletedClassSection'));
+
+        Subject::saved($on('savedSubject'));
+        Subject::deleted($on('deletedSubject'));
+
+        StudentSection::saved($on('savedStudentSection'));
+        StudentSection::deleted($on('deletedStudentSection'));
+
+        StudentSubject::saved($on('savedStudentSubject'));
+        StudentSubject::deleted($on('deletedStudentSubject'));
     }
 
     /**
@@ -57,6 +90,13 @@ class AppServiceProvider extends ServiceProvider
         // enough to be worth guessing, so it must not be guessable at speed.
         RateLimiter::for('pairing', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
+        });
+
+        // Posting to a group chat. Generous enough that nobody typing normally
+        // will ever see it, tight enough that one account cannot flood a class
+        // faster than a teacher can react.
+        RateLimiter::for('chat-send', function (Request $request) {
+            return Limit::perMinute(30)->by($request->bearerToken() ?: $request->ip());
         });
     }
 }

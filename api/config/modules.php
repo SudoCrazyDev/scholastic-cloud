@@ -105,6 +105,12 @@ return [
                 'subjects' => [
                     'label' => 'Subjects',
                     'description' => 'Subjects, subject templates and teacher assignment.',
+                    'special' => [
+                        'view-all' => [
+                            'label' => 'See every subject in the school',
+                            'description' => 'My Assigned Subjects lists the whole school rather than only the subjects this person advises. Tick it for a role that oversees other teachers' subjects — a principal, an administrator, a department head. A subject teacher holds Manage on their own subjects without it.',
+                        ],
+                    ],
                 ],
                 'timetable' => [
                     'label' => 'Timetable',

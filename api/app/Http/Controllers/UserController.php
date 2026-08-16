@@ -16,10 +16,17 @@ class UserController extends Controller
     use AuthorizesModuleAccess;
 
     /**
-     * Roles that see every subject in their institution(s) instead of only
-     * the subjects they advise.
+     * Seeing every subject in the institution rather than only the ones you
+     * advise is a permission, not a job title.
+     *
+     * This used to be a list of slug spellings. Maranatha's Department Head
+     * carried the slug `department-head-1` — generateSlug()'s collision suffix,
+     * written by a role-builder save that never changed the name — and five
+     * department heads silently got a subject teacher's view of 208 subjects
+     * instead of the whole school's. The same shape had already cost their
+     * administrators the Receipt Approvals queue.
      */
-    private const SUBJECT_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator', 'department-head'];
+    private const SUBJECT_OVERVIEW_PERMISSION = 'subjects.view-all';
 
     /**
      * Display a listing of the resource with pagination and filtering.
@@ -437,7 +444,12 @@ class UserController extends Controller
     }
 
     /**
-     * Get the current user's advised subjects (assigned to them as teacher).
+     * The subjects behind "My Assigned Subjects".
+     *
+     * Normally the ones the caller advises. A caller holding
+     * `subjects.view-all` gets every subject in the institutions they belong to
+     * instead — see SUBJECT_OVERVIEW_PERMISSION.
+     *
      * Optional query: academic_year — filter by class section's academic year.
      */
     public function getMySubjects(Request $request): \Illuminate\Http\JsonResponse
@@ -445,8 +457,8 @@ class UserController extends Controller
         try {
             $user = $request->user();
 
-            $role = method_exists($user, 'getRole') ? $user->getRole() : null;
-            $hasInstitutionOverview = in_array((string) ($role->slug ?? ''), self::SUBJECT_OVERVIEW_ROLES, true);
+            $hasInstitutionOverview = method_exists($user, 'hasPermissionTo')
+                && $user->hasPermissionTo(self::SUBJECT_OVERVIEW_PERMISSION);
 
             if ($hasInstitutionOverview) {
                 $institutionIds = $user->userInstitutions()->pluck('institution_id');

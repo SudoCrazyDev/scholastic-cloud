@@ -1,12 +1,10 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { userService } from '../services/userService'
-import { useAuth } from './useAuth'
-
-const INSTITUTION_OVERVIEW_ROLES = ['principal', 'institution-admin', 'institution-administrator', 'department-head']
+import { usePermissions } from './usePermissions'
 
 export const useAssignedSubjects = () => {
-  const { user } = useAuth()
+  const { hasPermission } = usePermissions()
   const [search, setSearch] = useState('')
   const [sectionFilter, setSectionFilter] = useState('all')
   const [sorting, setSorting] = useState<{ field: string; direction: 'asc' | 'desc' }>({
@@ -14,8 +12,10 @@ export const useAssignedSubjects = () => {
     direction: 'asc',
   })
 
-  // Principals and institution admins see every subject in the institution
-  const isInstitutionOverview = INSTITUTION_OVERVIEW_ROLES.includes(user?.role?.slug || '')
+  // Presentation only — the heading, the empty state, and whether each card
+  // shows an adviser. The API decides the list from this same permission, so
+  // this never filters anything; it just describes what came back.
+  const isInstitutionOverview = hasPermission('subjects.view-all')
 
   const {
     data: assignedSubjectsRaw = [],

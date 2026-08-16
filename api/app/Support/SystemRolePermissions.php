@@ -83,6 +83,11 @@ class SystemRolePermissions
             'student-attendance', 'certificate-builder', 'form-builder', 'id-card-builder',
         ],
 
+        // A department head works the same screens as a teacher. The difference
+        // is reach, not ability: they oversee other teachers' subjects, which is
+        // `subjects.view-all` in SPECIAL below, not anything in this list. Keep
+        // the two sets identical here — the moment they differ, the reason
+        // should be a capability a department head has and a teacher does not.
         'department-head' => [
             'announcements', 'subjects', 'consolidated-grades', 'proficiency',
             'student-attendance', 'certificate-builder', 'form-builder', 'id-card-builder',
@@ -141,6 +146,7 @@ class SystemRolePermissions
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
             'tala.configure', 'students.reset-portal-password',
+            'subjects.view-all',
         ],
         'principal' => [
             'finance.request-void', 'finance.approve-void', 'finance.void-immediately',
@@ -149,6 +155,7 @@ class SystemRolePermissions
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
             'tala.configure', 'students.reset-portal-password',
+            'subjects.view-all',
         ],
         // Finance both raises and reviews void requests, but does not skip the
         // queue — a void it raises from the ledger still becomes a pending
@@ -177,6 +184,11 @@ class SystemRolePermissions
         // login that already exists to a different email address, which is how
         // you would point a student's account at your own inbox.
         'subject-teacher' => ['students.reset-portal-password'],
+
+        // The one thing that separates a department head from a teacher. Their
+        // module sets are identical, so this — not `subjects.manage`, which a
+        // teacher also holds — is what My Assigned Subjects has to key off.
+        'department-head' => ['subjects.view-all'],
     ];
 
     /**
