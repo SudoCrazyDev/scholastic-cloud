@@ -1,0 +1,46 @@
+name = "scholastic-chat-realtime"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# One inbox object per person: holds their socket, and their send-rate counter.
+# SQLite-backed so the class is available on the Workers free plan as well as
+# paid.
+[[durable_objects.bindings]]
+name = "CHAT_INBOX"
+class_name = "ChatInbox"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatInbox"]
+
+# One database per tenant, and that is deliberate: D1 executes one query at a
+# time, so a shared database would serialize every school behind every other
+# one. Each entry in the CHAT_TENANTS secret names its binding via `db`.
+#
+# Add a client by creating their database and adding a block here:
+#   npx wrangler d1 create scholastic-chat-<tenant>
+#   npx wrangler d1 execute scholastic-chat-<tenant> --remote --file schema.sql
+[[d1_databases]]
+binding = "CHAT_DB_PROD"
+database_name = "scholastic-chat-prod"
+database_id = "3dc19a5a-ec3b-4755-9b0f-e1750ccadb2a"
+
+[[d1_databases]]
+binding = "CHAT_DB_MARANATHA"
+database_name = "scholastic-chat-maranatha"
+database_id = "a8b2f693-da01-491b-9188-c77873f42dd7"
+
+[[d1_databases]]
+binding = "CHAT_DB_MCADAVAO"
+database_name = "scholastic-chat-mcadavao"
+database_id = "279ecd0f-5705-4cc9-afcc-b52a3ca2c411"
+
+# Membership repair across every tenant. This is the only scheduled job the
+# platform has: no ScholasticCloud deployment runs `php artisan schedule:run`.
+[triggers]
+crons = ["*/30 * * * *"]
+
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true

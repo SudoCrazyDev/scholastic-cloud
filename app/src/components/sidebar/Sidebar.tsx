@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useFeatures } from '../../hooks/useFeatures';
 import { institutionService } from '../../services/institutionService';
 import {
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   Building2,
   Shield,
   CreditCard,
+  ToggleRight,
   Wallet,
   Menu,
   GraduationCap,
@@ -43,9 +45,11 @@ import {
   Banknote,
   Smartphone,
   MessageSquare,
+  MessagesSquare,
   Sparkles,
 } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
+import { chatService } from '../../services/chatService';
 
 interface MenuItem {
   id: string;
@@ -58,6 +62,13 @@ interface MenuItem {
    */
   module?: string;
   ability?: string;
+  /**
+   * Feature the item's institution must have, e.g. 'chat'. A different question
+   * from `module`: that asks whether this person's role may open the screen,
+   * this asks whether their school has the thing at all. An item may declare
+   * both, and then needs both.
+   */
+  feature?: string;
   /**
    * Role slugs, for the student portal only. Student access is not modelled as
    * module permissions — those screens are a student's own records, and every
@@ -109,6 +120,19 @@ const menuGroups: MenuGroup[] = [
         path: '/announcements/manage',
         module: 'announcements',
         ability: 'manage',
+      },
+      {
+        // Shown to everyone signed in, staff and students alike. The screen
+        // lists the groups the person's own enrolment puts them in, and shows
+        // an empty state to anyone with none — no permission decides this.
+        //
+        // Whether the school has chat at all is decided by the platform, and
+        // that gate is not a permission the school can grant itself.
+        id: 'chat',
+        label: 'Chat',
+        icon: <MessagesSquare className="w-5 h-5" />,
+        path: '/chat',
+        feature: 'chat',
       },
     ],
   },
@@ -415,6 +439,13 @@ const menuGroups: MenuGroup[] = [
         module: 'roles',
       },
       {
+        id: 'feature-access',
+        label: 'Feature Access',
+        icon: <ToggleRight className="w-5 h-5" />,
+        path: '/feature-access',
+        module: 'feature-access',
+      },
+      {
         id: 'subscriptions',
         label: 'Subscriptions',
         icon: <CreditCard className="w-5 h-5" />,
@@ -476,6 +507,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { user } = useAuth();
   const { can, isStudent } = usePermissions();
+  const { hasFeature } = useFeatures();
   const userRoleSlug = user?.role?.slug;
 
   const institutionId = user?.user_institutions?.[0]?.institution_id;
@@ -504,11 +536,30 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
   });
   const unreadCount = unreadResponse?.data?.count ?? 0;
 
+  // Unread chat messages across every group. Polled on the same slow timer as
+  // the announcement badge — while the chat screen is open its own sync keeps
+  // this fresher than 60s, and while it is closed a minute is soon enough.
+  const { data: chatUnreadResponse } = useQuery({
+    queryKey: ['chat', 'unread-count'],
+    queryFn: () => chatService.getUnreadCount(),
+    refetchInterval: 60000,
+    // Off entirely where the school does not have chat. Without this the
+    // sidebar would poll an endpoint that answers 403 once a minute, for every
+    // signed-in user of every institution that has it switched off.
+    enabled: hasFeature('chat'),
+  });
+  const chatUnreadCount = chatUnreadResponse?.data?.count ?? 0;
+
   const filteredGroups = useMemo(() => {
     return menuGroups
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
+          // Feature-gated: the school does not have it, so nobody there sees
+          // it — a super-administrator's wildcard does not override this, since
+          // it is not a statement about the person.
+          if (item.feature && !hasFeature(item.feature)) return false;
+
           // Module-gated: shown only when the role can reach it. This mirrors
           // the API — hiding the link is presentation, the endpoint enforces.
           if (item.module) return can(item.module, item.ability ?? 'view');
@@ -525,7 +576,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [userRoleSlug, can, isStudent]);
+  }, [userRoleSlug, can, isStudent, hasFeature]);
 
   return (
     <motion.div
@@ -631,6 +682,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onMobileClose }) => {
                   {item.id === 'announcements-board' && unreadCount > 0 && (
                     <span className="ml-auto inline-flex items-center justify-center rounded-full bg-primary-600 px-1.5 min-w-[1.25rem] h-5 text-[10px] font-semibold text-white">
                       {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                  {item.id === 'chat' && chatUnreadCount > 0 && (
+                    <span className="ml-auto inline-flex items-center justify-center rounded-full bg-primary-600 px-1.5 min-w-[1.25rem] h-5 text-[10px] font-semibold text-white">
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                     </span>
                   )}
                 </NavLink>

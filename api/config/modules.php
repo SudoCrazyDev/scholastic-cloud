@@ -47,6 +47,13 @@ return [
         'my-class-sections',
         'my-assigned-subjects',
         'my-timesheet',
+        // Group chat. A teacher's own advisory and subject groups, and the
+        // student's mirror of the same — their own conversations, so no role
+        // grants access to them and none can take it away. Who is in a group is
+        // derived from enrolment (App\Services\Chat\ChatMembershipSync), which
+        // is what does the gating. Administering chat across an institution is a
+        // separate concern and is not this entry.
+        'my-chats',
     ],
 
     /*
@@ -108,7 +115,7 @@ return [
                     'special' => [
                         'view-all' => [
                             'label' => 'See every subject in the school',
-                            'description' => 'My Assigned Subjects lists the whole school rather than only the subjects this person advises. Tick it for a role that oversees other teachers' subjects — a principal, an administrator, a department head. A subject teacher holds Manage on their own subjects without it.',
+                            'description' => 'My Assigned Subjects lists the whole school rather than only the subjects this person advises. Tick it for a role that oversees other teachers\' subjects — a principal, an administrator, a department head. A subject teacher holds Manage on their own subjects without it.',
                         ],
                     ],
                 ],
@@ -338,6 +345,11 @@ return [
                 'subscriptions' => [
                     'label' => 'Subscriptions',
                     'description' => 'Platform-wide subscription plans.',
+                    'system_only' => true,
+                ],
+                'feature-access' => [
+                    'label' => 'Feature Access',
+                    'description' => 'Decide which institutions have which features. Not the same as a role: a feature switched off here is closed to the whole school, including its own administrator.',
                     'system_only' => true,
                 ],
             ],

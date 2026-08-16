@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiometricDeviceController;
 use App\Http\Controllers\BridgeController;
 use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\CoreValueMarkingController;
 use App\Http\Controllers\SmsBridgeController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\SmsGatewayController;
 use App\Http\Controllers\SmsMessageController;
 use App\Http\Controllers\SmsSettingsController;
 use App\Http\Controllers\GateSmsSettingController;
+use App\Http\Controllers\InstitutionFeatureController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DisbursementComponentTypeController;
 use App\Http\Controllers\DisbursementController;
@@ -108,6 +110,17 @@ Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackControll
 
 // Public kiosk endpoint for RFID gate scanners
 Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan'])->middleware('throttle:pairing');
+
+// Chat membership repair, called by the chat Worker's cron trigger. Outside the
+// user-token group because it is machine-to-machine: it carries the tenant
+// secret, and is closed entirely when no secret is configured.
+Route::post('/chat/reconcile', [ChatController::class, 'reconcile'])
+    ->middleware('auth.chat.worker');
+
+// Full roster snapshot, pulled by the same cron trigger. Re-derives membership
+// and pushes every group, so a roster the service missed repairs itself.
+Route::post('/chat/roster-snapshot', [ChatController::class, 'rosterSnapshot'])
+    ->middleware('auth.chat.worker');
 
 // Permanent (non-expiring) media links for uploaded files. Not behind auth
 // because browsers request these from <img>/<a> without the bearer token —
@@ -693,6 +706,51 @@ Route::middleware('auth.token')->group(function () {
     Route::post('announcements/{id}/attachments', [AnnouncementController::class, 'uploadAttachment'])->middleware('module:announcements,manage');
     Route::delete('announcements/{id}/attachments/{attachmentId}', [AnnouncementController::class, 'deleteAttachment'])->middleware('module:announcements,manage');
     Route::apiResource('announcements', AnnouncementController::class)->middleware('module:announcements,view,shared');
+
+    // Chat — group conversations for a teacher's advisory and each subject they
+    // teach, and the mirror of that for a student. Ungated on purpose: these are
+    // the signed-in person's own groups, and chat_participants (derived from
+    // enrolment) is the authorization. Admin oversight of chat is a separate,
+    // permissioned module and is not part of these routes.
+    /*
+     * Which institutions have which features. Platform administration — the
+     * module is `system_only`, so only a wildcard holder reaches it and a school
+     * can never be granted it in its own role builder.
+     */
+    Route::get('institution-features', [InstitutionFeatureController::class, 'index'])
+        ->middleware('module:feature-access,view');
+    Route::put('institution-features/{institutionId}/{feature}', [InstitutionFeatureController::class, 'update'])
+        ->middleware('module:feature-access,manage');
+
+    /*
+     * Chat is gated on the institution having the feature, not on a role — see
+     * config/features.php. `feature:chat` wraps every route rather than being
+     * repeated on each, so a route added later cannot quietly miss it.
+     *
+     * This includes chat/token: without it, a school switched off would still be
+     * handed a signed token for the chat service and could talk to the edge
+     * directly, where nothing knows the feature exists.
+     */
+    Route::middleware('feature:chat')->group(function () {
+        Route::get('chat/conversations', [ChatController::class, 'conversations']);
+        Route::get('chat/sync', [ChatController::class, 'sync']);
+        Route::get('chat/socket-token', [ChatController::class, 'socketToken']);
+        // The one chat endpoint that survives the move to the chat service: it
+        // hands out the token the client then uses to talk to that service.
+        Route::get('chat/token', [ChatController::class, 'accessToken']);
+        Route::get('chat/unread-count', [ChatController::class, 'unreadCount']);
+        Route::get('chat/conversations/{conversationId}/messages', [ChatController::class, 'messages']);
+        Route::post('chat/conversations/{conversationId}/read', [ChatController::class, 'markRead']);
+        // Posting carries its own limiter — the shared `api` budget of 300/min is
+        // sized for screens, not for a keyboard.
+        Route::post('chat/conversations/{conversationId}/messages', [ChatController::class, 'send'])
+            ->middleware('throttle:chat-send');
+        // Teacher moderation. Not permissioned either: whether someone may remove
+        // a message is decided by their role *in that group*, which comes from the
+        // same derived roster as everything else here.
+        Route::post('chat/conversations/{conversationId}/messages/{messageId}/delete', [ChatController::class, 'deleteMessage']);
+        Route::post('chat/conversations/{conversationId}/lock', [ChatController::class, 'setLocked']);
+    });
 
     // Online admission form submissions (admin list/detail/accept/reject)
     Route::get('admission-form-settings', [AdmissionFormSubmissionController::class, 'settings'])->middleware('module:admission-forms,view');

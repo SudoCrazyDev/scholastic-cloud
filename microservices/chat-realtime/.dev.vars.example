@@ -1,0 +1,10 @@
+# Copy to .dev.vars for `npm run dev`. The real values are Worker secrets in
+# production (`wrangler secret put …`) and are never committed.
+#
+# `secret` must match CHAT_WORKER_SECRET in that deployment's api/.env, the key
+# must match its CHAT_TENANT, and `db` names the D1 binding in wrangler.toml.
+CHAT_TENANTS={"local":{"secret":"local-dev-secret","api":"http://localhost:8000/api","db":"CHAT_DB_PROD"}}
+
+# Notifications for closed tabs. Generate a pair with `node scripts/vapid-keys.mjs`.
+# Leave this out and push is simply off — the toggle does not appear in the app.
+CHAT_VAPID={"publicKey":"…","privateKey":"…","subject":"mailto:support@scholastic.cloud"}

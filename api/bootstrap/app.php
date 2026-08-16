@@ -26,7 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.token'        => \App\Http\Middleware\AuthenticateToken::class,
             'auth.bridge.token' => \App\Http\Middleware\AuthenticateBridgeToken::class,
             'auth.sms.token'    => \App\Http\Middleware\AuthenticateSmsToken::class,
+            'auth.chat.worker'  => \App\Http\Middleware\AuthenticateChatWorker::class,
             'module'            => \App\Http\Middleware\EnsureModuleAccess::class,
+            // What the school has, as opposed to what the person may reach.
+            'feature'           => \App\Http\Middleware\EnsureFeatureEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

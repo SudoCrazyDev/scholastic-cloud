@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Features;
+
 use App\Auth\StudentPortalUser;
 use App\Models\User;
 use App\Models\Student;
@@ -238,6 +240,9 @@ class AuthController extends Controller
                 // are personal, not gated on the module catalog.
                 'permissions' => [],
                 'full_access' => false,
+                // Students hold no permissions, but their school still either has
+                // a feature or does not — chat is one that both sides use.
+                'features' => Features::keysForStudent($student),
                 'user_institutions' => $userInstitutions,
                 'created_at' => $student->created_at,
                 'updated_at' => $student->updated_at,
@@ -270,6 +275,11 @@ class AuthController extends Controller
             // sidebar and routes without re-deriving it from the role slug.
             'permissions' => $user->permissionList(),
             'full_access' => $user->hasFullAccess(),
+            // What this user's *institution* has, which is a different question
+            // from what their role may reach — see config/features.php. Travels
+            // on the profile so the client can gate the sidebar without a second
+            // request, exactly as permissions already do.
+            'features' => Features::keysForUser($user),
             'user_institutions' => $user->userInstitutions->map(function ($userInstitution) {
                 return [
                     'institution_id' => $userInstitution->institution_id,
@@ -366,6 +376,9 @@ class AuthController extends Controller
             // the sidebar would still be drawn from the admin's permissions.
             'permissions' => $targetUser->permissionList(),
             'full_access' => $targetUser->hasFullAccess(),
+            // The target's features too, for the same reason as their
+            // permissions: the screen has to be theirs, not the admin's.
+            'features' => Features::keysForUser($targetUser),
             'user_institutions' => $targetUser->userInstitutions->map(function ($userInstitution) {
                 return [
                     'institution_id' => $userInstitution->institution_id,
@@ -505,6 +518,9 @@ class AuthController extends Controller
             ],
             'permissions' => [],
             'full_access' => false,
+            // Students hold no permissions, but their school still either has
+            // a feature or does not — chat is one that both sides use.
+            'features' => Features::keysForStudent($student),
             'user_institutions' => $institutions,
             'created_at' => $student->created_at,
             'updated_at' => $student->updated_at,

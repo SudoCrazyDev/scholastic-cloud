@@ -20,6 +20,15 @@ export interface User {
   permissions?: string[];
   /** True for super-administrators, who hold a wildcard grant. */
   full_access?: boolean;
+  /**
+   * Features the user's institution has, e.g. "chat".
+   *
+   * A different axis from `permissions`: that one says what this person's role
+   * may reach, this says what their school has at all. A feature switched off is
+   * off for the school's own administrator too, and the wildcard does not reach
+   * it — only the platform can turn it on.
+   */
+  features?: string[];
   user_institutions?: UserInstitution[];
 }
 

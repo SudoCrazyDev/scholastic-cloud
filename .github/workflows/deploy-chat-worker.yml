@@ -1,0 +1,193 @@
+# Deploy the chat service — Cloudflare Worker, Durable Objects and D1.
+#
+# Unlike the App and API workflows there is no per-client matrix: one Worker
+# serves production and every self-hosting client. Which schools it talks to is
+# held in the Worker's CHAT_TENANTS secret, not in this file, so onboarding a
+# client is a secret update rather than a deploy.
+#
+# Deploying this is optional. A deployment with no CHAT_* vars in its api/.env
+# serves chat from its own MySQL and never touches the Worker — see
+# microservices/chat-realtime/README.md.
+
+name: Deploy Chat Worker
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'microservices/chat-realtime/**'
+      - '.github/workflows/deploy-chat-worker.yml'
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: >-
+          Optional file from microservices/chat-realtime/migrations/ to run
+          before deploying, e.g. 0001_message_changed_at.sql. Column changes
+          only — new tables and indexes are picked up by schema.sql on every
+          run. Runs once per tenant and is NOT idempotent, so use it on the
+          deploy that introduces the column and not again.
+        required: false
+        type: string
+
+# Two deploys racing would leave the Worker on one commit and the databases
+# part-way through another.
+concurrency:
+  group: chat-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    defaults:
+      run:
+        working-directory: microservices/chat-realtime
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=()
+          [ -z "$CLOUDFLARE_API_TOKEN" ] && missing+=("CLOUDFLARE_API_TOKEN")
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && missing+=("CLOUDFLARE_ACCOUNT_ID")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "❌ Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "✅ All required secrets are present"
+
+      # A placeholder id deploys "successfully" and then fails at runtime on the
+      # first query, which is a much worse way to find out.
+      - name: Check every D1 binding has a real id
+        run: |
+          if grep -q 'REPLACE_WITH_D1_ID' wrangler.toml; then
+            echo "❌ wrangler.toml still has a placeholder database_id:"
+            grep -n -B2 'REPLACE_WITH_D1_ID' wrangler.toml
+            echo ""
+            echo "Create the database and paste its id in:"
+            echo "  npx wrangler d1 create scholastic-chat-<tenant>"
+            exit 1
+          fi
+          echo "✅ All D1 bindings point at a real database"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: microservices/chat-realtime/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Every database named in wrangler.toml, so adding a tenant is one config
+      # change rather than two.
+      - name: Collect tenant databases
+        id: databases
+        run: |
+          names=$(sed -n 's/^[[:space:]]*database_name[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' wrangler.toml | sort -u)
+          if [ -z "$names" ]; then
+            echo "❌ No d1_databases found in wrangler.toml"
+            exit 1
+          fi
+          echo "Found:"; echo "$names" | sed 's/^/  - /'
+          echo "names<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$names" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      # schema.sql is entirely CREATE ... IF NOT EXISTS, so this is safe on every
+      # run and is what ships a new table or index. It does nothing for a new
+      # *column* on an existing table — that is what the `migration` input is
+      # for, and why it exists as a separate deliberate step.
+      - name: Apply schema to every tenant
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          while IFS= read -r db; do
+            [ -z "$db" ] && continue
+            echo "── $db"
+            npx wrangler d1 execute "$db" --remote --file schema.sql --yes
+          done <<< "${{ steps.databases.outputs.names }}"
+
+      - name: Run migration
+        if: ${{ inputs.migration != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          file="migrations/${{ inputs.migration }}"
+          if [ ! -f "$file" ]; then
+            echo "❌ No such migration: $file"
+            ls -1 migrations/ 2>/dev/null | sed 's/^/  /'
+            exit 1
+          fi
+          while IFS= read -r db; do
+            [ -z "$db" ] && continue
+            echo "── $db"
+            npx wrangler d1 execute "$db" --remote --file "$file" --yes
+          done <<< "${{ steps.databases.outputs.names }}"
+
+      # CHAT_TENANTS and CHAT_VAPID are deliberately not set here. One holds
+      # every school's shared secret and the other is the push identity; both are
+      # managed out of band with `wrangler secret put`, so rotating a client's key
+      # never means touching this repository, and a repo compromise does not hand
+      # over the ability to mint chat tokens for every school.
+      - name: Deploy Worker
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deploy | tee deploy.log
+          url=$(sed -n 's|.*\(https://[a-z0-9.-]*\.workers\.dev\).*|\1|p' deploy.log | head -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # The Worker answering with the tenant count is the cheapest proof that it
+      # booted, parsed CHAT_TENANTS and can serve a request — as opposed to
+      # having uploaded and then thrown on its first line.
+      - name: Verify the deployment is serving
+        if: ${{ steps.deploy.outputs.url != '' }}
+        run: |
+          url="${{ steps.deploy.outputs.url }}"
+          for attempt in 1 2 3; do
+            body=$(curl -fsS --max-time 15 "$url/" || true)
+            if [ -n "$body" ]; then break; fi
+            echo "attempt $attempt: no answer yet"
+            sleep 5
+          done
+
+          echo "$body"
+
+          if ! echo "$body" | grep -q '"service":"scholastic-chat"'; then
+            echo "❌ $url did not identify itself as the chat service"
+            exit 1
+          fi
+
+          tenants=$(echo "$body" | sed -n 's/.*"tenants":\([0-9][0-9]*\).*/\1/p')
+          if [ "${tenants:-0}" -eq 0 ]; then
+            echo "❌ Deployed, but no tenants are configured — CHAT_TENANTS is missing or unparseable."
+            echo "   Chat will answer 401 for every client until it is set:"
+            echo "     npx wrangler secret put CHAT_TENANTS"
+            exit 1
+          fi
+
+          echo "✅ Serving $tenants tenant(s) at $url"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Chat Worker"
+            echo ""
+            echo "- URL: ${{ steps.deploy.outputs.url || 'not deployed' }}"
+            echo "- Commit: \`${{ github.sha }}\`"
+            if [ -n "${{ inputs.migration }}" ]; then
+              echo "- Migration run: \`${{ inputs.migration }}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

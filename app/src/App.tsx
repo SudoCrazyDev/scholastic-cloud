@@ -7,11 +7,13 @@ import PublicLayout from './components/layouts/PublicLayout';
 import PrivateLayout from './components/layouts/PrivateLayout';
 import StudentOnlyRoute from './components/StudentOnlyRoute';
 import RequireModule from './components/RequireModule';
+import RequireFeature from './components/RequireFeature';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Institutions from './pages/Institutions';
 import Roles from './pages/Roles';
 import Subscriptions from './pages/Subscriptions';
+import FeatureAccess from './pages/FeatureAccess';
 import Staffs from './pages/Staffs';
 import ClassSections from './pages/ClassSections/ClassSections';
 import Students from './pages/Students/Students';
@@ -69,6 +71,7 @@ import SmsMessages from './pages/SMS/Messages';
 import SmsSettings from './pages/SMS/Settings';
 import AnnouncementBoard from './pages/Announcements/AnnouncementBoard';
 import AnnouncementsManage from './pages/Announcements/AnnouncementsManage';
+import ChatPage from './pages/Chat/ChatPage';
 
 
 function App() {
@@ -107,6 +110,13 @@ function App() {
               <Route path="institutions" element={<RequireModule module="institutions"><Institutions /></RequireModule>} />
               <Route path="roles" element={<RequireModule module="roles"><Roles /></RequireModule>} />
               <Route path="subscriptions" element={<RequireModule module="subscriptions"><Subscriptions /></RequireModule>} />
+              {/*
+                Platform administration. `feature-access` is a system_only
+                module, so only a wildcard holder reaches it — an institution
+                cannot be granted the ability to decide its own features, which
+                is the entire point of the screen.
+              */}
+              <Route path="feature-access" element={<RequireModule module="feature-access"><FeatureAccess /></RequireModule>} />
               <Route path="staffs" element={<RequireModule module="staffs"><Staffs /></RequireModule>} />
               <Route path="students" element={<RequireModule module="students" ability="manage"><Students /></RequireModule>} />
               <Route path="admission-forms" element={<RequireModule module="admission-forms"><AdmissionForms /></RequireModule>} />
@@ -126,6 +136,17 @@ function App() {
                 The page itself decides what to render: composer, or setup panel.
               */}
               <Route path="tala" element={<RequireModule module="tala" ability="view"><TalaChat /></RequireModule>} />
+              {/*
+                No permission gates chat, and none should: a teacher's own
+                advisory and a student's own subjects are their own data, and the
+                API scopes every response to the groups their enrolment puts them
+                in — there is nothing here a role could usefully withhold.
+
+                The feature gate is a different question, and the one the school
+                does not get to answer: whether this institution has chat at all.
+                Decided on the platform's Feature Access screen.
+              */}
+              <Route path="chat" element={<RequireFeature feature="chat"><ChatPage /></RequireFeature>} />
               <Route path="assigned-subjects/:id" element={<RequireModule module="subjects"><SubjectDetail /></RequireModule>} />
               <Route
                 path="my-assessments"

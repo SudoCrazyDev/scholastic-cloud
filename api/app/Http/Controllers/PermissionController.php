@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Support\Features;
 use App\Support\Modules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +46,8 @@ class PermissionController extends Controller
                 'full_access' => $user instanceof StudentPortalUser
                     ? false
                     : $user->hasFullAccess(),
+                // What the institution has, alongside what the role may reach.
+                'features' => Features::keysForUser($user),
             ],
         ]);
     }
