@@ -55,8 +55,17 @@ class Role extends Model
      *
      * System roles (institution_id null) share one namespace; each institution
      * gets its own, so two schools can both name a role "Cashier".
+     *
+     * `$ignoreId` is the role being renamed, and must be passed on every update.
+     * Without it a role collides with its own stored slug: saving "Department
+     * Head" without touching the name finds the row itself, decides
+     * `department-head` is taken, and writes `department-head-1`. That is not
+     * hypothetical — it happened to Maranatha's Department Head on 2026-08-12 and
+     * cost five department heads their institution-wide subject list, six days
+     * after a migration repaired the identical suffix on their administrator
+     * role.
      */
-    public static function generateSlug(string $title, ?string $institutionId = null): string
+    public static function generateSlug(string $title, ?string $institutionId = null, int|string|null $ignoreId = null): string
     {
         $slug = Str::slug($title);
         $originalSlug = $slug;
@@ -64,6 +73,7 @@ class Role extends Model
 
         while (
             static::where('slug', $slug)
+                ->when($ignoreId !== null, fn ($query) => $query->whereKeyNot($ignoreId))
                 ->where(function ($query) use ($institutionId) {
                     $institutionId === null
                         ? $query->whereNull('institution_id')

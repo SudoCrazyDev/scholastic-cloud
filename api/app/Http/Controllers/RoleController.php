@@ -200,8 +200,11 @@ class RoleController extends Controller
                     $role->update([
                         'title' => $validated['title'],
                         // The slug is what older code still keys off, so it
-                        // follows the title rather than being frozen.
-                        'slug' => Role::generateSlug($validated['title'], $role->institution_id),
+                        // follows the title rather than being frozen. Passing
+                        // the role's own id keeps it from colliding with itself
+                        // and picking up a `-1` on a save that never changed the
+                        // name — see Role::generateSlug().
+                        'slug' => Role::generateSlug($validated['title'], $role->institution_id, $role->id),
                     ]);
                 }
 
