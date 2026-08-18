@@ -35,6 +35,7 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false)
   const [resetPasswordError, setResetPasswordError] = useState<string | null>(null)
   const [resetPasswordSuccess, setResetPasswordSuccess] = useState<string | null>(null)
+  const [resetPasswordTemporaryPassword, setResetPasswordTemporaryPassword] = useState<string | null>(null)
 
   // Search and pagination state
   const [searchValue, setSearchValue] = useState(options.search || '')
@@ -174,10 +175,11 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
       queryClient.invalidateQueries({ queryKey: ['staffs'] })
       // The temporary password is random and returned exactly once, so it has
       // to reach the admin here — there is no way to look it up afterwards.
-      const temporaryPassword = result?.data?.temporary_password
+      const temporaryPassword = result?.data?.temporary_password ?? null
+      setResetPasswordTemporaryPassword(temporaryPassword)
       setResetPasswordSuccess(
         temporaryPassword
-          ? `Password reset. Temporary password: ${temporaryPassword} — share it with the staff member now, it will not be shown again.`
+          ? 'Password reset. Share the temporary password below with the staff member now — it will not be shown again.'
           : 'Password reset successfully!'
       )
       setResetPasswordError(null)
@@ -246,10 +248,10 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
   }
 
   const handleResetPassword = (staff: User) => {
-    console.log('handleResetPassword called with staff:', staff);
     setResettingPasswordStaff(staff)
     setResetPasswordError(null)
     setResetPasswordSuccess(null)
+    setResetPasswordTemporaryPassword(null)
     setIsResetPasswordModalOpen(true)
   }
 
@@ -284,8 +286,12 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     
     setResetPasswordLoading(true)
     try {
+      // The modal deliberately stays open: the API returns the temporary
+      // password exactly once and there is nowhere to look it up afterwards,
+      // so the admin has to read it off this screen before dismissing it.
       await resetPasswordMutation.mutateAsync(resettingPasswordStaff.id)
-      setIsResetPasswordModalOpen(false)
+    } catch {
+      // Already surfaced in the modal by the mutation's onError.
     } finally {
       setResetPasswordLoading(false)
     }
@@ -310,6 +316,7 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     setResettingPasswordStaff(null)
     setResetPasswordError(null)
     setResetPasswordSuccess(null)
+    setResetPasswordTemporaryPassword(null)
   }
 
   return {
@@ -340,6 +347,7 @@ export const useStaffs = (options: UseStaffsOptions = {}) => {
     resetPasswordLoading,
     resetPasswordError,
     resetPasswordSuccess,
+    resetPasswordTemporaryPassword,
     
     // Selection
     selectedRows,

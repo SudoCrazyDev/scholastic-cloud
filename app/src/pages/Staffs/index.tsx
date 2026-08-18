@@ -33,6 +33,7 @@ const Staffs: React.FC = () => {
     resetPasswordLoading,
     resetPasswordError,
     resetPasswordSuccess,
+    resetPasswordTemporaryPassword,
     
 
     
@@ -181,6 +182,7 @@ const Staffs: React.FC = () => {
         loading={resetPasswordLoading}
         error={resetPasswordError}
         success={resetPasswordSuccess}
+        temporaryPassword={resetPasswordTemporaryPassword}
         onSubmit={handleResetPasswordSubmit}
       />
     </div>
