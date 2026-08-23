@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { PDFDownloadLink } from '@react-pdf/renderer'
 import {
   PencilSquareIcon,
   TrashIcon,
@@ -35,7 +34,6 @@ import { paymentVoidService } from '../../services/paymentVoidService'
 import { paymentPlanService } from '../../services/paymentPlanService'
 import { useAuth } from '../../hooks/useAuth'
 import { usePermissions } from '../../hooks/usePermissions'
-import { StudentNOAPDF } from '../../components/StudentNOAPDF'
 import { PaymentPlanPicker } from '../../components/payment-plan-picker'
 import { PaymentPlanHistoryTable } from '../../components/payment-plan-history-table'
 import DashboardStudentsView from './DashboardStudentsView'
@@ -47,6 +45,7 @@ import StudentFeesView from './StudentFeesView'
 import SiblingDiscountsView from './SiblingDiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
+import NoticeOfAccountModal from './NoticeOfAccountModal'
 import DataClearingView from './DataClearingView'
 import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType } from '../../types'
 
@@ -285,6 +284,9 @@ const Finance: React.FC = () => {
   })
   const [ledgerAdditionalFeeError, setLedgerAdditionalFeeError] = useState<string | null>(null)
   const [showLedgerPlanPicker, setShowLedgerPlanPicker] = useState(false)
+  // The notice of account is printed for a chosen scope, so the button opens the picker
+  // rather than downloading the whole academic year outright.
+  const [showNoaOptions, setShowNoaOptions] = useState(false)
 
   const createLedgerDiscountMutation = useMutation({
     mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
@@ -2045,19 +2047,9 @@ const Finance: React.FC = () => {
               </p>
             </div>
             {selectedLedgerStudent && ledgerNoaQuery.data?.data && (
-              <PDFDownloadLink
-                document={<StudentNOAPDF data={ledgerNoaQuery.data.data} />}
-                fileName={`NOA-${selectedLedgerStudent.last_name}-${selectedLedgerStudent.first_name}-${ledgerAcademicYear}`.replace(
-                  /[^a-zA-Z0-9-_]/g,
-                  '-'
-                )}
-              >
-                {({ loading }) => (
-                  <Button variant="outline" size="sm">
-                    {loading ? 'Preparing Notice of Account...' : 'Download Notice of Account'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
+              <Button variant="outline" size="sm" onClick={() => setShowNoaOptions(true)}>
+                Download Notice of Account
+              </Button>
             )}
           </div>
 
@@ -3638,6 +3630,16 @@ const Finance: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Notice of account scope picker (from the ledger) */}
+      {showNoaOptions && selectedLedgerStudent && ledgerNoaQuery.data?.data && (
+        <NoticeOfAccountModal
+          data={ledgerNoaQuery.data.data}
+          student={selectedLedgerStudent}
+          academicYear={ledgerAcademicYear}
+          onClose={() => setShowNoaOptions(false)}
+        />
       )}
 
       {/* Void request modal (from the ledger) */}
