@@ -399,6 +399,10 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const paymentPlan = ledgerData?.payment_plan ?? null
   const installmentsData = ledgerData?.installments
   const installments = useMemo(() => installmentsData ?? [], [installmentsData])
+  // On a running-total plan each period is billed with the unpaid balance behind it folded
+  // in, so the schedule states the arrears as one figure to settle rather than a column of
+  // amounts the payer has to add up. The period's own amount stays on the row beneath it.
+  const rollsUpArrears = paymentPlan?.surcharge_mode === 'running_total'
   // Paid ahead of the schedule on a net-of-downpayment plan: it is why the installments
   // below are smaller than charges ÷ count, so it has to be stated on the card.
   const downpayment = ledgerData?.downpayment?.amount ?? 0
@@ -906,6 +910,14 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           <p className="text-sm text-gray-600 mb-4">
             Net charges (after discounts) divided across {paymentPlan.installment_count}{' '}
             installments for academic year {resolvedAcademicYear}.
+            {rollsUpArrears && (
+              <>
+                {' '}
+                Each period is shown with everything still unpaid behind it folded in, so the
+                figure on a row is the whole amount owed to settle up to that period. A period
+                already paid drops out of it.
+              </>
+            )}
           </p>
 
           {downpayment > 0.01 && (
@@ -970,9 +982,16 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                         )}
                       </div>
                     </div>
-                    <p className="text-base font-bold text-gray-900 tabular-nums whitespace-nowrap">
-                      {formatAmount(installment.amount)}
-                    </p>
+                    <div className="text-right shrink-0">
+                      <p className="text-base font-bold text-gray-900 tabular-nums whitespace-nowrap">
+                        {formatAmount(rollsUpArrears ? installment.running_total_due : installment.amount)}
+                      </p>
+                      {rollsUpArrears && (
+                        <p className="text-xs text-gray-500 tabular-nums whitespace-nowrap mt-0.5">
+                          This period {formatAmount(installment.amount)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   {isPaid ? (
                     <div className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-green-700 bg-green-50 border-t border-green-100">
@@ -1067,7 +1086,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                     Due Date
                   </th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                    Amount Due
+                    {rollsUpArrears ? 'Total Due Through' : 'Amount Due'}
                   </th>
                   {isStudentUser && (
                     <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase w-64">
@@ -1106,7 +1125,18 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                         )}
                       </td>
                       <td className="px-4 py-2 text-sm text-right text-gray-900 tabular-nums">
-                        {formatAmount(installment.amount)}
+                        {rollsUpArrears ? (
+                          <>
+                            <span className="font-semibold">
+                              {formatAmount(installment.running_total_due)}
+                            </span>
+                            <span className="block text-xs font-normal text-gray-500">
+                              This period {formatAmount(installment.amount)}
+                            </span>
+                          </>
+                        ) : (
+                          formatAmount(installment.amount)
+                        )}
                       </td>
                       {isStudentUser && (
                         <td className="px-4 py-2 text-right">

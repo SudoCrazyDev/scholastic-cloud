@@ -139,6 +139,10 @@ class PaymentPlanService
                 'original_amount' => $originalAmount,
                 'discount_amount' => $discountAmount,
                 'paid_amount' => $paidApplied,
+                // Filled in by withRunningTotals() once surcharges are booked; defaulted
+                // here so the shape is complete even for a caller that skips it.
+                'outstanding_amount' => round(max(0.0, $amount - $paidApplied), 2),
+                'running_total_due' => 0.0,
                 'status' => $status,
             ];
         }
@@ -263,6 +267,56 @@ class PaymentPlanService
                 'percentage' => $fee->late_fee_percentage !== null ? (float) $fee->late_fee_percentage : null,
                 'assessed_on' => $fee->assessed_on?->toDateString(),
             ])->values()->all();
+
+            return $installment;
+        }, $installments);
+    }
+
+    /**
+     * Stamp each installment with what is still outstanding through it, so a plan that
+     * bills arrears as one accumulating figure has a figure to bill.
+     *
+     * `outstanding_amount` is what the period alone still owes — its unpaid principal plus
+     * the uncollected part of every surcharge booked against it. `running_total_due`
+     * accumulates that down the schedule, so period N carries everything unpaid from 1..N.
+     * A settled period contributes nothing, so a student who missed June and August but
+     * paid July is asked for June + August + September's own principal and no more.
+     *
+     * Both are net of collections, which makes them a balance rather than a charge total,
+     * and both are reported on every plan — only a `running_total` plan presents the
+     * running figure as the amount due. Nothing here assesses a surcharge: the charges are
+     * already booked by the time this runs, so switching a plan's mode re-presents a year
+     * without re-pricing it.
+     *
+     * A future period counts its own unpaid principal, matching how the schools state it:
+     * with June and August unpaid at 1,030 each, September asks for 3,060 before its own
+     * due date has even passed.
+     *
+     * @param  array<int, float>  $lateFeePaidBySequence  collected against each period's
+     *                            surcharges, keyed by installment sequence
+     */
+    public function withRunningTotals(array $installments, array $lateFeePaidBySequence = []): array
+    {
+        $running = 0.0;
+
+        return array_map(function (array $installment) use (&$running, $lateFeePaidBySequence) {
+            $sequence = (int) ($installment['sequence'] ?? 0);
+
+            // Overpayment against either side is credit held elsewhere in the ledger, so
+            // neither leg is allowed to go negative and mask what a later period owes.
+            $principalDue = max(0.0, round(
+                (float) ($installment['amount'] ?? 0) - (float) ($installment['paid_amount'] ?? 0),
+                2
+            ));
+            $surchargeDue = max(0.0, round(
+                (float) ($installment['late_fee_amount'] ?? 0)
+                    - (float) ($lateFeePaidBySequence[$sequence] ?? 0),
+                2
+            ));
+
+            $installment['outstanding_amount'] = round($principalDue + $surchargeDue, 2);
+            $running = round($running + $installment['outstanding_amount'], 2);
+            $installment['running_total_due'] = $running;
 
             return $installment;
         }, $installments);

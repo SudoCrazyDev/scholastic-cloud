@@ -31,9 +31,25 @@ class PaymentPlan extends Model
      */
     public const SURCHARGE_CARRY_OVER = 'carry_over';
 
+    /**
+     * Surcharged exactly like `per_installment` — once per installment, on its own amount,
+     * with nothing compounding — but billed as one accumulating figure: every period is
+     * presented owing the whole unpaid balance behind it as well as its own. An unpaid June
+     * at 1,030 and an unpaid August at 1,030 make September ask for 3,060 rather than its
+     * own 1,000.
+     *
+     * A settled period drops out of the total, so a student who missed June and August but
+     * paid July is asked for June + August + September and nothing more.
+     *
+     * Only the presentation differs: the surcharge rows this mode books are identical to
+     * `per_installment`, so moving a plan between the two never re-prices a year.
+     */
+    public const SURCHARGE_RUNNING_TOTAL = 'running_total';
+
     public const SURCHARGE_MODES = [
         self::SURCHARGE_PER_INSTALLMENT,
         self::SURCHARGE_CARRY_OVER,
+        self::SURCHARGE_RUNNING_TOTAL,
     ];
 
     protected $fillable = [
@@ -60,6 +76,15 @@ class PaymentPlan extends Model
     public function carriesOverSurcharge(): bool
     {
         return $this->surcharge_mode === self::SURCHARGE_CARRY_OVER;
+    }
+
+    /**
+     * Whether each period is billed with the unpaid balance behind it folded in, rather
+     * than standing on its own. Presentation only — see SURCHARGE_RUNNING_TOTAL.
+     */
+    public function rollsUpArrears(): bool
+    {
+        return $this->surcharge_mode === self::SURCHARGE_RUNNING_TOTAL;
     }
 
     public function institution()

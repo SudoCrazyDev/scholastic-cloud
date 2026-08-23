@@ -219,6 +219,12 @@ class StudentFinanceController extends Controller
             (float) $downpayment['amount']
         );
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
+        // Arrears folded forward, so a plan billing one accumulating figure has it to show.
+        // Reported on every plan; only a `running_total` plan presents it as the amount due.
+        $installments = $this->planService->withRunningTotals(
+            $installments,
+            $this->lateFeePaidBySequence($activePayments, $chargedLateFees)
+        );
 
         $lateFeesTotal = (float) $chargedLateFees->sum(fn ($fee) => (float) $fee->amount);
         // Cash-basis fees are outside the schedule but still owed, so they are part of what
@@ -725,6 +731,12 @@ class StudentFinanceController extends Controller
             (float) $downpayment['amount']
         );
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
+        // Arrears folded forward, so a plan billing one accumulating figure has it to show.
+        // Reported on every plan; only a `running_total` plan presents it as the amount due.
+        $installments = $this->planService->withRunningTotals(
+            $installments,
+            $this->lateFeePaidBySequence($payments, $chargedLateFees)
+        );
 
         $lateFeesTotal = (float) $chargedLateFees->sum(fn ($fee) => (float) $fee->amount);
         $chargesTotal = round($principalCharges + $cashChargesTotal + $lateFeesTotal, 2);
@@ -826,6 +838,39 @@ class StudentFinanceController extends Controller
                 'available_academic_years' => $availableAcademicYears,
             ]
         ]);
+    }
+
+    /**
+     * How much has been collected against each period's surcharges, keyed by installment
+     * sequence — what withRunningTotals() needs to report a balance rather than a charge.
+     *
+     * A late fee is booked against the installment that incurred it and the payment that
+     * settles it points at the fee row, so the collection is mapped back through the row to
+     * land on the period rather than on principal. A carry-over plan books two rows for one
+     * period; both belong to the same sequence and are summed.
+     *
+     * @param  iterable  $payments  non-voided StudentPayment rows
+     * @param  iterable  $lateFees  StudentAdditionalFee rows, source `late_fee`
+     * @return array<int, float>
+     */
+    private function lateFeePaidBySequence($payments, $lateFees): array
+    {
+        $sequenceByFee = collect($lateFees)
+            ->filter(fn ($fee) => $fee->installment_sequence !== null)
+            ->mapWithKeys(fn ($fee) => [$fee->id => (int) $fee->installment_sequence]);
+
+        $paid = [];
+        foreach ($payments as $payment) {
+            $feeId = $payment->student_additional_fee_id;
+            if (! $feeId || ! $sequenceByFee->has($feeId)) {
+                continue;
+            }
+
+            $sequence = $sequenceByFee[$feeId];
+            $paid[$sequence] = round(($paid[$sequence] ?? 0.0) + (float) $payment->amount, 2);
+        }
+
+        return $paid;
     }
 
     /**

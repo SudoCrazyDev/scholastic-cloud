@@ -51,6 +51,14 @@ const SURCHARGE_MODE_OPTIONS: Array<{ value: SurchargeMode; label: string; hint:
       'unpaid. An unpaid ₱2,500 at 3% adds ₱75 and stops there, however long it stays unpaid.',
   },
   {
+    value: 'running_total',
+    label: 'Charged once, then totalled into a running balance',
+    hint:
+      'Surcharged once per installment exactly as above — nothing compounds. What changes is ' +
+      'what each period asks for: the unpaid balance behind it is folded in. Unpaid June at ' +
+      '₱1,030 and unpaid August at ₱1,030 make September ask for ₱3,060, not its own ₱1,000.',
+  },
+  {
     value: 'carry_over',
     label: 'Carried over and charged again each period',
     hint:
@@ -395,7 +403,7 @@ const PaymentPlansView: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Late fees on an installment that stays unpaid
             </label>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               {SURCHARGE_MODE_OPTIONS.map((option) => {
                 const selected = form.surcharge_mode === option.value
                 return (
@@ -426,6 +434,14 @@ const PaymentPlansView: React.FC = () => {
                 )
               })}
             </div>
+            {form.surcharge_mode === 'running_total' && (
+              <p className="mt-2 text-xs text-gray-500">
+                Students are charged no more than they would be under the first option — the
+                schedule simply states the arrears as one figure to settle. A period that has
+                been paid drops out of the total, so a student who missed June and August but
+                paid July is asked for June + August + September and nothing else.
+              </p>
+            )}
             {form.surcharge_mode === 'carry_over' && (
               <p className="mt-2 text-xs text-gray-500">
                 Each period uses its own late fee percentage for both charges, and a period set
@@ -435,7 +451,9 @@ const PaymentPlansView: React.FC = () => {
             )}
             {!form.installments.some((inst) => Number(inst.late_fee) > 0) && (
               <p className="mt-2 text-xs text-gray-500">
-                No installment below charges a late fee yet, so this setting has no effect.
+                {form.surcharge_mode === 'running_total'
+                  ? 'No installment below charges a late fee yet, so the running balance accumulates unpaid principal only.'
+                  : 'No installment below charges a late fee yet, so this setting has no effect.'}
               </p>
             )}
           </div>
@@ -601,6 +619,14 @@ const PaymentPlansView: React.FC = () => {
                           title="Payments received before the first installment's month are deducted from the amount being divided."
                         >
                           Net of downpayment
+                        </span>
+                      )}
+                      {plan.surcharge_mode === 'running_total' && (
+                        <span
+                          className="inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800"
+                          title="Each installment is still surcharged only once, but every period is billed with the unpaid balance behind it folded in, so the schedule states the arrears as one running figure."
+                        >
+                          Running total
                         </span>
                       )}
                       {plan.surcharge_mode === 'carry_over'

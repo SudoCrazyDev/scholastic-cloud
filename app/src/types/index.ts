@@ -531,10 +531,14 @@ export type AdvancePaymentMode = 'equal_split' | 'net_of_downpayment';
 
 // How a plan assesses the late-fee percentages its installments carry.
 //   'per_installment' — each installment is surcharged once, on its own amount (the default).
+//   'running_total'   — surcharged exactly like 'per_installment', but every period is billed
+//                       with the unpaid balance behind it folded in, so an unpaid June and
+//                       August at 1,030 each make September ask for 3,060. Presentation only:
+//                       the charges booked are identical, see `running_total_due`.
 //   'carry_over'      — the unpaid balance rolls forward and is surcharged again each period,
 //                       on top of that period's own overdue surcharge. Earlier surcharges are
 //                       part of the carried balance, so the charge compounds.
-export type SurchargeMode = 'per_installment' | 'carry_over';
+export type SurchargeMode = 'per_installment' | 'running_total' | 'carry_over';
 
 export interface StudentPaymentPlan {
   id: string;
@@ -833,6 +837,12 @@ export interface StudentInstallment {
   original_amount: number;
   discount_amount: number;
   paid_amount: number;
+  // What this period alone still owes: unpaid principal plus the uncollected part of every
+  // surcharge booked against it.
+  outstanding_amount: number;
+  // `outstanding_amount` accumulated through this period, so it carries everything unpaid
+  // behind it as well as its own. What a 'running_total' plan bills; reported on every plan.
+  running_total_due: number;
   status: 'paid' | 'partial' | 'pending';
 }
 

@@ -27,10 +27,14 @@ use Illuminate\Support\Collection;
  * is opened the day an installment falls overdue or months later, and paying late is
  * surcharged even though the installment is settled by the time anyone looks.
  *
- * Two modes, chosen per payment plan:
+ * Three modes, chosen per payment plan:
  *
  *  - `per_installment` (the default): each installment is surcharged once, on what it still
  *    owed when its grace window elapsed.
+ *  - `running_total`: assessed identically to `per_installment` — the mode only changes how
+ *    the arrears are presented, by folding each period's unpaid balance forward into the
+ *    next, so nothing here needs to treat it differently. See PaymentPlan::SURCHARGE_RUNNING_TOTAL
+ *    and PaymentPlanService::withRunningTotals().
  *  - `carry_over`: the unpaid balance rolls forward, so a period is assessed twice —
  *    once when it opens, against everything already delinquent behind it, and once when
  *    its own grace window elapses, against its own unpaid principal. Earlier surcharges
@@ -84,6 +88,8 @@ class LateFeeService
         $context = compact('institutionId', 'studentId', 'academicYear');
         $context['paymentPlanId'] = $plan?->payment_plan_id;
 
+        // Only carry-over changes what is assessed. `running_total` bills the same charges
+        // as `per_installment` and merely presents them accumulated, so it belongs here.
         $handled = $plan?->paymentPlan?->carriesOverSurcharge()
             ? $this->applyCarryOver($context, $installments, $handled, $collections, $principalPayments, $downpayment)
             : $this->applyPerInstallment($context, $installments, $handled, $collections, $principalPayments, $downpayment);
