@@ -19,161 +19,176 @@ Font.register({
   ],
 })
 
-const styles = StyleSheet.create({
-  page: {
-    flexDirection: 'column',
-    backgroundColor: '#ffffff',
-    padding: 24,
-    fontFamily: 'Helvetica',
-    fontSize: 10,
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-  institutionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  subTitle: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  meta: {
-    fontSize: 9,
-    color: '#4b5563',
-  },
-  section: {
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  row: {
-    flexDirection: 'row',
-    marginBottom: 3,
-  },
-  label: {
-    width: '30%',
-    fontWeight: 'bold',
-    fontSize: 9,
-  },
-  value: {
-    width: '70%',
-    fontSize: 9,
-  },
-  table: {
-    width: '100%',
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    marginTop: 4,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    minHeight: 20,
-    alignItems: 'center',
-  },
-  tableRowHeader: {
-    backgroundColor: '#f3f4f6',
-  },
-  tableCol: {
-    borderRightWidth: 1,
-    borderRightColor: '#e5e7eb',
-    padding: 4,
-    fontSize: 8,
-  },
-  tableColFee: {
-    width: '60%',
-  },
-  tableColAmount: {
-    width: '40%',
-    textAlign: 'right',
-  },
-  tableColDiscountDesc: {
-    width: '50%',
-  },
-  tableColDiscountType: {
-    width: '20%',
-    textAlign: 'center',
-  },
-  tableColDiscountAmount: {
-    width: '30%',
-    textAlign: 'right',
-  },
-  tableColPaymentDesc: {
-    width: '55%',
-  },
-  tableColPaymentAmount: {
-    width: '25%',
-    textAlign: 'right',
-  },
-  tableColPaymentDate: {
-    width: '20%',
-    textAlign: 'center',
-  },
-  tableColPeriod: {
-    width: '34%',
-  },
-  tableColPeriodDate: {
-    width: '18%',
-    textAlign: 'center',
-  },
-  tableColPeriodAmount: {
-    width: '16%',
-    textAlign: 'right',
-  },
-  tableRowArrears: {
-    backgroundColor: '#fef2f2',
-  },
-  tableRowSelected: {
-    backgroundColor: '#eff6ff',
-  },
-  tableRowTotal: {
-    backgroundColor: '#f3f4f6',
-  },
-  periodNote: {
-    fontSize: 7,
-    color: '#6b7280',
-  },
-  note: {
-    fontSize: 8,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  scopeBanner: {
-    marginTop: 4,
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  footer: {
-    marginTop: 14,
-    fontSize: 8,
-    color: '#6b7280',
-    textAlign: 'right',
-  },
-  totalsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    fontSize: 9,
-    marginTop: 2,
-  },
-  totalsLabel: {
-    color: '#4b5563',
-  },
-  totalsValue: {
-    fontWeight: 'bold',
-  },
-  strong: {
-    fontWeight: 'bold',
-  },
-})
+// The notice is drawn at one set of proportions and photo-reduced for the smaller page,
+// so a quarter-A4 slip reads like the A4 statement rather than a differently-designed
+// document. Only lengths scale; widths are percentages and colors are shared.
+const buildStyles = (scale: number) => {
+  const s = (value: number) => Math.round(value * scale * 100) / 100
+
+  return StyleSheet.create({
+    page: {
+      flexDirection: 'column',
+      backgroundColor: '#ffffff',
+      padding: s(24),
+      fontFamily: 'Helvetica',
+      fontSize: s(10),
+    },
+    header: {
+      textAlign: 'center',
+      marginBottom: s(18),
+    },
+    institutionTitle: {
+      fontSize: s(14),
+      fontWeight: 'bold',
+      marginBottom: s(2),
+    },
+    subTitle: {
+      fontSize: s(11),
+      fontWeight: 'bold',
+      marginBottom: s(4),
+    },
+    meta: {
+      fontSize: s(9),
+      color: '#4b5563',
+    },
+    section: {
+      marginBottom: s(10),
+    },
+    sectionTitle: {
+      fontSize: s(11),
+      fontWeight: 'bold',
+      marginBottom: s(6),
+    },
+    row: {
+      flexDirection: 'row',
+      marginBottom: s(3),
+    },
+    label: {
+      width: '30%',
+      fontWeight: 'bold',
+      fontSize: s(9),
+    },
+    value: {
+      width: '70%',
+      fontSize: s(9),
+    },
+    table: {
+      width: '100%',
+      borderStyle: 'solid',
+      borderWidth: 1,
+      borderColor: '#d1d5db',
+      marginTop: s(4),
+    },
+    tableRow: {
+      flexDirection: 'row',
+      borderBottomWidth: 1,
+      borderBottomColor: '#e5e7eb',
+      minHeight: s(20),
+      alignItems: 'center',
+    },
+    tableRowHeader: {
+      backgroundColor: '#f3f4f6',
+    },
+    tableCol: {
+      borderRightWidth: 1,
+      borderRightColor: '#e5e7eb',
+      padding: s(4),
+      fontSize: s(8),
+    },
+    tableColFee: {
+      width: '60%',
+    },
+    tableColAmount: {
+      width: '40%',
+      textAlign: 'right',
+    },
+    tableColDiscountDesc: {
+      width: '50%',
+    },
+    tableColDiscountType: {
+      width: '20%',
+      textAlign: 'center',
+    },
+    tableColDiscountAmount: {
+      width: '30%',
+      textAlign: 'right',
+    },
+    tableColPaymentDesc: {
+      width: '55%',
+    },
+    tableColPaymentAmount: {
+      width: '25%',
+      textAlign: 'right',
+    },
+    tableColPaymentDate: {
+      width: '20%',
+      textAlign: 'center',
+    },
+    tableColPeriod: {
+      width: '34%',
+    },
+    tableColPeriodDate: {
+      width: '18%',
+      textAlign: 'center',
+    },
+    tableColPeriodAmount: {
+      width: '16%',
+      textAlign: 'right',
+    },
+    tableRowArrears: {
+      backgroundColor: '#fef2f2',
+    },
+    tableRowSelected: {
+      backgroundColor: '#eff6ff',
+    },
+    tableRowTotal: {
+      backgroundColor: '#f3f4f6',
+    },
+    periodNote: {
+      fontSize: s(7),
+      color: '#6b7280',
+    },
+    note: {
+      fontSize: s(8),
+      color: '#6b7280',
+      marginTop: s(4),
+    },
+    scopeBanner: {
+      marginTop: s(4),
+      fontSize: s(10),
+      fontWeight: 'bold',
+    },
+    footer: {
+      marginTop: s(14),
+      fontSize: s(8),
+      color: '#6b7280',
+      textAlign: 'right',
+    },
+    totalsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      fontSize: s(9),
+      marginTop: s(2),
+    },
+    totalsLabel: {
+      color: '#4b5563',
+    },
+    totalsValue: {
+      fontWeight: 'bold',
+    },
+    strong: {
+      fontWeight: 'bold',
+    },
+  })
+}
+
+// A4 for the full-year statement; A6 — a quarter of A4 — for the month slip, whose
+// content is short enough to hand over as a billing stub.
+const A4_STYLES = buildStyles(1)
+// Not the exact 0.5 linear ratio between the two sheets: at half size the type would be
+// unreadable, and the month notice carries a fraction of the statement's content, so it
+// can afford proportionally larger text.
+const A6_STYLES = buildStyles(0.75)
 
 interface StudentNOAPDFProps {
   data: StudentNOAResponse
@@ -208,6 +223,7 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
   // full-year statement rather than printing an empty schedule.
   const monthly = scope === 'month' ? summarizeMonthlyNOA(data, installmentSequence) : null
   const isMonthly = Boolean(monthly)
+  const styles = isMonthly ? A6_STYLES : A4_STYLES
 
   const fullName = `${student.last_name}, ${student.first_name}${
     student.middle_name ? ' ' + student.middle_name : ''
@@ -215,7 +231,7 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size={isMonthly ? 'A6' : 'A4'} style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           {institutionName && (
@@ -528,12 +544,12 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
           </View>
         )}
 
-        {/* Totals Summary. On a monthly notice this is context for the amount due above,
-            never a replacement for it — it covers the whole year, other fees included. */}
+        {/* Totals Summary. Whole-year figures, so it belongs to the full statement only:
+            on a month slip it sat under the amount due inviting the payer to settle the
+            wrong number. */}
+        {!isMonthly && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {isMonthly ? 'Account Summary (whole academic year)' : 'Summary'}
-          </Text>
+          <Text style={styles.sectionTitle}>Summary</Text>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Balance Forward</Text>
             <Text style={styles.totalsValue}>{formatAmount(totals.balance_forward)}</Text>
@@ -555,6 +571,7 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
             <Text style={[styles.totalsValue, styles.strong]}>{formatAmount(totals.balance)}</Text>
           </View>
         </View>
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>
