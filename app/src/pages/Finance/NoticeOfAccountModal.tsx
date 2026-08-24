@@ -12,6 +12,7 @@ interface NoticeOfAccountModalProps {
   student: Student
   academicYear: string
   institutionName?: string
+  institutionAddress?: string
   logoUrl?: string | null
   onClose: () => void
 }
@@ -30,6 +31,7 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
   student,
   academicYear,
   institutionName,
+  institutionAddress,
   logoUrl,
   onClose,
 }) => {
@@ -193,6 +195,7 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
               <StudentNOAPDF
                 data={data}
                 institutionName={institutionName}
+                institutionAddress={institutionAddress}
                 logoUrl={logoUrl}
                 scope={scope}
                 installmentSequence={sequence}

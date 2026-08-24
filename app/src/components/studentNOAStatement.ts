@@ -21,11 +21,8 @@ export interface MonthlyNOAStatement {
 
 const round2 = (value: number) => Math.round(value * 100) / 100
 
-// What a period is billing this cycle: its own principal plus any surcharge booked
-// against it. Mirrors the ledger's Payment Schedule so the print never disagrees with it.
-export const periodCharged = (installment: StudentInstallment) =>
-  Number(installment.amount || 0) + Number(installment.late_fee_amount || 0)
-
+// What a period still owes: unpaid principal plus the uncollected part of any surcharge
+// booked against it. Mirrors the ledger's Payment Schedule so the print never disagrees.
 export const periodUnpaid = (installment: StudentInstallment) =>
   Math.max(0, Number(installment.outstanding_amount || 0))
 

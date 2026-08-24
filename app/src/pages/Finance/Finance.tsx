@@ -23,6 +23,7 @@ import { Autocomplete } from '../../components/autocomplete'
 import { schoolFeeService } from '../../services/schoolFeeService'
 import { schoolFeeDefaultService } from '../../services/schoolFeeDefaultService'
 import { studentService } from '../../services/studentService'
+import { institutionService } from '../../services/institutionService'
 import { studentPaymentService } from '../../services/studentPaymentService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import { studentDiscountService } from '../../services/studentDiscountService'
@@ -179,11 +180,21 @@ const Finance: React.FC = () => {
   const roleSlug: string | undefined = user?.role?.slug
   // Whose letterhead the notice of account carries. A user posted to several schools
   // works out of their default one, the same institution the ledger's figures come from.
-  const institution = useMemo(() => {
+  const institutionId = useMemo(() => {
     const memberships: UserInstitution[] = user?.user_institutions ?? []
     return (memberships.find((membership) => membership.is_default) ?? memberships[0])?.institution
+      ?.id
   }, [user])
-  const { schoolLogoUrl } = useInstitutionLogo(institution?.id)
+  // The profile payload carries only the institution's id, title and theme, and the
+  // letterhead needs its address too, so the full record is fetched once per session.
+  const institutionQuery = useQuery({
+    queryKey: ['institution', institutionId],
+    queryFn: () => institutionService.getInstitution(institutionId!),
+    enabled: Boolean(institutionId),
+    staleTime: 5 * 60 * 1000,
+  })
+  const institution = institutionQuery.data?.data
+  const { schoolLogoUrl } = useInstitutionLogo(institutionId)
   const isVoidApprover = can('finance', 'approve-void')
   // Finance reviews the queue but does not skip it: a void raised from the ledger
   // still becomes a pending request unless the role may void immediately.
@@ -3647,6 +3658,7 @@ const Finance: React.FC = () => {
           student={selectedLedgerStudent}
           academicYear={ledgerAcademicYear}
           institutionName={institution?.title}
+          institutionAddress={institution?.address}
           logoUrl={schoolLogoUrl}
           onClose={() => setShowNoaOptions(false)}
         />
