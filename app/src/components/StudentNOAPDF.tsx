@@ -1,5 +1,5 @@
 import React from 'react'
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
 import type { StudentNOAResponse } from '../types'
 import { periodCharged, periodUnpaid, summarizeMonthlyNOA } from './studentNOAStatement'
 import type { NOAScopeMode } from './studentNOAStatement'
@@ -34,8 +34,24 @@ const buildStyles = (scale: number) => {
       fontSize: s(10),
     },
     header: {
-      textAlign: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: s(18),
+    },
+    headerLogo: {
+      width: s(46),
+      height: s(46),
+      objectFit: 'contain',
+    },
+    // Balances the logo on the opposite side so the wordmark stays centred on the sheet
+    // rather than on the space the logo leaves behind.
+    headerSpacer: {
+      width: s(46),
+    },
+    headerText: {
+      flexGrow: 1,
+      flexShrink: 1,
+      textAlign: 'center',
     },
     institutionTitle: {
       fontSize: s(14),
@@ -193,6 +209,9 @@ const A6_STYLES = buildStyles(0.75)
 interface StudentNOAPDFProps {
   data: StudentNOAResponse
   institutionName?: string
+  // Blob URL from useInstitutionLogo. The logo endpoint is authenticated and react-pdf
+  // cannot send a bearer token when it loads an image by URL, so the caller fetches it.
+  logoUrl?: string | null
   scope?: NOAScopeMode
   // Sequence of the installment being billed. Ignored unless `scope` is 'month'; a
   // sequence with no matching installment falls back to the full-year statement.
@@ -214,6 +233,7 @@ const formatDate = (value?: string | null) => {
 export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
   data,
   institutionName,
+  logoUrl,
   scope = 'total',
   installmentSequence = null,
 }) => {
@@ -234,14 +254,18 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
       <Page size={isMonthly ? 'A6' : 'A4'} style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          {institutionName && (
-            <Text style={styles.institutionTitle}>{institutionName}</Text>
-          )}
-          <Text style={styles.subTitle}>NOTICE / STATEMENT OF ACCOUNT</Text>
-          <Text style={styles.meta}>Academic Year: {academic_year}</Text>
-          {isMonthly && (
-            <Text style={styles.scopeBanner}>Statement for {monthly!.selected.label}</Text>
-          )}
+          {logoUrl ? <Image src={logoUrl} style={styles.headerLogo} /> : null}
+          <View style={styles.headerText}>
+            {institutionName && (
+              <Text style={styles.institutionTitle}>{institutionName}</Text>
+            )}
+            <Text style={styles.subTitle}>NOTICE / STATEMENT OF ACCOUNT</Text>
+            <Text style={styles.meta}>Academic Year: {academic_year}</Text>
+            {isMonthly && (
+              <Text style={styles.scopeBanner}>Statement for {monthly!.selected.label}</Text>
+            )}
+          </View>
+          {logoUrl ? <View style={styles.headerSpacer} /> : null}
         </View>
 
         {/* Student Info */}

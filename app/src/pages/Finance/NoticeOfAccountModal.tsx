@@ -12,6 +12,7 @@ interface NoticeOfAccountModalProps {
   student: Student
   academicYear: string
   institutionName?: string
+  logoUrl?: string | null
   onClose: () => void
 }
 
@@ -29,6 +30,7 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
   student,
   academicYear,
   institutionName,
+  logoUrl,
   onClose,
 }) => {
   const installments = useMemo(() => data.installments ?? [], [data.installments])
@@ -186,11 +188,12 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
               The modal stays open on click: unmounting it mid-click would cancel the
               anchor's download before the browser acts on it. */}
           <PDFDownloadLink
-            key={`${scope}-${sequence ?? 'all'}`}
+            key={`${scope}-${sequence ?? 'all'}-${logoUrl ? 'logo' : 'nologo'}`}
             document={
               <StudentNOAPDF
                 data={data}
                 institutionName={institutionName}
+                logoUrl={logoUrl}
                 scope={scope}
                 installmentSequence={sequence}
               />

@@ -33,6 +33,7 @@ import { studentFeeService } from '../../services/studentFeeService'
 import { paymentVoidService } from '../../services/paymentVoidService'
 import { paymentPlanService } from '../../services/paymentPlanService'
 import { useAuth } from '../../hooks/useAuth'
+import { useInstitutionLogo } from '../../hooks/useInstitutionLogo'
 import { usePermissions } from '../../hooks/usePermissions'
 import { PaymentPlanPicker } from '../../components/payment-plan-picker'
 import { PaymentPlanHistoryTable } from '../../components/payment-plan-history-table'
@@ -47,7 +48,7 @@ import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
 import NoticeOfAccountModal from './NoticeOfAccountModal'
 import DataClearingView from './DataClearingView'
-import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType, UserInstitution } from '../../types'
 
 const BILLING_TYPE_LABELS: Record<FeeBillingType, string> = {
   cash: 'Cash Basis',
@@ -176,6 +177,13 @@ const Finance: React.FC = () => {
   const { user } = useAuth()
   const { can } = usePermissions()
   const roleSlug: string | undefined = user?.role?.slug
+  // Whose letterhead the notice of account carries. A user posted to several schools
+  // works out of their default one, the same institution the ledger's figures come from.
+  const institution = useMemo(() => {
+    const memberships: UserInstitution[] = user?.user_institutions ?? []
+    return (memberships.find((membership) => membership.is_default) ?? memberships[0])?.institution
+  }, [user])
+  const { schoolLogoUrl } = useInstitutionLogo(institution?.id)
   const isVoidApprover = can('finance', 'approve-void')
   // Finance reviews the queue but does not skip it: a void raised from the ledger
   // still becomes a pending request unless the role may void immediately.
@@ -3638,6 +3646,8 @@ const Finance: React.FC = () => {
           data={ledgerNoaQuery.data.data}
           student={selectedLedgerStudent}
           academicYear={ledgerAcademicYear}
+          institutionName={institution?.title}
+          logoUrl={schoolLogoUrl}
           onClose={() => setShowNoaOptions(false)}
         />
       )}
