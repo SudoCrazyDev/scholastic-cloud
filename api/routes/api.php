@@ -282,14 +282,18 @@ Route::middleware('auth.token')->group(function () {
     Route::get('students/{student}/auth', [App\Http\Controllers\StudentAuthController::class, 'show'])->middleware('module:students,view');
     Route::get('students/{student}/auth/logs', [App\Http\Controllers\StudentAuthController::class, 'logs'])->middleware('module:students,view');
     // Ledger, notice of account and payment plan are read by the student's own
-    // portal as well as by finance staff.
+    // portal as well as by finance staff. Payment plan is also writable by the
+    // student's own portal — StudentPaymentPlanController::store lets a student
+    // make their first selection only, and PaymentPlanController itself rejects
+    // any student on store/show/update/destroy, leaving only the active-plans
+    // listing (index) open to them.
     Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger'])->middleware('module:finance,view,shared');
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount'])->middleware('module:finance,view,shared');
     Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show'])->middleware('module:payment-plans,view,shared');
-    Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store'])->middleware('module:payment-plans,manage');
+    Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store'])->middleware('module:payment-plans,manage,shared');
     Route::get('students/{id}/sibling-group', [SiblingGroupController::class, 'showForStudent'])->middleware('module:discounts,view');
     Route::get('payment-plan-changes', [StudentPaymentPlanChangeController::class, 'index'])->middleware('module:payment-plans,view');
-    Route::apiResource('payment-plans', PaymentPlanController::class)->middleware('module:payment-plans,view');
+    Route::apiResource('payment-plans', PaymentPlanController::class)->middleware('module:payment-plans,view,shared');
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment'])->middleware('module:students,view');
     Route::post('students/{id}/update', [StudentController::class, 'updateWithFile'])->middleware('module:students,manage');
     Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord'])->middleware('module:students,manage');
