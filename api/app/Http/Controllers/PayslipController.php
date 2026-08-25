@@ -522,6 +522,8 @@ class PayslipController extends Controller
             'time_in' => 'nullable|date_format:H:i',
             'time_out' => 'nullable|date_format:H:i',
             'overtime_minutes' => 'sometimes|nullable|integer|min:0|max:1440',
+            'waive_late' => 'sometimes|boolean',
+            'waive_undertime' => 'sometimes|boolean',
         ]);
 
         $timeIn = ($validated['time_in'] ?? null) ? $validated['time_in'].':00' : null;
@@ -545,6 +547,17 @@ class PayslipController extends Controller
         if (array_key_exists('overtime_minutes', $validated)) {
             // Approved overtime — the only minutes that are actually paid.
             $update['overtime_minutes'] = (int) ($validated['overtime_minutes'] ?? 0);
+        }
+
+        // Forgiving a penalty by hand, for the day a staff member was late for
+        // a reason no attendance request was ever filed for. It sets the same
+        // flag an approved exception sets, so pricing needs no special case —
+        // and regenerating the payroll drops it again, because generation
+        // rebuilds the flags from the exceptions on record.
+        foreach (['waive_late', 'waive_undertime'] as $waiver) {
+            if (array_key_exists($waiver, $validated)) {
+                $update[$waiver] = (bool) $validated[$waiver];
+            }
         }
 
         $day->update($update);

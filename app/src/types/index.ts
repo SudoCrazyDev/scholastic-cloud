@@ -2925,6 +2925,10 @@ export interface UpdatePayslipDayData {
   time_in: string | null;
   time_out: string | null;
   overtime_minutes?: number; // approved OT minutes for the day
+  // Forgive the day's late / undertime penalty by hand. Regenerating the
+  // payroll rebuilds these from the attendance exceptions on record.
+  waive_late?: boolean;
+  waive_undertime?: boolean;
 }
 
 // =====================

@@ -112,7 +112,13 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
   const queryClient = useQueryClient()
   const [showPrint, setShowPrint] = useState<'slip' | 'record' | null>(null)
   const [editingDay, setEditingDay] = useState<PayslipDay | null>(null)
-  const [dayForm, setDayForm] = useState({ time_in: '', time_out: '', overtime: '' })
+  const [dayForm, setDayForm] = useState({
+    time_in: '',
+    time_out: '',
+    overtime: '',
+    waive_late: false,
+    waive_undertime: false,
+  })
   const [form, setForm] = useState<RatesForm | null>(null)
   const [deductionRows, setDeductionRows] = useState<DeductionRow[]>([])
   // Bumped after every pick so the autocomplete remounts and clears its typed query.
@@ -161,11 +167,15 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
       time_in: string | null
       time_out: string | null
       overtime_minutes: number
+      waive_late: boolean
+      waive_undertime: boolean
     }) =>
       payrollService.updatePayslipDay(payslipId, payload.dayId, {
         time_in: payload.time_in,
         time_out: payload.time_out,
         overtime_minutes: payload.overtime_minutes,
+        waive_late: payload.waive_late,
+        waive_undertime: payload.waive_undertime,
       }),
     onSuccess: () => {
       invalidate()
@@ -423,6 +433,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                           time_in: day.time_in || '',
                           time_out: day.time_out || '',
                           overtime: day.overtime_minutes > 0 ? String(day.overtime_minutes) : '',
+                          waive_late: day.waive_late,
+                          waive_undertime: day.waive_undertime,
                         })
                         setEditingDay(day)
                       }}
@@ -867,6 +879,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                   time_in: dayForm.time_in || null,
                   time_out: dayForm.time_out || null,
                   overtime_minutes: Math.max(0, Math.round(numberOrZero(dayForm.overtime))),
+                  waive_late: dayForm.waive_late,
+                  waive_undertime: dayForm.waive_undertime,
                 })
               }}
               className="space-y-4 p-6"
@@ -908,6 +922,47 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     : ''}
                   Paid at {peso(payslip.overtime_rate_per_minute)} per minute
                   {payslip.overtime_rate_per_minute <= 0 && ' (rate is 0 — set it in Payroll Settings)'}.
+                </p>
+              </div>
+              <div className="border-t border-gray-100 pt-4">
+                <p className="mb-2 text-xs font-medium text-gray-600">Waive penalties</p>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={dayForm.waive_late}
+                    onChange={(e) =>
+                      setDayForm((prev) => ({ ...prev, waive_late: e.target.checked }))
+                    }
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  Waive late
+                  {editingDay.late_minutes > 0 && (
+                    <span className="text-xs text-gray-400">
+                      ({editingDay.late_minutes} min ·{' '}
+                      {peso(editingDay.late_minutes * payslip.late_penalty_per_minute)})
+                    </span>
+                  )}
+                </label>
+                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={dayForm.waive_undertime}
+                    onChange={(e) =>
+                      setDayForm((prev) => ({ ...prev, waive_undertime: e.target.checked }))
+                    }
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  Waive undertime
+                  {editingDay.undertime_minutes > 0 && (
+                    <span className="text-xs text-gray-400">
+                      ({editingDay.undertime_minutes} min ·{' '}
+                      {peso(editingDay.undertime_minutes * payslip.undertime_penalty_per_minute)})
+                    </span>
+                  )}
+                </label>
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Forgives the penalty for this day only. Regenerating the payroll rebuilds the
+                  waivers from the approved attendance requests, so a lasting one belongs there.
                 </p>
               </div>
               <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
