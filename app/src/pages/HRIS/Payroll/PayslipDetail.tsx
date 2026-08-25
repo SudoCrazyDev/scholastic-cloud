@@ -293,6 +293,16 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
     { id: 'custom', label: 'Custom deduction…' },
   ]
 
+  // Late and undertime are only charged against a scheduled start and end, so a
+  // staff member with no schedule assigned is quietly exempt from both however
+  // they punch. That is invisible on a slip whose penalty column is all dashes,
+  // which reads as "never late" rather than "never checked".
+  const penaltiesConfigured =
+    payslip.late_penalty_per_minute > 0 || payslip.undertime_penalty_per_minute > 0
+  const unscheduledDays = payslip.days.filter(
+    (day) => !day.is_rest_day && !day.is_holiday && (!day.schedule_start || !day.schedule_end)
+  ).length
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -345,6 +355,17 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                 could be made. Regenerate once the real punches arrive, or correct the day by hand.
               </p>
             )}
+            {penaltiesConfigured && unscheduledDays > 0 && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <span className="font-medium">
+                  {unscheduledDays} working day{unscheduledDays === 1 ? '' : 's'} had no schedule
+                </span>{' '}
+                — late and undertime cannot be charged without a scheduled start and end, so{' '}
+                {unscheduledDays === 1 ? 'that day was' : 'those days were'} paid on hours worked
+                alone. Assign this staff member a schedule and regenerate to price{' '}
+                {unscheduledDays === 1 ? 'it' : 'them'} against it.
+              </p>
+            )}
           </div>
           <div className="max-h-[32rem] overflow-y-auto overflow-x-auto">
             <table className="w-full text-sm">
@@ -359,6 +380,12 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                     title="Peso deducted from the daily rate for late arrival + undertime"
                   >
                     Penalty
+                  </th>
+                  <th
+                    className="px-4 py-2.5 text-right"
+                    title="Late — minutes punched in after the scheduled start, past the grace period"
+                  >
+                    Late
                   </th>
                   <th
                     className="px-4 py-2.5 text-right"
@@ -379,8 +406,9 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
               <tbody>
                 {payslip.days.map((day) => {
                   const off = day.is_rest_day || day.is_holiday
-                  // The stored penalty bundles late + undertime; split out the
-                  // undertime share so the UT column can show what it cost.
+                  // The stored penalty bundles late + undertime; split out each
+                  // share so the Late and UT columns can show what they cost.
+                  const latePenalty = day.late_minutes * payslip.late_penalty_per_minute
                   const undertimePenalty =
                     day.undertime_minutes * payslip.undertime_penalty_per_minute
                   return (
@@ -462,6 +490,29 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                         )}
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums">
+                        {day.late_minutes > 0 ? (
+                          <span
+                            className="text-red-600"
+                            title={
+                              latePenalty > 0
+                                ? `${day.late_minutes} min late · −${peso(latePenalty)}`
+                                : `${day.late_minutes} min late`
+                            }
+                          >
+                            {day.late_minutes}m
+                          </span>
+                        ) : day.waive_late ? (
+                          <span
+                            className="text-xs italic text-gray-400"
+                            title="Late waived by an approved exception"
+                          >
+                            waived
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
                         {day.undertime_minutes > 0 ? (
                           <span
                             className="text-red-600"
@@ -518,6 +569,12 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ payslipId, periodFinalize
                   <td className="px-4 py-2.5 text-right tabular-nums">{payslip.hours_worked}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-red-600">
                     {payslip.penalty_total > 0 ? `−${peso(payslip.penalty_total)}` : '—'}
+                  </td>
+                  <td
+                    className="px-4 py-2.5 text-right tabular-nums text-red-600"
+                    title={`${payslip.late_minutes} min late this period`}
+                  >
+                    {payslip.late_minutes > 0 ? `${payslip.late_minutes}m` : '—'}
                   </td>
                   <td
                     className="px-4 py-2.5 text-right tabular-nums text-red-600"
