@@ -69,21 +69,30 @@ class ReamortizingPaymentPlanTest extends TestCase
 
     /**
      * @param  array<int, array{0: string, 1: float}>  $payments  [date, amount]
+     * @param  array<int, array{0: string, 1: float}>  $discounts  [date granted, amount]
      */
-    private function build(array $payments, ?StudentPaymentPlan $plan = null): array
-    {
+    private function build(
+        array $payments,
+        ?StudentPaymentPlan $plan = null,
+        array $discounts = []
+    ): array {
         $rows = array_map(
             fn ($payment) => ['payment_date' => $payment[0], 'amount' => $payment[1]],
             $payments
+        );
+        $adjustments = array_map(
+            fn ($discount) => ['date' => $discount[0], 'charge' => 0.0, 'discount' => $discount[1]],
+            $discounts
         );
 
         return $this->service->buildInstallments(
             $plan ?? $this->plan(),
             self::YEAR,
             self::CHARGES,
-            0.0,
+            array_sum(array_column($adjustments, 'discount')),
             array_sum(array_column($rows, 'amount')),
-            $rows
+            $rows,
+            $adjustments
         );
     }
 
@@ -226,6 +235,60 @@ class ReamortizingPaymentPlanTest extends TestCase
         );
         $this->assertEqualsWithDelta(5000.0, $downpayment['amount'], 0.01);
         $this->assertSame('2026-07-01', $downpayment['boundary']);
+    }
+
+    public function test_a_discount_granted_mid_year_leaves_the_months_already_billed_alone(): void
+    {
+        Carbon::setTestNow('2027-01-15 09:00:00');
+
+        // 3,700 scholarship awarded on 1 November, against the same 7,900 paid in July.
+        $installments = $this->build(
+            [['2026-07-20', 7900.0]],
+            null,
+            [['2026-11-01', 3700.0]]
+        );
+
+        // July through October were billed before the scholarship existed and keep their
+        // figures — reprinting one of those notices must not produce a different number.
+        $this->assertEqualsWithDelta(2370.0, $installments[0]['amount'], 0.01);   // Jul
+        $this->assertEqualsWithDelta(1755.56, $installments[1]['amount'], 0.01);  // Aug
+        $this->assertEqualsWithDelta(1975.0, $installments[2]['amount'], 0.01);   // Sep
+        $this->assertEqualsWithDelta(2257.14, $installments[3]['amount'], 0.01);  // Oct
+        foreach ([0, 1, 2, 3] as $index) {
+            $this->assertEqualsWithDelta(0.0, $installments[$index]['discount_amount'], 0.01);
+        }
+
+        // November opened after it was granted, so it is the first to feel it: the balance is
+        // now 20,000 - 7,900 = 12,100, over the six months left.
+        $this->assertEqualsWithDelta(2016.67, $installments[4]['amount'], 0.01);
+        $this->assertGreaterThan(0.0, $installments[4]['discount_amount']);
+
+        // And what is still to be collected is the discounted balance, not the original.
+        $this->assertEqualsWithDelta(
+            12100.0,
+            array_sum(array_column($this->service->withRunningTotals($installments), 'outstanding_amount')),
+            0.01
+        );
+    }
+
+    public function test_a_discount_granted_before_the_schedule_opens_lowers_every_month(): void
+    {
+        Carbon::setTestNow('2026-08-25 09:00:00');
+
+        $installments = $this->build(
+            [['2026-07-20', 7900.0]],
+            null,
+            [['2026-06-20', 3700.0]]
+        );
+
+        // 20,000 over ten months from the start, then 12,100 over the nine that remain.
+        $this->assertEqualsWithDelta(2000.0, $installments[0]['amount'], 0.01);
+        $this->assertEqualsWithDelta(1344.44, $installments[1]['amount'], 0.01);
+        $this->assertEqualsWithDelta(
+            12100.0,
+            array_sum(array_column($this->service->withRunningTotals($installments), 'outstanding_amount')),
+            0.01
+        );
     }
 
     public function test_a_fixed_plan_is_untouched(): void

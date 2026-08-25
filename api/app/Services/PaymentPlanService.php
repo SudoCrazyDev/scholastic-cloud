@@ -28,6 +28,11 @@ class PaymentPlanService
      * @param  iterable|null  $principalPayments  Non-voided payments that settle plan
      *         principal (late-fee collections excluded) — needed to date the
      *         downpayment. Omit to skip downpayment detection entirely.
+     * @param  iterable|null  $datedAdjustments  When what is owed changed, and by how much:
+     *         a list of ['date' => string, 'charge' => float, 'discount' => float]. Only a
+     *         reamortizing plan reads it, and only to keep a period priced from the figures
+     *         that stood when it opened — see buildReamortized(). Omit and every adjustment
+     *         is treated as having been in force from the start of the year.
      */
     public function buildInstallments(
         ?StudentPaymentPlan $plan,
@@ -35,7 +40,8 @@ class PaymentPlanService
         float $grossCharges,
         float $discountsTotal = 0.0,
         float $paymentsTotal = 0.0,
-        $principalPayments = null
+        $principalPayments = null,
+        $datedAdjustments = null
     ): array {
         $definition = $plan?->paymentPlan;
         if (! $definition) {
@@ -66,7 +72,8 @@ class PaymentPlanService
                 $pivotMonth,
                 $grossCharges,
                 $netCharges,
-                $principalPayments
+                $principalPayments,
+                $datedAdjustments
             );
         }
 
@@ -196,8 +203,17 @@ class PaymentPlanService
      * counting it again here would bill it twice. The last period is never rolled forward —
      * there is nothing after it to absorb the balance, so it holds whatever is left.
      *
+     * A period is priced from the figures that stood when it opened, which means discounts and
+     * ad-hoc charges as well as payments. A scholarship granted in November did not exist in
+     * July, so July keeps the figure it was actually billed; the discount is felt from the
+     * period that opened after it was granted. Without that, awarding a discount mid-year
+     * would silently rewrite every notice the school had already issued. `$datedAdjustments`
+     * carries those events; the grade's standard fees have no event and are treated as having
+     * stood all year, since a change to one is a correction rather than something granted.
+     *
      * @param  \Illuminate\Support\Collection  $templates  ordered by sequence
      * @param  iterable|null  $principalPayments  Non-voided payments settling plan principal
+     * @param  iterable|null  $datedAdjustments  ['date', 'charge', 'discount'] per event
      */
     private function buildReamortized(
         $templates,
@@ -205,7 +221,8 @@ class PaymentPlanService
         int $pivotMonth,
         float $grossCharges,
         float $netCharges,
-        $principalPayments
+        $principalPayments,
+        $datedAdjustments = null
     ): array {
         $count = $templates->count();
         $today = Carbon::today();
@@ -252,9 +269,28 @@ class PaymentPlanService
                 && ($until === null || $payment['date']->lessThan($until)))
             ->sum('amount'), 2);
 
-        // Discounts are applied to the year as a whole, so each period carries them in the
-        // same proportion — enough to state a gross figure beside the net one it bills.
-        $grossFactor = $netCharges > 0 ? $grossCharges / $netCharges : 0.0;
+        // Adjustments are read backwards from today: what stood when a period opened is what
+        // is owed now, less everything granted or charged after that moment. A discount dated
+        // the day a period opens counts for it — unlike a payment, which lands inside the
+        // period and moves the next one.
+        $adjustments = collect($datedAdjustments ?? [])
+            ->map(fn ($row) => [
+                'date' => $this->paymentDate(['payment_date' => $row['date'] ?? null]),
+                'charge' => (float) ($row['charge'] ?? 0),
+                'discount' => (float) ($row['discount'] ?? 0),
+            ])
+            ->filter(fn ($row) => $row['date'] !== null)
+            ->values();
+
+        $chargesAfter = fn (Carbon $opening) => round((float) $adjustments
+            ->filter(fn ($row) => $row['date']->greaterThan($opening))
+            ->sum('charge'), 2);
+        $discountsAfter = fn (Carbon $opening) => round((float) $adjustments
+            ->filter(fn ($row) => $row['date']->greaterThan($opening))
+            ->sum('discount'), 2);
+
+        // What is still owed in total, which the periods yet to open have to add up to.
+        $balanceNow = max(0.0, round($netCharges - $paidToDate, 2));
 
         $projected = null;
         $installments = [];
@@ -266,17 +302,20 @@ class PaymentPlanService
 
             if (! $opening->greaterThan($today)) {
                 // Opened: priced from what was actually still owed that day, and frozen there.
-                $balance = max(0.0, round($netCharges - $paidBefore($opening), 2));
+                // Anything granted or charged since is not in it — it belongs to the periods
+                // that opened after it happened.
+                $netThen = max(0.0, round(
+                    $netCharges - $chargesAfter($opening) + $discountsAfter($opening),
+                    2
+                ));
+                $balance = max(0.0, round($netThen - $paidBefore($opening), 2));
                 $amount = round($balance / $periodsLeft, 2);
-                // What the periods after it are projected from, on the assumption this one is
-                // settled for the figure it asks.
-                $projected = round($balance - $amount, 2);
             } else {
                 // Not yet opened: level at the figure the schedule is currently running at.
                 // Before the schedule has opened at all there is no such figure, so the
                 // balance as it stands is levelled across the whole thing.
                 if ($projected === null) {
-                    $projected = max(0.0, round($netCharges - $paidToDate, 2));
+                    $projected = $balanceNow;
                 }
 
                 // The final period takes the residue whole, so the projection lands on zero.
@@ -287,7 +326,18 @@ class PaymentPlanService
             }
 
             $amount = max(0.0, $amount);
-            $originalAmount = $grossFactor > 0 ? round($amount * $grossFactor, 2) : $amount;
+
+            // Each period states a gross figure beside the net one it bills, in the proportion
+            // that stood when it opened — so a period that opened before a discount was granted
+            // shows no discount rather than a share of one it never had.
+            $grossThen = max(0.0, round($grossCharges - $chargesAfter($opening), 2));
+            $netThenForFactor = max(0.0, round(
+                $netCharges - $chargesAfter($opening) + $discountsAfter($opening),
+                2
+            ));
+            $originalAmount = $netThenForFactor > 0
+                ? round($amount * ($grossThen / $netThenForFactor), 2)
+                : $amount;
 
             $paidApplied = $paidWithin($opening, $nextOpening);
             $status = 'pending';
@@ -295,6 +345,16 @@ class PaymentPlanService
                 $status = 'paid';
             } elseif ($paidApplied > 0) {
                 $status = 'partial';
+            }
+
+            // The periods still to open have to add up to what is actually owed now, so they
+            // are projected from the current balance less whatever this period still wants —
+            // not from this period's own historical balance, which may predate a discount.
+            if (! $opening->greaterThan($today)) {
+                $projected = max(0.0, round(
+                    $balanceNow - max(0.0, round($amount - $paidApplied, 2)),
+                    2
+                ));
             }
 
             // Closed short: the shortfall is already re-divided into the periods after this

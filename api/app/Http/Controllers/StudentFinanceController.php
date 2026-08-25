@@ -191,7 +191,11 @@ class StudentFinanceController extends Controller
             $principalCharges,
             (float) $discountsTotal,
             $principalPayments,
-            $principalPaymentRows
+            $principalPaymentRows,
+            $this->datedAdjustments(
+                $activeDiscountsWithAmount->merge($activeGradeLevelDiscountsWithAmount),
+                $installmentAdditionalFees
+            )
         );
 
         // Reported alongside the schedule so the monthly view can show the downpayment as
@@ -626,7 +630,13 @@ class StudentFinanceController extends Controller
             $principalCharges,
             (float) $discountsTotal,
             $principalPayments,
-            $principalPaymentRows
+            $principalPaymentRows,
+            // Mirrors the ledger, and drawn from the same discount payloads this method totals,
+            // so a printed notice prices a month exactly as the screen does.
+            $this->datedAdjustments(
+                $discountsWithAmount->merge($gradeLevelDiscountsWithAmount),
+                $installmentAdditionalFees
+            )
         );
 
         $downpayment = $this->planService->resolveDownpayment(
@@ -822,6 +832,55 @@ class StudentFinanceController extends Controller
             fn ($payment) => $payment->student_additional_fee_id
                 && in_array($payment->student_additional_fee_id, $ids, true)
         );
+    }
+
+    /**
+     * When what a student owes changed, and by how much — what a reamortizing plan needs to
+     * keep a period priced from the figures that stood when it opened.
+     *
+     * A discount granted in November did not exist in July, so July must keep the figure it
+     * was billed; the same goes for an ad-hoc charge added mid-year. Without the dates, either
+     * one would silently rewrite every notice already issued for the earlier months.
+     *
+     * The grade's standard fees are deliberately absent: they are the year's stated cost
+     * rather than something granted on a date, so a change to one is a correction and is meant
+     * to re-price the schedule.
+     *
+     * @param  iterable  $discountPayloads  ['discount' => model, 'amount' => float] as
+     *                   applyDiscounts() returns them, already filtered to the active ones
+     * @param  iterable  $installmentFees  StudentAdditionalFee rows that join the principal
+     * @return array<int, array{date: string, charge: float, discount: float}>
+     */
+    private function datedAdjustments($discountPayloads, $installmentFees): array
+    {
+        $rows = [];
+
+        foreach ($discountPayloads as $payload) {
+            $date = $payload['discount']->created_at;
+            if (! $date) {
+                continue;
+            }
+
+            $rows[] = [
+                'date' => $date->toDateString(),
+                'charge' => 0.0,
+                'discount' => round((float) $payload['amount'], 2),
+            ];
+        }
+
+        foreach ($installmentFees as $fee) {
+            if (! $fee->created_at) {
+                continue;
+            }
+
+            $rows[] = [
+                'date' => $fee->created_at->toDateString(),
+                'charge' => round((float) $fee->amount, 2),
+                'discount' => 0.0,
+            ];
+        }
+
+        return $rows;
     }
 
     /**
