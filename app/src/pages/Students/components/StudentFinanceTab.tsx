@@ -409,6 +409,42 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   // month, not a share of the year, and a month that closed short has already been folded
   // into the ones after it.
   const isRecalculated = paymentPlan?.schedule_mode === 'reamortizing'
+
+  // The month being collected now, as the server marked it. Deliberately not worked out from
+  // the reader's own clock: every other figure on the row is decided against the server's, so
+  // a device an hour or a timezone out would bill a different month than the amounts were
+  // built for. The local fallback only covers a response from before `is_current` existed.
+  const currentPeriod = useMemo(() => {
+    if (!installments.length) return null
+
+    const flagged = installments.find((installment) => installment.is_current)
+    if (flagged) return flagged
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const openingOf = (installment: StudentInstallment) => {
+      if (installment.opens_on) return new Date(`${installment.opens_on}T00:00:00`)
+      const due = new Date(`${installment.due_date}T00:00:00`)
+      return new Date(due.getFullYear(), due.getMonth(), 1)
+    }
+
+    let current = installments[0]
+    for (const installment of installments) {
+      if (openingOf(installment) <= today) current = installment
+    }
+    return current
+  }, [installments])
+
+  // Unpaid months before the current one. On a recalculated plan they report nothing — their
+  // shortfall was re-divided into the months that follow, so it is already inside the figure
+  // below. On a fixed plan it is genuinely still owed and has to be stated, or the month's
+  // own amount would read as the whole bill.
+  const arrearsBeforeCurrent = useMemo(() => {
+    if (!currentPeriod) return 0
+    return installments
+      .filter((installment) => installment.sequence < currentPeriod.sequence)
+      .reduce((sum, installment) => sum + (installment.outstanding_amount ?? 0), 0)
+  }, [installments, currentPeriod])
   // Paid ahead of the schedule on a net-of-downpayment plan: it is why the installments
   // below are smaller than charges ÷ count, so it has to be stated on the card.
   const downpayment = ledgerData?.downpayment?.amount ?? 0
@@ -875,28 +911,91 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               </div>
             )}
 
-            <div className="border-t border-gray-200 pt-4 space-y-2 text-sm text-gray-700">
-              <div className="flex justify-between">
-                <span>Balance Forward</span>
-                <span className="font-medium">{formatAmount(noaData?.totals?.balance_forward)}</span>
+            {/* A student is shown what this month asks for rather than the year's totals:
+                the totals invite adding them up, and on a recalculated plan they do not
+                reconcile the way a reader expects. Staff keep the full breakdown. */}
+            {isStudentUser ? (
+              <div className="border-t border-gray-200 pt-4">
+                {currentPeriod ? (
+                  <div className="rounded-lg border border-primary-100 bg-primary-50/50 p-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Due this month</p>
+                        <p className="text-xs text-gray-500">
+                          {currentPeriod.label}
+                          {currentPeriod.due_date && (
+                            <>
+                              {' · due '}
+                              {new Date(`${currentPeriod.due_date}T00:00:00`).toLocaleDateString(
+                                'en-PH',
+                                { month: 'short', day: 'numeric', year: 'numeric' }
+                              )}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900 tabular-nums">
+                        {formatAmount(currentPeriod.outstanding_amount)}
+                      </p>
+                    </div>
+
+                    {currentPeriod.paid_amount > 0 && (
+                      <p className="mt-2 text-xs text-gray-600">
+                        {formatAmount(currentPeriod.paid_amount)} already received against this
+                        month&apos;s {formatAmount(currentPeriod.amount)}.
+                      </p>
+                    )}
+
+                    {arrearsBeforeCurrent > 0.01 && (
+                      <div className="mt-3 border-t border-primary-100 pt-3 text-sm">
+                        <div className="flex justify-between text-gray-700">
+                          <span>Unpaid from earlier months</span>
+                          <span className="font-medium tabular-nums">
+                            {formatAmount(arrearsBeforeCurrent)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex justify-between font-semibold text-gray-900">
+                          <span>Total due now</span>
+                          <span className="tabular-nums">
+                            {formatAmount(
+                              (currentPeriod.outstanding_amount ?? 0) + arrearsBeforeCurrent
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    No payment schedule has been set for this academic year yet. Please contact
+                    the finance office.
+                  </p>
+                )}
               </div>
-              <div className="flex justify-between">
-                <span>Total Charges</span>
-                <span className="font-medium">{formatAmount(noaData?.totals?.charges)}</span>
+            ) : (
+              <div className="border-t border-gray-200 pt-4 space-y-2 text-sm text-gray-700">
+                <div className="flex justify-between">
+                  <span>Balance Forward</span>
+                  <span className="font-medium">{formatAmount(noaData?.totals?.balance_forward)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Charges</span>
+                  <span className="font-medium">{formatAmount(noaData?.totals?.charges)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Discounts</span>
+                  <span className="font-medium">{formatAmount(noaData?.totals?.discounts)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Payments</span>
+                  <span className="font-medium">{formatAmount(noaData?.totals?.payments)}</span>
+                </div>
+                <div className="flex justify-between text-base font-semibold text-gray-900">
+                  <span>Balance</span>
+                  <span>{formatAmount(noaData?.totals?.balance)}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Total Discounts</span>
-                <span className="font-medium">{formatAmount(noaData?.totals?.discounts)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Payments</span>
-                <span className="font-medium">{formatAmount(noaData?.totals?.payments)}</span>
-              </div>
-              <div className="flex justify-between text-base font-semibold text-gray-900">
-                <span>Balance</span>
-                <span>{formatAmount(noaData?.totals?.balance)}</span>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </div>

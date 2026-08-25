@@ -173,7 +173,7 @@ class PaymentPlanService
             ];
         }
 
-        return $installments;
+        return $this->markCurrentPeriod($installments);
     }
 
     /**
@@ -404,6 +404,47 @@ class PaymentPlanService
                 'running_total_due' => 0.0,
                 'status' => $status,
             ];
+        }
+
+        return $this->markCurrentPeriod($installments);
+    }
+
+    /**
+     * Flag the period being collected now, so a caller does not have to decide it from the
+     * reader's own clock.
+     *
+     * A period opens on the first of its month — `opens_on` where the schedule reports it,
+     * and the first of the due date's month otherwise, which is the same boundary. The
+     * current one is the last to have opened: before the schedule starts that is its first
+     * period, and once it has ended the last one stays current, so there is always exactly
+     * one month to bill.
+     *
+     * Decided here rather than in the browser because everything else on the row — what is
+     * overdue, what rolled forward, what each period is priced at — is decided against the
+     * server's clock. A device an hour or a timezone out, or simply set wrong, would
+     * otherwise bill a different month than the one the amounts were built for.
+     */
+    private function markCurrentPeriod(array $installments): array
+    {
+        if (! $installments) {
+            return $installments;
+        }
+
+        $today = Carbon::today();
+        $currentIndex = 0;
+
+        foreach ($installments as $i => $installment) {
+            $opening = ($installment['opens_on'] ?? null)
+                ? Carbon::parse($installment['opens_on'])->startOfDay()
+                : Carbon::parse($installment['due_date'])->startOfMonth();
+
+            if (! $opening->greaterThan($today)) {
+                $currentIndex = $i;
+            }
+        }
+
+        foreach ($installments as $i => $installment) {
+            $installments[$i]['is_current'] = $i === $currentIndex;
         }
 
         return $installments;

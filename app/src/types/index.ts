@@ -837,6 +837,10 @@ export interface StudentInstallment {
   // First day of the period's month — when a reamortizing plan prices it. Reported on
   // those plans only.
   opens_on?: string;
+  // The period being collected now, decided against the server's clock so it cannot disagree
+  // with the amounts, overdue flags and carry-forwards built alongside it. Exactly one period
+  // carries it: the first before the schedule opens, the last once it has ended.
+  is_current?: boolean;
   grace_period_days: number;
   overdue_date: string;
   is_overdue: boolean;
