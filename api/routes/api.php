@@ -287,8 +287,11 @@ Route::middleware('auth.token')->group(function () {
     // make their first selection only, and PaymentPlanController itself rejects
     // any student on store/show/update/destroy, leaving only the active-plans
     // listing (index) open to them.
-    Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger'])->middleware('module:finance,view,shared');
-    Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount'])->middleware('module:finance,view,shared');
+    // `simulate.date` is a TESTING AID: with ?as_of=YYYY-MM-DD these two read as though it
+    // were that date, so a recalculated plan's later months can be checked without waiting
+    // for them. It no-ops outside a local environment. Safe to remove.
+    Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger'])->middleware(['module:finance,view,shared', 'simulate.date']);
+    Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount'])->middleware(['module:finance,view,shared', 'simulate.date']);
     Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show'])->middleware('module:payment-plans,view,shared');
     Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store'])->middleware('module:payment-plans,manage,shared');
     Route::get('students/{id}/sibling-group', [SiblingGroupController::class, 'showForStudent'])->middleware('module:discounts,view');
