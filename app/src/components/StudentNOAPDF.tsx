@@ -1,7 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
 import type { StudentNOAResponse } from '../types'
-import { periodUnpaid, summarizeMonthlyNOA } from './studentNOAStatement'
+import { buildNOALines, describeCoveredPeriods, summarizeMonthlyNOA } from './studentNOAStatement'
 import type { NOAScopeMode } from './studentNOAStatement'
 
 // Register basic font
@@ -172,6 +172,10 @@ const buildStyles = (scale: number) => {
       textAlign: 'right',
     },
 
+    tableNote: {
+      fontSize: s(7.5),
+      marginTop: s(2),
+    },
     otherFees: {
       marginTop: s(8),
     },
@@ -232,14 +236,6 @@ const formatAmount = (amount?: number | null) =>
     maximumFractionDigits: 2,
   })
 
-// One printed line of the DESCRIPTION / AMOUNT table. Charges are positive and
-// settlements negative, so the column adds up to the TOTAL beneath it.
-interface NOALine {
-  key: string
-  description: string
-  amount: number
-}
-
 export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
   data,
   institutionName,
@@ -248,7 +244,7 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
   scope = 'total',
   installmentSequence = null,
 }) => {
-  const { student, academic_year, grade_level, fees, discounts, payments, totals } = data
+  const { student, academic_year, grade_level } = data
 
   // Without a matching period there is no month to bill, so the notice falls back to the
   // full-year statement rather than printing an empty schedule.
@@ -256,64 +252,7 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
   const isMonthly = Boolean(monthly)
   const styles = isMonthly ? A6_STYLES : A4_STYLES
 
-  const lines: NOALine[] = []
-  let total: number
-
-  if (monthly) {
-    if (monthly.balanceForward > 0) {
-      lines.push({
-        key: 'balance-forward',
-        description: 'Balance Forward (previous academic year)',
-        amount: monthly.balanceForward,
-      })
-    }
-    monthly.arrears.forEach((installment) => {
-      lines.push({
-        key: `arrear-${installment.sequence}`,
-        description: `${installment.label} - unpaid balance`,
-        amount: periodUnpaid(installment),
-      })
-    })
-    lines.push({
-      key: 'selected',
-      description: monthly.selected.label,
-      amount: periodUnpaid(monthly.selected),
-    })
-    total = monthly.totalDue
-  } else {
-    const balanceForward = Number(totals.balance_forward || 0)
-    if (balanceForward > 0) {
-      lines.push({
-        key: 'balance-forward',
-        description: 'Balance Forward (previous academic year)',
-        amount: balanceForward,
-      })
-    }
-    fees.forEach((fee) => {
-      lines.push({
-        key: `fee-${fee.fee_id}`,
-        description: fee.fee_name,
-        amount: Number(fee.amount || 0),
-      })
-    })
-    ;(discounts ?? []).forEach((discount) => {
-      lines.push({
-        key: `discount-${discount.discount_id}`,
-        description: `Discount${discount.fee_name ? ` - ${discount.fee_name}` : ''}`,
-        amount: -Number(discount.amount || 0),
-      })
-    })
-    payments.forEach((payment) => {
-      lines.push({
-        key: `payment-${payment.payment_id}`,
-        description: `Payment${payment.fee_name ? ` - ${payment.fee_name}` : ''}${
-          payment.receipt_number ? ` (OR: ${payment.receipt_number})` : ''
-        }`,
-        amount: -Number(payment.amount || 0),
-      })
-    })
-    total = Number(totals.balance || 0)
-  }
+  const { lines, total } = buildNOALines(data, monthly)
 
   const fullName = `${student.last_name}, ${student.first_name}${
     student.middle_name ? ' ' + student.middle_name : ''
@@ -337,7 +276,7 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
               ) : null}
               <Text style={styles.institutionMeta}>
                 A.Y. {academic_year}
-                {monthly ? ` - ${monthly.selected.label}` : ''}
+                {monthly ? ` - For ${describeCoveredPeriods(monthly)}` : ''}
               </Text>
             </View>
             {logoUrl ? <View style={styles.headerSpacer} /> : null}
@@ -398,6 +337,13 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
               </View>
             </View>
           </View>
+
+          {monthly && lines.some((line) => line.apportioned) ? (
+            <Text style={styles.tableNote}>
+              Amounts shown are each fee's share of the period{monthly.arrears.length ? 's' : ''}
+              {' '}covered.
+            </Text>
+          ) : null}
 
           {/* Cash-basis fees: shown for information, deliberately outside the total */}
           {monthly && monthly.otherFees.length > 0 ? (

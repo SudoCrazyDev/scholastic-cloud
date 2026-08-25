@@ -966,6 +966,9 @@ export interface StudentNOAResponse {
     balance: number;
   };
   cash_basis?: LedgerCashBasisSummary;
+  /** Per-fee charge/discount/paid/outstanding — what the notice itemizes its table from. */
+  fee_breakdown?: LedgerFeeBreakdown[];
+  unallocated_payments?: number;
   payment_plan?: StudentPaymentPlan | null;
   downpayment?: ScheduleDownpayment;
   installments?: StudentInstallment[];

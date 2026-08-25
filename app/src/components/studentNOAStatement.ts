@@ -74,3 +74,120 @@ export const summarizeMonthlyNOA = (
       data.cash_basis?.outstanding ?? Math.max(0, round2(otherFeesCharged - otherFeesPaid)),
   }
 }
+
+/** One printed row of the notice's DESCRIPTION / AMOUNT table. */
+export interface NOALine {
+  key: string
+  description: string
+  amount: number
+  /** Split across fees rather than read off one, so the notice can say so. */
+  apportioned?: boolean
+}
+
+/**
+ * The notice bills by fee, not by month: a payer reads "Tuition, Books, Miscellaneous",
+ * the way the school's own form is laid out, and the periods being covered are stated in
+ * words rather than as rows of their own.
+ *
+ * Every line is signed so the column adds up to the total printed beneath it.
+ */
+export const buildNOALines = (
+  data: StudentNOAResponse,
+  monthly: MonthlyNOAStatement | null
+): { lines: NOALine[]; total: number } => {
+  const breakdown = data.fee_breakdown ?? []
+  const lines: NOALine[] = []
+
+  if (!monthly) {
+    const balanceForward = Number(data.totals?.balance_forward || 0)
+    if (balanceForward > 0) {
+      lines.push({
+        key: 'balance-forward',
+        description: 'Balance Forward (previous academic year)',
+        amount: balanceForward,
+      })
+    }
+    // Each fee states exactly what it still owes — charge less its discounts and
+    // whatever the cashier has already collected against it.
+    breakdown.forEach((fee) => {
+      lines.push({
+        key: `fee-${fee.fee_id}`,
+        description: fee.fee_name,
+        amount: fee.outstanding,
+      })
+    })
+    // Money taken without being priced to a fee reduces the bill but belongs to no line
+    // above, so it is named rather than silently folded into one.
+    const unapplied = Number(data.unallocated_payments || 0)
+    if (unapplied > 0) {
+      lines.push({ key: 'unapplied', description: 'Less: Unapplied Payments', amount: -unapplied })
+    }
+    return { lines, total: Number(data.totals?.balance || 0) }
+  }
+
+  if (monthly.balanceForward > 0) {
+    lines.push({
+      key: 'balance-forward',
+      description: 'Balance Forward (previous academic year)',
+      amount: monthly.balanceForward,
+    })
+  }
+
+  // A surcharge is booked whole against the period that incurred it, so it is billed at
+  // its own figure instead of being spread — and only once its period is in scope.
+  const lateFees = breakdown.filter(
+    (fee) =>
+      fee.source === 'late_fee' &&
+      fee.outstanding > 0 &&
+      (fee.installment_sequence ?? 0) <= monthly.selected.sequence
+  )
+  const lateFeesDue = round2(lateFees.reduce((sum, fee) => sum + fee.outstanding, 0))
+
+  // What is left is amortized principal. The schedule divides every fee by the same
+  // count, so a period is genuinely each fee's share of itself — apportioning by net
+  // charge reproduces that split rather than inventing one.
+  const principalDue = Math.max(0, round2(monthly.totalDue - monthly.balanceForward - lateFeesDue))
+  const amortized = breakdown.filter(
+    (fee) => fee.billing_type !== 'cash' && fee.source !== 'late_fee'
+  )
+  const weights = amortized.map((fee) => Math.max(0, round2(fee.charge - fee.discount)))
+  const weightTotal = round2(weights.reduce((sum, weight) => sum + weight, 0))
+
+  if (principalDue > 0 && weightTotal > 0) {
+    let assigned = 0
+    // The last line absorbs the rounding so the column reconciles with the total exactly.
+    const lastIndex = weights.reduce((last, weight, index) => (weight > 0 ? index : last), -1)
+    amortized.forEach((fee, index) => {
+      if (weights[index] <= 0) return
+      const share =
+        index === lastIndex
+          ? round2(principalDue - assigned)
+          : round2((principalDue * weights[index]) / weightTotal)
+      assigned = round2(assigned + share)
+      lines.push({
+        key: `fee-${fee.fee_id}`,
+        description: fee.fee_name,
+        amount: share,
+        apportioned: true,
+      })
+    })
+  } else if (principalDue > 0) {
+    lines.push({ key: 'principal', description: 'Assessed Fees', amount: principalDue })
+  }
+
+  lateFees.forEach((fee) => {
+    lines.push({ key: `late-${fee.fee_id}`, description: fee.fee_name, amount: fee.outstanding })
+  })
+
+  return { lines, total: monthly.totalDue }
+}
+
+/**
+ * Which periods a month notice is collecting for, phrased for the slip — the arrears are
+ * no longer rows of their own, so the notice has to say in words what it covers.
+ */
+export const describeCoveredPeriods = (monthly: MonthlyNOAStatement): string => {
+  if (!monthly.arrears.length) return monthly.selected.label
+  const earliest = monthly.arrears[0].label
+  return `${earliest} to ${monthly.selected.label}`
+}

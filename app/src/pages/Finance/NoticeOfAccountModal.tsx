@@ -3,7 +3,11 @@ import { PDFDownloadLink } from '@react-pdf/renderer'
 import { Button } from '../../components/button'
 import { Select } from '../../components/select'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
-import { summarizeMonthlyNOA } from '../../components/studentNOAStatement'
+import {
+  buildNOALines,
+  describeCoveredPeriods,
+  summarizeMonthlyNOA,
+} from '../../components/studentNOAStatement'
 import type { NOAScopeMode } from '../../components/studentNOAStatement'
 import type { Student, StudentNOAResponse } from '../../types'
 
@@ -68,6 +72,7 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
   )
 
   const preview = scope === 'month' ? summarizeMonthlyNOA(data, sequence) : null
+  const { lines: printedLines, total: printedTotal } = buildNOALines(data, preview)
   const canPrintMonth = installments.length > 0
 
   const fileName = sanitizeFileName(
@@ -134,36 +139,27 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
                 />
               </div>
 
+              {/* The same rows the notice prints, so what is approved here is what is
+                  handed over — the periods behind the figures are named above them. */}
               {preview && (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-1.5 text-sm">
-                  {preview.balanceForward > 0 && (
-                    <div className="flex justify-between text-red-700">
-                      <span>Balance forward (previous academic year)</span>
-                      <span className="tabular-nums">
-                        {formatCurrency(preview.balanceForward)}
-                      </span>
-                    </div>
-                  )}
-                  {preview.arrears.map((installment) => (
-                    <div
-                      key={installment.sequence}
-                      className="flex justify-between text-red-700"
-                    >
-                      <span>{installment.label} — unpaid</span>
-                      <span className="tabular-nums">
-                        {formatCurrency(installment.outstanding_amount)}
-                      </span>
+                  <p className="text-xs text-gray-500">
+                    Covering {describeCoveredPeriods(preview)}
+                    {preview.arrears.length
+                      ? ` — ${preview.arrears.length} earlier period${
+                          preview.arrears.length > 1 ? 's' : ''
+                        } still unpaid`
+                      : ''}
+                  </p>
+                  {printedLines.map((line) => (
+                    <div key={line.key} className="flex justify-between text-gray-700">
+                      <span>{line.description}</span>
+                      <span className="tabular-nums">{formatCurrency(line.amount)}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between text-gray-700">
-                    <span>{preview.selected.label} — this period</span>
-                    <span className="tabular-nums">
-                      {formatCurrency(preview.selected.outstanding_amount)}
-                    </span>
-                  </div>
                   <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-1.5">
                     <span>Total amount due</span>
-                    <span className="tabular-nums">{formatCurrency(preview.totalDue)}</span>
+                    <span className="tabular-nums">{formatCurrency(printedTotal)}</span>
                   </div>
                   {preview.otherFees.length > 0 && (
                     <div className="flex justify-between text-xs text-gray-500 pt-1">

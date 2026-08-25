@@ -440,102 +440,13 @@ class StudentFinanceController extends Controller
 
         // Per-fee breakdown used by the cashiering (POS) screen to show the
         // outstanding amount for each fee so the cashier can pay toward each.
-        $paidByFee = $activePayments
-            ->filter(fn ($payment) => $payment->school_fee_id)
-            ->groupBy('school_fee_id')
-            ->map(fn ($group) => (float) $group->sum('amount'));
-
-        // Additional fees (ad-hoc charges and late fees) are settled through
-        // student_additional_fee_id, so their collections track separately.
-        $paidByAdditionalFee = $activePayments
-            ->filter(fn ($payment) => $payment->student_additional_fee_id)
-            ->groupBy('student_additional_fee_id')
-            ->map(fn ($group) => (float) $group->sum('amount'));
-
-        // Grade-level discounts voided for this student are already dropped from
-        // $activeGradeLevelDiscountsWithAmount — the breakdown must use that same set,
-        // or a void the totals honour still shows up against a fee.
-        $activeDiscountPayloads = $activeDiscountsWithAmount
-            ->merge($activeGradeLevelDiscountsWithAmount);
-
-        $discountByFee = $activeDiscountPayloads
-            ->filter(fn ($payload) => $payload['discount']->school_fee_id)
-            ->groupBy(fn ($payload) => $payload['discount']->school_fee_id)
-            ->map(fn ($group) => (float) collect($group)->sum('amount'))
-            ->all();
-
-        // A whole-bill discount carries no school_fee_id, so it has no fee of its own to
-        // sit against. It was priced against the standard charges (see applyDiscounts),
-        // so it is spread back over those same fees — otherwise the Fees view reports
-        // outstanding that the ledger balance has already discounted away. What each fee
-        // still owes is part of that spread: a cashier who collected a fee's whole charge
-        // before the discount existed left it nothing to write off.
-        $unassignedDiscountTotal = (float) $activeDiscountPayloads
-            ->reject(fn ($payload) => $payload['discount']->school_fee_id)
-            ->sum('amount');
-
-        $unassignedShares = $this->allocateUnassignedDiscounts(
-            $unassignedDiscountTotal,
+        [$feeBreakdown, $unallocatedPayments] = $this->buildFeeBreakdown(
+            $activePayments,
             $feeDefaults,
-            $discountByFee,
-            $paidByFee->all()
+            $manualAdditionalFees,
+            $chargedLateFees,
+            $activeDiscountsWithAmount->merge($activeGradeLevelDiscountsWithAmount)
         );
-
-        foreach ($unassignedShares as $feeId => $share) {
-            $discountByFee[$feeId] = round(($discountByFee[$feeId] ?? 0) + $share, 2);
-        }
-
-        $feeBreakdown = $feeDefaults->map(function ($default) use ($paidByFee, $discountByFee) {
-            $feeId = $default->school_fee_id;
-            $charge = (float) $default->amount;
-            $discount = (float) ($discountByFee[$feeId] ?? 0);
-            $paid = (float) ($paidByFee[$feeId] ?? 0);
-
-            return [
-                'fee_id' => $feeId,
-                'fee_name' => $default->schoolFee?->name ?? 'School Fee',
-                'is_additional' => false,
-                // Standard grade-level fees are the plan's principal by definition.
-                'billing_type' => StudentAdditionalFee::BILLING_INSTALLMENT,
-                'charge' => round($charge, 2),
-                'discount' => round($discount, 2),
-                'paid' => round($paid, 2),
-                'outstanding' => round($charge - $discount - $paid, 2),
-            ];
-        })->toBase()->merge(
-            // Ad-hoc fees first, then the surcharges charged against the schedule — each
-            // its own collectible line, already in installment order.
-            $manualAdditionalFees
-                ->merge($chargedLateFees)
-                ->map(function ($af) use ($paidByAdditionalFee, $discountByFee) {
-                    $charge = (float) $af->amount;
-                    $discount = (float) ($discountByFee[$af->id] ?? 0);
-                    $paid = (float) ($paidByAdditionalFee[$af->id] ?? 0);
-
-                    return [
-                        'fee_id' => $af->id,
-                        'fee_name' => $af->name,
-                        'is_additional' => true,
-                        'source' => $af->source,
-                        // A late fee is reported as installment-based: it is not amortized,
-                        // but the schedule shows it on the period that incurred it, so the
-                        // Fees view must not list it as separately collectible cash.
-                        'billing_type' => $af->isCashBasis()
-                            ? StudentAdditionalFee::BILLING_CASH
-                            : StudentAdditionalFee::BILLING_INSTALLMENT,
-                        'installment_sequence' => $af->installment_sequence,
-                        'late_fee_stage' => $af->isLateFee() ? $af->lateFeeStage() : null,
-                        'charge' => round($charge, 2),
-                        'discount' => round($discount, 2),
-                        'paid' => round($paid, 2),
-                        'outstanding' => round($charge - $discount - $paid, 2),
-                    ];
-                })
-        )->values();
-
-        $unallocatedPayments = (float) $activePayments
-            ->filter(fn ($payment) => !$payment->school_fee_id && !$payment->student_additional_fee_id)
-            ->sum('amount');
 
         return response()->json([
             'success' => true,
@@ -782,6 +693,16 @@ class StudentFinanceController extends Controller
             ];
         }));
 
+        // The notice itemizes by fee, so it bills from the same per-fee figures the
+        // cashier collects against rather than a second reading of the same rows.
+        [$feeBreakdown, $unallocatedPayments] = $this->buildFeeBreakdown(
+            $payments,
+            $feeDefaults,
+            $manualAdditionalFees,
+            $chargedLateFees,
+            $discountsWithAmount->merge($gradeLevelDiscountsWithAmount)
+        );
+
         $allFees = $feeDefaults->map(function ($default) {
             return [
                 'fee_id' => $default->school_fee_id,
@@ -842,6 +763,8 @@ class StudentFinanceController extends Controller
                     'outstanding' => round(max($cashChargesTotal - $cashPaymentsTotal, 0), 2),
                     'fee_count' => $cashAdditionalFees->count(),
                 ],
+                'fee_breakdown' => $feeBreakdown,
+                'unallocated_payments' => $unallocatedPayments,
                 'payment_plan' => $this->planService->serializePlan($paymentPlan),
                 'downpayment' => $downpayment,
                 'installments' => $installments,
@@ -1140,6 +1063,125 @@ class StudentFinanceController extends Controller
             ->whereIn('grade_level_discount_id', $gradeLevelDiscounts->pluck('id'))
             ->get()
             ->keyBy('grade_level_discount_id');
+    }
+
+    /**
+     * What each fee has been charged, discounted and collected against, and the money
+     * collected against no fee at all.
+     *
+     * The cashier prices a payment per fee, so this is what the POS screen bills from;
+     * the notice of account itemizes the same way, and sharing the computation is what
+     * keeps a printed notice agreeing with the counter it was printed at.
+     *
+     * @param  iterable  $activePayments  non-voided StudentPayment rows
+     * @param  iterable  $feeDefaults  SchoolFeeDefault rows for the grade level and year
+     * @param  iterable  $manualAdditionalFees  ad-hoc fees, late fees excluded
+     * @param  iterable  $chargedLateFees  surcharges booked against the schedule
+     * @param  iterable  $discountPayloads  applyDiscounts() output, student + grade level
+     * @return array{0: \Illuminate\Support\Collection, 1: float}
+     */
+    private function buildFeeBreakdown(
+        $activePayments,
+        $feeDefaults,
+        $manualAdditionalFees,
+        $chargedLateFees,
+        $discountPayloads
+    ): array {
+        $activePayments = collect($activePayments);
+        $discountPayloads = collect($discountPayloads);
+
+        $paidByFee = $activePayments
+            ->filter(fn ($payment) => $payment->school_fee_id)
+            ->groupBy('school_fee_id')
+            ->map(fn ($group) => (float) $group->sum('amount'));
+
+        // Additional fees (ad-hoc charges and late fees) are settled through
+        // student_additional_fee_id, so their collections track separately.
+        $paidByAdditionalFee = $activePayments
+            ->filter(fn ($payment) => $payment->student_additional_fee_id)
+            ->groupBy('student_additional_fee_id')
+            ->map(fn ($group) => (float) $group->sum('amount'));
+
+        $discountByFee = $discountPayloads
+            ->filter(fn ($payload) => $payload['discount']->school_fee_id)
+            ->groupBy(fn ($payload) => $payload['discount']->school_fee_id)
+            ->map(fn ($group) => (float) collect($group)->sum('amount'))
+            ->all();
+
+        // A whole-bill discount carries no school_fee_id, so it has no fee of its own to
+        // sit against. It was priced against the standard charges (see applyDiscounts),
+        // so it is spread back over those same fees — otherwise the Fees view reports
+        // outstanding that the ledger balance has already discounted away. What each fee
+        // still owes is part of that spread: a cashier who collected a fee's whole charge
+        // before the discount existed left it nothing to write off.
+        $unassignedDiscountTotal = (float) $discountPayloads
+            ->reject(fn ($payload) => $payload['discount']->school_fee_id)
+            ->sum('amount');
+
+        $unassignedShares = $this->allocateUnassignedDiscounts(
+            $unassignedDiscountTotal,
+            $feeDefaults,
+            $discountByFee,
+            $paidByFee->all()
+        );
+
+        foreach ($unassignedShares as $feeId => $share) {
+            $discountByFee[$feeId] = round(($discountByFee[$feeId] ?? 0) + $share, 2);
+        }
+
+        $breakdown = collect($feeDefaults)->map(function ($default) use ($paidByFee, $discountByFee) {
+            $feeId = $default->school_fee_id;
+            $charge = (float) $default->amount;
+            $discount = (float) ($discountByFee[$feeId] ?? 0);
+            $paid = (float) ($paidByFee[$feeId] ?? 0);
+
+            return [
+                'fee_id' => $feeId,
+                'fee_name' => $default->schoolFee?->name ?? 'School Fee',
+                'is_additional' => false,
+                // Standard grade-level fees are the plan's principal by definition.
+                'billing_type' => StudentAdditionalFee::BILLING_INSTALLMENT,
+                'charge' => round($charge, 2),
+                'discount' => round($discount, 2),
+                'paid' => round($paid, 2),
+                'outstanding' => round($charge - $discount - $paid, 2),
+            ];
+        })->toBase()->merge(
+            // Ad-hoc fees first, then the surcharges charged against the schedule — each
+            // its own collectible line, already in installment order.
+            collect($manualAdditionalFees)
+                ->merge($chargedLateFees)
+                ->map(function ($af) use ($paidByAdditionalFee, $discountByFee) {
+                    $charge = (float) $af->amount;
+                    $discount = (float) ($discountByFee[$af->id] ?? 0);
+                    $paid = (float) ($paidByAdditionalFee[$af->id] ?? 0);
+
+                    return [
+                        'fee_id' => $af->id,
+                        'fee_name' => $af->name,
+                        'is_additional' => true,
+                        'source' => $af->source,
+                        // A late fee is reported as installment-based: it is not amortized,
+                        // but the schedule shows it on the period that incurred it, so the
+                        // Fees view must not list it as separately collectible cash.
+                        'billing_type' => $af->isCashBasis()
+                            ? StudentAdditionalFee::BILLING_CASH
+                            : StudentAdditionalFee::BILLING_INSTALLMENT,
+                        'installment_sequence' => $af->installment_sequence,
+                        'late_fee_stage' => $af->isLateFee() ? $af->lateFeeStage() : null,
+                        'charge' => round($charge, 2),
+                        'discount' => round($discount, 2),
+                        'paid' => round($paid, 2),
+                        'outstanding' => round($charge - $discount - $paid, 2),
+                    ];
+                })
+        )->values();
+
+        $unallocatedPayments = round((float) $activePayments
+            ->filter(fn ($payment) => !$payment->school_fee_id && !$payment->student_additional_fee_id)
+            ->sum('amount'), 2);
+
+        return [$breakdown, $unallocatedPayments];
     }
 
     /**
