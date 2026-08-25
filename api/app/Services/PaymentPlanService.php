@@ -21,6 +21,10 @@ class PaymentPlanService
      * month is a downpayment: it comes off the amount being divided, so every
      * installment is smaller rather than the earliest ones being settled outright.
      *
+     * A `reamortizing` plan divides nothing up front: each period is priced from the
+     * balance as it stood when that period opened, over the periods left to collect it
+     * in. See buildReamortized().
+     *
      * @param  iterable|null  $principalPayments  Non-voided payments that settle plan
      *         principal (late-fee collections excluded) — needed to date the
      *         downpayment. Omit to skip downpayment detection entirely.
@@ -51,6 +55,21 @@ class PaymentPlanService
         $count = $templates->count();
         $pivotMonth = $this->resolvePivotMonth($templates);
         $netCharges = max(0.0, $grossCharges - $discountsTotal);
+
+        // A reamortizing plan prices each period from the balance rather than from a share of
+        // the total, so none of the splitting below applies to it — and neither does the
+        // downpayment deduction, which its first period already accounts for.
+        if ($definition->reamortizes()) {
+            return $this->buildReamortized(
+                $templates,
+                $startYear,
+                $pivotMonth,
+                $grossCharges,
+                $netCharges,
+                $principalPayments
+            );
+        }
+
         $usePercentage = $templates->every(fn ($t) => $t->share_percentage !== null);
 
         // A downpayment is already-settled money, so it leaves the schedule twice over:
@@ -151,6 +170,186 @@ class PaymentPlanService
     }
 
     /**
+     * Build the schedule for a plan that re-divides the balance every time a period opens.
+     *
+     * One rule, applied at one moment. A period opens on the first day of its due month, and
+     * the instant it does its amount is fixed at
+     *
+     *     balance still owed at that moment ÷ periods remaining, this one included
+     *
+     * and then frozen. Money paid inside a period never re-prices that period's own bill —
+     * it lowers the balance the *next* period opens on. So "a payment was made" and "a month
+     * went by" are not two triggers: they are the two ways the balance at the next opening
+     * ends up what it is.
+     *
+     * On 23,700 over July–April, a student who pays 7,900 in July still owed 2,370 for July
+     * (its figure was set on 1 July, when nothing had been paid), is billed 15,800 ÷ 9 =
+     * 1,755.56 from August, and — having paid nothing since — 15,800 ÷ 5 = 3,160 from
+     * December. Paying the figure asked for keeps it level: settling 3,160 in December leaves
+     * 12,640 over four months, which is 3,160 again.
+     *
+     * Periods that have not opened yet are therefore projected level at the current figure,
+     * which makes the unpaid part of the schedule sum to exactly the remaining balance.
+     *
+     * A period that closed short is marked `rolled_forward` and reports nothing outstanding:
+     * its shortfall was re-divided into the periods that follow, which now carry it, so
+     * counting it again here would bill it twice. The last period is never rolled forward —
+     * there is nothing after it to absorb the balance, so it holds whatever is left.
+     *
+     * @param  \Illuminate\Support\Collection  $templates  ordered by sequence
+     * @param  iterable|null  $principalPayments  Non-voided payments settling plan principal
+     */
+    private function buildReamortized(
+        $templates,
+        int $startYear,
+        int $pivotMonth,
+        float $grossCharges,
+        float $netCharges,
+        $principalPayments
+    ): array {
+        $count = $templates->count();
+        $today = Carbon::today();
+
+        // Each period's due date, and the moment it opens: the first of its month. Anchoring
+        // on the month rather than the due date is what makes a payment made anywhere in July
+        // count towards August's figure, however late in the month the installment falls due.
+        $dueDates = [];
+        $openings = [];
+        $previousOpening = null;
+        foreach ($templates->values() as $i => $template) {
+            $dueDate = $this->resolveDueDate(
+                $startYear,
+                (int) $template->due_month,
+                (int) $template->due_day,
+                $pivotMonth
+            );
+            $opening = $dueDate->copy()->startOfMonth();
+            // Two periods billed in the same month share an opening rather than reopening
+            // one that has already passed, so the walk never moves backwards.
+            if ($previousOpening !== null && $opening->lessThan($previousOpening)) {
+                $opening = $previousOpening->copy();
+            }
+
+            $dueDates[$i] = $dueDate;
+            $openings[$i] = $opening;
+            $previousOpening = $opening;
+        }
+
+        $payments = collect($principalPayments ?? [])
+            ->map(fn ($payment) => [
+                'date' => $this->paymentDate($payment),
+                'amount' => (float) (is_array($payment) ? $payment['amount'] : $payment->amount),
+            ])
+            ->filter(fn ($payment) => $payment['date'] !== null)
+            ->values();
+        $paidToDate = round((float) $payments->sum('amount'), 2);
+
+        $paidBefore = fn (Carbon $boundary) => round((float) $payments
+            ->filter(fn ($payment) => $payment['date']->lessThan($boundary))
+            ->sum('amount'), 2);
+        $paidWithin = fn (Carbon $from, ?Carbon $until) => round((float) $payments
+            ->filter(fn ($payment) => ! $payment['date']->lessThan($from)
+                && ($until === null || $payment['date']->lessThan($until)))
+            ->sum('amount'), 2);
+
+        // Discounts are applied to the year as a whole, so each period carries them in the
+        // same proportion — enough to state a gross figure beside the net one it bills.
+        $grossFactor = $netCharges > 0 ? $grossCharges / $netCharges : 0.0;
+
+        $projected = null;
+        $installments = [];
+
+        foreach ($templates->values() as $i => $template) {
+            $periodsLeft = $count - $i;
+            $opening = $openings[$i];
+            $nextOpening = $openings[$i + 1] ?? null;
+
+            if (! $opening->greaterThan($today)) {
+                // Opened: priced from what was actually still owed that day, and frozen there.
+                $balance = max(0.0, round($netCharges - $paidBefore($opening), 2));
+                $amount = round($balance / $periodsLeft, 2);
+                // What the periods after it are projected from, on the assumption this one is
+                // settled for the figure it asks.
+                $projected = round($balance - $amount, 2);
+            } else {
+                // Not yet opened: level at the figure the schedule is currently running at.
+                // Before the schedule has opened at all there is no such figure, so the
+                // balance as it stands is levelled across the whole thing.
+                if ($projected === null) {
+                    $projected = max(0.0, round($netCharges - $paidToDate, 2));
+                }
+
+                // The final period takes the residue whole, so the projection lands on zero.
+                $amount = $periodsLeft === 1
+                    ? round($projected, 2)
+                    : round($projected / $periodsLeft, 2);
+                $projected = round($projected - $amount, 2);
+            }
+
+            $amount = max(0.0, $amount);
+            $originalAmount = $grossFactor > 0 ? round($amount * $grossFactor, 2) : $amount;
+
+            $paidApplied = $paidWithin($opening, $nextOpening);
+            $status = 'pending';
+            if ($amount <= 0 || $paidApplied >= $amount - 0.005) {
+                $status = 'paid';
+            } elseif ($paidApplied > 0) {
+                $status = 'partial';
+            }
+
+            // Closed short: the shortfall is already re-divided into the periods after this
+            // one, so this row is history rather than a bill. The last period has nothing
+            // after it to carry the balance, so it is never rolled forward.
+            $rolledForward = $nextOpening !== null
+                && ! $nextOpening->greaterThan($today)
+                && $status !== 'paid';
+
+            $graceDays = max(0, (int) $template->grace_period_days);
+            $overdueDate = $dueDates[$i]->copy()->addDays($graceDays);
+
+            $installments[] = [
+                'sequence' => $i + 1,
+                'label' => $template->label ?: $dueDates[$i]->format('F Y'),
+                'due_date' => $dueDates[$i]->toDateString(),
+                'opens_on' => $opening->toDateString(),
+                'grace_period_days' => $graceDays,
+                'overdue_date' => $overdueDate->toDateString(),
+                // A period already re-divided into the ones behind it is not overdue — it is
+                // being collected again, on their rows.
+                'is_overdue' => ! $rolledForward
+                    && $status !== 'paid'
+                    && $amount > 0
+                    && $today->greaterThan($overdueDate),
+                // These plans assess no surcharge: re-spreading the shortfall is the whole
+                // consequence of missing a period. Any late fee the template carries is
+                // reported as zero so nothing downstream shows a charge that is never made.
+                // withLateFees() still stamps rows booked under a plan the student has since
+                // left — those were charged, and stay collectible.
+                'late_fee_percentage' => 0.0,
+                'late_fee_amount' => 0.0,
+                'late_fee_applied' => false,
+                'late_fee_id' => null,
+                'late_fee_charges' => [],
+                'amount' => $amount,
+                'original_amount' => $originalAmount,
+                'discount_amount' => round($originalAmount - $amount, 2),
+                // What actually arrived while this period was the one being collected. Left
+                // uncapped: a July that was billed 2,370 and received 7,900 is why August
+                // dropped, and hiding the surplus would leave that unexplained.
+                'paid_amount' => $paidApplied,
+                'rolled_forward' => $rolledForward,
+                'outstanding_amount' => $rolledForward
+                    ? 0.0
+                    : round(max(0.0, $amount - $paidApplied), 2),
+                'running_total_due' => 0.0,
+                'status' => $status,
+            ];
+        }
+
+        return $installments;
+    }
+
+    /**
      * How much of what has been collected counts as a downpayment against the schedule,
      * and the date that decides it.
      *
@@ -175,7 +374,11 @@ class PaymentPlanService
         $none = ['amount' => 0.0, 'boundary' => null];
 
         $definition = $plan?->paymentPlan;
-        if (! $definition || ! $definition->deductsDownpayment()) {
+        // A reamortizing plan reports the same money for a different reason: it does not
+        // deduct it, its first period is simply priced from a balance that already has it
+        // taken off. Either way the schedule totals less than the year's charges, and the
+        // difference has to be stated or the collected money reads as unapplied.
+        if (! $definition || ! ($definition->deductsDownpayment() || $definition->reamortizes())) {
             return $none;
         }
 
@@ -304,7 +507,11 @@ class PaymentPlanService
 
             // Overpayment against either side is credit held elsewhere in the ledger, so
             // neither leg is allowed to go negative and mask what a later period owes.
-            $principalDue = max(0.0, round(
+            //
+            // A reamortizing plan's closed-short period owes nothing here: what it did not
+            // collect was re-divided into the periods after it, so it is billed on their rows
+            // and adding it again would ask for it twice.
+            $principalDue = ($installment['rolled_forward'] ?? false) ? 0.0 : max(0.0, round(
                 (float) ($installment['amount'] ?? 0) - (float) ($installment['paid_amount'] ?? 0),
                 2
             ));
@@ -344,6 +551,8 @@ class PaymentPlanService
                 ?? ($plan->plan_type ? ucfirst((string) $plan->plan_type) : null),
             'advance_payment_mode' => $definition?->advance_payment_mode
                 ?? PaymentPlan::ADVANCE_EQUAL_SPLIT,
+            'schedule_mode' => $definition?->schedule_mode
+                ?? PaymentPlan::SCHEDULE_FIXED,
             'surcharge_mode' => $definition?->surcharge_mode
                 ?? PaymentPlan::SURCHARGE_PER_INSTALLMENT,
             'installment_count' => $installmentCount,

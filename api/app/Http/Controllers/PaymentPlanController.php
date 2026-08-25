@@ -70,6 +70,8 @@ class PaymentPlanController extends Controller
                 'description' => $validated['description'] ?? null,
                 'advance_payment_mode' => $validated['advance_payment_mode']
                     ?? PaymentPlan::ADVANCE_EQUAL_SPLIT,
+                'schedule_mode' => $validated['schedule_mode']
+                    ?? PaymentPlan::SCHEDULE_FIXED,
                 'surcharge_mode' => $validated['surcharge_mode']
                     ?? PaymentPlan::SURCHARGE_PER_INSTALLMENT,
                 'is_active' => $validated['is_active'] ?? true,
@@ -141,6 +143,8 @@ class PaymentPlanController extends Controller
                 'description' => $validated['description'] ?? null,
                 'advance_payment_mode' => $validated['advance_payment_mode']
                     ?? $plan->advance_payment_mode,
+                'schedule_mode' => $validated['schedule_mode']
+                    ?? $plan->schedule_mode,
                 'surcharge_mode' => $validated['surcharge_mode']
                     ?? $plan->surcharge_mode,
                 'is_active' => $validated['is_active'] ?? $plan->is_active,
@@ -205,6 +209,7 @@ class PaymentPlanController extends Controller
             ],
             'description' => 'nullable|string',
             'advance_payment_mode' => ['nullable', Rule::in(PaymentPlan::ADVANCE_PAYMENT_MODES)],
+            'schedule_mode' => ['nullable', Rule::in(PaymentPlan::SCHEDULE_MODES)],
             'surcharge_mode' => ['nullable', Rule::in(PaymentPlan::SURCHARGE_MODES)],
             'is_active' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',
@@ -255,6 +260,7 @@ class PaymentPlanController extends Controller
             'name' => $plan->name,
             'description' => $plan->description,
             'advance_payment_mode' => $plan->advance_payment_mode ?? PaymentPlan::ADVANCE_EQUAL_SPLIT,
+            'schedule_mode' => $plan->schedule_mode ?? PaymentPlan::SCHEDULE_FIXED,
             'surcharge_mode' => $plan->surcharge_mode ?? PaymentPlan::SURCHARGE_PER_INSTALLMENT,
             'is_active' => (bool) $plan->is_active,
             'sort_order' => (int) $plan->sort_order,

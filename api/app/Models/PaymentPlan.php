@@ -21,6 +21,33 @@ class PaymentPlan extends Model
         self::ADVANCE_NET_OF_DOWNPAYMENT,
     ];
 
+    /** The net charges are divided once, up front, and each installment keeps that amount. */
+    public const SCHEDULE_FIXED = 'fixed';
+
+    /**
+     * What is still owed is re-divided every time a period opens, across the periods left to
+     * collect it in: `remaining balance ÷ periods remaining`. The figure is then frozen for
+     * that period — money paid inside it never re-prices its own bill, it lowers the balance
+     * the next period opens on.
+     *
+     * So on 23,700 over ten months from July, a student who pays 7,900 in July is billed
+     * 15,800 ÷ 9 = 1,755.56 from August; one who then pays nothing until December is billed
+     * 15,800 ÷ 5 = 3,160, because the same balance now has five months to land in rather
+     * than nine. Paying the figure asked for keeps it level — it only moves when the student
+     * pays more or less than the schedule expected.
+     *
+     * A missed period is its own consequence: the shortfall is re-spread across what follows,
+     * so these plans assess no surcharge (see LateFeeService, which is not run for them) and
+     * `advance_payment_mode` has nothing to decide — money paid before the schedule opens is
+     * already part of the first period's balance.
+     */
+    public const SCHEDULE_REAMORTIZING = 'reamortizing';
+
+    public const SCHEDULE_MODES = [
+        self::SCHEDULE_FIXED,
+        self::SCHEDULE_REAMORTIZING,
+    ];
+
     /** Each installment is surcharged once, on its own amount, when it goes overdue. */
     public const SURCHARGE_PER_INSTALLMENT = 'per_installment';
 
@@ -57,6 +84,7 @@ class PaymentPlan extends Model
         'name',
         'description',
         'advance_payment_mode',
+        'schedule_mode',
         'surcharge_mode',
         'is_active',
         'sort_order',
@@ -71,6 +99,15 @@ class PaymentPlan extends Model
     public function deductsDownpayment(): bool
     {
         return $this->advance_payment_mode === self::ADVANCE_NET_OF_DOWNPAYMENT;
+    }
+
+    /**
+     * Whether each period's amount is re-derived from the balance when it opens, rather than
+     * fixed once at the start of the schedule. See SCHEDULE_REAMORTIZING.
+     */
+    public function reamortizes(): bool
+    {
+        return $this->schedule_mode === self::SCHEDULE_REAMORTIZING;
     }
 
     public function carriesOverSurcharge(): bool

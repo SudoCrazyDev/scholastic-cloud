@@ -19,10 +19,30 @@ import type {
   AdvancePaymentMode,
   CreatePaymentPlanData,
   PaymentPlan,
+  ScheduleMode,
   SurchargeMode,
 } from '../../types'
 
 const monthName = (month: number) => MONTH_NAMES[month - 1] ?? String(month)
+
+const SCHEDULE_MODE_OPTIONS: Array<{ value: ScheduleMode; label: string; hint: string }> = [
+  {
+    value: 'fixed',
+    label: 'Fixed for the whole year',
+    hint:
+      'Net charges are divided once, at the start, and that figure stands until the year ends. ' +
+      'Money collected settles the earliest installments — paying extra puts a student months ' +
+      'ahead rather than lowering the bill.',
+  },
+  {
+    value: 'reamortizing',
+    label: 'Recalculated each period from the balance',
+    hint:
+      'Every time a period opens, whatever is still owed is divided across the periods left ' +
+      'to collect it in. On ₱23,700 over ten months, paying ₱7,900 in July makes August ' +
+      '₱15,800 ÷ 9 = ₱1,755.56; paying nothing after that makes December ₱15,800 ÷ 5 = ₱3,160.',
+  },
+]
 
 const ADVANCE_MODE_OPTIONS: Array<{ value: AdvancePaymentMode; label: string; hint: string }> = [
   {
@@ -93,6 +113,7 @@ const emptyForm = () => ({
   name: '',
   description: '',
   advance_payment_mode: 'equal_split' as AdvancePaymentMode,
+  schedule_mode: 'fixed' as ScheduleMode,
   surcharge_mode: 'per_installment' as SurchargeMode,
   is_active: true,
   installments: [emptyInstallment()],
@@ -177,6 +198,9 @@ const PaymentPlansView: React.FC = () => {
         // to the default split and change every student's installment amounts — or
         // to the default surcharge rule and change what they owe on an overdue one.
         advance_payment_mode: plan.advance_payment_mode ?? 'equal_split',
+        // Same reason: dropping this would put every student on the plan back on a fixed
+        // schedule and re-price the rest of their year.
+        schedule_mode: plan.schedule_mode ?? 'fixed',
         surcharge_mode: plan.surcharge_mode ?? 'per_installment',
         is_active: !plan.is_active,
         sort_order: plan.sort_order,
@@ -199,6 +223,11 @@ const PaymentPlansView: React.FC = () => {
   })
 
   const isSaving = createMutation.isPending || updateMutation.isPending
+  // A recalculated schedule answers both of the other questions on its own: money paid before
+  // it opens is already part of the first period's balance, and a missed period is re-divided
+  // into the ones after it instead of being surcharged. Both settings are hidden rather than
+  // shown inert, so nothing is configured that will never be read.
+  const isReamortizing = form.schedule_mode === 'reamortizing'
 
   const handleEdit = (plan: PaymentPlan) => {
     setEditingPlan(plan)
@@ -207,6 +236,7 @@ const PaymentPlansView: React.FC = () => {
       name: plan.name,
       description: plan.description || '',
       advance_payment_mode: plan.advance_payment_mode ?? 'equal_split',
+      schedule_mode: plan.schedule_mode ?? 'fixed',
       surcharge_mode: plan.surcharge_mode ?? 'per_installment',
       is_active: plan.is_active,
       installments: plan.installments.length
@@ -291,6 +321,7 @@ const PaymentPlansView: React.FC = () => {
       name: form.name.trim(),
       description: form.description.trim() || null,
       advance_payment_mode: form.advance_payment_mode,
+      schedule_mode: form.schedule_mode,
       surcharge_mode: form.surcharge_mode,
       is_active: form.is_active,
       installments: form.installments.map((inst) => ({
@@ -364,6 +395,51 @@ const PaymentPlansView: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
+              How each installment's amount is worked out
+            </label>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {SCHEDULE_MODE_OPTIONS.map((option) => {
+                const selected = form.schedule_mode === option.value
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      selected
+                        ? 'border-primary-400 bg-primary-50/50 ring-1 ring-primary-200'
+                        : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                    } ${isSaving ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="schedule_mode"
+                      className="mt-0.5 h-4 w-4 shrink-0 text-primary-600 focus:ring-primary-500"
+                      value={option.value}
+                      checked={selected}
+                      onChange={() => setForm((prev) => ({ ...prev, schedule_mode: option.value }))}
+                      disabled={isSaving}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-gray-900">{option.label}</span>
+                      <span className="block text-xs text-gray-500 mt-1">{option.hint}</span>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+            {isReamortizing && (
+              <p className="mt-2 text-xs text-gray-500">
+                A period's figure is fixed the day it opens — the first of its month — and does
+                not move again, so a payment made during a month changes the month after it
+                rather than the bill already issued. A period that closes short is not chased
+                separately: what it did not collect is already included in the periods that
+                follow, so no late fee is charged on these plans.
+              </p>
+            )}
+          </div>
+
+          {!isReamortizing && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Payments made before the schedule starts
             </label>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -398,7 +474,9 @@ const PaymentPlansView: React.FC = () => {
               })}
             </div>
           </div>
+          )}
 
+          {!isReamortizing && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Late fees on an installment that stays unpaid
@@ -457,15 +535,18 @@ const PaymentPlansView: React.FC = () => {
               </p>
             )}
           </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700">
                 Installments
                 <span className="ml-2 text-xs font-normal text-gray-500">
-                  {form.advance_payment_mode === 'net_of_downpayment'
-                    ? 'Net charges less any downpayment are split evenly across these installments.'
-                    : 'Net charges are split evenly across these installments.'}
+                  {isReamortizing
+                    ? 'The balance still owed is re-divided across the periods left, each time one opens.'
+                    : form.advance_payment_mode === 'net_of_downpayment'
+                      ? 'Net charges less any downpayment are split evenly across these installments.'
+                      : 'Net charges are split evenly across these installments.'}
                 </span>
               </label>
               <Button type="button" variant="outline" size="sm" onClick={addInstallment} disabled={isSaving}>
@@ -477,7 +558,11 @@ const PaymentPlansView: React.FC = () => {
               {form.installments.map((inst, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-1 sm:grid-cols-[2.5rem_1fr_1fr_6rem_6rem_2.5rem] gap-3 items-end rounded-lg border border-gray-200 p-3 bg-gray-50/50"
+                  className={`grid grid-cols-1 ${
+                    isReamortizing
+                      ? 'sm:grid-cols-[2.5rem_1fr_1fr_6rem_2.5rem]'
+                      : 'sm:grid-cols-[2.5rem_1fr_1fr_6rem_6rem_2.5rem]'
+                  } gap-3 items-end rounded-lg border border-gray-200 p-3 bg-gray-50/50`}
                 >
                   <div className="text-sm font-semibold text-gray-500 sm:pb-2.5">#{index + 1}</div>
                   <div>
@@ -511,18 +596,20 @@ const PaymentPlansView: React.FC = () => {
                       disabled={isSaving}
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Late fee (%)</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={inst.late_fee}
-                      onChange={(e) => updateInstallment(index, 'late_fee', e.target.value)}
-                      disabled={isSaving}
-                    />
-                  </div>
+                  {!isReamortizing && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Late fee (%)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={inst.late_fee}
+                        onChange={(e) => updateInstallment(index, 'late_fee', e.target.value)}
+                        disabled={isSaving}
+                      />
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeInstallment(index)}
@@ -538,15 +625,16 @@ const PaymentPlansView: React.FC = () => {
             <p className="mt-2 text-xs text-gray-500">
               Due dates repeat every school year, so only a month and day are needed — the year is
               applied automatically (August–December fall in the start year, January–July in the
-              following year). Grace days are how long after the due date before the late fee applies; the
-              late fee is a one-time charge of that percent of the installment, added to the
-              student's balance while the installment stays unpaid.
+              following year).{' '}
+              {isReamortizing
+                ? "Grace days are how long after the due date before the period is flagged overdue. A period is priced from the balance on the first of its month, whatever day it falls due."
+                : 'Grace days are how long after the due date before the late fee applies; the late fee is a one-time charge of that percent of the installment, added to the student’s balance while the installment stays unpaid.'}
             </p>
 
             {/* A plan left at 0% silently never surcharges anyone, and nothing downstream
                 reports it — the omission only surfaces when finance asks why a late payment
                 went uncharged. Say so here, while it is still being edited. */}
-            {!form.installments.some((inst) => Number(inst.late_fee) > 0) && (
+            {!isReamortizing && !form.installments.some((inst) => Number(inst.late_fee) > 0) && (
               <div className="mt-3 flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-amber-600" />
                 <p className="text-xs text-amber-800">
@@ -613,7 +701,16 @@ const PaymentPlansView: React.FC = () => {
                       <span className="inline-flex rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">
                         {plan.installment_count} installment{plan.installment_count === 1 ? '' : 's'}
                       </span>
-                      {plan.advance_payment_mode === 'net_of_downpayment' && (
+                      {plan.schedule_mode === 'reamortizing' && (
+                        <span
+                          className="inline-flex rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800"
+                          title="Each time a period opens, the balance still owed is divided across the periods left to collect it in. Paying more lowers what follows; missing a period raises it. No late fee is charged."
+                        >
+                          Recalculated each period
+                        </span>
+                      )}
+                      {plan.schedule_mode !== 'reamortizing'
+                        && plan.advance_payment_mode === 'net_of_downpayment' && (
                         <span
                           className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800"
                           title="Payments received before the first installment's month are deducted from the amount being divided."
@@ -621,7 +718,8 @@ const PaymentPlansView: React.FC = () => {
                           Net of downpayment
                         </span>
                       )}
-                      {plan.surcharge_mode === 'running_total' && (
+                      {plan.schedule_mode !== 'reamortizing'
+                        && plan.surcharge_mode === 'running_total' && (
                         <span
                           className="inline-flex rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-800"
                           title="Each installment is still surcharged only once, but every period is billed with the unpaid balance behind it folded in, so the schedule states the arrears as one running figure."
@@ -629,7 +727,8 @@ const PaymentPlansView: React.FC = () => {
                           Running total
                         </span>
                       )}
-                      {plan.surcharge_mode === 'carry_over'
+                      {plan.schedule_mode !== 'reamortizing'
+                        && plan.surcharge_mode === 'carry_over'
                         && plan.installments.some((inst) => Number(inst.late_fee_percentage) > 0) && (
                         <span
                           className="inline-flex rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
@@ -638,7 +737,10 @@ const PaymentPlansView: React.FC = () => {
                           Carried late fees
                         </span>
                       )}
-                      {!plan.installments.some((inst) => Number(inst.late_fee_percentage) > 0) && (
+                      {/* Flagged only where it is an omission. A recalculated plan charges no
+                          late fee by design — the shortfall is re-spread instead. */}
+                      {plan.schedule_mode !== 'reamortizing'
+                        && !plan.installments.some((inst) => Number(inst.late_fee_percentage) > 0) && (
                         <span
                           className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700"
                           title="No installment has a late fee percentage, so students on this plan are never surcharged for paying late."
@@ -658,7 +760,9 @@ const PaymentPlansView: React.FC = () => {
                         >
                           {inst.label || `Installment ${inst.sequence}`} · {monthName(inst.due_month)} {inst.due_day}
                           {inst.grace_period_days ? ` · +${inst.grace_period_days}d grace` : ''}
-                          {inst.late_fee_percentage ? ` · ${inst.late_fee_percentage}% late fee` : ''}
+                          {plan.schedule_mode !== 'reamortizing' && inst.late_fee_percentage
+                            ? ` · ${inst.late_fee_percentage}% late fee`
+                            : ''}
                         </span>
                       ))}
                     </div>

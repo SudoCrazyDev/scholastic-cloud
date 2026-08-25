@@ -529,6 +529,17 @@ export type StudentPaymentPlanType = 'monthly' | 'quarterly';
 //                          so every installment is smaller.
 export type AdvancePaymentMode = 'equal_split' | 'net_of_downpayment';
 
+// How a plan derives what each period is billed.
+//   'fixed'        — the net charges are divided once, up front, and the figure stands for
+//                    the life of the schedule (the default).
+//   'reamortizing' — what is still owed is re-divided every time a period opens, across the
+//                    periods left to collect it in. Paying 7,900 of 23,700 in July takes the
+//                    ten-month figure from 2,370 to 15,800 ÷ 9 = 1,755.56 from August; paying
+//                    nothing after that takes it to 15,800 ÷ 5 = 3,160 by December. The figure
+//                    is frozen once a period opens, so money paid inside a period moves the
+//                    next one rather than its own. These plans assess no late fee.
+export type ScheduleMode = 'fixed' | 'reamortizing';
+
 // How a plan assesses the late-fee percentages its installments carry.
 //   'per_installment' — each installment is surcharged once, on its own amount (the default).
 //   'running_total'   — surcharged exactly like 'per_installment', but every period is billed
@@ -547,6 +558,7 @@ export interface StudentPaymentPlan {
   name?: string | null;
   plan_type?: StudentPaymentPlanType | null;
   advance_payment_mode?: AdvancePaymentMode;
+  schedule_mode?: ScheduleMode;
   surcharge_mode?: SurchargeMode;
   installment_count: number;
   selected_at?: string | null;
@@ -571,6 +583,7 @@ export interface PaymentPlan {
   name: string;
   description?: string | null;
   advance_payment_mode?: AdvancePaymentMode;
+  schedule_mode?: ScheduleMode;
   surcharge_mode?: SurchargeMode;
   is_active: boolean;
   sort_order: number;
@@ -584,6 +597,7 @@ export interface CreatePaymentPlanData {
   name: string;
   description?: string | null;
   advance_payment_mode?: AdvancePaymentMode;
+  schedule_mode?: ScheduleMode;
   surcharge_mode?: SurchargeMode;
   is_active?: boolean;
   sort_order?: number;
@@ -820,6 +834,9 @@ export interface StudentInstallment {
   sequence: number;
   label: string;
   due_date: string;
+  // First day of the period's month — when a reamortizing plan prices it. Reported on
+  // those plans only.
+  opens_on?: string;
   grace_period_days: number;
   overdue_date: string;
   is_overdue: boolean;
@@ -837,8 +854,12 @@ export interface StudentInstallment {
   original_amount: number;
   discount_amount: number;
   paid_amount: number;
+  // Reamortizing plans only: this period closed without being settled, and the shortfall was
+  // re-divided across the periods after it. It is history rather than a bill — it owes
+  // nothing, and asking for it again would collect it twice.
+  rolled_forward?: boolean;
   // What this period alone still owes: unpaid principal plus the uncollected part of every
-  // surcharge booked against it.
+  // surcharge booked against it. Zero on a rolled-forward period.
   outstanding_amount: number;
   // `outstanding_amount` accumulated through this period, so it carries everything unpaid
   // behind it as well as its own. What a 'running_total' plan bills; reported on every plan.

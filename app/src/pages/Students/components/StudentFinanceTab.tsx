@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import {
+  ArrowPathIcon,
   ArrowUpTrayIcon,
   CalendarDaysIcon,
   CheckCircleIcon,
@@ -403,6 +404,11 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   // in, so the schedule states the arrears as one figure to settle rather than a column of
   // amounts the payer has to add up. The period's own amount stays on the row beneath it.
   const rollsUpArrears = paymentPlan?.surcharge_mode === 'running_total'
+  // On a recalculated plan the monthly figure moves: each period is priced from the balance
+  // the day it opens, over the periods left. A row is therefore what was billed for that
+  // month, not a share of the year, and a month that closed short has already been folded
+  // into the ones after it.
+  const isRecalculated = paymentPlan?.schedule_mode === 'reamortizing'
   // Paid ahead of the schedule on a net-of-downpayment plan: it is why the installments
   // below are smaller than charges ÷ count, so it has to be stated on the card.
   const downpayment = ledgerData?.downpayment?.amount ?? 0
@@ -908,8 +914,21 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
             </span>
           </div>
           <p className="text-sm text-gray-600 mb-4">
-            Net charges (after discounts) divided across {paymentPlan.installment_count}{' '}
-            installments for academic year {resolvedAcademicYear}.
+            {isRecalculated ? (
+              <>
+                Recalculated each period for academic year {resolvedAcademicYear}: when a month
+                opens, whatever is still owed is divided across the months left to collect it
+                in. Paying more than the figure asked lowers the months that follow; a month
+                that passes unpaid raises them, because the same balance now has fewer months
+                to land in. A month's figure is fixed the day it opens, so a payment made
+                during it changes the next month rather than the bill already issued.
+              </>
+            ) : (
+              <>
+                Net charges (after discounts) divided across {paymentPlan.installment_count}{' '}
+                installments for academic year {resolvedAcademicYear}.
+              </>
+            )}
             {rollsUpArrears && (
               <>
                 {' '}
@@ -941,6 +960,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               const isPaying =
                 createOnlinePaymentMutation.isPending && payingInstallment === installment.sequence
               const isPaid = installment.status === 'paid'
+              // Closed short on a recalculated plan: what it did not collect is already
+              // included in the periods after it, so there is nothing to settle on this row.
+              const isCarried = installment.rolled_forward === true
               const remaining = Math.max(0, installment.amount - installment.paid_amount)
               const receipt = latestReceiptBySequence.get(installment.sequence)
               const receiptStatus = !isPaid && receipt?.status !== 'approved' ? receipt?.status : undefined
@@ -991,12 +1013,22 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                           This period {formatAmount(installment.amount)}
                         </p>
                       )}
+                      {installment.paid_amount > 0 && !rollsUpArrears && isRecalculated && (
+                        <p className="text-xs text-gray-500 tabular-nums whitespace-nowrap mt-0.5">
+                          {formatAmount(installment.paid_amount)} received
+                        </p>
+                      )}
                     </div>
                   </div>
                   {isPaid ? (
                     <div className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-green-700 bg-green-50 border-t border-green-100">
                       <CheckCircleIcon className="w-4 h-4" />
                       Paid
+                    </div>
+                  ) : isCarried ? (
+                    <div className="w-full flex items-center justify-center gap-2 py-3 px-4 text-xs font-medium text-gray-500 bg-gray-50 border-t border-gray-100 text-center">
+                      <ArrowPathIcon className="w-4 h-4 shrink-0" />
+                      Unpaid — carried into the installments after it
                     </div>
                   ) : (
                     isStudentUser && (
@@ -1101,6 +1133,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                     createOnlinePaymentMutation.isPending &&
                     payingInstallment === installment.sequence
                   const isPaid = installment.status === 'paid'
+                  // Closed short on a recalculated plan: already re-divided into the periods
+                  // after it, so it is history rather than something still to settle.
+                  const isCarried = installment.rolled_forward === true
                   const remaining = Math.max(0, installment.amount - installment.paid_amount)
                   const receipt = latestReceiptBySequence.get(installment.sequence)
                   const receiptStatus =
@@ -1135,7 +1170,19 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                             </span>
                           </>
                         ) : (
-                          formatAmount(installment.amount)
+                          <>
+                            {formatAmount(installment.amount)}
+                            {isRecalculated && installment.paid_amount > 0 && (
+                              <span className="block text-xs font-normal text-gray-500">
+                                {formatAmount(installment.paid_amount)} received
+                              </span>
+                            )}
+                            {isCarried && (
+                              <span className="block text-xs font-normal text-gray-500">
+                                Carried into later installments
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
                       {isStudentUser && (
@@ -1144,6 +1191,11 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-700 px-2.5 py-1 text-xs font-medium">
                               <CheckCircleIcon className="w-3.5 h-3.5" />
                               Paid
+                            </span>
+                          ) : isCarried ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-600 px-2.5 py-1 text-xs font-medium">
+                              <ArrowPathIcon className="w-3.5 h-3.5" />
+                              Carried forward
                             </span>
                           ) : (
                             <div className="flex flex-col items-end gap-1.5">

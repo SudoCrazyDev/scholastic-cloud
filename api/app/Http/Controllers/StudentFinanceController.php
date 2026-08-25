@@ -209,15 +209,22 @@ class StudentFinanceController extends Controller
         // window, and on a carry-over plan the balance rolled into a period that has opened
         // — then work from the charged rows. Once booked the fee stays: settling the
         // installment no longer erases it, and finance can waive it by deleting the charge.
-        $chargedLateFees = $this->lateFeeService->apply(
-            $institutionId,
-            $studentId,
-            $academicYear,
-            $installments,
-            $paymentPlan,
-            $principalPaymentRows,
-            (float) $downpayment['amount']
-        );
+        //
+        // A reamortizing plan assesses nothing: a missed period is re-divided across the
+        // periods after it, and that is the whole consequence. Surcharges booked under a plan
+        // the student has since left are left exactly as they are — they were charged, and
+        // stay collectible — so the rows already read from the ledger stand unchanged.
+        if (! $paymentPlan?->paymentPlan?->reamortizes()) {
+            $chargedLateFees = $this->lateFeeService->apply(
+                $institutionId,
+                $studentId,
+                $academicYear,
+                $installments,
+                $paymentPlan,
+                $principalPaymentRows,
+                (float) $downpayment['amount']
+            );
+        }
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
         // Arrears folded forward, so a plan billing one accumulating figure has it to show.
         // Reported on every plan; only a `running_total` plan presents it as the amount due.
@@ -720,16 +727,19 @@ class StudentFinanceController extends Controller
         );
 
         // The notice of account books newly-incurred surcharges just like the ledger, so a
-        // printed NOA and the on-screen balance can never disagree about them.
-        $chargedLateFees = $this->lateFeeService->apply(
-            $institutionId,
-            $studentId,
-            $academicYear,
-            $installments,
-            $paymentPlan,
-            $principalPaymentRows,
-            (float) $downpayment['amount']
-        );
+        // printed NOA and the on-screen balance can never disagree about them — including in
+        // declining to assess any on a reamortizing plan.
+        if (! $paymentPlan?->paymentPlan?->reamortizes()) {
+            $chargedLateFees = $this->lateFeeService->apply(
+                $institutionId,
+                $studentId,
+                $academicYear,
+                $installments,
+                $paymentPlan,
+                $principalPaymentRows,
+                (float) $downpayment['amount']
+            );
+        }
         $installments = $this->planService->withLateFees($installments, $chargedLateFees);
         // Arrears folded forward, so a plan billing one accumulating figure has it to show.
         // Reported on every plan; only a `running_total` plan presents it as the amount due.

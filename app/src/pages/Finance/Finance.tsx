@@ -3033,6 +3033,12 @@ const Finance: React.FC = () => {
                     )
                     const planInstallments = ledger?.installments ?? []
                     const plan = ledger?.payment_plan
+                    // A recalculated plan cannot be settled cumulatively. Money paid in one
+                    // period has already lowered the periods after it, so letting a surplus
+                    // also fill their Cumulative Due would collect it twice — July's 7,900 on
+                    // 23,700 would read as settling August through October as well. The server
+                    // states what each period still owes, and that is what is billed.
+                    const isRecalculated = plan?.schedule_mode === 'reamortizing'
 
                     // A late fee is charged against one installment, and the payment that
                     // settles it points at the fee row — map fee back to installment so the
@@ -3059,6 +3065,12 @@ const Finance: React.FC = () => {
                       monthLabel: string
                       due: number
                       paid: number
+                      // What this period alone still owes, as the server states it. Set only on
+                      // a recalculated plan, where it cannot be derived from due minus paid.
+                      outstanding?: number
+                      // Closed short on a recalculated plan: already re-divided into the
+                      // periods after it, so it is history rather than something to collect.
+                      carried?: boolean
                       // Months elapsed since the first scheduled due date; drives quarter grouping.
                       monthOffset: number
                     }
@@ -3087,6 +3099,10 @@ const Finance: React.FC = () => {
                           // it is collected together with the installment that incurred it.
                           due: inst.amount + (inst.late_fee_amount ?? 0),
                           paid: inst.paid_amount + (lateFeePaidBySequence[inst.sequence] ?? 0),
+                          // Already net of what was collected against both the principal and
+                          // any surcharge, and zero on a period that was carried forward.
+                          outstanding: isRecalculated ? inst.outstanding_amount : undefined,
+                          carried: inst.rolled_forward === true,
                           monthOffset: due.getFullYear() * 12 + due.getMonth() - firstMonthIndex,
                         }
                       })
@@ -3133,6 +3149,11 @@ const Finance: React.FC = () => {
                       sublabel?: string
                       due: number
                       paid: number
+                      // Neither of these leading rows is a plan period, so neither carries a
+                      // server-stated outstanding figure or rolls forward. Declared so they
+                      // share a shape with the periods they are spread alongside.
+                      outstanding?: number
+                      carried?: boolean
                     }> =
                       Math.abs(balanceForward) > 0.01
                         ? [
@@ -3168,17 +3189,36 @@ const Finance: React.FC = () => {
                       })
                     }
 
-                    const buildRows = (base: Array<{ key: string; label: string; sublabel?: string; due: number; paid: number }>) => {
+                    const buildRows = (
+                      base: Array<{
+                        key: string
+                        label: string
+                        sublabel?: string
+                        due: number
+                        paid: number
+                        outstanding?: number
+                        carried?: boolean
+                      }>
+                    ) => {
                       let cumulativeDue = 0
                       let cumulativePaid = 0
+                      let cumulativeOwed = 0
                       return [...leadingRows, ...base].map((r) => {
                         cumulativeDue += r.due
                         cumulativePaid += r.paid
+                        // On a fixed plan money settles the earliest periods first, so what is
+                        // left through this period is simply what was billed less what came in.
+                        // On a recalculated plan it is the sum of what each period still owes:
+                        // a surplus has already been spent lowering the periods ahead, and a
+                        // carried period owes nothing because they now carry it.
+                        cumulativeOwed += r.outstanding ?? Math.max(r.due - r.paid, 0)
                         return {
                           ...r,
                           cumulativeDue,
                           cumulativePaid,
-                          remaining: Math.max(cumulativeDue - cumulativePaid, 0),
+                          remaining: isRecalculated
+                            ? cumulativeOwed
+                            : Math.max(cumulativeDue - cumulativePaid, 0),
                         }
                       })
                     }
@@ -3217,6 +3257,23 @@ const Finance: React.FC = () => {
                             <span>Unapplied payments: <strong className="text-gray-900">{formatCurrency(unapplied)}</strong></span>
                           )}
                         </div>
+                        {isRecalculated && (
+                          <div className="rounded-lg border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-900">
+                            This plan is <strong>recalculated each period</strong>: when a month
+                            opens, the balance still owed is divided across the months left, and
+                            that figure is fixed for the month. So paying more than a month asked
+                            lowers the months after it instead of settling them, and a month that
+                            closed short is re-divided into the months that follow — marked{' '}
+                            <strong>Carried</strong>, owing nothing itself.
+                            <span className="block mt-1">
+                              The two cumulative columns are plain running totals of what was
+                              billed and what came in, so on this kind of plan neither has to land
+                              on Total Payable — a carried month's amount is billed again in the
+                              months after it. <strong>Remaining</strong> is the figure to read:
+                              what every month still owes, added up, ending at the current balance.
+                            </span>
+                          </div>
+                        )}
                         {cashCharges > 0.01 && (
                           <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">
                             <strong>{formatCurrency(cashCharges)}</strong> in cash-basis fees is
@@ -3240,7 +3297,11 @@ const Finance: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-200 bg-white">
                               {rows.map((r) => {
-                                const isFullyPaid = r.cumulativePaid >= r.cumulativeDue - 0.01
+                                // A recalculated period stands on its own — being square
+                                // cumulatively says nothing about whether it was settled.
+                                const isFullyPaid = isRecalculated
+                                  ? (r.outstanding ?? Math.max(r.due - r.paid, 0)) <= 0.01 && !r.carried
+                                  : r.cumulativePaid >= r.cumulativeDue - 0.01
                                 return (
                                   <tr key={r.key} className="hover:bg-gray-50/50">
                                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
@@ -3255,14 +3316,29 @@ const Finance: React.FC = () => {
                                     <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(r.cumulativePaid)}</td>
                                     <td className="px-4 py-3 text-sm text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.remaining)}</td>
                                     <td className="px-4 py-3 text-center">
-                                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                                        isFullyPaid
-                                          ? 'bg-green-100 text-green-700'
-                                          : r.paid > 0
-                                            ? 'bg-yellow-100 text-yellow-700'
-                                            : 'bg-gray-100 text-gray-500'
-                                      }`}>
-                                        {isFullyPaid ? 'Paid' : r.paid > 0 ? 'Partial' : 'Unpaid'}
+                                      <span
+                                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                          isFullyPaid
+                                            ? 'bg-green-100 text-green-700'
+                                            : r.carried
+                                              ? 'bg-gray-100 text-gray-500'
+                                              : r.paid > 0
+                                                ? 'bg-yellow-100 text-yellow-700'
+                                                : 'bg-gray-100 text-gray-500'
+                                        }`}
+                                        title={
+                                          r.carried
+                                            ? 'Closed unpaid — what it did not collect was re-divided into the installments after it, so it is not collected again here.'
+                                            : undefined
+                                        }
+                                      >
+                                        {isFullyPaid
+                                          ? 'Paid'
+                                          : r.carried
+                                            ? 'Carried'
+                                            : r.paid > 0
+                                              ? 'Partial'
+                                              : 'Unpaid'}
                                       </span>
                                     </td>
                                   </tr>

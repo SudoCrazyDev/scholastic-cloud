@@ -75,10 +75,27 @@ export const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({
             <p className="text-sm text-gray-600">
               {plan.description
                 ? plan.description
-                : `Pay your net fees in ${plan.installment_count} installment${
-                    plan.installment_count === 1 ? '' : 's'
-                  }.`}
+                : plan.schedule_mode === 'reamortizing'
+                  ? `Your balance is re-divided across the months left to pay it, every time a month starts — so the amount changes as you pay.`
+                  : `Pay your net fees in ${plan.installment_count} installment${
+                      plan.installment_count === 1 ? '' : 's'
+                    }.`}
             </p>
+            {/* A student picks their plan once and cannot change it themselves, so the
+                difference between a fixed and a recalculated schedule has to be on the card
+                they are choosing from — not only in the schedule they see afterwards. */}
+            {plan.schedule_mode === 'reamortizing' ? (
+              <p className="mt-2 text-xs text-gray-500">
+                <span className="font-medium text-gray-700">Amount changes each month.</span>{' '}
+                Paying more than a month asks lowers the months after it; paying less raises
+                them, because the same balance has fewer months left. No late fee is charged.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                <span className="font-medium text-gray-700">Same amount every month.</span>{' '}
+                Your fees are divided once and the monthly figure stays fixed for the year.
+              </p>
+            )}
           </button>
         ))}
       </div>
