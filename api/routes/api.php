@@ -312,7 +312,20 @@ Route::middleware('auth.token')->group(function () {
     // Staff routes
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole'])->middleware('module:staffs,manage');
     Route::post('staffs/{id}/reset-password', [StaffController::class, 'resetPassword'])->middleware('module:staffs,manage');
-    Route::apiResource('staffs', StaffController::class)->middleware('module:staffs,view');
+    // Reading the colleague list is deliberately open to any staff account:
+    // the timetable, staff schedules, ZK user mapping, the attendance-request
+    // modal and the subject-teacher picker all need to name a co-worker
+    // without holding the `staffs` module — a subject teacher reassigning one
+    // of their own subjects has no business editing staff records. Gating the
+    // whole resource on `staffs.view` shadowed StaffController's own guards
+    // and left those pickers unable to search at all. Both reads are already
+    // scoped to the caller's institution and exclude super-administrators;
+    // every write below still requires `staffs.manage`.
+    Route::get('staffs', [StaffController::class, 'index']);
+    Route::get('staffs/{id}', [StaffController::class, 'show']);
+    Route::apiResource('staffs', StaffController::class)
+        ->except(['index', 'show'])
+        ->middleware('module:staffs,view');
     // Track & Strand routes
     Route::get('tracks', [TrackController::class, 'index'])->middleware('module:tracks-strands,view');
     Route::post('tracks', [TrackController::class, 'store'])->middleware('module:tracks-strands,manage');
