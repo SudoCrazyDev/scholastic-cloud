@@ -209,9 +209,9 @@ views' requests.
   `ReceiptPrintModal.tsx`, `DataClearingView.tsx`, `PaymentPlansView.tsx` (standalone page),
   `ReceiptApprovalsView.tsx` (takes `embedded` + `studentId` — also rendered inside Cashiering,
   scoped to the selected student).
-- Shared constants: `src/pages/Finance/paymentMethods.ts` — the mode-of-payment list used by both
-  the till and the receipt queue, plus `paymentMethodOptionsFor(current)`, which appends whatever a
-  record already holds so an edit form cannot silently blank a value that is not in the list.
+- Shared constants: `src/pages/Finance/paymentMethods.ts` — the mode-of-payment list. Only the
+  till offers this choice; a receipt approval does not, because the mode is already settled by the
+  proof of payment the student uploaded.
 - Shared PDF: `src/components/StudentNOAPDF.tsx`.
 - Services (`src/services/`): `schoolFeeService.ts`, `schoolFeeDefaultService.ts`,
   `financeDashboardService.ts`, `studentPaymentService.ts`, `studentFinanceService.ts`,
@@ -395,20 +395,36 @@ a **Subdivide across fees** panel, and a **Payment summary** block:
   source the till reads — so the reviewer allocates against real balances. "Fill from balances"
   spreads the verified amount oldest-first. A running footer shows *Allocated* and what will post
   as *General / Other*, and turns red (blocking Approve) when the split exceeds the amount.
-- Payment summary is mode of payment / OR number / reference number / payment date / remarks.
+- Payment summary is **only the OR number and the reference number** — on a review and on an
+  approved receipt alike. Everything else about how the money arrived is already settled by the
+  uploaded receipt: the mode is an online transfer, the date is when it was verified, the remark
+  says which installment it came in for. The API stamps those, and the reviewer is never asked
+  to restate them — doing so was only ever a chance to contradict the image in front of them.
+  The two identifiers are the only things the receipt cannot tell the system itself, which is
+  why they are the only things this screen writes.
 - Approve → `POST /payment-receipt-submissions/{id}/approve` with
-  `{amount, allocations[], payment_method?, payment_date?, or_number?, reference_number?, remarks?}`;
-  Reject → `POST …/{id}/reject` with a required `review_note`.
+  `{amount, allocations[], or_number?, reference_number?}`. Reject → `POST …/{id}/reject` with a
+  required `review_note`.
 
-**Approved → "Edit details"** opens the same receipt read-only, showing the Payment Summary and the
-per-fee subdivision labelled *"Amounts are settled — not editable here"*. "Edit details" makes the
-five payment-summary fields editable — the OR number usually only exists once the booklet is
-written up — via `PUT /payment-receipt-submissions/{id}/payment-details`. **No amount is editable
+**Approved → "Edit details"** opens the same receipt read-only, showing the full Payment Summary
+(all five values, for reading). The subdivision is deliberately **not** repeated here — it is one
+expand away on the row the modal was opened from, and a second copy only made the modal longer than
+the receipt image it exists to show. "Edit details" then exposes **the two identifiers only** — the OR number usually
+does not exist until the booklet is written up hours later, which is the whole reason this editor
+exists — via `PUT /payment-receipt-submissions/{id}/payment-details`. **No amount is editable
 there, by design**: the verified figure and its split are what the ledger has already been moved
 by, and restating them would move a student's balance with no void, no note and no trail. That is
 what the void request queue is for. The update writes the header **and every line item**, because
 the ledger reads `or_number` / `payment_date` off the lines — a header-only edit would never show
 on the account.
+
+`updatePaymentDetails` applies **only the keys the request carried**, so a field the editor does
+not send is left as the approval posted it. Without that, an edit touching just the OR number
+would null the mode and the remark by omission and quietly strip a posted collection of how it was
+paid. An identifier sent as `""` is the exception and *is* a change — it clears, so a mistyped OR
+number can be taken back off the receipt (and freed for the receipt that should have it). The
+frontend therefore sends both identifiers verbatim rather than as `|| undefined`, which axios would
+drop from the body altogether.
 
 Approved rows in the table carry a chevron that expands the subdivision inline (per-fee amounts,
 total posted, receipt number, mode, OR / ref) and an "across N fees" hint under the amount. An

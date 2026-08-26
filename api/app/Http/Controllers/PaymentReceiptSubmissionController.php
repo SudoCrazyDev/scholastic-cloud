@@ -395,21 +395,37 @@ class PaymentReceiptSubmissionController extends Controller
             return $this->duplicateIdentifierResponse($taken);
         }
 
-        $details = [
-            'payment_method' => $this->blankToNull($validated['payment_method'] ?? null),
-            'payment_date' => $validated['payment_date'] ?? $transaction->payment_date?->toDateString(),
-            'or_number' => $orNumber,
-            'reference_number' => $referenceNumber,
-            'remarks' => $this->blankToNull($validated['remarks'] ?? null),
-        ];
+        // Only what the request actually carried. A field that is absent is left exactly as
+        // the approval posted it rather than being nulled by omission: the screen edits the
+        // two receipt identifiers and sends nothing else, so the mode, the date and the
+        // remark have to survive that. An identifier sent empty *is* a change — it clears.
+        $details = [];
 
-        DB::transaction(function () use ($transaction, $details) {
-            $transaction->update($details);
+        if ($request->has('or_number')) {
+            $details['or_number'] = $orNumber;
+        }
+        if ($request->has('reference_number')) {
+            $details['reference_number'] = $referenceNumber;
+        }
+        if ($request->has('payment_method')) {
+            $details['payment_method'] = $this->blankToNull($validated['payment_method'] ?? null);
+        }
+        if ($request->has('remarks')) {
+            $details['remarks'] = $this->blankToNull($validated['remarks'] ?? null);
+        }
+        if (!empty($validated['payment_date'])) {
+            $details['payment_date'] = $validated['payment_date'];
+        }
 
-            // The line items denormalize the header's details and the ledger reads them
-            // off the lines, so an OR number written only on the header would never show.
-            $transaction->items()->update($details);
-        });
+        if ($details !== []) {
+            DB::transaction(function () use ($transaction, $details) {
+                $transaction->update($details);
+
+                // The line items denormalize the header's details and the ledger reads them
+                // off the lines, so an OR number written only on the header would never show.
+                $transaction->items()->update($details);
+            });
+        }
 
         return response()->json([
             'success' => true,

@@ -434,6 +434,76 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
         $this->assertSame('3500.00', (string) $submission->fresh()->amount);
     }
 
+    /**
+     * The screen edits the two receipt identifiers and sends nothing else, so everything it
+     * does not send has to survive. Nulling the mode and the remark by omission would strip
+     * a posted collection of how it was paid, silently, on an edit that only touched the OR
+     * number.
+     */
+    public function test_correcting_the_identifiers_leaves_the_rest_of_the_collection_alone(): void
+    {
+        $submission = $this->pendingSubmission();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->postJson('/api/payment-receipt-submissions/'.$submission->id.'/approve', [
+                'amount' => 2000,
+                'payment_method' => 'GCash',
+                'payment_date' => '2026-08-10',
+                'remarks' => 'Cleared same day',
+            ])
+            ->assertOk();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->putJson('/api/payment-receipt-submissions/'.$submission->id.'/payment-details', [
+                'or_number' => 'OR-5150',
+                'reference_number' => '',
+            ])
+            ->assertOk();
+
+        $transaction = $submission->fresh()->paymentTransaction;
+        $this->assertSame('OR-5150', $transaction->or_number);
+        $this->assertSame('GCash', $transaction->payment_method);
+        $this->assertSame('2026-08-10', $transaction->payment_date->toDateString());
+        $this->assertSame('Cleared same day', $transaction->remarks);
+
+        // ...and the line items the ledger actually reads agree with the header.
+        foreach ($transaction->items()->get() as $item) {
+            $this->assertSame('OR-5150', $item->or_number);
+            $this->assertSame('GCash', $item->payment_method);
+            $this->assertSame('Cleared same day', $item->remarks);
+        }
+    }
+
+    /**
+     * A number sent empty is a correction, not an omission: a cashier who typed the wrong OR
+     * number needs a way to take it back off the receipt.
+     */
+    public function test_an_identifier_sent_empty_is_cleared(): void
+    {
+        $submission = $this->pendingSubmission();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->postJson('/api/payment-receipt-submissions/'.$submission->id.'/approve', [
+                'amount' => 2000,
+                'or_number' => 'OR-TYPO',
+            ])
+            ->assertOk();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->putJson('/api/payment-receipt-submissions/'.$submission->id.'/payment-details', [
+                'or_number' => '',
+                'reference_number' => '',
+            ])
+            ->assertOk();
+
+        $transaction = $submission->fresh()->paymentTransaction;
+        $this->assertNull($transaction->or_number);
+        $this->assertNull($transaction->items()->first()->or_number);
+
+        // Freed, so the next receipt may legitimately take it.
+        $this->recordPayment(['or_number' => 'OR-TYPO'])->assertCreated();
+    }
+
     public function test_correcting_details_may_keep_the_receipts_own_or_number(): void
     {
         $submission = $this->pendingSubmission();

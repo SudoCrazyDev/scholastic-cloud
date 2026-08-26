@@ -4,10 +4,8 @@ import { toast } from 'react-hot-toast'
 import { ChevronRightIcon } from '@heroicons/react/24/outline'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
-import { Select } from '../../components/select'
 import { paymentReceiptService } from '../../services/paymentReceiptService'
 import { studentFinanceService } from '../../services/studentFinanceService'
-import { paymentMethodOptionsFor } from './paymentMethods'
 import type {
   ApproveReceiptSubmissionData,
   LedgerFeeBreakdown,
@@ -72,20 +70,23 @@ interface ReceiptApprovalsViewProps {
   studentId?: string | null
 }
 
+/**
+ * The only two things about a collection this screen writes.
+ *
+ * How the money arrived is settled by the receipt the student uploaded — the mode is an
+ * online transfer, the date is when it was verified, the remark says which installment it
+ * came in for — and the API fills all three in. What the receipt cannot tell the system is
+ * the number the school will reconcile it by, so that is what the reviewer supplies, both
+ * when approving and when correcting afterwards.
+ */
 type DetailsForm = {
-  payment_method: string
   or_number: string
   reference_number: string
-  payment_date: string
-  remarks: string
 }
 
 const EMPTY_DETAILS: DetailsForm = {
-  payment_method: '',
   or_number: '',
   reference_number: '',
-  payment_date: '',
-  remarks: '',
 }
 
 const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
@@ -110,8 +111,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [rejectMode, setRejectMode] = useState(false)
   const [rejectNote, setRejectNote] = useState('')
-  // Approved receipts open read-only; the reviewer asks for the details form explicitly.
-  const [editingDetails, setEditingDetails] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const submissionsQuery = useQuery({
@@ -163,7 +162,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     setFieldErrors({})
     setRejectMode(false)
     setRejectNote('')
-    setEditingDetails(false)
   }
 
   const invalidateAfterReview = () => {
@@ -194,7 +192,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     onSuccess: (response) => {
       // Stay on the receipt so the reviewer sees the corrected details land.
       setReviewTarget(response.data)
-      setEditingDetails(false)
       setFieldErrors({})
       invalidateAfterReview()
       toast.success(response.message || 'Payment details updated.')
@@ -225,26 +222,22 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     setFieldErrors({})
     setRejectMode(false)
     setRejectNote('')
-    setEditingDetails(false)
 
     const transaction = submission.payment_transaction
     setDetails({
-      payment_method: transaction?.payment_method ?? '',
       or_number: transaction?.or_number ?? '',
       reference_number: transaction?.reference_number ?? '',
-      payment_date: transaction?.payment_date?.slice(0, 10) ?? '',
-      remarks: transaction?.remarks ?? '',
     })
   }
 
   // A refreshed queue carries new relations for the open receipt; keep the form in step.
   useEffect(() => {
-    if (!reviewTarget || editingDetails) return
+    if (!reviewTarget) return
     const refreshed = submissions.find((submission) => submission.id === reviewTarget.id)
     if (refreshed && refreshed.updated_at !== reviewTarget.updated_at) {
       setReviewTarget(refreshed)
     }
-  }, [submissions, reviewTarget, editingDetails])
+  }, [submissions, reviewTarget])
 
   const handleApprove = () => {
     if (!reviewTarget) return
@@ -272,13 +265,12 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     setFieldErrors({})
     approveMutation.mutate({
       id: reviewTarget.id,
+      // Only what the review form actually asked for. Mode, date and remark are left to the
+      // API's defaults rather than posted as blanks from fields that are no longer rendered.
       data: {
         amount,
-        payment_method: details.payment_method || undefined,
-        payment_date: details.payment_date || undefined,
         or_number: details.or_number || undefined,
         reference_number: details.reference_number || undefined,
-        remarks: details.remarks || undefined,
         allocations: lines.length ? lines : undefined,
       },
     })
@@ -289,12 +281,12 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     setFieldErrors({})
     detailsMutation.mutate({
       id: reviewTarget.id,
+      // Sent verbatim rather than as `|| undefined`: axios drops undefined keys, and an
+      // emptied field has to reach the API as "" for it to read as "clear this" instead of
+      // "leave it". Mode, date and remark are not sent at all, so they stay as posted.
       data: {
-        payment_method: details.payment_method || undefined,
-        payment_date: details.payment_date || undefined,
-        or_number: details.or_number || undefined,
-        reference_number: details.reference_number || undefined,
-        remarks: details.remarks || undefined,
+        or_number: details.or_number,
+        reference_number: details.reference_number,
       },
     })
   }
@@ -329,20 +321,9 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     return items && items.length ? items : null
   }
 
+  /** The two receipt identifiers — see DetailsForm for why it is only these. */
   const renderDetailsFields = (disabled: boolean) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div className="sm:col-span-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Mode of payment</label>
-        <Select
-          value={details.payment_method}
-          onChange={(event) =>
-            setDetails((prev) => ({ ...prev, payment_method: event.target.value }))
-          }
-          options={paymentMethodOptionsFor(details.payment_method)}
-          className="w-full"
-          disabled={disabled}
-        />
-      </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           OR number <span className="font-normal text-gray-400">(optional)</span>
@@ -366,28 +347,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
           }
           placeholder="e.g. bank transaction id"
           error={fieldError('reference_number')}
-          disabled={disabled}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Payment date</label>
-        <Input
-          type="date"
-          value={details.payment_date}
-          onChange={(event) =>
-            setDetails((prev) => ({ ...prev, payment_date: event.target.value }))
-          }
-          disabled={disabled}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Remarks <span className="font-normal text-gray-400">(optional)</span>
-        </label>
-        <Input
-          value={details.remarks}
-          onChange={(event) => setDetails((prev) => ({ ...prev, remarks: event.target.value }))}
-          placeholder="Optional notes"
           disabled={disabled}
         />
       </div>
@@ -868,90 +827,25 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
             </div>
           )}
 
-          {/* An approved receipt has already moved the ledger. Its Payment Summary can be
-              corrected — the OR number is usually written up hours later — but the amount
-              and the split are shown as settled figures, not fields. */}
+          {/* An approved receipt has already moved the ledger, so its amount and its split are
+              not fields here — the void queue is the way those change. The two receipt
+              identifiers are, and they are shown as inputs straight away: with nothing else on
+              this card to read, a read-only pass behind an "Edit details" button was a click
+              that revealed exactly what it had just been hiding. */}
           {reviewTarget.status === 'approved' && postedTransaction && (
             <div className="rounded-lg border border-gray-200">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-900">Payment summary</h4>
-                  <p className="text-xs text-gray-500">
-                    Receipt {postedTransaction.receipt_number}
-                  </p>
-                </div>
-                {!editingDetails && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditingDetails(true)}
-                  >
-                    Edit details
-                  </Button>
-                )}
+              <div className="border-b border-gray-100 px-4 py-2.5">
+                <h4 className="text-sm font-semibold text-gray-900">Payment summary</h4>
+                <p className="text-xs text-gray-500">
+                  Receipt {postedTransaction.receipt_number}
+                </p>
               </div>
 
-              <div className="space-y-4 px-4 py-3">
-                {editingDetails ? (
-                  renderDetailsFields(detailsMutation.isPending)
-                ) : (
-                  <dl className="space-y-1 text-sm">
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-gray-500">Mode of payment</dt>
-                      <dd className="text-gray-900">{postedTransaction.payment_method || '—'}</dd>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-gray-500">OR number</dt>
-                      <dd className="font-mono text-gray-900">
-                        {postedTransaction.or_number || '—'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-gray-500">Reference number</dt>
-                      <dd className="font-mono text-gray-900">
-                        {postedTransaction.reference_number || '—'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-gray-500">Payment date</dt>
-                      <dd className="text-gray-900">
-                        {postedTransaction.payment_date?.slice(0, 10) || '—'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-gray-500">Remarks</dt>
-                      <dd className="text-right text-gray-900">
-                        {postedTransaction.remarks || '—'}
-                      </dd>
-                    </div>
-                  </dl>
-                )}
-
-                <div className="rounded-lg bg-gray-50 p-3">
-                  <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    <span>Subdivided across</span>
-                    <span className="normal-case font-normal text-gray-400">
-                      Amounts are settled — not editable here
-                    </span>
-                  </div>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {(postedTransaction.items ?? []).map((item) => (
-                      <li key={item.id} className="flex justify-between gap-3">
-                        <span className="text-gray-700">{lineLabel(item)}</span>
-                        <span className="tabular-nums text-gray-900">
-                          {formatAmount(item.amount)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-2 flex justify-between gap-3 border-t border-gray-200 pt-2 text-sm font-semibold">
-                    <span className="text-gray-700">Total posted</span>
-                    <span className="tabular-nums text-gray-900">
-                      {formatAmount(postedTransaction.total_amount)}
-                    </span>
-                  </div>
-                </div>
+              {/* The subdivision is not repeated here either. It is one expand away on the row
+                  this modal was opened from, and a second copy of it only made the modal
+                  longer than the receipt image it exists to show. */}
+              <div className="px-4 py-3">
+                {renderDetailsFields(detailsMutation.isPending)}
               </div>
             </div>
           )}
@@ -1023,38 +917,22 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
                 </Button>
               </>
             )
-          ) : editingDetails ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setEditingDetails(false)
-                  setFieldErrors({})
-                  setDetails({
-                    payment_method: postedTransaction?.payment_method ?? '',
-                    or_number: postedTransaction?.or_number ?? '',
-                    reference_number: postedTransaction?.reference_number ?? '',
-                    payment_date: postedTransaction?.payment_date?.slice(0, 10) ?? '',
-                    remarks: postedTransaction?.remarks ?? '',
-                  })
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                loading={detailsMutation.isPending}
-                onClick={handleSaveDetails}
-                className="bg-primary-600 hover:bg-primary-700 text-white"
-              >
-                Save details
-              </Button>
-            </>
           ) : (
-            <Button type="button" variant="outline" onClick={closeReviewModal}>
-              Close
-            </Button>
+            <>
+              <Button type="button" variant="outline" onClick={closeReviewModal}>
+                Close
+              </Button>
+              {reviewTarget.status === 'approved' && postedTransaction && (
+                <Button
+                  type="button"
+                  loading={detailsMutation.isPending}
+                  onClick={handleSaveDetails}
+                  className="bg-primary-600 hover:bg-primary-700 text-white"
+                >
+                  Save details
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>

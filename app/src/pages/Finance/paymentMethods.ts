@@ -1,11 +1,11 @@
 import type { SelectOption } from '../../components/select'
 
 /**
- * The modes of payment a collection can be recorded under.
+ * The modes of payment a cashier can record a collection under.
  *
- * Shared by the cashier's till and the receipt-approval queue on purpose: the two are
- * recording the same thing, and a mode offered in one place but not the other shows up
- * later as a collections report that cannot be totalled by method.
+ * Only the till offers this choice. A receipt approval does not: the mode is already
+ * settled by the proof of payment the student uploaded, so the API stamps it rather than
+ * asking the reviewer to restate it.
  */
 export const PAYMENT_METHOD_OPTIONS: SelectOption[] = [
   { value: '', label: '— Select payment mode' },
@@ -20,20 +20,3 @@ export const PAYMENT_METHOD_OPTIONS: SelectOption[] = [
   { value: 'Money Order', label: 'Money Order' },
   { value: 'Other', label: 'Other' },
 ]
-
-/**
- * The same list, guaranteed to contain whatever a record already holds.
- *
- * A receipt approved before a reviewer picked a mode was posted as
- * "Online - Receipt Upload", which is not something a cashier should be able to choose at
- * the till and so is not in the list. Without this the edit form would render that receipt
- * with an empty dropdown and quietly blank a real value on save.
- */
-export const paymentMethodOptionsFor = (current?: string | null): SelectOption[] => {
-  const value = (current ?? '').trim()
-  if (!value || PAYMENT_METHOD_OPTIONS.some((option) => option.value === value)) {
-    return PAYMENT_METHOD_OPTIONS
-  }
-
-  return [...PAYMENT_METHOD_OPTIONS, { value, label: value }]
-}
