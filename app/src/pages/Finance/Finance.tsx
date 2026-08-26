@@ -3238,6 +3238,15 @@ const Finance: React.FC = () => {
                     const rows = buildRows(periods)
                     const totalDue = rows.reduce((s, r) => s + r.due, 0)
                     const totalPaid = rows.reduce((s, r) => s + r.paid, 0)
+                    // Billed less collected is only the balance on a fixed plan. On a
+                    // recalculated one an opened period keeps the figure it printed even once
+                    // it is settled, while the payment that settled it has already been netted
+                    // out of the periods after it — so subtracting it again understates what is
+                    // left. The last row's Remaining is that running sum of what each period
+                    // still owes, which is the balance.
+                    const totalRemaining = isRecalculated
+                      ? rows[rows.length - 1]?.remaining ?? 0
+                      : Math.max(totalDue - totalPaid - unapplied, 0)
 
                     return (
                       <div className="space-y-4">
@@ -3354,7 +3363,7 @@ const Finance: React.FC = () => {
                                 </td>
                                 <td colSpan={2} />
                                 <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                  {formatCurrency(Math.max(totalDue - totalPaid - unapplied, 0))}
+                                  {formatCurrency(totalRemaining)}
                                 </td>
                                 <td />
                               </tr>
