@@ -3248,6 +3248,29 @@ const Finance: React.FC = () => {
                       ? rows[rows.length - 1]?.remaining ?? 0
                       : Math.max(totalDue - totalPaid - unapplied, 0)
 
+                    // Amount Due sums what each month printed when it opened, which on a
+                    // recalculated plan is not a column of debts: a payment against a month
+                    // already open lowered the months after it rather than that month's own
+                    // figure, and a carried month's shortfall is billed again on the months
+                    // behind it. Both leave the column above the balance, so the gap is stated
+                    // rather than left for a reader to find by subtracting.
+                    const billedNotOwed = Math.max(totalDue - totalRemaining, 0)
+                    const rebilledFromCarried = rows.reduce(
+                      (s, r) => (r.carried ? s + Math.max(r.due - r.paid, 0) : s),
+                      0
+                    )
+                    const collectedInBilled = Math.max(billedNotOwed - rebilledFromCarried, 0)
+                    const billedNotOwedNote = [
+                      collectedInBilled > 0.01
+                        ? `${formatCurrency(collectedInBilled)} already collected`
+                        : null,
+                      rebilledFromCarried > 0.01
+                        ? `${formatCurrency(rebilledFromCarried)} billed again later`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+
                     return (
                       <div className="space-y-4">
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
@@ -3357,7 +3380,14 @@ const Finance: React.FC = () => {
                             <tfoot className="bg-gray-50">
                               <tr className="font-semibold">
                                 <td className="px-4 py-3 text-sm text-gray-900">Total</td>
-                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(totalDue)}</td>
+                                <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
+                                  {formatCurrency(totalDue)}
+                                  {isRecalculated && billedNotOwedNote && (
+                                    <span className="block text-xs font-normal text-gray-500 whitespace-nowrap">
+                                      {billedNotOwedNote}
+                                    </span>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
                                   {formatCurrency(totalPaid)}
                                 </td>
