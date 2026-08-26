@@ -207,7 +207,8 @@ views' requests.
 - Sub-view components (same folder): `DashboardStudentsView.tsx`, `CollectionsView.tsx`,
   `DiscountsView.tsx` (grade-level), `DefaultDiscountsView.tsx`, `ReceiptBuilderView.tsx`,
   `ReceiptPrintModal.tsx`, `DataClearingView.tsx`, `PaymentPlansView.tsx` (standalone page),
-  `ReceiptApprovalsView.tsx` (takes `embedded` — also rendered inside Cashiering).
+  `ReceiptApprovalsView.tsx` (takes `embedded` + `studentId` — also rendered inside Cashiering,
+  scoped to the selected student).
 - Shared constants: `src/pages/Finance/paymentMethods.ts` — the mode-of-payment list used by both
   the till and the receipt queue, plus `paymentMethodOptionsFor(current)`, which appends whatever a
   record already holds so an edit form cannot silently blank a value that is not in the list.
@@ -342,10 +343,12 @@ A reused OR or reference number comes back as a 422 keyed by field, and the mess
 offending `Input` (cleared as soon as it is retyped); the generic `cashierError` line is suppressed
 while a field error is showing so the same sentence is not printed twice in one card.
 
-Below the till, `<ReceiptApprovalsView embedded />` renders the receipt queue (pending / approved
-only) so a cashier sees what is waiting on them without leaving the screen. Modes of payment come
-from `paymentMethods.ts`, shared with that queue — a mode offered in one place and not the other
-shows up later as a collections report that cannot be totalled by method.
+Below the till, `<ReceiptApprovalsView embedded studentId={selectedStudent?.id ?? null} />`
+renders the receipt queue (pending / approved only), **scoped to the selected student** — it
+answers "what has this student already sent in?", not "what does the whole school owe review on".
+With nobody selected it renders a prompt and fires no request. Modes of payment come from
+`paymentMethods.ts`, shared with that queue — a mode offered in one place and not the other shows
+up later as a collections report that cannot be totalled by method.
 
 ### Ledger (`/finance/ledger`)
 Same student search → `GET /students/{id}/ledger` + `GET /students/{id}/noa`. Three view modes:
@@ -376,8 +379,15 @@ breakdown (school year June–March). Read-only.
 ### Receipt Approvals (`/finance/receipt-approvals`) — `ReceiptApprovalsView.tsx`
 Queue of student-uploaded payment receipts (`GET /payment-receipt-submissions?status=`), with a
 pending/approved/rejected filter (pending auto-refetches every 60s). Also rendered on
-**Cashiering** as `<ReceiptApprovalsView embedded />` — same component, no page card, fewer
-columns, and only the pending/approved filters.
+**Cashiering** as `<ReceiptApprovalsView embedded studentId={…} />` — same component, no page card,
+fewer columns, and only the pending/approved filters.
+
+Two props shape it. `embedded` drops the page card and the Year / Uploaded columns. `studentId`
+scopes the queue to one student (`?student_id=`): passing it **at all** is what scopes, so
+`undefined` means the institution-wide page while `null` means "the cashier has not picked anybody
+yet" — which renders a prompt and leaves the query disabled rather than briefly showing everyone.
+A scoped queue also drops the **Student** column (their name on every row of their own list is
+noise) and moves the expand chevron into the installment cell so the chevrons still line up.
 
 **Pending → "Review"** opens the receipt image (or a file link for PDFs), a verified-amount input,
 a **Subdivide across fees** panel, and a **Payment summary** block:

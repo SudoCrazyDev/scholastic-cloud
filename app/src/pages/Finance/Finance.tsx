@@ -2052,9 +2052,11 @@ const Finance: React.FC = () => {
             </div>
           </form>
 
-          {/* Receipts students uploaded, waiting on this same cashier. Kept below the till
-              so taking a payment is still the first thing on the screen. */}
-          <ReceiptApprovalsView embedded />
+          {/* Receipts the student at the counter uploaded, waiting on this same cashier.
+              Kept below the till so taking a payment is still the first thing on the screen,
+              and scoped to the selection so it answers "what has this student already sent
+              in?" rather than listing the whole school's queue. */}
+          <ReceiptApprovalsView embedded studentId={selectedStudent?.id ?? null} />
 
           {showReceiptModal && lastReceipt && selectedStudent && (
             <ReceiptPrintModal

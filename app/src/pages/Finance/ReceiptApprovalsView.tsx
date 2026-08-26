@@ -61,6 +61,15 @@ interface ReceiptApprovalsViewProps {
    * actionable there.
    */
   embedded?: boolean
+  /**
+   * Scopes the queue to one student's receipts.
+   *
+   * `undefined` leaves it unscoped — the whole institution's queue, which is what the full
+   * page shows. A value (or `null` for "nobody picked yet") scopes it, which is what
+   * Cashiering wants: the cashier has a student in front of them, and the other students'
+   * receipts are somebody else's problem right now.
+   */
+  studentId?: string | null
 }
 
 type DetailsForm = {
@@ -79,8 +88,15 @@ const EMPTY_DETAILS: DetailsForm = {
   remarks: '',
 }
 
-const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = false }) => {
+const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
+  embedded = false,
+  studentId,
+}) => {
   const queryClient = useQueryClient()
+  // Scoped by the caller passing the prop at all, so "no student picked" stays distinct from
+  // "show everyone" — the first waits, the second queries.
+  const scopedToStudent = studentId !== undefined
+  const hasStudent = Boolean(studentId)
   const statuses: ReceiptSubmissionStatus[] = embedded
     ? ['pending', 'approved']
     : ['pending', 'approved', 'rejected']
@@ -99,8 +115,14 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = 
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const submissionsQuery = useQuery({
-    queryKey: ['payment-receipt-submissions', 'queue', statusFilter],
-    queryFn: () => paymentReceiptService.list({ status: statusFilter }),
+    queryKey: ['payment-receipt-submissions', 'queue', statusFilter, studentId ?? null],
+    queryFn: () =>
+      paymentReceiptService.list({
+        status: statusFilter,
+        student_id: studentId ?? undefined,
+      }),
+    // Nothing to ask for until the cashier has picked somebody.
+    enabled: !scopedToStudent || hasStudent,
     refetchInterval: statusFilter === 'pending' ? 60000 : false,
   })
   // Memoized because the refresh effect below depends on it: a fresh array identity every
@@ -296,7 +318,10 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = 
 
   const fieldError = (field: string) => fieldErrors[field]?.[0]
 
-  const columnCount = embedded ? 6 : 8
+  // One student's queue does not need their name repeated down every row, so that column
+  // goes and the expand chevron moves into the installment cell.
+  const showStudentColumn = !scopedToStudent
+  const columnCount = 5 + (showStudentColumn ? 1 : 0) + (embedded ? 0 : 2)
 
   /** The per-fee split of a posted approval, or null when there is nothing to show. */
   const subdivisionOf = (submission: PaymentReceiptSubmission): StudentPayment[] | null => {
@@ -369,12 +394,40 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = 
     </div>
   )
 
+  /**
+   * Expands the row into its subdivision. Rendered in whichever cell leads the row, so the
+   * chevrons still line up when the student column is gone.
+   */
+  const expandToggle = (
+    submission: PaymentReceiptSubmission,
+    isExpanded: boolean,
+    canExpand: boolean
+  ) =>
+    canExpand ? (
+      <button
+        type="button"
+        onClick={() => setExpandedId(isExpanded ? null : submission.id)}
+        aria-expanded={isExpanded}
+        aria-label={isExpanded ? 'Hide the payment breakdown' : 'Show the payment breakdown'}
+        className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+      >
+        <ChevronRightIcon
+          className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
+    ) : (
+      <span className="inline-block w-5" aria-hidden="true" />
+    )
+
   const table = (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+            {showStudentColumn && (
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+            )}
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Installment</th>
             {!embedded && (
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year</th>
@@ -389,7 +442,14 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = 
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white">
-          {submissionsQuery.isLoading && (
+          {scopedToStudent && !hasStudent && (
+            <tr>
+              <td colSpan={columnCount} className="px-4 py-8 text-center text-sm text-gray-500">
+                Search for a student above to see the receipts they have uploaded.
+              </td>
+            </tr>
+          )}
+          {(!scopedToStudent || hasStudent) && submissionsQuery.isLoading && (
             <tr>
               <td colSpan={columnCount} className="px-4 py-8 text-center text-gray-500">
                 Loading receipt submissions...
@@ -415,32 +475,20 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = 
               return (
                 <React.Fragment key={submission.id}>
                   <tr className={isExpanded ? 'bg-gray-50/60' : undefined}>
+                    {showStudentColumn && (
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <div className="flex items-center gap-1.5">
+                          {expandToggle(submission, isExpanded, Boolean(split))}
+                          {studentName(submission)}
+                        </div>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-sm text-gray-700">
                       <div className="flex items-center gap-1.5">
-                        {split ? (
-                          <button
-                            type="button"
-                            onClick={() => setExpandedId(isExpanded ? null : submission.id)}
-                            aria-expanded={isExpanded}
-                            aria-label={
-                              isExpanded ? 'Hide the payment breakdown' : 'Show the payment breakdown'
-                            }
-                            className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                          >
-                            <ChevronRightIcon
-                              className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                              aria-hidden="true"
-                            />
-                          </button>
-                        ) : (
-                          <span className="inline-block w-5" aria-hidden="true" />
-                        )}
-                        {studentName(submission)}
+                        {!showStudentColumn && expandToggle(submission, isExpanded, Boolean(split))}
+                        {submission.installment_label ||
+                          `Installment #${submission.installment_sequence}`}
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {submission.installment_label ||
-                        `Installment #${submission.installment_sequence}`}
                     </td>
                     {!embedded && (
                       <td className="px-4 py-3 text-sm text-gray-600">{submission.academic_year}</td>
@@ -558,13 +606,16 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = 
                 </React.Fragment>
               )
             })}
-          {!submissionsQuery.isLoading && !submissionsQuery.isError && !submissions.length && (
-            <tr>
-              <td colSpan={columnCount} className="px-4 py-8 text-center text-gray-500">
-                No {statusFilter} receipt submissions.
-              </td>
-            </tr>
-          )}
+          {(!scopedToStudent || hasStudent) &&
+            !submissionsQuery.isLoading &&
+            !submissionsQuery.isError &&
+            !submissions.length && (
+              <tr>
+                <td colSpan={columnCount} className="px-4 py-8 text-center text-gray-500">
+                  No {statusFilter} receipt submissions{scopedToStudent ? ' for this student' : ''}.
+                </td>
+              </tr>
+            )}
         </tbody>
       </table>
     </div>
@@ -1017,8 +1068,9 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({ embedded = 
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Receipt approvals</h3>
             <p className="text-xs text-gray-500">
-              Proof of payment students uploaded — verify the amount, say which fees it settles,
-              then post it.
+              {scopedToStudent
+                ? 'Proof of payment this student uploaded — verify the amount, say which fees it settles, then post it.'
+                : 'Proof of payment students uploaded — verify the amount, say which fees it settles, then post it.'}
             </p>
           </div>
           {statusTabs}
