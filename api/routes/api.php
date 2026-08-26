@@ -293,6 +293,9 @@ Route::middleware('auth.token')->group(function () {
     Route::get('students/{id}/ledger', [StudentFinanceController::class, 'ledger'])->middleware(['module:finance,view,shared', 'simulate.date']);
     Route::get('students/{id}/noa', [StudentFinanceController::class, 'noticeOfAccount'])->middleware(['module:finance,view,shared', 'simulate.date']);
     Route::get('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'show'])->middleware('module:payment-plans,view,shared');
+    // Read-only: every plan priced against this student's own account, so a family can see
+    // what each would cost them before committing to one. Selects nothing, writes nothing.
+    Route::get('students/{id}/payment-plan/options', [StudentPaymentPlanController::class, 'options'])->middleware(['module:payment-plans,view,shared', 'simulate.date']);
     Route::post('students/{id}/payment-plan', [StudentPaymentPlanController::class, 'store'])->middleware('module:payment-plans,manage,shared');
     Route::get('students/{id}/sibling-group', [SiblingGroupController::class, 'showForStudent'])->middleware('module:discounts,view');
     Route::get('payment-plan-changes', [StudentPaymentPlanChangeController::class, 'index'])->middleware('module:payment-plans,view');

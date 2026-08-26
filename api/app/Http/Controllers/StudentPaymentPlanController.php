@@ -8,13 +8,159 @@ use App\Models\Student;
 use App\Models\StudentPaymentPlan;
 use App\Models\StudentPaymentPlanChange;
 use App\Services\PaymentPlanService;
+use App\Services\PaymentScheduleBasis;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class StudentPaymentPlanController extends Controller
 {
-    public function __construct(private PaymentPlanService $planService) {}
+    public function __construct(
+        private PaymentPlanService $planService,
+        private PaymentScheduleBasis $scheduleBasis
+    ) {}
+
+    /**
+     * Every plan the school offers, each priced against this student's own account.
+     *
+     * A student picks their plan once and cannot change it themselves, so they were choosing
+     * between names with no idea what any of them would cost. This answers "what would three
+     * terms look like for me" using their real charges, discounts and payments — only the plan
+     * is swapped — so the comparison is what they would actually be billed rather than a
+     * worked example.
+     *
+     * Strictly read-only. It does not select a plan, and it deliberately does not run
+     * LateFeeService: booking a surcharge is a side effect of reading a ledger, and a plan
+     * merely being compared must not leave charges on the account. A projection therefore
+     * shows principal only, which `includes_surcharges: false` states plainly.
+     */
+    public function options(Request $request, string $studentId): JsonResponse
+    {
+        if ($this->isStudentActor($request) && ! $this->isSelfStudent($request, $studentId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Students can only compare plans for their own account',
+            ], 403);
+        }
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (! $institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned',
+            ], 400);
+        }
+
+        $academicYear = $request->get('academic_year');
+        if (! $academicYear) {
+            return response()->json([
+                'success' => false,
+                'message' => 'academic_year is required',
+            ], 422);
+        }
+
+        $student = Student::whereHas('studentInstitutions', function ($query) use ($institutionId) {
+            $query->where('institution_id', $institutionId);
+        })->find($studentId);
+
+        if (! $student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student not found',
+            ], 404);
+        }
+
+        $basis = $this->scheduleBasis->for($institutionId, $studentId, $academicYear);
+
+        $selected = StudentPaymentPlan::where('institution_id', $institutionId)
+            ->where('student_id', $studentId)
+            ->where('academic_year', $academicYear)
+            ->first();
+
+        $plans = PaymentPlan::with('installments')
+            ->where('institution_id', $institutionId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        // The student's own plan is priced too, even if it has since been disabled — otherwise
+        // the one schedule they are actually on would be missing from the comparison.
+        if ($selected?->payment_plan_id && ! $plans->contains('id', $selected->payment_plan_id)) {
+            $current = PaymentPlan::with('installments')->find($selected->payment_plan_id);
+            if ($current) {
+                $plans = $plans->push($current);
+            }
+        }
+
+        $options = $plans->map(function (PaymentPlan $definition) use (
+            $basis,
+            $academicYear,
+            $selected
+        ) {
+            // A throwaway selection, never saved: buildInstallments() reads the plan off it,
+            // and this is what lets one student's figures be priced against every plan.
+            $hypothetical = new StudentPaymentPlan(['academic_year' => $academicYear]);
+            $hypothetical->setRelation('paymentPlan', $definition);
+
+            $installments = $this->planService->withRunningTotals(
+                $this->planService->buildInstallments(
+                    $hypothetical,
+                    $academicYear,
+                    $basis['principal_charges'],
+                    $basis['discounts_total'],
+                    $basis['principal_payments'],
+                    $basis['principal_payment_rows'],
+                    $basis['dated_adjustments']
+                )
+            );
+
+            $current = collect($installments)->firstWhere('is_current', true);
+            $stillToCollect = round(
+                (float) collect($installments)->sum('outstanding_amount'),
+                2
+            );
+
+            return [
+                'payment_plan_id' => $definition->id,
+                'name' => $definition->name,
+                'description' => $definition->description,
+                'schedule_mode' => $definition->schedule_mode ?? PaymentPlan::SCHEDULE_FIXED,
+                'advance_payment_mode' => $definition->advance_payment_mode,
+                'surcharge_mode' => $definition->surcharge_mode,
+                'installment_count' => $definition->installments->count(),
+                'is_selected' => $selected?->payment_plan_id === $definition->id,
+                'is_active' => (bool) $definition->is_active,
+                // What this plan would ask for next, and what is left to collect under it.
+                'current_period' => $current ? [
+                    'sequence' => $current['sequence'],
+                    'label' => $current['label'],
+                    'due_date' => $current['due_date'],
+                    'amount' => $current['amount'],
+                    'outstanding_amount' => $current['outstanding_amount'],
+                ] : null,
+                'still_to_collect' => $stillToCollect,
+                'installments' => $installments,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'academic_year' => $academicYear,
+                'grade_level' => $basis['grade_level'],
+                // Stated so the comparison can say what it is priced on rather than leaving a
+                // parent to wonder whether their payments were counted.
+                'principal_charges' => $basis['principal_charges'],
+                'discounts_total' => $basis['discounts_total'],
+                'payments_total' => $basis['principal_payments'],
+                'selected_payment_plan_id' => $selected?->payment_plan_id,
+                // Late fees are not projected: see the note on this method.
+                'includes_surcharges' => false,
+                'options' => $options,
+            ],
+        ]);
+    }
 
     public function show(Request $request, string $studentId): JsonResponse
     {

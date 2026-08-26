@@ -1,6 +1,7 @@
 import { api } from '../lib/api'
 import type {
   ApiResponse,
+  PaymentPlanOptionsResponse,
   StudentLedgerResponse,
   StudentNOAResponse,
   StudentPaymentPlan,
@@ -52,6 +53,22 @@ class StudentFinanceService {
 
     const url = `/students/${studentId}/noa${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     const response = await api.get<ApiResponse<StudentNOAResponse>>(url)
+    return response.data
+  }
+
+  /**
+   * Every plan the school offers, priced against this student's own charges, discounts and
+   * payments. Read-only: it selects nothing and books nothing.
+   */
+  async getPlanOptions(studentId: string, academicYear: string) {
+    const params = new URLSearchParams({ academic_year: academicYear })
+    const asOf = simulatedDate()
+    if (asOf) {
+      params.append('as_of', asOf)
+    }
+
+    const url = `/students/${studentId}/payment-plan/options?${params.toString()}`
+    const response = await api.get<ApiResponse<PaymentPlanOptionsResponse>>(url)
     return response.data
   }
 

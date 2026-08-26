@@ -23,6 +23,7 @@ import { studentOnlinePaymentService } from '../../../services/studentOnlinePaym
 import { paymentReceiptService } from '../../../services/paymentReceiptService'
 import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
 import { PaymentPlanPicker } from '../../../components/payment-plan-picker'
+import { PaymentPlanComparison } from '../../../components/payment-plan-comparison'
 import { PaymentPlanHistoryTable } from '../../../components/payment-plan-history-table'
 import type {
   CreateStudentOnlinePaymentCheckoutData,
@@ -84,6 +85,15 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     queryFn: () => studentFinanceService.getNoticeOfAccount(studentId, resolvedAcademicYear),
     enabled: Boolean(studentId && resolvedAcademicYear),
   })
+
+  // Every plan the school offers, priced against this student. Read-only: it selects nothing
+  // and books nothing, so it is safe to load alongside the ledger.
+  const planOptionsQuery = useQuery({
+    queryKey: ['student-plan-options', studentId, resolvedAcademicYear],
+    queryFn: () => studentFinanceService.getPlanOptions(studentId, resolvedAcademicYear),
+    enabled: Boolean(studentId && resolvedAcademicYear),
+  })
+  const planOptions = planOptionsQuery.data?.data
 
   const onlinePaymentsQuery = useQuery({
     queryKey: ['student-online-payments', studentId, resolvedAcademicYear],
@@ -504,12 +514,25 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
             later.
           </p>
         </div>
-        <PaymentPlanPicker
-          plans={activePlans}
-          loading={setPaymentPlanMutation.isPending}
-          plansLoading={activePlansQuery.isLoading}
-          onSelect={handlePlanSubmit}
-        />
+        {/* Priced against this student's own account, so the choice is made on real figures
+            rather than on plan names. The picker stays as the fallback for the moment the
+            projection cannot be built — no plan should ever be unchoosable. */}
+        {planOptionsQuery.isError ? (
+          <PaymentPlanPicker
+            plans={activePlans}
+            loading={setPaymentPlanMutation.isPending}
+            plansLoading={activePlansQuery.isLoading}
+            onSelect={handlePlanSubmit}
+          />
+        ) : (
+          <PaymentPlanComparison
+            data={planOptions}
+            loading={planOptionsQuery.isLoading}
+            onSelect={(paymentPlanId) => handlePlanSubmit(paymentPlanId)}
+            selecting={setPaymentPlanMutation.isPending}
+            selectingPlanId={setPaymentPlanMutation.variables ?? null}
+          />
+        )}
       </div>
     )
   }
@@ -1362,6 +1385,24 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* A student cannot switch plans themselves, so this answers "what would the other plans
+          have cost us" rather than offering an action — the registrar handles a real change.
+          Their own plan is marked, and no plan carries a choose button once one is set. */}
+      {isStudentUser && paymentPlan && (planOptions?.options?.length ?? 0) > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
+          <h4 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <CalendarDaysIcon className="w-5 h-5 text-primary-600" />
+            Compare payment plans
+          </h4>
+          <p className="text-sm text-gray-600 mt-1 mb-4">
+            What each of the school&apos;s plans would ask of you from here, worked out from your
+            own balance. Your plan is set for {resolvedAcademicYear} — contact the registrar if
+            you would like to change it.
+          </p>
+          <PaymentPlanComparison data={planOptions} loading={planOptionsQuery.isLoading} />
         </div>
       )}
 

@@ -604,6 +604,44 @@ export interface CreatePaymentPlanData {
   installments: Array<Omit<PaymentPlanInstallmentTemplate, 'id' | 'sequence'> & { sequence?: number }>;
 }
 
+// One plan priced against a particular student's account — what they would actually be billed
+// under it, not a worked example. Late fees are never projected (`includes_surcharges`).
+export interface PaymentPlanOption {
+  payment_plan_id: string;
+  name: string;
+  description?: string | null;
+  schedule_mode?: ScheduleMode;
+  advance_payment_mode?: AdvancePaymentMode;
+  surcharge_mode?: SurchargeMode;
+  installment_count: number;
+  /** The plan the student is on. Priced too, even if it has since been disabled. */
+  is_selected: boolean;
+  is_active: boolean;
+  /** What this plan would ask for next, given everything already paid. */
+  current_period?: {
+    sequence: number;
+    label: string;
+    due_date: string;
+    amount: number;
+    outstanding_amount: number;
+  } | null;
+  /** The balance left to collect under this plan — the same figure whatever the shape. */
+  still_to_collect: number;
+  installments: StudentInstallment[];
+}
+
+export interface PaymentPlanOptionsResponse {
+  academic_year: string;
+  grade_level?: string | null;
+  principal_charges: number;
+  discounts_total: number;
+  payments_total: number;
+  selected_payment_plan_id?: string | null;
+  /** Always false today: a plan being compared must not book a surcharge to project one. */
+  includes_surcharges: boolean;
+  options: PaymentPlanOption[];
+}
+
 export interface PaymentPlanChange {
   id: string;
   student_id: string;
