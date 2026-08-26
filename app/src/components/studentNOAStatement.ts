@@ -143,35 +143,44 @@ export const buildNOALines = (
   )
   const lateFeesDue = round2(lateFees.reduce((sum, fee) => sum + fee.outstanding, 0))
 
-  // What is left is amortized principal. The schedule divides every fee by the same
-  // count, so a period is genuinely each fee's share of itself — apportioning by net
-  // charge reproduces that split rather than inventing one.
+  // What is left is amortized principal, split across the fees it is owed against.
   const principalDue = Math.max(0, round2(monthly.totalDue - monthly.balanceForward - lateFeesDue))
   const amortized = breakdown.filter(
     (fee) => fee.billing_type !== 'cash' && fee.source !== 'late_fee'
   )
-  const weights = amortized.map((fee) => Math.max(0, round2(fee.charge - fee.discount)))
+  // Weighted by what each fee still owes, never by what it was charged. A fee the payer
+  // has already settled in full is finished with, and billing it a share of a later month
+  // would ask for money against a line that owes nothing — the amounts would still sum to
+  // the right total, so the error hides in a bill that looks like it adds up.
+  const weights = amortized.map((fee) => Math.max(0, round2(fee.charge - fee.discount - fee.paid)))
   const weightTotal = round2(weights.reduce((sum, weight) => sum + weight, 0))
+  const canApportion = principalDue > 0 && weightTotal > 0
+  // The last fee with something outstanding absorbs the rounding, so the column
+  // reconciles exactly without dropping a remainder onto a settled line.
+  const lastIndex = weights.reduce((last, weight, index) => (weight > 0 ? index : last), -1)
 
-  if (principalDue > 0 && weightTotal > 0) {
-    let assigned = 0
-    // The last line absorbs the rounding so the column reconciles with the total exactly.
-    const lastIndex = weights.reduce((last, weight, index) => (weight > 0 ? index : last), -1)
-    amortized.forEach((fee, index) => {
-      if (weights[index] <= 0) return
-      const share =
-        index === lastIndex
+  let assigned = 0
+  amortized.forEach((fee, index) => {
+    // A settled fee stays on the notice at zero rather than disappearing from it: the
+    // payer reads the same list of fees each month and can see which are done.
+    const share =
+      !canApportion || weights[index] <= 0
+        ? 0
+        : index === lastIndex
           ? round2(principalDue - assigned)
           : round2((principalDue * weights[index]) / weightTotal)
-      assigned = round2(assigned + share)
-      lines.push({
-        key: `fee-${fee.fee_id}`,
-        description: fee.fee_name,
-        amount: share,
-        apportioned: true,
-      })
+    assigned = round2(assigned + share)
+    lines.push({
+      key: `fee-${fee.fee_id}`,
+      description: fee.fee_name,
+      amount: share,
+      apportioned: share > 0,
     })
-  } else if (principalDue > 0) {
+  })
+
+  // Money due with no outstanding fee to hang it on. Named rather than dropped, or the
+  // rows would stop adding up to the total beneath them.
+  if (principalDue > 0 && !canApportion) {
     lines.push({ key: 'principal', description: 'Assessed Fees', amount: principalDue })
   }
 
