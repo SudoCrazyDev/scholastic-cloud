@@ -1,5 +1,11 @@
 import { api } from '../lib/api'
-import type { ApiResponse, PaymentReceiptSubmission, ReceiptSubmissionStatus } from '../types'
+import type {
+  ApiResponse,
+  ApproveReceiptSubmissionData,
+  PaymentReceiptSubmission,
+  ReceiptSubmissionStatus,
+  UpdateReceiptPaymentDetailsData,
+} from '../types'
 
 class PaymentReceiptService {
   private baseUrl = '/payment-receipt-submissions'
@@ -38,10 +44,27 @@ class PaymentReceiptService {
     return response.data
   }
 
-  async approve(id: string, amount: number) {
+  /**
+   * Approve and post. `allocations` says which fees the verified amount settles; whatever
+   * is left unallocated posts as a single General / Other line, so passing the amount on
+   * its own is still valid.
+   */
+  async approve(id: string, payload: ApproveReceiptSubmissionData) {
     const response = await api.post<ApiResponse<PaymentReceiptSubmission>>(
       `${this.baseUrl}/${id}/approve`,
-      { amount }
+      payload
+    )
+    return response.data
+  }
+
+  /**
+   * Corrects how an approved collection is described — the OR number usually only exists
+   * once the booklet is written up. Amounts are not editable here by design.
+   */
+  async updatePaymentDetails(id: string, payload: UpdateReceiptPaymentDetailsData) {
+    const response = await api.put<ApiResponse<PaymentReceiptSubmission>>(
+      `${this.baseUrl}/${id}/payment-details`,
+      payload
     )
     return response.data
   }

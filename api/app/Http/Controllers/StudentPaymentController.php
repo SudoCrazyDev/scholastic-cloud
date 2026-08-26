@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Student;
 use App\Models\SchoolFee;
-use App\Models\StudentAdditionalFee;
 use App\Models\StudentPayment;
 use App\Models\PaymentTransaction;
 use App\Auth\StudentPortalUser;
+use App\Services\Payments\FeeAllocationGuard;
+use App\Services\Payments\PaymentIdentifierRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -110,6 +111,7 @@ class StudentPaymentController extends Controller
             'payment_date' => 'nullable|date',
             'payment_method' => 'nullable|string|max:255',
             'reference_number' => 'nullable|string|max:255',
+            'or_number' => 'nullable|string|max:255',
             'remarks' => 'nullable|string',
             'school_fee_id' => 'nullable|uuid|exists:school_fees,id',
             'additional_fee_id' => 'nullable|uuid|exists:student_additional_fees,id',
@@ -124,6 +126,18 @@ class StudentPaymentController extends Controller
                 'success' => false,
                 'message' => 'Student not found in this institution'
             ], 404);
+        }
+
+        $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
+        $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
+
+        $taken = PaymentIdentifierRegistry::conflicts($institutionId, [
+            'or_number' => $orNumber,
+            'reference_number' => $referenceNumber,
+        ]);
+
+        if ($taken) {
+            return $this->duplicateIdentifierResponse($taken);
         }
 
         if (!empty($validated['school_fee_id']) && !empty($validated['additional_fee_id'])) {
@@ -168,7 +182,8 @@ class StudentPaymentController extends Controller
             'amount' => $validated['amount'],
             'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
             'payment_method' => $validated['payment_method'] ?? null,
-            'reference_number' => $validated['reference_number'] ?? null,
+            'reference_number' => $referenceNumber,
+            'or_number' => $orNumber,
             'receipt_number' => PaymentTransaction::generateUniqueReceiptNumber(),
             'remarks' => $validated['remarks'] ?? null,
             'received_by' => $request->user()?->id,
@@ -215,56 +230,35 @@ class StudentPaymentController extends Controller
             ], 404);
         }
 
-        // Validate every referenced fee belongs to this institution.
-        $feeIds = collect($validated['items'])
-            ->pluck('school_fee_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($feeIds->isNotEmpty()) {
-            $foundCount = SchoolFee::where('institution_id', $institutionId)
-                ->whereIn('id', $feeIds)
-                ->count();
-
-            if ($foundCount !== $feeIds->count()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'One or more school fees were not found for this institution'
-                ], 404);
-            }
-        }
-
-        // Additional-fee lines (ad-hoc charges and late fees) settle a specific charge
-        // row, so verify each one belongs to this student and year.
-        $additionalFeeIds = collect($validated['items'])
-            ->pluck('additional_fee_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($additionalFeeIds->isNotEmpty()) {
-            $error = $this->assertAdditionalFeesBelongTo(
-                $additionalFeeIds->all(),
-                $institutionId,
-                $validated['student_id'],
-                $validated['academic_year']
-            );
-
-            if ($error) {
-                return $error;
-            }
-        }
-
-        $mixedLine = collect($validated['items'])->first(
-            fn ($item) => !empty($item['school_fee_id']) && !empty($item['additional_fee_id'])
+        // Every referenced fee has to belong to this institution, and an additional-fee
+        // line to this student and year — the same rules a subdivided receipt approval
+        // is held to.
+        $badAllocation = FeeAllocationGuard::check(
+            $validated['items'],
+            $institutionId,
+            $validated['student_id'],
+            $validated['academic_year']
         );
 
-        if ($mixedLine) {
+        if ($badAllocation) {
             return response()->json([
                 'success' => false,
-                'message' => 'A payment line can settle a school fee or an additional fee, not both'
-            ], 422);
+                'message' => $badAllocation['message'],
+            ], $badAllocation['status']);
+        }
+
+        // Both identifiers stay optional, but one the cashier does enter has to name
+        // this collection alone or it reconciles against nothing.
+        $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
+        $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
+
+        $taken = PaymentIdentifierRegistry::conflicts($institutionId, [
+            'or_number' => $orNumber,
+            'reference_number' => $referenceNumber,
+        ]);
+
+        if ($taken) {
+            return $this->duplicateIdentifierResponse($taken);
         }
 
         $totalAmount = collect($validated['items'])->sum(fn ($item) => (float) $item['amount']);
@@ -282,7 +276,9 @@ class StudentPaymentController extends Controller
             $tendered,
             $changeDue,
             $paymentDate,
-            $receiptNumber
+            $receiptNumber,
+            $orNumber,
+            $referenceNumber
         ) {
             $transaction = PaymentTransaction::create([
                 'institution_id' => $institutionId,
@@ -290,8 +286,8 @@ class StudentPaymentController extends Controller
                 'academic_year' => $validated['academic_year'],
                 'payment_date' => $paymentDate,
                 'payment_method' => $validated['payment_method'] ?? null,
-                'reference_number' => $validated['reference_number'] ?? null,
-                'or_number' => $validated['or_number'] ?? null,
+                'reference_number' => $referenceNumber,
+                'or_number' => $orNumber,
                 'receipt_number' => $receiptNumber,
                 'remarks' => $validated['remarks'] ?? null,
                 'total_amount' => $totalAmount,
@@ -311,8 +307,8 @@ class StudentPaymentController extends Controller
                     'amount' => $item['amount'],
                     'payment_date' => $paymentDate,
                     'payment_method' => $validated['payment_method'] ?? null,
-                    'reference_number' => $validated['reference_number'] ?? null,
-                    'or_number' => $validated['or_number'] ?? null,
+                    'reference_number' => $referenceNumber,
+                    'or_number' => $orNumber,
                     'receipt_number' => $receiptNumber,
                     'remarks' => $item['remarks'] ?? ($validated['remarks'] ?? null),
                     'received_by' => $request->user()?->id,
@@ -411,6 +407,21 @@ class StudentPaymentController extends Controller
     }
 
     /**
+     * A duplicate identifier is a validation failure, reported field-by-field so the
+     * cashier's own OR / reference input is the thing that lights up.
+     *
+     * @param  array<string, string[]>  $errors
+     */
+    private function duplicateIdentifierResponse(array $errors): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => collect($errors)->flatten()->implode(' '),
+            'errors' => $errors,
+        ], 422);
+    }
+
+    /**
      * Guard additional-fee allocations: every referenced charge must belong to this
      * institution, student, and academic year. Returns an error response, or null when
      * all of them check out.
@@ -421,25 +432,17 @@ class StudentPaymentController extends Controller
         string $studentId,
         string $academicYear
     ): ?JsonResponse {
-        $ids = array_values(array_unique(array_filter($additionalFeeIds)));
-        if (empty($ids)) {
+        $lines = array_map(fn ($id) => ['additional_fee_id' => $id], $additionalFeeIds);
+
+        $problem = FeeAllocationGuard::check($lines, $institutionId, $studentId, $academicYear);
+        if (!$problem) {
             return null;
         }
 
-        $found = StudentAdditionalFee::where('institution_id', $institutionId)
-            ->where('student_id', $studentId)
-            ->where('academic_year', $academicYear)
-            ->whereIn('id', $ids)
-            ->count();
-
-        if ($found !== count($ids)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'One or more additional fees were not found for this student and academic year'
-            ], 404);
-        }
-
-        return null;
+        return response()->json([
+            'success' => false,
+            'message' => $problem['message'],
+        ], $problem['status']);
     }
 
     private function isStudentUser(Request $request): bool

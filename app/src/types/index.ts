@@ -514,10 +514,44 @@ export interface PaymentReceiptSubmission {
   reviewed_by?: string | null;
   reviewed_at?: string | null;
   student_payment_id?: string | null;
+  payment_transaction_id?: string | null;
   created_at?: string;
   updated_at?: string;
   student?: { id: string; first_name: string; middle_name?: string | null; last_name: string };
   reviewer?: { id: string; first_name: string; last_name: string } | null;
+  /**
+   * The cashiering transaction the approval posted. Its `items` are how the verified
+   * amount was subdivided — one line per fee it settled, plus a General / Other line for
+   * whatever was not pinned to a fee. Absent on pending and rejected receipts, and on
+   * approvals posted before receipts carried a transaction.
+   */
+  payment_transaction?: PaymentTransaction | null;
+}
+
+/**
+ * What a reviewer decides when approving: the amount read off the receipt image, how it is
+ * subdivided across the student's fees, and how the collection is described.
+ */
+export interface ApproveReceiptSubmissionData {
+  amount: number;
+  payment_method?: string;
+  payment_date?: string;
+  or_number?: string;
+  reference_number?: string;
+  remarks?: string;
+  allocations?: CreatePaymentTransactionItem[];
+}
+
+/**
+ * Corrections to an already-posted approval. Money is deliberately absent: the amount and
+ * its split have already moved the ledger, and restating them belongs in the void queue.
+ */
+export interface UpdateReceiptPaymentDetailsData {
+  payment_method?: string;
+  payment_date?: string;
+  or_number?: string;
+  reference_number?: string;
+  remarks?: string;
 }
 
 // Legacy enum kept for back-compat; plans are now identified by payment_plan_id + name.

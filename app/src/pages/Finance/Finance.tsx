@@ -41,6 +41,7 @@ import { PaymentPlanHistoryTable } from '../../components/payment-plan-history-t
 import DashboardStudentsView from './DashboardStudentsView'
 import CollectionsView from './CollectionsView'
 import ReceiptApprovalsView from './ReceiptApprovalsView'
+import { PAYMENT_METHOD_OPTIONS } from './paymentMethods'
 import DiscountsView from './DiscountsView'
 import DefaultDiscountsView from './DefaultDiscountsView'
 import StudentFeesView from './StudentFeesView'
@@ -272,6 +273,9 @@ const Finance: React.FC = () => {
   const [cashierGeneralAmount, setCashierGeneralAmount] = useState('')
   const [cashierTendered, setCashierTendered] = useState('')
   const [cashierError, setCashierError] = useState<string | null>(null)
+  // Field-keyed validation errors from the API — currently the two receipt identifiers,
+  // each of which has to be unique within the school.
+  const [cashierFieldErrors, setCashierFieldErrors] = useState<Record<string, string[]>>({})
   const [lastReceipt, setLastReceipt] = useState<PaymentTransaction | null>(null)
   const [showReceiptModal, setShowReceiptModal] = useState(false)
 
@@ -821,6 +825,7 @@ const Finance: React.FC = () => {
         remarks: '',
       }))
       setCashierError(null)
+      setCashierFieldErrors({})
       queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
       queryClient.invalidateQueries({ queryKey: ['cashier-ledger'] })
@@ -829,6 +834,9 @@ const Finance: React.FC = () => {
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to record payment.'
       setCashierError(message)
+      // A reused OR or reference number comes back keyed by field, so the cashier's own
+      // input is what lights up rather than only a toast they have to trace back.
+      setCashierFieldErrors(error.response?.data?.errors ?? {})
       toast.error(message)
     },
   })
@@ -1138,12 +1146,15 @@ const Finance: React.FC = () => {
     [cashierLineItems]
   )
 
+  const hasCashierFieldError = Object.values(cashierFieldErrors).some((messages) => messages?.length)
+
   const cashierTenderedValue = Number(cashierTendered) || 0
   const cashierChangeDue = cashierTendered ? Math.max(cashierTenderedValue - cashierTotal, 0) : 0
 
   const handleCashierTransactionSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     setCashierError(null)
+    setCashierFieldErrors({})
     if (!selectedStudent) {
       setCashierError('Please select a student.')
       toast.error('Please select a student.')
@@ -1924,19 +1935,7 @@ const Finance: React.FC = () => {
                       onChange={(e) =>
                         setCashierPaymentForm((prev) => ({ ...prev, payment_method: e.target.value }))
                       }
-                      options={[
-                        { value: '', label: '— Select payment mode' },
-                        { value: 'Cash', label: 'Cash' },
-                        { value: 'Check', label: 'Check' },
-                        { value: 'Bank Transfer', label: 'Bank Transfer' },
-                        { value: 'GCash', label: 'GCash' },
-                        { value: 'Maya', label: 'Maya' },
-                        { value: 'Credit Card', label: 'Credit Card' },
-                        { value: 'Debit Card', label: 'Debit Card' },
-                        { value: 'Online Banking', label: 'Online Banking' },
-                        { value: 'Money Order', label: 'Money Order' },
-                        { value: 'Other', label: 'Other' },
-                      ]}
+                      options={PAYMENT_METHOD_OPTIONS}
                       className="w-full"
                       disabled={createTransactionMutation.isPending}
                     />
@@ -1948,10 +1947,12 @@ const Finance: React.FC = () => {
                       </label>
                       <Input
                         value={cashierPaymentForm.or_number}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setCashierPaymentForm((prev) => ({ ...prev, or_number: e.target.value }))
-                        }
+                          setCashierFieldErrors((prev) => ({ ...prev, or_number: [] }))
+                        }}
                         placeholder="Official Receipt no."
+                        error={cashierFieldErrors.or_number?.[0]}
                         disabled={createTransactionMutation.isPending}
                       />
                     </div>
@@ -1961,10 +1962,12 @@ const Finance: React.FC = () => {
                       </label>
                       <Input
                         value={cashierPaymentForm.reference_number}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setCashierPaymentForm((prev) => ({ ...prev, reference_number: e.target.value }))
-                        }
+                          setCashierFieldErrors((prev) => ({ ...prev, reference_number: [] }))
+                        }}
                         placeholder="e.g. check no., transaction id"
+                        error={cashierFieldErrors.reference_number?.[0]}
                         disabled={createTransactionMutation.isPending}
                       />
                     </div>
@@ -2028,7 +2031,11 @@ const Finance: React.FC = () => {
                     )}
                   </div>
 
-                  {cashierError && <p className="text-sm text-red-600">{cashierError}</p>}
+                  {/* Suppressed when the failure already reads on the field that caused it —
+                      a reused OR number does not need saying twice in the same card. */}
+                  {cashierError && !hasCashierFieldError && (
+                    <p className="text-sm text-red-600">{cashierError}</p>
+                  )}
 
                   <Button
                     type="submit"
@@ -2044,6 +2051,10 @@ const Finance: React.FC = () => {
               </div>
             </div>
           </form>
+
+          {/* Receipts students uploaded, waiting on this same cashier. Kept below the till
+              so taking a payment is still the first thing on the screen. */}
+          <ReceiptApprovalsView embedded />
 
           {showReceiptModal && lastReceipt && selectedStudent && (
             <ReceiptPrintModal

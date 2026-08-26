@@ -542,6 +542,9 @@ Route::middleware('auth.token')->group(function () {
     Route::post('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'store'])->middleware('module:finance,manage,shared');
     Route::post('payment-receipt-submissions/{id}/approve', [PaymentReceiptSubmissionController::class, 'approve'])->middleware('module:finance,manage');
     Route::post('payment-receipt-submissions/{id}/reject', [PaymentReceiptSubmissionController::class, 'reject'])->middleware('module:finance,manage');
+    // Corrects how an approved collection is described (OR number, reference, mode, date,
+    // remarks). Never its amount or its split — that is what the void queue is for.
+    Route::put('payment-receipt-submissions/{id}/payment-details', [PaymentReceiptSubmissionController::class, 'updatePaymentDetails'])->middleware('module:finance,manage');
 
     // Payment void requests (finance requests, admin approves/disapproves)
     Route::get('payment-void-requests', [PaymentVoidRequestController::class, 'index'])->middleware('module:finance,view');

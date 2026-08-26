@@ -73,6 +73,23 @@ views' requests.
   separate transaction-items table. A line settles **either** a school fee (`school_fee_id`) or an
   additional fee (`student_additional_fee_id`) — never both; with neither set it is a
   "General / Other" payment.
+- **Receipt identifiers — `or_number` and `reference_number`** — both **optional**, both **unique
+  per institution**. A school reconciles an entered number against its physical OR booklet or the
+  bank statement, so two collections carrying the same one make both unreconcilable; the second is
+  refused with a 422 naming the receipt that already holds it (`errors.or_number`, so the cashier's
+  own field lights up). The two are separate namespaces — an OR number does not collide with a
+  reference number. Enforced in two places, deliberately:
+  - `payment_transactions` carries the DB unique indexes `(institution_id, or_number)` and
+    `(institution_id, reference_number)`. Blanks are normalized to **NULL**, so any number of
+    receipts may leave a number unissued (MySQL treats each NULL in a unique index as distinct)
+    while two empty strings would have collided.
+  - `student_payments` is **not** indexed, and must not be: a line item denormalizes its header's
+    number, so a four-fee receipt legitimately repeats the same OR number four times. Standalone
+    payments there (no `payment_transaction_id` — the legacy single-fee path) are held unique by
+    `PaymentIdentifierRegistry` instead, which is also what every write goes through.
+  A **voided** payment keeps its number reserved: the physical receipt was spoiled, not returned to
+  the booklet. Comparison is whatever the MySQL collation says, i.e. case-insensitive; values are
+  trimmed before storing, so `"OR-1042 "` is the same number as `"OR-1042"`.
 - **Discounts — three different things**:
   1. **Student discounts** (`student_discounts`) — applied to one student for a year, fixed or
      percentage, optionally tied to one fee or **split across fees** via `allocations`. Created
@@ -159,12 +176,21 @@ views' requests.
 - **Receipt submissions** (`payment_receipt_submissions`) — a student uploads a proof-of-payment
   image/PDF for an installment on My Finance (status `pending`; file stored on R2 under
   `{institution}/student/{student}/payment-receipts/`). Reviewer roles (finance + admin roles)
-  view the image on **Receipt Approvals**, enter the verified amount, and approve — which posts a
-  `student_payments` row (`payment_method: 'Online - Receipt Upload'`, linked via
-  `student_payment_id`) so the installment schedule updates automatically — or reject with a
-  required `review_note` the student sees on My Finance. Installments are computed live, so the
-  target is `academic_year` + `installment_sequence`, not a foreign key. One pending submission
-  per installment at a time.
+  view the image on **Receipt Approvals**, enter the verified amount, say which fees it settles,
+  and approve — or reject with a required `review_note` the student sees on My Finance.
+  Installments are computed live, so the target is `academic_year` + `installment_sequence`, not a
+  foreign key. One pending submission per installment at a time.
+
+  Approving posts a **full cashiering transaction**, not a single payment: a `payment_transactions`
+  header plus one `student_payments` line per allocated fee, linked back through
+  `payment_receipt_submissions.payment_transaction_id`. It used to write one unallocated
+  `student_payments` row, which reduced the balance and told the school nothing — the ledger read
+  "Payment" with no fee behind it and the collection could not be reconciled fee by fee.
+  `student_payment_id` is kept, pointing at the **first** line item, so anything already reading it
+  still resolves; `payment_transaction_id` is the link to follow for the whole receipt.
+  Allocations are **optional** and whatever is left unallocated posts as one "General / Other"
+  line, so approving with nothing but an amount behaves exactly as it did before. Over-allocating
+  is a 422 — it would post more than the image was verified for.
 - **NOA (Notice of Account)** — printable statement per student+year, rendered client-side by
   `StudentNOAPDF` (`@react-pdf/renderer`) from `GET /students/{id}/noa`.
 - **Receipts** — printed via `ReceiptPrintModal`, which lays the transaction out according to the
@@ -180,7 +206,11 @@ views' requests.
   top; `view` memo maps pathname → view).
 - Sub-view components (same folder): `DashboardStudentsView.tsx`, `CollectionsView.tsx`,
   `DiscountsView.tsx` (grade-level), `DefaultDiscountsView.tsx`, `ReceiptBuilderView.tsx`,
-  `ReceiptPrintModal.tsx`, `DataClearingView.tsx`, `PaymentPlansView.tsx` (standalone page).
+  `ReceiptPrintModal.tsx`, `DataClearingView.tsx`, `PaymentPlansView.tsx` (standalone page),
+  `ReceiptApprovalsView.tsx` (takes `embedded` — also rendered inside Cashiering).
+- Shared constants: `src/pages/Finance/paymentMethods.ts` — the mode-of-payment list used by both
+  the till and the receipt queue, plus `paymentMethodOptionsFor(current)`, which appends whatever a
+  record already holds so an edit form cannot silently blank a value that is not in the list.
 - Shared PDF: `src/components/StudentNOAPDF.tsx`.
 - Services (`src/services/`): `schoolFeeService.ts`, `schoolFeeDefaultService.ts`,
   `financeDashboardService.ts`, `studentPaymentService.ts`, `studentFinanceService.ts`,
@@ -202,17 +232,30 @@ views' requests.
   dashboard/collections + school-fee-defaults (~lines 297–305), student-payments +
   payment-transactions (~306–311), student-discounts (+`/void`) (~316–321), default-discounts
   apiResource (~324), grade-level-discounts (~327–331), student-additional-fees (~334–338),
-  payment-void-requests (~341–344), receipt-templates apiResource (~347), and the
+  payment-void-requests (~341–344), receipt-templates apiResource (~347),
+  payment-receipt-submissions (index/store/approve/reject + `PUT …/{id}/payment-details`), and the
   student-scoped ledger/NOA/payment-plan routes (~177–182), and the four
   `finance/data-clear*` routes behind `module:finance,clear-data` (just after receipt-templates).
 - Controllers (`app/Http/Controllers/`): `SchoolFeeController`, `SchoolFeeDefaultController`,
   `FinanceDashboardController` (`summary`, `collections`), `StudentPaymentController` (store =
   create transaction + lines), `PaymentTransactionController`, `StudentDiscountController`,
   `DefaultDiscountController`, `GradeLevelDiscountController`, `StudentAdditionalFeeController`,
-  `PaymentVoidRequestController`, `StudentFinanceController` (`ledger`, `noticeOfAccount`),
+  `PaymentVoidRequestController`, `PaymentReceiptSubmissionController` (`index`, `store`,
+  `approve` = post a subdivided transaction, `reject`, `updatePaymentDetails`),
+  `StudentFinanceController` (`ledger`, `noticeOfAccount`),
   `StudentPaymentPlanController`, `StudentPaymentPlanChangeController`, `PaymentPlanController`,
   `ReceiptTemplateController`, `FinanceDataClearController` (`groups`, `preview`, `store`,
   `history`).
+- Payment posting internals (`app/Services/Payments/`):
+  - `PaymentIdentifierRegistry.php` — normalizes `or_number` / `reference_number` (trim, blank →
+    NULL) and reports per-institution collisions as Laravel-shaped field errors. Every write path
+    goes through it: the till, the legacy single-payment path, receipt approval, and the
+    approved-receipt details edit (which passes its own transaction id so a receipt may keep the
+    number it already holds).
+  - `FeeAllocationGuard.php` — the rules a set of payment lines must satisfy before posting: a line
+    settles a school fee **or** an additional fee and never both, school fees belong to the
+    institution, additional fees belong to *this* student and year. Shared by the till and the
+    approval queue so a receipt cannot be made to settle a charge on someone else's account.
 - Data clearing internals: `app/Support/FinanceDataGroups.php` (the group catalog — what is
   clearable, year-scoped vs catalog, and the `dependents()` hazard map) and
   `app/Services/Finance/FinanceDataCleaner.php` (counting, the blocker guard, the transactional
@@ -289,10 +332,20 @@ The POS. Debounced student search (min 2 chars) → select a student → their l
 `fee_breakdown` loads (reusing `GET /students/{id}/ledger`) showing each fee's outstanding
 balance. The cashier types amounts per fee line (a "Pay full" shortcut fills the outstanding
 amount), plus an optional "General / Other" free-form line, payment method, OR number,
-amount tendered (change computed client-side). Overpaying a line only warns (advance payment is
-allowed). Submit → `POST /student-payments` with `items[]` → creates one `PaymentTransaction` +
-one `StudentPayment` per line, returns the transaction, and opens `ReceiptPrintModal` for
-printing. Invalidates `finance-dashboard`, `student-ledger`, `cashier-ledger` query keys.
+reference number, amount tendered (change computed client-side). Overpaying a line only warns
+(advance payment is allowed). Submit → `POST /student-payments` with `items[]` → creates one
+`PaymentTransaction` + one `StudentPayment` per line, returns the transaction, and opens
+`ReceiptPrintModal` for printing. Invalidates `finance-dashboard`, `student-ledger`,
+`cashier-ledger` query keys.
+
+A reused OR or reference number comes back as a 422 keyed by field, and the message renders on the
+offending `Input` (cleared as soon as it is retyped); the generic `cashierError` line is suppressed
+while a field error is showing so the same sentence is not printed twice in one card.
+
+Below the till, `<ReceiptApprovalsView embedded />` renders the receipt queue (pending / approved
+only) so a cashier sees what is waiting on them without leaving the screen. Modes of payment come
+from `paymentMethods.ts`, shared with that queue — a mode offered in one place and not the other
+shows up later as a collections report that cannot be totalled by method.
 
 ### Ledger (`/finance/ledger`)
 Same student search → `GET /students/{id}/ledger` + `GET /students/{id}/noa`. Three view modes:
@@ -322,13 +375,40 @@ breakdown (school year June–March). Read-only.
 
 ### Receipt Approvals (`/finance/receipt-approvals`) — `ReceiptApprovalsView.tsx`
 Queue of student-uploaded payment receipts (`GET /payment-receipt-submissions?status=`), with a
-pending/approved/rejected filter (pending auto-refetches every 60s). "Review" opens a modal with
-the receipt image (or a file link for PDFs), a verified-amount input, and Approve / Reject
-actions. Approve → `POST /payment-receipt-submissions/{id}/approve` with `{amount}` (posts the
-payment); Reject → `POST …/{id}/reject` with a required `review_note`. Invalidates ledger, NOA,
-and dashboard queries afterwards. Backend role gate: `REVIEWER_ROLES` in
-`PaymentReceiptSubmissionController` (`finance`, `institution-administrator`, `principal`,
-`super-administrator`).
+pending/approved/rejected filter (pending auto-refetches every 60s). Also rendered on
+**Cashiering** as `<ReceiptApprovalsView embedded />` — same component, no page card, fewer
+columns, and only the pending/approved filters.
+
+**Pending → "Review"** opens the receipt image (or a file link for PDFs), a verified-amount input,
+a **Subdivide across fees** panel, and a **Payment summary** block:
+- The fee rows come from the student's own `GET /students/{id}/ledger` `fee_breakdown` — the same
+  source the till reads — so the reviewer allocates against real balances. "Fill from balances"
+  spreads the verified amount oldest-first. A running footer shows *Allocated* and what will post
+  as *General / Other*, and turns red (blocking Approve) when the split exceeds the amount.
+- Payment summary is mode of payment / OR number / reference number / payment date / remarks.
+- Approve → `POST /payment-receipt-submissions/{id}/approve` with
+  `{amount, allocations[], payment_method?, payment_date?, or_number?, reference_number?, remarks?}`;
+  Reject → `POST …/{id}/reject` with a required `review_note`.
+
+**Approved → "Edit details"** opens the same receipt read-only, showing the Payment Summary and the
+per-fee subdivision labelled *"Amounts are settled — not editable here"*. "Edit details" makes the
+five payment-summary fields editable — the OR number usually only exists once the booklet is
+written up — via `PUT /payment-receipt-submissions/{id}/payment-details`. **No amount is editable
+there, by design**: the verified figure and its split are what the ledger has already been moved
+by, and restating them would move a student's balance with no void, no note and no trail. That is
+what the void request queue is for. The update writes the header **and every line item**, because
+the ledger reads `or_number` / `payment_date` off the lines — a header-only edit would never show
+on the account.
+
+Approved rows in the table carry a chevron that expands the subdivision inline (per-fee amounts,
+total posted, receipt number, mode, OR / ref) and an "across N fees" hint under the amount. An
+approval posted before `payment_transaction_id` existed renders an amber note instead of the edit
+form and returns 422 if edited.
+
+Invalidates `student-ledger`, `cashier-ledger`, NOA, and dashboard queries afterwards. Permission
+gate: `module:finance,view` to see the queue, `module:finance,manage` to approve, reject, or correct
+details (see `hasFinanceAbility` in `PaymentReceiptSubmissionController` — the permission is the
+authority, not a role slug list).
 
 ### Void Requests (`/finance/void-requests`)
 Visible only when `canRequestVoid` (frontend) — `finance` role or an approver role. Lists
@@ -446,7 +526,7 @@ the academic year. Routed as a sibling of `/finance` in `App.tsx` with its own s
 | `gradeLevelDiscountService` | CRUD `/grade-level-discounts` |
 | `studentAdditionalFeeService` | CRUD `/student-additional-fees` |
 | `paymentVoidService` | GET/POST `/payment-void-requests`, POST `…/{id}/approve`, POST `…/{id}/disapprove` |
-| `paymentReceiptService` | GET/POST `/payment-receipt-submissions` (POST is student multipart upload), POST `…/{id}/approve`, POST `…/{id}/reject` |
+| `paymentReceiptService` | GET/POST `/payment-receipt-submissions` (POST is student multipart upload), POST `…/{id}/approve`, POST `…/{id}/reject`, PUT `…/{id}/payment-details` |
 | `paymentPlanService` | CRUD `/payment-plans`, GET `/payment-plan-changes` |
 | `receiptTemplateService` | CRUD `/receipt-templates` |
 | `financeDataClearService` | GET `/finance/data-clear/groups`, GET `/finance/data-clear/history`, POST `/finance/data-clear/preview`, POST `/finance/data-clear` (all behind `module:finance,clear-data`) |

@@ -32,6 +32,7 @@ class PaymentReceiptSubmission extends Model
         'reviewed_by',
         'reviewed_at',
         'student_payment_id',
+        'payment_transaction_id',
     ];
 
     protected $casts = [
@@ -60,6 +61,15 @@ class PaymentReceiptSubmission extends Model
     public function studentPayment()
     {
         return $this->belongsTo(StudentPayment::class);
+    }
+
+    /**
+     * The cashiering transaction the approval posted. Its line items are how the
+     * verified amount was subdivided across the student's fees.
+     */
+    public function paymentTransaction()
+    {
+        return $this->belongsTo(PaymentTransaction::class);
     }
 
     public function getUrlAttribute(): ?string

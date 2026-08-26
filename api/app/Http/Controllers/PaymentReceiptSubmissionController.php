@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
 use App\Models\PaymentReceiptSubmission;
+use App\Models\PaymentTransaction;
 use App\Models\Student;
 use App\Models\StudentPayment;
+use App\Services\Payments\FeeAllocationGuard;
+use App\Services\Payments\PaymentIdentifierRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +43,10 @@ class PaymentReceiptSubmissionController extends Controller
             ->with([
                 'student:id,first_name,middle_name,last_name',
                 'reviewer:id,first_name,last_name',
+                // An approved row shows how its verified amount was subdivided, which is
+                // the transaction's line items and the fee each one settled.
+                'paymentTransaction.items.schoolFee:id,name',
+                'paymentTransaction.items.additionalFee:id,name,source',
             ])
             ->where('institution_id', $institutionId);
 
@@ -152,8 +159,16 @@ class PaymentReceiptSubmissionController extends Controller
     }
 
     /**
-     * Approve a pending submission: staff enters the verified amount and the
-     * payment is posted to the student's ledger.
+     * Approve a pending submission: staff enters the verified amount, says which fees it
+     * settles, and the payment is posted to the student's ledger.
+     *
+     * The posting is a real cashiering transaction - a `payment_transactions` header with
+     * a `student_payments` line per fee - rather than the single unallocated payment this
+     * used to write. A lump sum reduced the balance and told the school nothing about what
+     * it had collected: the ledger read "Payment" with no fee against it, and the receipt
+     * could not be reconciled fee by fee. Allocations stay optional, and whatever the
+     * reviewer leaves unallocated is posted as one "General / Other" line, so approving
+     * with nothing but an amount behaves exactly as it did before.
      */
     public function approve(Request $request, string $id): JsonResponse
     {
@@ -163,6 +178,15 @@ class PaymentReceiptSubmissionController extends Controller
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
+            'payment_method' => 'nullable|string|max:255',
+            'payment_date' => 'nullable|date',
+            'or_number' => 'nullable|string|max:255',
+            'reference_number' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string',
+            'allocations' => 'nullable|array',
+            'allocations.*.school_fee_id' => 'nullable|uuid|exists:school_fees,id',
+            'allocations.*.additional_fee_id' => 'nullable|uuid|exists:student_additional_fees,id',
+            'allocations.*.amount' => 'required|numeric|min:0.01',
         ]);
 
         $institutionId = $this->resolveInstitutionId($request);
@@ -175,45 +199,260 @@ class PaymentReceiptSubmissionController extends Controller
             return response()->json(['success' => false, 'message' => 'Only pending submissions can be approved.'], 422);
         }
 
+        $verifiedAmount = round((float) $validated['amount'], 2);
+        $allocations = $validated['allocations'] ?? [];
+
+        $badAllocation = FeeAllocationGuard::check(
+            $allocations,
+            $submission->institution_id,
+            $submission->student_id,
+            $submission->academic_year
+        );
+
+        if ($badAllocation) {
+            return response()->json([
+                'success' => false,
+                'message' => $badAllocation['message'],
+            ], $badAllocation['status']);
+        }
+
+        $allocatedTotal = round(
+            array_sum(array_map(fn ($line) => (float) $line['amount'], $allocations)),
+            2
+        );
+
+        // Over-allocating would post more than the receipt was verified for, so the
+        // ledger and the image would disagree about what the student actually paid.
+        if ($allocatedTotal > $verifiedAmount + 0.001) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The fees you subdivided across add up to more than the verified amount.',
+                'errors' => ['allocations' => ['Allocated total exceeds the verified amount.']],
+            ], 422);
+        }
+
+        $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
+        $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
+
+        $taken = PaymentIdentifierRegistry::conflicts($institutionId, [
+            'or_number' => $orNumber,
+            'reference_number' => $referenceNumber,
+        ]);
+
+        if ($taken) {
+            return $this->duplicateIdentifierResponse($taken);
+        }
+
         $userId = $request->user()?->id;
+        $label = $submission->installment_label
+            ?: 'Installment #' . $submission->installment_sequence;
+        $remarks = $this->blankToNull($validated['remarks'] ?? null)
+            ?? 'Posted from verified online payment receipt (' . $label . ')';
+        $paymentDate = $validated['payment_date'] ?? now()->toDateString();
+        $paymentMethod = $this->blankToNull($validated['payment_method'] ?? null)
+            ?? 'Online - Receipt Upload';
 
-        DB::transaction(function () use ($submission, $validated, $userId) {
-            $label = $submission->installment_label
-                ?: 'Installment #' . $submission->installment_sequence;
+        // Whatever was not pinned to a fee still has to be collected, so it goes in as a
+        // General / Other line and the transaction always totals the verified amount.
+        $lines = $allocations;
+        $unallocated = round($verifiedAmount - $allocatedTotal, 2);
+        if ($unallocated > 0 || $lines === []) {
+            $lines[] = [
+                'school_fee_id' => null,
+                'additional_fee_id' => null,
+                'amount' => $unallocated > 0 ? $unallocated : $verifiedAmount,
+            ];
+        }
 
-            $payment = StudentPayment::create([
+        DB::transaction(function () use (
+            $submission,
+            $lines,
+            $verifiedAmount,
+            $paymentDate,
+            $paymentMethod,
+            $orNumber,
+            $referenceNumber,
+            $remarks,
+            $userId
+        ) {
+            $receiptNumber = PaymentTransaction::generateUniqueReceiptNumber();
+
+            $transaction = PaymentTransaction::create([
                 'institution_id' => $submission->institution_id,
                 'student_id' => $submission->student_id,
-                'school_fee_id' => null,
                 'academic_year' => $submission->academic_year,
-                'amount' => $validated['amount'],
-                'payment_date' => now()->toDateString(),
-                'payment_method' => 'Online - Receipt Upload',
-                'reference_number' => null,
-                'receipt_number' => StudentPayment::generateUniqueReceiptNumber(),
-                'remarks' => 'Posted from verified online payment receipt (' . $label . ')',
+                'payment_date' => $paymentDate,
+                'payment_method' => $paymentMethod,
+                'reference_number' => $referenceNumber,
+                'or_number' => $orNumber,
+                'receipt_number' => $receiptNumber,
+                'remarks' => $remarks,
+                'total_amount' => $verifiedAmount,
+                'amount_tendered' => null,
+                'change_due' => null,
                 'received_by' => $userId,
             ]);
 
+            $firstPaymentId = null;
+
+            foreach ($lines as $line) {
+                $payment = StudentPayment::create([
+                    'institution_id' => $submission->institution_id,
+                    'student_id' => $submission->student_id,
+                    'payment_transaction_id' => $transaction->id,
+                    'school_fee_id' => $line['school_fee_id'] ?? null,
+                    'student_additional_fee_id' => $line['additional_fee_id'] ?? null,
+                    'academic_year' => $submission->academic_year,
+                    'amount' => $line['amount'],
+                    'payment_date' => $paymentDate,
+                    'payment_method' => $paymentMethod,
+                    'reference_number' => $referenceNumber,
+                    'or_number' => $orNumber,
+                    'receipt_number' => $receiptNumber,
+                    'remarks' => $remarks,
+                    'received_by' => $userId,
+                ]);
+
+                $firstPaymentId ??= $payment->id;
+            }
+
             $submission->update([
                 'status' => PaymentReceiptSubmission::STATUS_APPROVED,
-                'amount' => $validated['amount'],
-                'student_payment_id' => $payment->id,
+                'amount' => $verifiedAmount,
+                'student_payment_id' => $firstPaymentId,
+                'payment_transaction_id' => $transaction->id,
                 'reviewed_by' => $userId,
                 'reviewed_at' => now(),
             ]);
         });
 
-        $submission->load([
-            'student:id,first_name,middle_name,last_name',
-            'reviewer:id,first_name,last_name',
-        ]);
-
         return response()->json([
             'success' => true,
             'message' => 'Receipt approved. Payment posted to the student ledger.',
-            'data' => $submission,
+            'data' => $this->withReviewContext($submission),
         ]);
+    }
+
+    /**
+     * Correct the payment details on an already-approved receipt.
+     *
+     * The OR number usually arrives after the fact - the booklet is written up at the end
+     * of the day, or the bank reference is only read off the statement later - so an
+     * approval that has already posted still needs somewhere to put it. What can be
+     * changed is how the collection is *described*: mode of payment, OR number, reference
+     * number, date and remarks. What cannot is the money. The verified amount and its
+     * subdivision are what the ledger has already been moved by, and restating those here
+     * would move a student's balance with no void, no note and no trail - the void request
+     * queue is the way that is meant to happen.
+     */
+    public function updatePaymentDetails(Request $request, string $id): JsonResponse
+    {
+        if (!$this->canReview($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        $validated = $request->validate([
+            'payment_method' => 'nullable|string|max:255',
+            'payment_date' => 'nullable|date',
+            'or_number' => 'nullable|string|max:255',
+            'reference_number' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string',
+        ]);
+
+        $institutionId = $this->resolveInstitutionId($request);
+        $submission = PaymentReceiptSubmission::where('institution_id', $institutionId)
+            ->with('paymentTransaction')
+            ->find($id);
+
+        if (!$submission) {
+            return response()->json(['success' => false, 'message' => 'Receipt submission not found.'], 404);
+        }
+        if ($submission->status !== PaymentReceiptSubmission::STATUS_APPROVED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only an approved receipt has a posted payment to edit.',
+            ], 422);
+        }
+
+        $transaction = $submission->paymentTransaction;
+        if (!$transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This approval was posted before receipts carried a transaction record, so its details cannot be edited here.',
+            ], 422);
+        }
+
+        $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
+        $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
+
+        $taken = PaymentIdentifierRegistry::conflicts(
+            $institutionId,
+            ['or_number' => $orNumber, 'reference_number' => $referenceNumber],
+            $transaction->id
+        );
+
+        if ($taken) {
+            return $this->duplicateIdentifierResponse($taken);
+        }
+
+        $details = [
+            'payment_method' => $this->blankToNull($validated['payment_method'] ?? null),
+            'payment_date' => $validated['payment_date'] ?? $transaction->payment_date?->toDateString(),
+            'or_number' => $orNumber,
+            'reference_number' => $referenceNumber,
+            'remarks' => $this->blankToNull($validated['remarks'] ?? null),
+        ];
+
+        DB::transaction(function () use ($transaction, $details) {
+            $transaction->update($details);
+
+            // The line items denormalize the header's details and the ledger reads them
+            // off the lines, so an OR number written only on the header would never show.
+            $transaction->items()->update($details);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment details updated.',
+            'data' => $this->withReviewContext($submission),
+        ]);
+    }
+
+    /**
+     * Reload a submission with everything the queue renders it from: who it is for, who
+     * reviewed it, and how the posted amount was subdivided.
+     */
+    private function withReviewContext(PaymentReceiptSubmission $submission): PaymentReceiptSubmission
+    {
+        return $submission->fresh([
+            'student:id,first_name,middle_name,last_name',
+            'reviewer:id,first_name,last_name',
+            'paymentTransaction.items.schoolFee:id,name',
+            'paymentTransaction.items.additionalFee:id,name,source',
+        ]);
+    }
+
+    /**
+     * A field the reviewer cleared is absent, not an empty string — so a blank mode of payment
+     * falls back to the default instead of overwriting it with "".
+     */
+    private function blankToNull(mixed $value): ?string
+    {
+        $trimmed = trim((string) ($value ?? ''));
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    /**
+     * @param  array<string, string[]>  $errors
+     */
+    private function duplicateIdentifierResponse(array $errors): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => collect($errors)->flatten()->implode(' '),
+            'errors' => $errors,
+        ], 422);
     }
 
     /**
