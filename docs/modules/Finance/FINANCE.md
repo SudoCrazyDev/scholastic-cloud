@@ -395,39 +395,50 @@ a **Subdivide across fees** panel, and a **Payment summary** block:
   source the till reads — so the reviewer allocates against real balances. "Fill from balances"
   spreads the verified amount oldest-first. A running footer shows *Allocated* and what will post
   as *General / Other*, and turns red (blocking Approve) when the split exceeds the amount.
-- Payment summary is **only the OR number and the reference number** — on a review and on an
-  approved receipt alike. Everything else about how the money arrived is already settled by the
-  uploaded receipt: the mode is an online transfer, the date is when it was verified, the remark
-  says which installment it came in for. The API stamps those, and the reviewer is never asked
-  to restate them — doing so was only ever a chance to contradict the image in front of them.
-  The two identifiers are the only things the receipt cannot tell the system itself, which is
-  why they are the only things this screen writes.
+- Payment summary is **only the reference number** — on a review and on an approved receipt
+  alike, and it is the single thing this screen writes. Everything else about how the money
+  arrived is already settled by the uploaded receipt: the mode is an online transfer, the date
+  is when it was verified, the remark says which installment it came in for. The API stamps
+  those, and the reviewer is never asked to restate them — doing so was only ever a chance to
+  contradict the image in front of them. **No OR number here**: money that arrived online is
+  reconciled by the bank's or the wallet's own record of the transfer, which is what the
+  approver is reading off the image; an OR number belongs to the paper receipt a cashier writes
+  out, so it is captured at the till (see [Cashiering](#cashiering-financecashiering)) and
+  nowhere else.
 - Approve → `POST /payment-receipt-submissions/{id}/approve` with
-  `{amount, allocations[], or_number?, reference_number?}`. Reject → `POST …/{id}/reject` with a
-  required `review_note`.
+  `{amount, allocations[], reference_number?}`. Reject → `POST …/{id}/reject` with a required
+  `review_note`. The endpoint still *accepts* `or_number` / `payment_method` / `payment_date` /
+  `remarks` — it is the write path for a whole transaction and the uniqueness guard covers both
+  identifiers — but no screen sends them.
 
-**Approved → "Edit details"** opens the same receipt read-only, showing the full Payment Summary
-(all five values, for reading). The subdivision is deliberately **not** repeated here — it is one
-expand away on the row the modal was opened from, and a second copy only made the modal longer than
-the receipt image it exists to show. "Edit details" then exposes **the two identifiers only** — the OR number usually
-does not exist until the booklet is written up hours later, which is the whole reason this editor
-exists — via `PUT /payment-receipt-submissions/{id}/payment-details`. **No amount is editable
-there, by design**: the verified figure and its split are what the ledger has already been moved
-by, and restating them would move a student's balance with no void, no note and no trail. That is
-what the void request queue is for. The update writes the header **and every line item**, because
-the ledger reads `or_number` / `payment_date` off the lines — a header-only edit would never show
-on the account.
+**Approved → "Edit details"** opens the receipt with its status, verified amount and reviewer, and
+a Payment Summary holding one field: the **reference number**, shown as an input straight away
+rather than behind a second Edit step — with nothing else on the card to read, that step revealed
+exactly what it had been hiding. A bank reference is often only read off the statement hours later,
+which is the whole reason this editor exists. Saved via
+`PUT /payment-receipt-submissions/{id}/payment-details`. **No amount is editable there, by
+design**: the verified figure and its split are what the ledger has already been moved by, and
+restating them would move a student's balance with no void, no note and no trail. That is what the
+void request queue is for. The subdivision is deliberately **not** repeated on the card — it is one
+expand away on the row the modal was opened from. The update writes the header **and every line
+item**, because the ledger reads the identifiers and the date off the lines — a header-only edit
+would never show on the account.
 
 `updatePaymentDetails` applies **only the keys the request carried**, so a field the editor does
-not send is left as the approval posted it. Without that, an edit touching just the OR number
-would null the mode and the remark by omission and quietly strip a posted collection of how it was
-paid. An identifier sent as `""` is the exception and *is* a change — it clears, so a mistyped OR
-number can be taken back off the receipt (and freed for the receipt that should have it). The
-frontend therefore sends both identifiers verbatim rather than as `|| undefined`, which axios would
-drop from the body altogether.
+not send is left as the approval posted it. Without that, an edit touching just the reference
+number would null the mode, the date, the remark and any OR number by omission, and quietly strip a
+posted collection of how it was paid. An identifier sent as `""` is the exception and *is* a
+change — it clears, so a mistyped reference can be taken back off the receipt (and freed for the
+one that should have it). The frontend therefore sends the reference number verbatim rather than as
+`|| undefined`, which axios would drop from the body altogether.
+
+The table's identifier column is **Reference**. The expanded subdivision still prints an OR number
+when the record happens to carry one — approvals no longer set one, but rows approved before this
+did, and hiding a value that exists is worse than showing it.
 
 Approved rows in the table carry a chevron that expands the subdivision inline (per-fee amounts,
-total posted, receipt number, mode, OR / ref) and an "across N fees" hint under the amount. An
+total posted, receipt number, mode, reference, OR when present) and an "across N fees" hint under
+the amount. An
 approval posted before `payment_transaction_id` existed renders an amber note instead of the edit
 form and returns 422 if edited.
 

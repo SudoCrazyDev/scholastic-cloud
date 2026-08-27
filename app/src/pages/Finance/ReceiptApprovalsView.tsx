@@ -34,8 +34,8 @@ const extractErrorMessage = (error: unknown, fallback: string) => {
 }
 
 /**
- * Per-field validation errors, so a duplicate OR number lights up the OR field rather than
- * only appearing in a toast the reviewer has to read and then find.
+ * Per-field validation errors, so a duplicate reference number lights up the field itself
+ * rather than only appearing in a toast the reviewer has to read and then find.
  */
 const extractFieldErrors = (error: unknown): Record<string, string[]> => {
   if (error && typeof error === 'object' && 'response' in error) {
@@ -71,21 +71,21 @@ interface ReceiptApprovalsViewProps {
 }
 
 /**
- * The only two things about a collection this screen writes.
+ * The one thing about a collection this screen writes.
  *
  * How the money arrived is settled by the receipt the student uploaded — the mode is an
  * online transfer, the date is when it was verified, the remark says which installment it
- * came in for — and the API fills all three in. What the receipt cannot tell the system is
- * the number the school will reconcile it by, so that is what the reviewer supplies, both
- * when approving and when correcting afterwards.
+ * came in for — and the API fills all three in. What is left is the number the approver
+ * reconciles the payment by, and for money that arrived online that is the *reference*
+ * number: the bank's or the wallet's own record of the transfer, which is what appears on
+ * the image they are looking at. An OR number belongs to the official receipt a cashier
+ * writes out at the till, so it is captured there and not here.
  */
 type DetailsForm = {
-  or_number: string
   reference_number: string
 }
 
 const EMPTY_DETAILS: DetailsForm = {
-  or_number: '',
   reference_number: '',
 }
 
@@ -225,7 +225,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
 
     const transaction = submission.payment_transaction
     setDetails({
-      or_number: transaction?.or_number ?? '',
       reference_number: transaction?.reference_number ?? '',
     })
   }
@@ -269,7 +268,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       // API's defaults rather than posted as blanks from fields that are no longer rendered.
       data: {
         amount,
-        or_number: details.or_number || undefined,
         reference_number: details.reference_number || undefined,
         allocations: lines.length ? lines : undefined,
       },
@@ -283,9 +281,9 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       id: reviewTarget.id,
       // Sent verbatim rather than as `|| undefined`: axios drops undefined keys, and an
       // emptied field has to reach the API as "" for it to read as "clear this" instead of
-      // "leave it". Mode, date and remark are not sent at all, so they stay as posted.
+      // "leave it". Everything else — mode, date, remark, and any OR number a cashier put on
+      // the transaction — is not sent at all, so it stays exactly as posted.
       data: {
-        or_number: details.or_number,
         reference_number: details.reference_number,
       },
     })
@@ -321,21 +319,9 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     return items && items.length ? items : null
   }
 
-  /** The two receipt identifiers — see DetailsForm for why it is only these. */
+  /** The reference number — see DetailsForm for why it is only that. */
   const renderDetailsFields = (disabled: boolean) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          OR number <span className="font-normal text-gray-400">(optional)</span>
-        </label>
-        <Input
-          value={details.or_number}
-          onChange={(event) => setDetails((prev) => ({ ...prev, or_number: event.target.value }))}
-          placeholder="Official Receipt no."
-          error={fieldError('or_number')}
-          disabled={disabled}
-        />
-      </div>
+    <div className="grid grid-cols-1 gap-3">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Reference number <span className="font-normal text-gray-400">(optional)</span>
@@ -395,7 +381,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded</th>
             )}
             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">OR / Ref</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
           </tr>
@@ -474,7 +460,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 font-mono">
-                      {transaction?.or_number || transaction?.reference_number || '—'}
+                      {transaction?.reference_number || '—'}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span

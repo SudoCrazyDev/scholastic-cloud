@@ -475,6 +475,36 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
     }
 
     /**
+     * Receipt Approvals captures the reference number only — money that arrived online is
+     * reconciled by the bank's or the wallet's own record, and the OR number belongs to the
+     * paper receipt a cashier writes at the till. So the screen sends one identifier, and an
+     * OR number already sitting on the transaction has to survive that untouched.
+     */
+    public function test_correcting_only_the_reference_number_leaves_an_existing_or_number(): void
+    {
+        $submission = $this->pendingSubmission();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->postJson('/api/payment-receipt-submissions/'.$submission->id.'/approve', [
+                'amount' => 1500,
+                'or_number' => 'OR-FROM-BOOKLET',
+            ])
+            ->assertOk();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->putJson('/api/payment-receipt-submissions/'.$submission->id.'/payment-details', [
+                'reference_number' => 'GCASH-4471',
+            ])
+            ->assertOk();
+
+        $transaction = $submission->fresh()->paymentTransaction;
+        $this->assertSame('GCASH-4471', $transaction->reference_number);
+        $this->assertSame('OR-FROM-BOOKLET', $transaction->or_number);
+        $this->assertSame('GCASH-4471', $transaction->items()->first()->reference_number);
+        $this->assertSame('OR-FROM-BOOKLET', $transaction->items()->first()->or_number);
+    }
+
+    /**
      * A number sent empty is a correction, not an omission: a cashier who typed the wrong OR
      * number needs a way to take it back off the receipt.
      */
