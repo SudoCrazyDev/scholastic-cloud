@@ -8,6 +8,7 @@ import { paymentIdentifierService } from '../../services/paymentIdentifierServic
 import { paymentReceiptService } from '../../services/paymentReceiptService'
 import type {
   ApproveReceiptSubmissionData,
+  DuplicateReferenceGroup,
   PaymentIdentifierHolder,
   PaymentReceiptSubmission,
   ReceiptSubmissionStatus,
@@ -159,6 +160,17 @@ const EMPTY_DETAILS: DetailsForm = {
 }
 
 /**
+ * What the queue can be filtered to.
+ *
+ * The three statuses are what a receipt *is*. `duplicates` is not one of them — it is a
+ * question asked of the receipts already approved, "which of these were posted under a
+ * reference number another one also carries" — but it belongs in the same row of tabs
+ * because it is the same queue read a different way, and the answer is only actionable by
+ * the person already standing in it.
+ */
+type QueueTab = ReceiptSubmissionStatus | 'duplicates'
+
+/**
  * A reference number the reviewer is about to post that is already on live collections.
  *
  * Held while they look at those collections and decide, which is the whole point of
@@ -186,11 +198,13 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   // "show everyone" — the first waits, the second queries.
   const scopedToStudent = studentId !== undefined
   const hasStudent = Boolean(studentId)
-  const statuses: ReceiptSubmissionStatus[] = embedded
+  // The sweep is left off the embedded copy: a cashier at the till is looking at one
+  // student in front of them, and auditing the whole institution's books is not that job.
+  const tabs: QueueTab[] = embedded
     ? ['pending', 'approved']
-    : ['pending', 'approved', 'rejected']
+    : ['pending', 'approved', 'rejected', 'duplicates']
 
-  const [statusFilter, setStatusFilter] = useState<ReceiptSubmissionStatus>('pending')
+  const [statusFilter, setStatusFilter] = useState<QueueTab>('pending')
   const [reviewTarget, setReviewTarget] = useState<PaymentReceiptSubmission | null>(null)
   const [verifiedAmount, setVerifiedAmount] = useState('')
   const [details, setDetails] = useState<DetailsForm>(EMPTY_DETAILS)
@@ -201,20 +215,45 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const [duplicateRef, setDuplicateRef] = useState<DuplicateReferencePrompt | null>(null)
   const [checkingReference, setCheckingReference] = useState(false)
 
+  const showingDuplicates = statusFilter === 'duplicates'
+
   const submissionsQuery = useQuery({
     queryKey: ['payment-receipt-submissions', 'queue', statusFilter, studentId ?? null],
     queryFn: () =>
       paymentReceiptService.list({
-        status: statusFilter,
+        status: statusFilter as ReceiptSubmissionStatus,
         student_id: studentId ?? undefined,
       }),
-    // Nothing to ask for until the cashier has picked somebody.
-    enabled: !scopedToStudent || hasStudent,
+    // Nothing to ask for until the cashier has picked somebody — and nothing to ask this
+    // endpoint at all while the duplicates sweep is the thing on screen.
+    enabled: !showingDuplicates && (!scopedToStudent || hasStudent),
     refetchInterval: statusFilter === 'pending' ? 60000 : false,
   })
   // Memoized because the refresh effect below depends on it: a fresh array identity every
   // render would re-run that effect on every render.
   const submissions = useMemo(() => submissionsQuery.data?.data ?? [], [submissionsQuery.data])
+
+  // Not polled the way the pending queue is: this reads the whole institution's approved
+  // receipts, and nothing lands in it without somebody on this screen approving something
+  // — which invalidates it anyway.
+  const duplicatesQuery = useQuery({
+    queryKey: ['payment-receipt-submissions', 'duplicates'],
+    queryFn: () => paymentReceiptService.duplicates(),
+    enabled: showingDuplicates,
+  })
+  const duplicateGroups = useMemo(
+    () => duplicatesQuery.data?.data ?? [],
+    [duplicatesQuery.data]
+  )
+
+  // Whichever list is on screen is the one an open receipt is kept in step with.
+  const visibleSubmissions = useMemo(
+    () =>
+      showingDuplicates
+        ? duplicateGroups.flatMap((group) => group.submissions)
+        : submissions,
+    [showingDuplicates, duplicateGroups, submissions]
+  )
 
   const isPendingTarget = reviewTarget?.status === 'pending'
   const postedTransaction = reviewTarget?.payment_transaction ?? null
@@ -311,11 +350,11 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   // A refreshed queue carries new relations for the open receipt; keep the form in step.
   useEffect(() => {
     if (!reviewTarget) return
-    const refreshed = submissions.find((submission) => submission.id === reviewTarget.id)
+    const refreshed = visibleSubmissions.find((submission) => submission.id === reviewTarget.id)
     if (refreshed && refreshed.updated_at !== reviewTarget.updated_at) {
       setReviewTarget(refreshed)
     }
-  }, [submissions, reviewTarget])
+  }, [visibleSubmissions, reviewTarget])
 
   /** The write itself, once the reference number is settled one way or the other. */
   const postApproval = (amount: number, reference: string) => {
@@ -673,8 +712,8 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   )
 
   const statusTabs = (
-    <div className="flex rounded-lg border border-gray-200 overflow-hidden self-start">
-      {statuses.map((status) => (
+    <div className="flex shrink-0 self-start overflow-hidden rounded-lg border border-gray-200">
+      {tabs.map((status) => (
         <button
           key={status}
           type="button"
@@ -1046,6 +1085,153 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     </div>
   )
 
+  /**
+   * The sweep, once the money is already on the books.
+   *
+   * The dialog above catches a duplicate while the reviewer is still holding it. This
+   * catches the ones that got past — posted anyway, keyed in later on the details form,
+   * approved by two people at once, or approved before there was a check at all. Each card
+   * is one reference number and everything approved under it, oldest first, so the row at
+   * the top is the approval that got there first and the ones beneath it are what landed
+   * on top.
+   *
+   * It reports and does not act. Undoing a posting is the void queue's job, and it needs a
+   * reason written by somebody who has looked at both images — which is what this screen
+   * puts in front of them.
+   */
+  const duplicatesPanel = (
+    <div className="space-y-4">
+      {duplicatesQuery.isLoading && (
+        <div className="rounded-lg border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+          Checking approved receipts for shared reference numbers...
+        </div>
+      )}
+
+      {/* A failed sweep must not read as a clean set of books. */}
+      {!duplicatesQuery.isLoading && duplicatesQuery.isError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-8 text-center text-sm text-red-600">
+          {extractErrorMessage(duplicatesQuery.error, 'Failed to check for duplicate receipts.')}
+        </div>
+      )}
+
+      {!duplicatesQuery.isLoading && !duplicatesQuery.isError && !duplicateGroups.length && (
+        <div className="rounded-lg border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+          No approved receipt shares its reference number with another one.
+        </div>
+      )}
+
+      {!duplicatesQuery.isError &&
+        duplicateGroups.map((group: DuplicateReferenceGroup) => (
+          <div
+            key={group.reference_number}
+            className="overflow-hidden rounded-lg border border-amber-200"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-amber-900">
+                  Reference <span className="font-mono">{group.reference_number}</span>
+                </h4>
+                <p className="mt-0.5 text-xs text-amber-800">
+                  {group.count} approved receipts ·{' '}
+                  {/* The shape of the group is most of the answer: the same student twice is
+                      the case worth opening, two students is usually siblings on one
+                      transfer and usually fine. */}
+                  {group.student_count === 1
+                    ? 'the same student'
+                    : `${group.student_count} different students`}
+                  {group.latest_posted_at
+                    ? ` · latest ${formatDateTime(group.latest_posted_at)}`
+                    : ''}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                  Posted under it
+                </div>
+                <div className="text-sm font-semibold tabular-nums text-amber-900">
+                  {formatAmount(group.total_amount)}
+                </div>
+              </div>
+            </div>
+
+            <ul className="divide-y divide-gray-100 bg-white">
+              {group.submissions.map((submission, index) => {
+                const transaction = submission.payment_transaction
+                return (
+                  <li key={submission.id} className="flex flex-col gap-4 px-4 py-3 sm:flex-row">
+                    <ReceiptThumbnail
+                      url={submission.url}
+                      mimeType={submission.mime_type}
+                      fileName={submission.file_name}
+                      alt={`Receipt uploaded by ${studentName(submission)}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          {studentName(submission)}
+                        </span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            index === 0
+                              ? 'bg-gray-100 text-gray-600'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {index === 0 ? 'Approved first' : 'Posted after'}
+                        </span>
+                      </div>
+                      <dl className="mt-1.5 space-y-1 text-sm">
+                        {holderRow(
+                          'Installment',
+                          submission.installment_label ||
+                            `Installment #${submission.installment_sequence}`
+                        )}
+                        {holderRow('Academic year', submission.academic_year)}
+                        {holderRow(
+                          'Verified amount',
+                          submission.amount != null ? formatAmount(submission.amount) : null
+                        )}
+                        {/* Shown per row because the grouping ignores case and separators:
+                            two members of one card can read `BDO-778899` and `bdo 778899`,
+                            and the reviewer should see that is what happened. */}
+                        {holderRow('Reference as posted', transaction?.reference_number)}
+                        {holderRow('Receipt no.', transaction?.receipt_number)}
+                        {holderRow('OR no.', transaction?.or_number)}
+                        {holderRow('Payment date', formatDay(transaction?.payment_date))}
+                        {holderRow('Approved', formatDateTime(submission.reviewed_at))}
+                        {holderRow(
+                          'Approved by',
+                          submission.reviewer
+                            ? `${submission.reviewer.first_name} ${submission.reviewer.last_name}`
+                            : null
+                        )}
+                      </dl>
+                    </div>
+                    <div className="shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openReviewModal(submission)}
+                      >
+                        Open
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+
+            <p className="border-t border-gray-100 bg-gray-50 px-4 py-2 text-xs text-gray-500">
+              If these are one payment posted twice, raise a void request against the receipt
+              number of the one that should not stand — an approval cannot be taken back from
+              here.
+            </p>
+          </div>
+        ))}
+    </div>
+  )
+
   if (embedded) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -1069,18 +1255,19 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold text-gray-900">Receipt Approvals</h2>
           <p className="text-sm text-gray-500">
-            Review payment receipts uploaded by students, verify the amount against the image, say
-            which fees it settles, then approve or reject with a reason.
+            {showingDuplicates
+              ? 'Approved receipts posted under a reference number more than one of them carries. A shared number is not proof of a double posting — one transfer can settle two siblings’ fees, and a payment can be split across installments on purpose — so compare the images and the amounts before sending anything to the void queue.'
+              : 'Review payment receipts uploaded by students, verify the amount against the image, say which fees it settles, then approve or reject with a reason.'}
           </p>
         </div>
         {statusTabs}
       </div>
 
-      {table}
+      {showingDuplicates ? duplicatesPanel : table}
       {modal}
       {duplicateDialog}
     </div>

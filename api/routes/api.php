@@ -544,6 +544,9 @@ Route::middleware('auth.token')->group(function () {
 
     // Payment receipt submissions (student uploads proof of payment, finance verifies)
     Route::get('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'index'])->middleware('module:finance,view,shared');
+    // The same question asked after the fact: which approved receipts ended up sharing a
+    // reference number, whatever the pre-post check said at the time.
+    Route::get('payment-receipt-submissions/duplicates', [PaymentReceiptSubmissionController::class, 'duplicates'])->middleware('module:finance,view');
     Route::post('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'store'])->middleware('module:finance,manage,shared');
     Route::post('payment-receipt-submissions/{id}/approve', [PaymentReceiptSubmissionController::class, 'approve'])->middleware('module:finance,manage');
     Route::post('payment-receipt-submissions/{id}/reject', [PaymentReceiptSubmissionController::class, 'reject'])->middleware('module:finance,manage');

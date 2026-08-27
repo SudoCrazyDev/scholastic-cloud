@@ -536,6 +536,24 @@ export interface PaymentReceiptSubmission {
 }
 
 /**
+ * Approved receipts that were all posted under one reference number.
+ *
+ * `submissions` is oldest first, so the head of the list is the approval that got there
+ * first and everything under it posted on top of it. A group is evidence and not a
+ * verdict — `student_count` above 1 is usually siblings on one transfer, and a
+ * `total_amount` matching the figure on the image is a payment deliberately split across
+ * installments.
+ */
+export interface DuplicateReferenceGroup {
+  reference_number: string;
+  count: number;
+  total_amount: number;
+  student_count: number;
+  latest_posted_at?: string | null;
+  submissions: PaymentReceiptSubmission[];
+}
+
+/**
  * What a reviewer decides when approving: the amount read off the receipt image, how it is
  * subdivided across the student's fees, and how the collection is described.
  */

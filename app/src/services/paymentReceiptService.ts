@@ -2,6 +2,7 @@ import { api } from '../lib/api'
 import type {
   ApiResponse,
   ApproveReceiptSubmissionData,
+  DuplicateReferenceGroup,
   PaymentReceiptSubmission,
   ReceiptSubmissionStatus,
   UpdateReceiptPaymentDetailsData,
@@ -22,6 +23,21 @@ class PaymentReceiptService {
     const suffix = query.toString() ? `?${query.toString()}` : ''
     const response = await api.get<ApiResponse<PaymentReceiptSubmission[]>>(
       `${this.baseUrl}${suffix}`
+    )
+    return response.data
+  }
+
+  /**
+   * Approved receipts grouped by a reference number more than one of them was posted
+   * under. Only groups with at least two receipts come back, so an empty list means the
+   * books have no reference number doing double duty.
+   */
+  async duplicates(params?: { academic_year?: string }) {
+    const query = new URLSearchParams()
+    if (params?.academic_year) query.set('academic_year', params.academic_year)
+    const suffix = query.toString() ? `?${query.toString()}` : ''
+    const response = await api.get<ApiResponse<DuplicateReferenceGroup[]>>(
+      `${this.baseUrl}/duplicates${suffix}`
     )
     return response.data
   }

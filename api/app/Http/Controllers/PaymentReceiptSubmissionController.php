@@ -84,6 +84,175 @@ class PaymentReceiptSubmissionController extends Controller
     }
 
     /**
+     * Approved receipts that share a reference number with another approved receipt.
+     *
+     * The check that runs before an approval posts (`payment-identifiers/holders`) only
+     * catches a duplicate while the reviewer is still standing in front of it. It cannot
+     * catch the ones that got past it — the reviewer who posted anyway, the number typed
+     * in later on the payment-details form, the two receipts approved by two people at the
+     * same time, or anything approved before that check existed. This is the sweep after
+     * the fact: everything already on the books, grouped by the number it was reconciled
+     * by, so the pairs that should never have both posted can be found and sent to the
+     * void queue.
+     *
+     * Only approved receipts are grouped, and only against each other. A number shared
+     * with a collection taken at the till is a different question — the till has the
+     * physical receipt in hand, and one number legitimately spans several postings there —
+     * and answering it here would bury the case this screen is for: the same online
+     * transfer uploaded twice.
+     *
+     * A shared number is evidence, not a verdict. One transfer really can settle two
+     * siblings' fees, and a school splitting a payment across installments posts it twice
+     * on purpose. So this reports; the reviewer decides.
+     */
+    public function duplicates(Request $request): JsonResponse
+    {
+        if ($this->isStudentActor($request) || !$this->canSeeQueue($request)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        $filters = $request->validate([
+            'academic_year' => 'nullable|string|max:255',
+        ]);
+
+        $institutionId = $this->resolveInstitutionId($request);
+        if (!$institutionId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User does not have any institution assigned',
+            ], 400);
+        }
+
+        // The submission itself carries no reference number — the posting it created does.
+        // A transaction is the modern shape; `student_payments` is joined for the legacy
+        // approvals that were only ever linked by `student_payment_id`.
+        //
+        // An id and a string per approved receipt, so the grouping pass below stays cheap
+        // over a whole year's queue; the rows that turn out to be in a group are the only
+        // ones loaded in full.
+        $rows = DB::table('payment_receipt_submissions as s')
+            ->leftJoin('payment_transactions as t', 't.id', '=', 's.payment_transaction_id')
+            ->leftJoin('student_payments as p', 'p.id', '=', 's.student_payment_id')
+            ->where('s.institution_id', $institutionId)
+            ->where('s.status', PaymentReceiptSubmission::STATUS_APPROVED)
+            ->when(
+                !empty($filters['academic_year']),
+                fn ($query) => $query->where('s.academic_year', $filters['academic_year'])
+            )
+            // A voided posting is not a duplicate of anything: the money has already been
+            // taken back, which is exactly the outcome this screen sends people to. Left
+            // joins make these pass for a receipt that has no posting on that side at all.
+            ->whereNull('t.voided_at')
+            ->whereNull('p.voided_at')
+            ->orderBy('s.created_at')
+            ->get([
+                's.id',
+                DB::raw('COALESCE(t.reference_number, p.reference_number) as reference_number'),
+            ]);
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $reference = PaymentIdentifierRegistry::normalize($row->reference_number);
+            if ($reference === null) {
+                continue;
+            }
+
+            $key = $this->referenceKey($reference);
+            if ($key === '') {
+                continue;
+            }
+
+            // Oldest first within a group: the first row is the approval that got there
+            // first, and the ones under it are what posted on top of it.
+            $groups[$key] ??= ['reference_number' => $reference, 'ids' => []];
+            $groups[$key]['ids'][] = $row->id;
+        }
+
+        $groups = array_values(array_filter($groups, fn ($group) => count($group['ids']) > 1));
+        if ($groups === []) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $submissions = PaymentReceiptSubmission::query()
+            ->with([
+                'student:id,first_name,middle_name,last_name',
+                'reviewer:id,first_name,last_name',
+                'paymentTransaction.items.schoolFee:id,name',
+                'paymentTransaction.items.additionalFee:id,name,source',
+            ])
+            ->whereIn('id', array_merge(...array_column($groups, 'ids')))
+            ->get()
+            ->keyBy('id');
+
+        $data = [];
+
+        foreach ($groups as $group) {
+            $members = [];
+            foreach ($group['ids'] as $id) {
+                $submission = $submissions->get($id);
+                if ($submission) {
+                    $members[] = $submission;
+                }
+            }
+
+            if (count($members) < 2) {
+                continue;
+            }
+
+            $postedAt = array_filter(array_map(
+                fn ($submission) => $submission->reviewed_at?->toIso8601String()
+                    ?? $submission->created_at?->toIso8601String(),
+                $members
+            ));
+
+            $data[] = [
+                'reference_number' => $group['reference_number'],
+                'count' => count($members),
+                // What is on the books under this one number. The reviewer reads it against
+                // the amount on the image: two receipts of 5,000 totalling 10,000 is the
+                // whole point, and a school that meant to split one 10,000 transfer across
+                // two installments sees a total that matches it.
+                'total_amount' => round(
+                    array_sum(array_map(fn ($submission) => (float) $submission->amount, $members)),
+                    2
+                ),
+                // Same student twice is the suspicious shape. Two students sharing a number
+                // is usually siblings on one transfer, which is legitimate — so it is said
+                // here rather than left for the reviewer to work out from the names.
+                'student_count' => count(array_unique(
+                    array_map(fn ($submission) => $submission->student_id, $members)
+                )),
+                'latest_posted_at' => $postedAt === [] ? null : max($postedAt),
+                'submissions' => $members,
+            ];
+        }
+
+        // Most recently posted group first: a duplicate that landed this morning is still
+        // worth catching, while one from two years ago has already been reconciled around.
+        usort($data, fn ($a, $b) => strcmp((string) $b['latest_posted_at'], (string) $a['latest_posted_at']));
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * What counts as the same reference number for grouping.
+     *
+     * Case and separators are dropped: a reference is read off an image by hand, and
+     * `bdo 778899`, `BDO-778899` and `BDO778899` are one bank transfer keyed by three
+     * people. Grouping on the raw string would miss exactly the duplicates that are hardest
+     * to spot by eye. Each row still shows the number as it was actually posted, so a group
+     * whose members were typed differently reads as what it is.
+     */
+    private function referenceKey(string $reference): string
+    {
+        return (string) preg_replace('/[^A-Z0-9]/', '', strtoupper($reference));
+    }
+
+    /**
      * Student uploads a proof-of-payment receipt for an installment (status = pending).
      */
     public function store(Request $request): JsonResponse

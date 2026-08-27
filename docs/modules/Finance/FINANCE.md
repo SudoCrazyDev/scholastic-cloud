@@ -100,6 +100,18 @@ views' requests.
   - Blanks are normalized to **NULL** — "not issued" is an absence, not the number `""` — and
     values are trimmed, so `"OR-1042 "` is the same number as `"OR-1042"`. Comparison is whatever
     the MySQL collation says, i.e. case-insensitive.
+  - The same question is also asked **before** a write and **after** one, on the two screens where
+    the answer changes what somebody does:
+    - `GET /payment-identifiers/holders?reference_number=…&or_number=…`
+      (`PaymentIdentifierController`, `PaymentIdentifierRegistry::collisions()`) returns the live
+      collections already carrying the number **in full** — the collection, whose it is, and the
+      uploaded receipt behind it when there is one. Receipt Approvals calls it before posting so
+      the reviewer can compare the two images and decide; a field with no holder is absent from
+      `data`, so `{}` means nothing is reused. A check that fails to run never blocks the post.
+      Pass `except_transaction_id` / `except_payment_id` when editing, so a collection is not
+      reported as its own duplicate.
+    - `GET /payment-receipt-submissions/duplicates` sweeps what is already posted — see the
+      Duplicates tab below.
 - **Discounts — three different things**:
   1. **Student discounts** (`student_discounts`) — applied to one student for a year, fixed or
      percentage, optionally tied to one fee or **split across fees** via `allocations`. Created
@@ -246,7 +258,7 @@ views' requests.
   payment-transactions (~306–311), student-discounts (+`/void`) (~316–321), default-discounts
   apiResource (~324), grade-level-discounts (~327–331), student-additional-fees (~334–338),
   payment-void-requests (~341–344), receipt-templates apiResource (~347),
-  payment-receipt-submissions (index/store/approve/reject + `PUT …/{id}/payment-details`), and the
+  payment-receipt-submissions (index/duplicates/store/approve/reject + `PUT …/{id}/payment-details`), and the
   student-scoped ledger/NOA/payment-plan routes (~177–182), and the four
   `finance/data-clear*` routes behind `module:finance,clear-data` (just after receipt-templates).
 - Controllers (`app/Http/Controllers/`): `SchoolFeeController`, `SchoolFeeDefaultController`,
@@ -393,9 +405,14 @@ breakdown (school year June–March). Read-only.
 
 ### Receipt Approvals (`/finance/receipt-approvals`) — `ReceiptApprovalsView.tsx`
 Queue of student-uploaded payment receipts (`GET /payment-receipt-submissions?status=`), with a
-pending/approved/rejected filter (pending auto-refetches every 60s). Also rendered on
-**Cashiering** as `<ReceiptApprovalsView embedded studentId={…} />` — same component, no page card,
-fewer columns, and only the pending/approved filters.
+pending/approved/rejected filter plus a **Duplicates** tab (pending auto-refetches every 60s). Also
+rendered on **Cashiering** as `<ReceiptApprovalsView embedded studentId={…} />` — same component, no
+page card, fewer columns, and only the pending/approved filters.
+
+The tab strip is typed `QueueTab = ReceiptSubmissionStatus | 'duplicates'`: the three statuses are
+what a receipt *is*, `duplicates` is a question asked of the ones already approved. Selecting it
+disables the queue query and enables the sweep instead, and either list is what an open receipt is
+refreshed from (`visibleSubmissions`).
 
 Two props shape it. `embedded` drops the page card and the Year / Uploaded columns. `studentId`
 scopes the queue to one student (`?student_id=`): passing it **at all** is what scopes, so
@@ -462,6 +479,41 @@ Invalidates `student-ledger`, `cashier-ledger`, NOA, and dashboard queries after
 gate: `module:finance,view` to see the queue, `module:finance,manage` to approve, reject, or correct
 details (see `hasFinanceAbility` in `PaymentReceiptSubmissionController` — the permission is the
 authority, not a role slug list).
+
+#### Duplicates tab — approved receipts sharing a reference number
+`GET /payment-receipt-submissions/duplicates` (`PaymentReceiptSubmissionController::duplicates`,
+`module:finance,view`). Groups **approved** receipts by the reference number their posting carries,
+returning only groups of two or more, each as
+`{reference_number, count, total_amount, student_count, latest_posted_at, submissions[]}` with
+`submissions` **oldest first** — the head of the list got there first and everything under it
+posted on top. Groups come back most-recently-posted first.
+
+Why it exists on top of the pre-post check: that one only catches a duplicate while the reviewer is
+still holding it. It cannot catch the reviewer who posted anyway, a number typed in later on the
+payment-details form, two receipts approved at once by two people, or anything approved before the
+check existed. This is the sweep over money already on the books.
+
+- The reference number is read off the **posting**, not the submission — `payment_transactions`
+  first, `student_payments` for the legacy approvals only ever linked by `student_payment_id`. Both
+  are `LEFT JOIN`ed and both `voided_at`s must be NULL: a voided posting is not a duplicate of
+  anything, since voiding is the outcome this screen sends people to.
+- Grouping folds **case and separators** (`referenceKey()` — uppercase, strip non-alphanumerics),
+  because the number is read off an image by hand and `BDO-778899` / `bdo 778899` is one transfer
+  keyed twice. Each row still shows the number **as posted**, so a mixed group reads as what it is.
+  This is looser than the pre-post check, which compares by MySQL collation.
+- Only approved receipts, and only against each other. A number shared with a collection taken at
+  the till is a different question — one OR legitimately spans several postings there — and mixing
+  it in would bury the case this tab is for.
+- The query runs in two passes: one id-and-string row per approved receipt to find the groups, then
+  a single eager-loaded fetch of just the receipts that turned out to be in one.
+- **It reports and never acts.** `student_count > 1` is usually siblings on one transfer and
+  `total_amount` matching the figure on the image is a deliberate split, so the card shows both and
+  the reviewer decides. Undoing a posting is the void queue's job, against the receipt number.
+  "Open" on a row opens the same modal the Approved tab does, so a wrongly-keyed reference can be
+  corrected in place.
+- Not polled: nothing lands in it without an approval on this screen, which invalidates the
+  `['payment-receipt-submissions']` key anyway. Left off the embedded (Cashiering) copy — a cashier
+  is looking at one student, and auditing the institution's books is not that job.
 
 ### Void Requests (`/finance/void-requests`)
 Visible only when `canRequestVoid` (frontend) — `finance` role or an approver role. Lists
@@ -581,7 +633,8 @@ the academic year. Routed as a sibling of `/finance` in `App.tsx` with its own s
 | `gradeLevelDiscountService` | CRUD `/grade-level-discounts` |
 | `studentAdditionalFeeService` | CRUD `/student-additional-fees` |
 | `paymentVoidService` | GET/POST `/payment-void-requests`, POST `…/{id}/approve`, POST `…/{id}/disapprove` |
-| `paymentReceiptService` | GET/POST `/payment-receipt-submissions` (POST is student multipart upload), POST `…/{id}/approve`, POST `…/{id}/reject`, PUT `…/{id}/payment-details` |
+| `paymentReceiptService` | GET/POST `/payment-receipt-submissions` (POST is student multipart upload), GET `…/duplicates`, POST `…/{id}/approve`, POST `…/{id}/reject`, PUT `…/{id}/payment-details` |
+| `paymentIdentifierService` | GET `/payment-identifiers/holders` — is this OR / reference number already on a live collection? |
 | `paymentPlanService` | CRUD `/payment-plans`, GET `/payment-plan-changes` |
 | `receiptTemplateService` | CRUD `/receipt-templates` |
 | `financeDataClearService` | GET `/finance/data-clear/groups`, GET `/finance/data-clear/history`, POST `/finance/data-clear/preview`, POST `/finance/data-clear` (all behind `module:finance,clear-data`) |
