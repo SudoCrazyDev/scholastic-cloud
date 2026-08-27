@@ -3804,6 +3804,10 @@ const Finance: React.FC = () => {
                     ? 'This will void the payment immediately. A note is required.'
                     : 'This submits a void request to the approval queue. A note is required.'}
                 </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Once voided, this receipt's OR number and reference number are free again and
+                  may be entered on the corrected payment.
+                </p>
               </div>
               <div className="px-5 py-4 space-y-3">
                 <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">

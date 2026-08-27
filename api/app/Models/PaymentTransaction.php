@@ -25,6 +25,7 @@ class PaymentTransaction extends Model
         'amount_tendered',
         'change_due',
         'received_by',
+        'voided_at',
     ];
 
     protected $casts = [
@@ -32,6 +33,17 @@ class PaymentTransaction extends Model
         'total_amount' => 'decimal:2',
         'amount_tendered' => 'decimal:2',
         'change_due' => 'decimal:2',
+        'voided_at' => 'datetime',
+    ];
+
+    /**
+     * Database-generated copies of the two identifiers, holding the number only while
+     * this receipt stands so the unique index releases it on a void. They exist for the
+     * index alone — `or_number` and `reference_number` are what anything reads.
+     */
+    protected $hidden = [
+        'live_or_number',
+        'live_reference_number',
     ];
 
     public function items()

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Models\PaymentTransaction;
 use App\Models\PaymentVoidRequest;
 use App\Models\StudentPayment;
 use App\Models\User;
@@ -282,18 +283,38 @@ class PaymentVoidRequestController extends Controller
     }
 
     /**
-     * Stamp the void on every payment row of the receipt.
+     * Stamp the void on every payment row of the receipt, and on the transaction
+     * header once nothing of it is left standing.
+     *
+     * The header's stamp is what releases the receipt's OR and reference numbers:
+     * the unique index is over the live copy of each number, which goes NULL when
+     * the header is voided, so the cashier may enter that same OR again on the
+     * corrected entry.
      *
      * @param  \Illuminate\Support\Collection<int, StudentPayment>  $payments
      */
     private function applyVoid($payments, ?string $userId, string $note): void
     {
+        $voidedAt = now();
+
         foreach ($payments as $payment) {
             $payment->update([
-                'voided_at' => now(),
+                'voided_at' => $voidedAt,
                 'voided_by' => $userId,
                 'void_note' => $note,
             ]);
+        }
+
+        $transactionIds = $payments->pluck('payment_transaction_id')->filter()->unique();
+
+        foreach ($transactionIds as $transactionId) {
+            $stillStanding = StudentPayment::where('payment_transaction_id', $transactionId)
+                ->whereNull('voided_at')
+                ->exists();
+
+            if (! $stillStanding) {
+                PaymentTransaction::whereKey($transactionId)->update(['voided_at' => $voidedAt]);
+            }
         }
     }
 }

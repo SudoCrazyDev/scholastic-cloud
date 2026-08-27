@@ -18,15 +18,18 @@ use App\Models\StudentPayment;
  * Where uniqueness lives:
  *
  *   - `payment_transactions` is the source of truth and carries a database unique
- *     index per (institution, number). Its `student_payments` line items only
- *     denormalize the header's number, so they are *deliberately* not indexed —
- *     a four-fee receipt legitimately repeats its own OR number four times.
+ *     index per (institution, number) over the live copy of the number — a stored
+ *     column that goes NULL once the header is voided. Its `student_payments` line
+ *     items only denormalize the header's number, so they are *deliberately* not
+ *     indexed — a four-fee receipt legitimately repeats its own OR number four times.
  *   - `student_payments` rows with no `payment_transaction_id` are standalone
  *     payments (the legacy single-fee path), so they hold a number of their own and
  *     are checked here.
  *
- * A voided payment keeps its number reserved. The physical receipt was spoiled, not
- * returned to the booklet, so reissuing it would be the same collision one audit later.
+ * A voided receipt gives its number back. Voiding is mostly the cashier catching their
+ * own keying mistake while the physical OR is still in hand, so the number has to be
+ * enterable again — the voided row keeps showing what it was issued against, but it no
+ * longer holds the number against the next entry.
  */
 class PaymentIdentifierRegistry
 {
@@ -95,6 +98,7 @@ class PaymentIdentifierRegistry
     ): ?string {
         $transaction = PaymentTransaction::where('institution_id', $institutionId)
             ->where($field, $value)
+            ->whereNull('voided_at')
             ->when($exceptTransactionId, fn ($query) => $query->whereKeyNot($exceptTransactionId))
             ->value('receipt_number');
 
@@ -104,6 +108,7 @@ class PaymentIdentifierRegistry
 
         return StudentPayment::where('institution_id', $institutionId)
             ->whereNull('payment_transaction_id')
+            ->whereNull('voided_at')
             ->where($field, $value)
             ->when($exceptPaymentId, fn ($query) => $query->whereKeyNot($exceptPaymentId))
             ->value('receipt_number');

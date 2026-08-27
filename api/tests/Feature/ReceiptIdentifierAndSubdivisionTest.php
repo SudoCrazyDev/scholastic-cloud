@@ -75,6 +75,16 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
         ]);
 
         $this->staffWithRole('Cashier', ['finance.manage', 'finance.view'], 'cashier-token');
+        $this->staffWithRole(
+            'Finance Head',
+            ['finance.manage', 'finance.view', 'finance.request-void', 'finance.approve-void', 'finance.void-immediately'],
+            'void-token'
+        );
+        $this->staffWithRole(
+            'Void Requester',
+            ['finance.manage', 'finance.view', 'finance.request-void'],
+            'requester-token'
+        );
     }
 
     /**
@@ -120,6 +130,15 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
                     ['school_fee_id' => $this->tuition->id, 'amount' => 1000],
                 ],
             ], $overrides));
+    }
+
+    private function voidReceipt(string $receiptNumber, string $token = 'void-token'): \Illuminate\Testing\TestResponse
+    {
+        return $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/payment-void-requests', [
+                'receipt_number' => $receiptNumber,
+                'request_note' => 'Keyed against the wrong student.',
+            ]);
     }
 
     private function pendingSubmission(int $sequence = 1): PaymentReceiptSubmission
@@ -284,6 +303,140 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonStructure(['errors' => ['or_number']]);
+    }
+
+    // ------------------------------------------------------- reuse after a void
+
+    /**
+     * The usual void is the cashier catching their own keying mistake with the physical
+     * OR still in hand. The number has to be enterable again, or that OR can never be
+     * recorded against what it actually collected.
+     */
+    public function test_a_voided_receipt_gives_its_or_number_back(): void
+    {
+        $this->recordPayment(['or_number' => 'OR-1042'])->assertCreated();
+        $this->voidReceipt(PaymentTransaction::first()->receipt_number)->assertCreated();
+
+        $this->recordPayment(['or_number' => 'OR-1042'])->assertCreated();
+
+        // The voided header keeps showing the number it was issued against.
+        $this->assertSame(2, PaymentTransaction::where('or_number', 'OR-1042')->count());
+        $this->assertSame(
+            1,
+            PaymentTransaction::where('or_number', 'OR-1042')->whereNull('voided_at')->count()
+        );
+    }
+
+    public function test_a_voided_receipt_gives_its_reference_number_back(): void
+    {
+        $this->recordPayment(['reference_number' => 'BDO-99381'])->assertCreated();
+        $this->voidReceipt(PaymentTransaction::first()->receipt_number)->assertCreated();
+
+        $this->recordPayment(['reference_number' => 'BDO-99381'])->assertCreated();
+    }
+
+    /**
+     * Both numbers come back together, and the corrected entry is a collection in its
+     * own right — it may settle different fees for a different amount.
+     */
+    public function test_the_corrected_entry_may_carry_both_numbers_again(): void
+    {
+        $this->recordPayment([
+            'or_number' => 'OR-77',
+            'reference_number' => 'BPI-77',
+        ])->assertCreated();
+
+        $this->voidReceipt(PaymentTransaction::first()->receipt_number)->assertCreated();
+
+        $this->recordPayment([
+            'or_number' => 'OR-77',
+            'reference_number' => 'BPI-77',
+            'items' => [
+                ['school_fee_id' => $this->tuition->id, 'amount' => 2000],
+                ['school_fee_id' => $this->miscellaneous->id, 'amount' => 300],
+            ],
+        ])->assertCreated();
+
+        $live = PaymentTransaction::whereNull('voided_at')->get();
+        $this->assertCount(1, $live);
+        $this->assertSame('2300.00', (string) $live->first()->total_amount);
+    }
+
+    /**
+     * A request still waiting on approval has voided nothing yet. Releasing the number
+     * then would hand it out while the original collection still stands.
+     */
+    public function test_a_void_still_waiting_for_approval_holds_the_or_number(): void
+    {
+        $this->recordPayment(['or_number' => 'OR-900'])->assertCreated();
+
+        $this->voidReceipt(PaymentTransaction::first()->receipt_number, 'requester-token')
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'pending');
+
+        $this->recordPayment(['or_number' => 'OR-900'])->assertStatus(422);
+    }
+
+    /**
+     * Approving the queued request is the void, so the number comes back then.
+     */
+    public function test_approving_a_queued_void_releases_the_or_number(): void
+    {
+        $this->recordPayment(['or_number' => 'OR-901'])->assertCreated();
+
+        $requestId = $this->voidReceipt(PaymentTransaction::first()->receipt_number, 'requester-token')
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->withHeader('Authorization', 'Bearer void-token')
+            ->postJson('/api/payment-void-requests/'.$requestId.'/approve')
+            ->assertOk();
+
+        $this->recordPayment(['or_number' => 'OR-901'])->assertCreated();
+    }
+
+    /**
+     * Standalone payments — the legacy single-fee path, with no transaction header —
+     * are held unique in PHP rather than by the index, and follow the same rule.
+     */
+    public function test_a_voided_standalone_payment_gives_its_or_number_back(): void
+    {
+        $single = [
+            'student_id' => $this->student->id,
+            'academic_year' => '2026-2027',
+            'amount' => 750,
+            'school_fee_id' => $this->tuition->id,
+            'or_number' => 'OR-5150',
+        ];
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->postJson('/api/student-payments', $single)
+            ->assertCreated();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->postJson('/api/student-payments', $single)
+            ->assertStatus(422);
+
+        $this->voidReceipt(StudentPayment::first()->receipt_number)->assertCreated();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->postJson('/api/student-payments', $single)
+            ->assertCreated();
+    }
+
+    /**
+     * Voiding one receipt frees that receipt's number and nothing else.
+     */
+    public function test_voiding_one_receipt_leaves_another_receipts_number_held(): void
+    {
+        $this->recordPayment(['or_number' => 'OR-10'])->assertCreated();
+        $this->recordPayment(['or_number' => 'OR-11'])->assertCreated();
+
+        $this->voidReceipt(PaymentTransaction::where('or_number', 'OR-10')->value('receipt_number'))
+            ->assertCreated();
+
+        $this->recordPayment(['or_number' => 'OR-11'])->assertStatus(422);
+        $this->recordPayment(['or_number' => 'OR-10'])->assertCreated();
     }
 
     // ---------------------------------------------------------------- subdivision
