@@ -5,10 +5,8 @@ import { ChevronRightIcon } from '@heroicons/react/24/outline'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { paymentReceiptService } from '../../services/paymentReceiptService'
-import { studentFinanceService } from '../../services/studentFinanceService'
 import type {
   ApproveReceiptSubmissionData,
-  LedgerFeeBreakdown,
   PaymentReceiptSubmission,
   ReceiptSubmissionStatus,
   StudentPayment,
@@ -105,8 +103,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<ReceiptSubmissionStatus>('pending')
   const [reviewTarget, setReviewTarget] = useState<PaymentReceiptSubmission | null>(null)
   const [verifiedAmount, setVerifiedAmount] = useState('')
-  // Per-fee amounts the reviewer is subdividing the receipt across, keyed by fee_id.
-  const [allocations, setAllocations] = useState<Record<string, string>>({})
   const [details, setDetails] = useState<DetailsForm>(EMPTY_DETAILS)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [rejectMode, setRejectMode] = useState(false)
@@ -131,33 +127,9 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const isPendingTarget = reviewTarget?.status === 'pending'
   const postedTransaction = reviewTarget?.payment_transaction ?? null
 
-  /**
-   * The student's own fees for that year, so the reviewer subdivides against real
-   * balances instead of typing fee names from memory. Same source the till reads.
-   */
-  const feeBreakdownQuery = useQuery({
-    queryKey: ['receipt-approval-fees', reviewTarget?.student_id, reviewTarget?.academic_year],
-    queryFn: () =>
-      studentFinanceService.getLedger(reviewTarget!.student_id, reviewTarget!.academic_year),
-    enabled: Boolean(isPendingTarget && reviewTarget?.student_id && reviewTarget?.academic_year),
-  })
-  const feeBreakdown: LedgerFeeBreakdown[] = feeBreakdownQuery.data?.data?.fee_breakdown ?? []
-
-  const verifiedValue = Number(verifiedAmount) || 0
-  const allocatedTotal = useMemo(
-    () =>
-      Math.round(
-        Object.values(allocations).reduce((sum, raw) => sum + (Number(raw) || 0), 0) * 100
-      ) / 100,
-    [allocations]
-  )
-  const unallocated = Math.round((verifiedValue - allocatedTotal) * 100) / 100
-  const overAllocated = unallocated < -0.001
-
   const closeReviewModal = () => {
     setReviewTarget(null)
     setVerifiedAmount('')
-    setAllocations({})
     setDetails(EMPTY_DETAILS)
     setFieldErrors({})
     setRejectMode(false)
@@ -218,7 +190,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const openReviewModal = (submission: PaymentReceiptSubmission) => {
     setReviewTarget(submission)
     setVerifiedAmount(submission.amount != null ? String(submission.amount) : '')
-    setAllocations({})
     setFieldErrors({})
     setRejectMode(false)
     setRejectNote('')
@@ -245,31 +216,17 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       toast.error('Enter the verified amount shown on the receipt.')
       return
     }
-    if (overAllocated) {
-      toast.error('The fees you subdivided across add up to more than the verified amount.')
-      return
-    }
-
-    const lines = feeBreakdown
-      .map((fee) => ({ fee, amount: Number(allocations[fee.fee_id]) || 0 }))
-      .filter(({ amount: value }) => value > 0)
-      .map(({ fee, amount: value }) => ({
-        // Additional fees (ad-hoc charges and late fees) are not school_fees rows, so
-        // they are allocated through additional_fee_id instead.
-        school_fee_id: fee.is_additional ? null : fee.fee_id,
-        additional_fee_id: fee.is_additional ? fee.fee_id : null,
-        amount: value,
-      }))
 
     setFieldErrors({})
     approveMutation.mutate({
       id: reviewTarget.id,
       // Only what the review form actually asked for. Mode, date and remark are left to the
       // API's defaults rather than posted as blanks from fields that are no longer rendered.
+      // No allocations: the whole verified amount posts as one General / Other line, which
+      // is what the API does when it is sent none.
       data: {
         amount,
         reference_number: details.reference_number || undefined,
-        allocations: lines.length ? lines : undefined,
       },
     })
   }
@@ -653,129 +610,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
                 placeholder="0.00"
               />
 
-              {/* Subdividing is optional. What is left over posts as one General / Other
-                  line, so nothing the student paid can go missing by skipping this. */}
-              <div className="rounded-lg border border-gray-200">
-                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900">Subdivide across fees</h4>
-                    <p className="text-xs text-gray-500">
-                      Optional — anything you leave out posts as General / Other.
-                    </p>
-                  </div>
-                  {feeBreakdown.some((fee) => fee.outstanding > 0) && verifiedValue > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        // Spread what was verified over the oldest balances first, so the
-                        // common case is one click rather than a column of typing.
-                        let left = verifiedValue
-                        const next: Record<string, string> = {}
-                        for (const fee of feeBreakdown) {
-                          if (left <= 0) break
-                          if (fee.outstanding <= 0) continue
-                          const take = Math.round(Math.min(left, fee.outstanding) * 100) / 100
-                          next[fee.fee_id] = String(take)
-                          left = Math.round((left - take) * 100) / 100
-                        }
-                        setAllocations(next)
-                      }}
-                    >
-                      Fill from balances
-                    </Button>
-                  )}
-                </div>
-
-                {feeBreakdownQuery.isFetching && !feeBreakdown.length ? (
-                  <p className="px-4 py-6 text-center text-sm text-gray-500">Loading balances…</p>
-                ) : !feeBreakdown.length ? (
-                  <p className="px-4 py-6 text-center text-sm text-gray-500">
-                    No fees charged for {reviewTarget.academic_year} — the whole amount will post as
-                    General / Other.
-                  </p>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {feeBreakdown.map((fee) => (
-                      <div key={fee.fee_id} className="flex items-center gap-4 px-4 py-2.5">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-gray-900">
-                            {fee.fee_name}
-                            {fee.is_additional && (
-                              <span
-                                className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                                  fee.source === 'late_fee'
-                                    ? 'bg-red-50 text-red-600'
-                                    : 'bg-gray-100 text-gray-500'
-                                }`}
-                              >
-                                {fee.source === 'late_fee' ? 'Late fee' : 'Additional'}
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {fee.outstanding <= 0 ? (
-                              <span className="text-green-600">Fully paid</span>
-                            ) : (
-                              <>
-                                Balance:{' '}
-                                <span className="font-medium text-gray-700">
-                                  {formatAmount(fee.outstanding)}
-                                </span>
-                              </>
-                            )}
-                          </p>
-                        </div>
-                        <div className="relative">
-                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                            ₱
-                          </span>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={allocations[fee.fee_id] ?? ''}
-                            onChange={(event) =>
-                              setAllocations((prev) => ({
-                                ...prev,
-                                [fee.fee_id]: event.target.value,
-                              }))
-                            }
-                            placeholder="0.00"
-                            className="w-32 pl-6 text-right"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-4 py-2.5 text-sm">
-                  <span className="text-gray-600">
-                    Allocated{' '}
-                    <span className="font-semibold tabular-nums text-gray-900">
-                      {formatAmount(allocatedTotal)}
-                    </span>
-                  </span>
-                  <span
-                    className={
-                      overAllocated ? 'font-medium text-red-600' : 'text-gray-600'
-                    }
-                  >
-                    {overAllocated ? (
-                      <>Over by {formatAmount(Math.abs(unallocated))}</>
-                    ) : (
-                      <>
-                        General / Other{' '}
-                        <span className="font-semibold tabular-nums text-gray-900">
-                          {formatAmount(unallocated)}
-                        </span>
-                      </>
-                    )}
-                  </span>
-                </div>
-              </div>
 
               <div className="rounded-lg border border-gray-200 p-4 space-y-3">
                 <h4 className="text-sm font-semibold text-gray-900">Payment summary</h4>
@@ -895,7 +729,6 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
                 <Button
                   type="button"
                   loading={approveMutation.isPending}
-                  disabled={overAllocated}
                   onClick={handleApprove}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >

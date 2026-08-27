@@ -79,17 +79,29 @@ views' requests.
   refused with a 422 naming the receipt that already holds it (`errors.or_number`, so the cashier's
   own field lights up). The two are separate namespaces — an OR number does not collide with a
   reference number. Enforced in two places, deliberately:
-  - `payment_transactions` carries the DB unique indexes `(institution_id, or_number)` and
-    `(institution_id, reference_number)`. Blanks are normalized to **NULL**, so any number of
-    receipts may leave a number unissued (MySQL treats each NULL in a unique index as distinct)
-    while two empty strings would have collided.
+  - `payment_transactions` carries the DB unique indexes `(institution_id, live_or_number)` and
+    `(institution_id, live_reference_number)`. Those two columns are **stored generated columns**
+    that mirror `or_number` / `reference_number` while the header stands and go NULL once it is
+    voided — MySQL has no partial index, and this is what lets a voided number be entered again
+    (below). Blanks are normalized to **NULL**, so any number of receipts may leave a number
+    unissued (MySQL treats each NULL in a unique index as distinct) while two empty strings would
+    have collided. The generated pair is `$hidden` on the model: `or_number` and
+    `reference_number` are still what everything reads and writes.
   - `student_payments` is **not** indexed, and must not be: a line item denormalizes its header's
     number, so a four-fee receipt legitimately repeats the same OR number four times. Standalone
     payments there (no `payment_transaction_id` — the legacy single-fee path) are held unique by
     `PaymentIdentifierRegistry` instead, which is also what every write goes through.
-  A **voided** payment keeps its number reserved: the physical receipt was spoiled, not returned to
-  the booklet. Comparison is whatever the MySQL collation says, i.e. case-insensitive; values are
-  trimmed before storing, so `"OR-1042 "` is the same number as `"OR-1042"`.
+  A **voided** receipt gives both numbers back, and the corrected entry may carry them again. A
+  void is usually the cashier catching their own keying mistake — wrong student, wrong amount —
+  with the physical OR still in hand, so reserving the number forever meant that OR could never be
+  recorded against what it actually collected. The voided rows keep showing the number they were
+  issued against; they simply stop holding it. Releasing happens **on the void itself**, not on the
+  request: a void waiting in the approval queue has voided nothing yet, so the number stays held
+  until it is approved. `PaymentVoidRequestController::applyVoid` stamps `voided_at` on every line
+  item and, once none of a header's items are left standing, on `payment_transactions` too — that
+  header stamp is what empties the generated columns. Comparison is whatever the MySQL collation
+  says, i.e. case-insensitive; values are trimmed before storing, so `"OR-1042 "` is the same
+  number as `"OR-1042"`.
 - **Discounts — three different things**:
   1. **Student discounts** (`student_discounts`) — applied to one student for a year, fixed or
      percentage, optionally tied to one fee or **split across fees** via `allocations`. Created
@@ -166,7 +178,9 @@ views' requests.
   required); approver roles approve/disapprove with a review note. **When an approver submits a
   request themselves it is auto-approved and the payment is voided immediately** (backend
   behavior in `PaymentVoidRequestController@store`). Voided payments keep their rows —
-  `student_payments` gets `voided_at/voided_by/void_note`.
+  `student_payments` gets `voided_at/voided_by/void_note`, and the header gets `voided_at` once
+  none of its lines are left standing, which is what hands the receipt's OR and reference numbers
+  back for the corrected entry (see [Receipt identifiers](#core-concepts)).
 - **Void workflow (discounts)** — no queue and no request: the void is immediate, a note is
   required, and the row is kept. Gated by its own role-builder ability, **`discounts.void`**
   ("Void a discount", listed under Discounts as an extra ability), which sits outside
@@ -341,7 +355,9 @@ reference number, amount tendered (change computed client-side). Overpaying a li
 
 A reused OR or reference number comes back as a 422 keyed by field, and the message renders on the
 offending `Input` (cleared as soon as it is retyped); the generic `cashierError` line is suppressed
-while a field error is showing so the same sentence is not printed twice in one card.
+while a field error is showing so the same sentence is not printed twice in one card. A number the
+cashier voided is not reused in that sense — a voided receipt releases both of its numbers, so the
+re-entry that corrects the mistake carries the same OR and reference number and posts normally.
 
 Below the till, `<ReceiptApprovalsView embedded studentId={selectedStudent?.id ?? null} />`
 renders the receipt queue (pending / approved only), **scoped to the selected student** — it
@@ -390,11 +406,12 @@ A scoped queue also drops the **Student** column (their name on every row of the
 noise) and moves the expand chevron into the installment cell so the chevrons still line up.
 
 **Pending → "Review"** opens the receipt image (or a file link for PDFs), a verified-amount input,
-a **Subdivide across fees** panel, and a **Payment summary** block:
-- The fee rows come from the student's own `GET /students/{id}/ledger` `fee_breakdown` — the same
-  source the till reads — so the reviewer allocates against real balances. "Fill from balances"
-  spreads the verified amount oldest-first. A running footer shows *Allocated* and what will post
-  as *General / Other*, and turns red (blocking Approve) when the split exceeds the amount.
+and a **Payment summary** block. There is no allocation step: the reviewer reads the amount off the
+image and posts it, and the whole amount lands as one "General / Other" line — which is what the
+API does when it is sent no allocations. (An earlier build let the reviewer subdivide the amount
+across the student's outstanding fees here; that was removed on request. The approve endpoint still
+takes `allocations[]`, so the panel could come back without a backend change, and the queue still
+renders whatever split a transaction happens to carry.)
 - Payment summary is **only the reference number** — on a review and on an approved receipt
   alike, and it is the single thing this screen writes. Everything else about how the money
   arrived is already settled by the uploaded receipt: the mode is an online transfer, the date
@@ -451,7 +468,9 @@ authority, not a role slug list).
 Visible only when `canRequestVoid` (frontend) — `finance` role or an approver role. Lists
 `GET /payment-void-requests?status=` with a status filter. Approvers — `finance` included — get
 Approve / Disapprove (review note required for disapprove). Approving voids the underlying
-payment(s); the view invalidates ledger/NOA queries afterwards.
+payment(s) and releases the receipt's OR and reference numbers for re-entry; the view invalidates
+ledger/NOA queries afterwards. The void modal on the ledger says so, so a cashier keying the
+correction knows the OR in their hand is still enterable.
 
 ### Setup → School Fees (`/finance/school-fees`)
 CRUD on the fee catalog (`name`, `description`, `is_active`) via `/school-fees`.
@@ -578,7 +597,7 @@ All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 |---|---|
 | `school_fees` | Fee catalog. unique(institution_id, name), `is_active` |
 | `school_fee_defaults` | Amount per fee+grade+year. unique(school_fee_id, grade_level, academic_year) |
-| `payment_transactions` | Receipt header: `receipt_number` (unique), `total_amount`, `amount_tendered`, `change_due`, `or_number`-era fields |
+| `payment_transactions` | Receipt header: `receipt_number` (unique), `total_amount`, `amount_tendered`, `change_due`, `or_number`/`reference_number` (each unique per institution while the header stands, via the generated `live_*` columns), `voided_at` |
 | `student_payments` | Payment **lines**: nullable `school_fee_id` **or** `student_additional_fee_id` (mutually exclusive), `payment_transaction_id`, `receipt_number` (shared across lines), void columns (`voided_at/voided_by/void_note`) |
 | `student_discounts` | Per-student discount: `discount_type` fixed/percentage, nullable `school_fee_id`, void columns |
 | `default_discounts` | Reusable templates. unique(institution_id, name) |
