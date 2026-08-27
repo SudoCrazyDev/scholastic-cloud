@@ -6,30 +6,31 @@ use App\Models\PaymentTransaction;
 use App\Models\StudentPayment;
 
 /**
- * Keeps a school's receipt identifiers — the OR number and the reference number —
- * unique within the institution.
+ * Tells the cashier when a receipt identifier — the OR number or the reference number —
+ * is already on another collection. It does not stop them.
  *
- * Both stay optional: a school that does not issue an official receipt at the till,
- * or takes cash with nothing to reference, records neither. But a number that *is*
- * entered names one collection and only one, because that is what it is for —
- * reconciling against the physical OR booklet or the bank's own record. Two payments
- * carrying the same OR number make both unreconcilable.
+ * These were briefly held unique per institution, on the reasoning that a number names
+ * one collection and two of them make both unreconcilable. Real books say otherwise. A
+ * school writes one OR across several postings all the time: the tuition and the ₱60
+ * that came with it go in as two entries, siblings pay together on one receipt, an
+ * installment is settled in two goes. Refusing the second entry does not make the books
+ * tidier — it stops the cashier recording money that was actually collected.
  *
- * Where uniqueness lives:
+ * So the number is free, and a reuse is surfaced instead: the write goes through and the
+ * response carries a warning naming what already holds it, which is enough for the
+ * cashier to catch the case they *did* mean to catch — the same entry keyed twice.
  *
- *   - `payment_transactions` is the source of truth and carries a database unique
- *     index per (institution, number) over the live copy of the number — a stored
- *     column that goes NULL once the header is voided. Its `student_payments` line
- *     items only denormalize the header's number, so they are *deliberately* not
- *     indexed — a four-fee receipt legitimately repeats its own OR number four times.
- *   - `student_payments` rows with no `payment_transaction_id` are standalone
- *     payments (the legacy single-fee path), so they hold a number of their own and
- *     are checked here.
+ * Where the numbers live:
  *
- * A voided receipt gives its number back. Voiding is mostly the cashier catching their
- * own keying mistake while the physical OR is still in hand, so the number has to be
- * enterable again — the voided row keeps showing what it was issued against, but it no
- * longer holds the number against the next entry.
+ *   - `payment_transactions` is the header, and its `student_payments` line items
+ *     denormalize its number — a four-fee receipt repeats its own OR number four times,
+ *     which is why the line items are never counted as separate holders.
+ *   - `student_payments` rows with no `payment_transaction_id` are standalone payments
+ *     (the legacy single-fee path) and hold a number of their own.
+ *
+ * A voided receipt is not a holder. Voiding is usually the cashier catching their own
+ * keying mistake with the physical OR still in hand, and warning them about the entry
+ * they just took back is noise on the one path where reuse is certainly correct.
  */
 class PaymentIdentifierRegistry
 {
@@ -42,9 +43,8 @@ class PaymentIdentifierRegistry
     ];
 
     /**
-     * Blank means "not issued", which is not a value that can collide. Stored as
-     * NULL so the unique index treats each omission as distinct — an empty string
-     * would collide with the next blank one.
+     * Blank means "not issued". Stored as NULL rather than an empty string so a receipt
+     * that leaves a number off does not read as one carrying the number "".
      */
     public static function normalize(mixed $value): ?string
     {
@@ -54,20 +54,24 @@ class PaymentIdentifierRegistry
     }
 
     /**
-     * Which of the given identifiers are already spoken for in this institution.
+     * Which of the given identifiers are already on another live collection.
+     *
+     * Shaped like Laravel's validation errors — keyed by field, a list of sentences —
+     * so the same screen can render them beside the same input it renders errors on.
+     * They ride along with a successful write, so an empty array is the ordinary case.
      *
      * @param  array<string, string|null>  $values  keyed by field name
-     * @param  string|null  $exceptTransactionId  the transaction being edited, which may keep its own number
+     * @param  string|null  $exceptTransactionId  the transaction being edited, which is not its own duplicate
      * @param  string|null  $exceptPaymentId  the standalone payment being edited, likewise
-     * @return array<string, string[]>  Laravel-shaped validation errors, empty when all are free
+     * @return array<string, string[]>
      */
-    public static function conflicts(
+    public static function warnings(
         string $institutionId,
         array $values,
         ?string $exceptTransactionId = null,
         ?string $exceptPaymentId = null
     ): array {
-        $errors = [];
+        $warnings = [];
 
         foreach (self::LABELS as $field => $label) {
             $value = self::normalize($values[$field] ?? null);
@@ -75,42 +79,83 @@ class PaymentIdentifierRegistry
                 continue;
             }
 
-            $holder = self::holderOf($institutionId, $field, $value, $exceptTransactionId, $exceptPaymentId);
-            if ($holder !== null) {
-                $errors[$field] = [
-                    sprintf('This %s is already recorded on receipt %s.', $label, $holder),
-                ];
+            $holders = self::holdersOf($institutionId, $field, $value, $exceptTransactionId, $exceptPaymentId);
+            if ($holders === []) {
+                continue;
             }
+
+            $warnings[$field] = [self::sentence($label, $value, $holders)];
         }
 
-        return $errors;
+        return $warnings;
     }
 
     /**
-     * The receipt number of whatever already holds this identifier, or null when it is free.
+     * One sentence naming the most recent holder, and how many others there are.
+     *
+     * @param  array<int, array{receipt_number: string|null, student: string|null, payment_date: string|null}>  $holders
      */
-    private static function holderOf(
+    private static function sentence(string $label, string $value, array $holders): string
+    {
+        $first = $holders[0];
+        $where = 'receipt ' . ($first['receipt_number'] ?: 'an earlier collection');
+
+        if ($first['student']) {
+            $where .= ' for ' . $first['student'];
+        }
+        if ($first['payment_date']) {
+            $where .= ' on ' . $first['payment_date'];
+        }
+
+        $others = count($holders) - 1;
+        $rest = match (true) {
+            $others === 1 => ', and 1 other collection',
+            $others > 1 => sprintf(', and %d other collections', $others),
+            default => '',
+        };
+
+        return sprintf('%s %s is already on %s%s. Post it again only if that is a separate collection.', $label, $value, $where, $rest);
+    }
+
+    /**
+     * Live collections already carrying this identifier, newest first.
+     *
+     * @return array<int, array{receipt_number: string|null, student: string|null, payment_date: string|null}>
+     */
+    private static function holdersOf(
         string $institutionId,
         string $field,
         string $value,
         ?string $exceptTransactionId,
         ?string $exceptPaymentId
-    ): ?string {
-        $transaction = PaymentTransaction::where('institution_id', $institutionId)
+    ): array {
+        $transactions = PaymentTransaction::query()
+            ->with('student:id,first_name,last_name')
+            ->where('institution_id', $institutionId)
             ->where($field, $value)
             ->whereNull('voided_at')
             ->when($exceptTransactionId, fn ($query) => $query->whereKeyNot($exceptTransactionId))
-            ->value('receipt_number');
+            ->orderByDesc('created_at')
+            ->get(['id', 'student_id', 'receipt_number', 'payment_date', 'created_at']);
 
-        if ($transaction !== null) {
-            return $transaction;
-        }
-
-        return StudentPayment::where('institution_id', $institutionId)
+        $standalone = StudentPayment::query()
+            ->with('student:id,first_name,last_name')
+            ->where('institution_id', $institutionId)
             ->whereNull('payment_transaction_id')
             ->whereNull('voided_at')
             ->where($field, $value)
             ->when($exceptPaymentId, fn ($query) => $query->whereKeyNot($exceptPaymentId))
-            ->value('receipt_number');
+            ->orderByDesc('created_at')
+            ->get(['id', 'student_id', 'receipt_number', 'payment_date', 'created_at']);
+
+        return $transactions->concat($standalone)
+            ->sortByDesc('created_at')
+            ->map(fn ($holder) => [
+                'receipt_number' => $holder->receipt_number,
+                'student' => trim(($holder->student?->first_name ?? '') . ' ' . ($holder->student?->last_name ?? '')) ?: null,
+                'payment_date' => $holder->payment_date?->format('M j, Y'),
+            ])
+            ->values()
+            ->all();
     }
 }

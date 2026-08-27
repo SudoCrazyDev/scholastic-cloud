@@ -83,6 +83,13 @@ export interface ApiResponse<T = any> {
   data: T;
   message?: string;
   success: boolean;
+  /**
+   * Notes that ride along with a successful write â€” the write happened regardless.
+   * Keyed by field so a screen can render one beside the input it belongs to, the
+   * way it renders a validation error. Cashiering uses it to say an OR number is
+   * already on another collection, which is allowed but worth a second look.
+   */
+  warnings?: Record<string, string[]>;
 }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {

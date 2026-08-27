@@ -144,6 +144,17 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
   }
 
+  /**
+   * A reference or OR number may sit on more than one collection — the till and the
+   * queue draw on one booklet and a school splits a receipt across postings — so the
+   * write goes through and says what already holds the number.
+   */
+  const showIdentifierWarnings = (warnings?: Record<string, string[]>) => {
+    Object.values(warnings ?? {}).forEach((messages) => {
+      messages.forEach((message) => toast(message, { icon: '⚠️', duration: 8000 }))
+    })
+  }
+
   const approveMutation = useMutation({
     mutationFn: (payload: { id: string; data: ApproveReceiptSubmissionData }) =>
       paymentReceiptService.approve(payload.id, payload.data),
@@ -151,6 +162,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       closeReviewModal()
       invalidateAfterReview()
       toast.success(response.message || 'Receipt approved. Payment posted.')
+      showIdentifierWarnings(response.warnings)
     },
     onError: (error: unknown) => {
       setFieldErrors(extractFieldErrors(error))
@@ -167,6 +179,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       setFieldErrors({})
       invalidateAfterReview()
       toast.success(response.message || 'Payment details updated.')
+      showIdentifierWarnings(response.warnings)
     },
     onError: (error: unknown) => {
       setFieldErrors(extractFieldErrors(error))

@@ -830,12 +830,19 @@ const Finance: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
       queryClient.invalidateQueries({ queryKey: ['cashier-ledger'] })
       toast.success(`Payment recorded. Receipt: ${response.data.receipt_number}`)
+      // An OR number may cover several postings, so a reused one is recorded and
+      // reported rather than refused. Said after the success toast and left up longer:
+      // the cashier is being asked to check a receipt that already exists, not to fix
+      // this one.
+      Object.values(response.warnings ?? {}).forEach((messages) => {
+        messages.forEach((message) => toast(message, { icon: '⚠️', duration: 8000 }))
+      })
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to record payment.'
       setCashierError(message)
-      // A reused OR or reference number comes back keyed by field, so the cashier's own
-      // input is what lights up rather than only a toast they have to trace back.
+      // Validation errors come back keyed by field, so the cashier's own input is what
+      // lights up rather than only a toast they have to trace back.
       setCashierFieldErrors(error.response?.data?.errors ?? {})
       toast.error(message)
     },
@@ -3805,8 +3812,8 @@ const Finance: React.FC = () => {
                     : 'This submits a void request to the approval queue. A note is required.'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Once voided, this receipt's OR number and reference number are free again and
-                  may be entered on the corrected payment.
+                  The OR number and reference number on this receipt may be entered again on the
+                  corrected payment.
                 </p>
               </div>
               <div className="px-5 py-4 space-y-3">

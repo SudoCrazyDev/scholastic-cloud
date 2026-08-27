@@ -18,11 +18,12 @@ use Tests\TestCase;
 /**
  * Two changes to how a collection is identified and described.
  *
- * **A receipt identifier names one collection.** The OR number and the reference number
- * stay optional — plenty of schools take cash with neither — but one that is entered is
- * what the school reconciles against the physical OR booklet or the bank statement. Two
- * payments carrying the same number make both of them unreconcilable, so the second one
- * is refused rather than accepted and discovered at audit.
+ * **A reused receipt identifier is reported, not refused.** The OR number and the
+ * reference number stay optional — plenty of schools take cash with neither — and a
+ * school reuses one legitimately: an OR covers the tuition and the ₱60 that came with
+ * it as two postings, siblings pay on one receipt, an installment is settled in two
+ * goes. So the second entry posts, and the response names what already holds the
+ * number, which is what catches the case worth catching — the same entry keyed twice.
  *
  * **An approved receipt says what it settled.** Approving a student's uploaded proof of
  * payment used to write one unallocated payment: the ledger read "Payment" against no fee
@@ -166,25 +167,57 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
         $this->assertSame(2, PaymentTransaction::whereNull('or_number')->count());
     }
 
-    public function test_a_second_receipt_cannot_reuse_an_or_number(): void
+    public function test_a_second_receipt_may_reuse_an_or_number_and_says_who_holds_it(): void
     {
         $this->recordPayment(['or_number' => 'OR-1042'])->assertCreated();
+        $held = PaymentTransaction::first()->receipt_number;
 
-        $this->recordPayment(['or_number' => 'OR-1042'])
-            ->assertStatus(422)
-            ->assertJsonPath('errors.or_number.0', 'This OR number is already recorded on receipt '
-                .PaymentTransaction::first()->receipt_number.'.');
+        $response = $this->recordPayment(['or_number' => 'OR-1042'])->assertCreated();
 
-        $this->assertSame(1, PaymentTransaction::count());
+        $this->assertStringContainsString(
+            'OR number OR-1042 is already on receipt '.$held,
+            $response->json('warnings.or_number.0')
+        );
+        $this->assertStringContainsString('Paying Student', $response->json('warnings.or_number.0'));
+
+        // Both collections are on the books — the warning is a note, not a refusal.
+        $this->assertSame(2, PaymentTransaction::where('or_number', 'OR-1042')->count());
     }
 
-    public function test_a_second_receipt_cannot_reuse_a_reference_number(): void
+    public function test_a_second_receipt_may_reuse_a_reference_number(): void
     {
         $this->recordPayment(['reference_number' => 'BDO-99381'])->assertCreated();
 
         $this->recordPayment(['reference_number' => 'BDO-99381'])
-            ->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['reference_number']]);
+            ->assertCreated()
+            ->assertJsonStructure(['warnings' => ['reference_number']]);
+    }
+
+    /**
+     * The ordinary receipt carries no warning at all — an unremarkable collection must
+     * not train the cashier to click past one.
+     */
+    public function test_a_first_use_of_a_number_warns_about_nothing(): void
+    {
+        $this->recordPayment(['or_number' => 'OR-1', 'reference_number' => 'BDO-1'])
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
+    }
+
+    /**
+     * A third posting on the same OR counts the ones before it rather than naming only
+     * the last, so the cashier can tell "the split I expected" from "this is the fourth
+     * time".
+     */
+    public function test_the_warning_counts_the_collections_already_holding_the_number(): void
+    {
+        $this->recordPayment(['or_number' => 'OR-77'])->assertCreated();
+        $this->recordPayment(['or_number' => 'OR-77'])->assertCreated();
+
+        $this->assertStringContainsString(
+            'and 1 other collection',
+            $this->recordPayment(['or_number' => 'OR-77'])->assertCreated()->json('warnings.or_number.0')
+        );
     }
 
     /**
@@ -194,7 +227,9 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
     public function test_an_or_number_does_not_collide_with_a_reference_number(): void
     {
         $this->recordPayment(['or_number' => 'S-7'])->assertCreated();
-        $this->recordPayment(['reference_number' => 'S-7'])->assertCreated();
+        $this->recordPayment(['reference_number' => 'S-7'])
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
     }
 
     /**
@@ -204,7 +239,12 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
     public function test_a_padded_or_number_is_the_same_number(): void
     {
         $this->recordPayment(['or_number' => 'OR-1042'])->assertCreated();
-        $this->recordPayment(['or_number' => '  OR-1042  '])->assertStatus(422);
+
+        $this->recordPayment(['or_number' => '  OR-1042  '])
+            ->assertCreated()
+            ->assertJsonStructure(['warnings' => ['or_number']]);
+
+        $this->assertSame(2, PaymentTransaction::where('or_number', 'OR-1042')->count());
     }
 
     public function test_a_blank_or_number_is_stored_as_nothing_rather_than_an_empty_string(): void
@@ -218,7 +258,7 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
      * Uniqueness is per school. Two institutions on the same deployment issue their own
      * OR booklets and both start at 1.
      */
-    public function test_another_school_may_use_the_same_or_number(): void
+    public function test_another_school_using_the_same_or_number_is_not_worth_a_warning(): void
     {
         $this->recordPayment(['or_number' => 'OR-1'])->assertCreated();
 
@@ -267,7 +307,8 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
                 'or_number' => 'OR-1',
                 'items' => [['school_fee_id' => $otherFee->id, 'amount' => 500]],
             ])
-            ->assertCreated();
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
     }
 
     /**
@@ -289,35 +330,42 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
     }
 
     /**
-     * The till and the approval queue draw on one booklet, so a number used in either
-     * place is used in both.
+     * The till and the approval queue draw on one booklet, so an approver reusing a
+     * number the till already wrote hears about it — and still posts.
      */
-    public function test_an_approval_cannot_reuse_a_cashiers_or_number(): void
+    public function test_an_approval_reusing_a_cashiers_or_number_is_warned_and_posts(): void
     {
         $this->recordPayment(['or_number' => 'OR-500'])->assertCreated();
+        $submission = $this->pendingSubmission();
 
         $this->withHeader('Authorization', 'Bearer cashier-token')
-            ->postJson('/api/payment-receipt-submissions/'.$this->pendingSubmission()->id.'/approve', [
+            ->postJson('/api/payment-receipt-submissions/'.$submission->id.'/approve', [
                 'amount' => 3500,
                 'or_number' => 'OR-500',
             ])
-            ->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['or_number']]);
+            ->assertOk()
+            ->assertJsonStructure(['warnings' => ['or_number']]);
+
+        $this->assertSame('approved', $submission->fresh()->status);
+        $this->assertSame('OR-500', $submission->fresh()->paymentTransaction->or_number);
     }
 
-    // ------------------------------------------------------- reuse after a void
+    // ------------------------------------------------- a voided receipt holds nothing
 
     /**
-     * The usual void is the cashier catching their own keying mistake with the physical
-     * OR still in hand. The number has to be enterable again, or that OR can never be
-     * recorded against what it actually collected.
+     * Re-keying a void is the one reuse that is certainly right: the cashier caught
+     * their own mistake with the physical OR still in hand, and the receipt they took
+     * back is not a collection any more. Warning them about it would be noise on the
+     * one path where the warning can never mean anything.
      */
-    public function test_a_voided_receipt_gives_its_or_number_back(): void
+    public function test_a_voided_receipt_is_not_reported_as_holding_its_or_number(): void
     {
         $this->recordPayment(['or_number' => 'OR-1042'])->assertCreated();
         $this->voidReceipt(PaymentTransaction::first()->receipt_number)->assertCreated();
 
-        $this->recordPayment(['or_number' => 'OR-1042'])->assertCreated();
+        $this->recordPayment(['or_number' => 'OR-1042'])
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
 
         // The voided header keeps showing the number it was issued against.
         $this->assertSame(2, PaymentTransaction::where('or_number', 'OR-1042')->count());
@@ -327,46 +375,41 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
         );
     }
 
-    public function test_a_voided_receipt_gives_its_reference_number_back(): void
+    public function test_a_voided_receipt_is_not_reported_as_holding_its_reference_number(): void
     {
         $this->recordPayment(['reference_number' => 'BDO-99381'])->assertCreated();
         $this->voidReceipt(PaymentTransaction::first()->receipt_number)->assertCreated();
 
-        $this->recordPayment(['reference_number' => 'BDO-99381'])->assertCreated();
+        $this->recordPayment(['reference_number' => 'BDO-99381'])
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
     }
 
     /**
-     * Both numbers come back together, and the corrected entry is a collection in its
-     * own right — it may settle different fees for a different amount.
+     * The void stamps the header, not just its line items — that is what the warning
+     * reads to decide a collection no longer stands.
      */
-    public function test_the_corrected_entry_may_carry_both_numbers_again(): void
+    public function test_voiding_every_line_marks_the_receipt_header_voided(): void
     {
         $this->recordPayment([
             'or_number' => 'OR-77',
-            'reference_number' => 'BPI-77',
-        ])->assertCreated();
-
-        $this->voidReceipt(PaymentTransaction::first()->receipt_number)->assertCreated();
-
-        $this->recordPayment([
-            'or_number' => 'OR-77',
-            'reference_number' => 'BPI-77',
             'items' => [
                 ['school_fee_id' => $this->tuition->id, 'amount' => 2000],
                 ['school_fee_id' => $this->miscellaneous->id, 'amount' => 300],
             ],
         ])->assertCreated();
 
-        $live = PaymentTransaction::whereNull('voided_at')->get();
-        $this->assertCount(1, $live);
-        $this->assertSame('2300.00', (string) $live->first()->total_amount);
+        $this->voidReceipt(PaymentTransaction::first()->receipt_number)->assertCreated();
+
+        $this->assertNotNull(PaymentTransaction::first()->voided_at);
+        $this->assertSame(0, StudentPayment::whereNull('voided_at')->count());
     }
 
     /**
-     * A request still waiting on approval has voided nothing yet. Releasing the number
-     * then would hand it out while the original collection still stands.
+     * A request still waiting on approval has voided nothing yet, so the collection it
+     * is about still stands and still shows up.
      */
-    public function test_a_void_still_waiting_for_approval_holds_the_or_number(): void
+    public function test_a_void_still_waiting_for_approval_still_holds_the_or_number(): void
     {
         $this->recordPayment(['or_number' => 'OR-900'])->assertCreated();
 
@@ -374,13 +417,15 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.status', 'pending');
 
-        $this->recordPayment(['or_number' => 'OR-900'])->assertStatus(422);
+        $this->recordPayment(['or_number' => 'OR-900'])
+            ->assertCreated()
+            ->assertJsonStructure(['warnings' => ['or_number']]);
     }
 
     /**
-     * Approving the queued request is the void, so the number comes back then.
+     * Approving the queued request is the void, so it goes quiet then.
      */
-    public function test_approving_a_queued_void_releases_the_or_number(): void
+    public function test_approving_a_queued_void_stops_the_warning(): void
     {
         $this->recordPayment(['or_number' => 'OR-901'])->assertCreated();
 
@@ -392,14 +437,16 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
             ->postJson('/api/payment-void-requests/'.$requestId.'/approve')
             ->assertOk();
 
-        $this->recordPayment(['or_number' => 'OR-901'])->assertCreated();
+        $this->recordPayment(['or_number' => 'OR-901'])
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
     }
 
     /**
      * Standalone payments — the legacy single-fee path, with no transaction header —
-     * are held unique in PHP rather than by the index, and follow the same rule.
+     * are read the same way.
      */
-    public function test_a_voided_standalone_payment_gives_its_or_number_back(): void
+    public function test_a_voided_standalone_payment_is_not_reported_either(): void
     {
         $single = [
             'student_id' => $this->student->id,
@@ -415,19 +462,23 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
 
         $this->withHeader('Authorization', 'Bearer cashier-token')
             ->postJson('/api/student-payments', $single)
-            ->assertStatus(422);
+            ->assertCreated()
+            ->assertJsonStructure(['warnings' => ['or_number']]);
 
-        $this->voidReceipt(StudentPayment::first()->receipt_number)->assertCreated();
+        StudentPayment::whereNull('voided_at')->get()->each(
+            fn ($payment) => $this->voidReceipt($payment->receipt_number)->assertCreated()
+        );
 
         $this->withHeader('Authorization', 'Bearer cashier-token')
             ->postJson('/api/student-payments', $single)
-            ->assertCreated();
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
     }
 
     /**
-     * Voiding one receipt frees that receipt's number and nothing else.
+     * Voiding one receipt quiets that receipt and nothing else.
      */
-    public function test_voiding_one_receipt_leaves_another_receipts_number_held(): void
+    public function test_voiding_one_receipt_leaves_another_receipt_reported(): void
     {
         $this->recordPayment(['or_number' => 'OR-10'])->assertCreated();
         $this->recordPayment(['or_number' => 'OR-11'])->assertCreated();
@@ -435,8 +486,12 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
         $this->voidReceipt(PaymentTransaction::where('or_number', 'OR-10')->value('receipt_number'))
             ->assertCreated();
 
-        $this->recordPayment(['or_number' => 'OR-11'])->assertStatus(422);
-        $this->recordPayment(['or_number' => 'OR-10'])->assertCreated();
+        $this->recordPayment(['or_number' => 'OR-11'])
+            ->assertCreated()
+            ->assertJsonStructure(['warnings' => ['or_number']]);
+        $this->recordPayment(['or_number' => 'OR-10'])
+            ->assertCreated()
+            ->assertJsonMissingPath('warnings');
     }
 
     // ---------------------------------------------------------------- subdivision
@@ -708,7 +763,7 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
         $this->assertSame('GCash', $submission->fresh()->paymentTransaction->payment_method);
     }
 
-    public function test_correcting_details_cannot_take_another_receipts_or_number(): void
+    public function test_correcting_details_onto_another_receipts_or_number_warns_and_saves(): void
     {
         $this->recordPayment(['or_number' => 'OR-TAKEN'])->assertCreated();
 
@@ -721,10 +776,32 @@ class ReceiptIdentifierAndSubdivisionTest extends TestCase
             ->putJson('/api/payment-receipt-submissions/'.$submission->id.'/payment-details', [
                 'or_number' => 'OR-TAKEN',
             ])
-            ->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['or_number']]);
+            ->assertOk()
+            ->assertJsonStructure(['warnings' => ['or_number']]);
 
-        $this->assertNull($submission->fresh()->paymentTransaction->or_number);
+        $this->assertSame('OR-TAKEN', $submission->fresh()->paymentTransaction->or_number);
+    }
+
+    /**
+     * Re-saving the same receipt is not a reuse of its own number.
+     */
+    public function test_correcting_details_does_not_warn_about_the_receipt_itself(): void
+    {
+        $submission = $this->pendingSubmission();
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->postJson('/api/payment-receipt-submissions/'.$submission->id.'/approve', [
+                'amount' => 1000,
+                'or_number' => 'OR-OWN',
+            ])
+            ->assertOk();
+
+        $this->withHeader('Authorization', 'Bearer cashier-token')
+            ->putJson('/api/payment-receipt-submissions/'.$submission->id.'/payment-details', [
+                'or_number' => 'OR-OWN',
+                'remarks' => 'Written up at end of day.',
+            ])
+            ->assertOk()
+            ->assertJsonMissingPath('warnings');
     }
 
     public function test_a_pending_receipt_has_no_payment_details_to_edit(): void

@@ -131,14 +131,10 @@ class StudentPaymentController extends Controller
         $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
         $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
 
-        $taken = PaymentIdentifierRegistry::conflicts($institutionId, [
+        $identifierWarnings = PaymentIdentifierRegistry::warnings($institutionId, [
             'or_number' => $orNumber,
             'reference_number' => $referenceNumber,
         ]);
-
-        if ($taken) {
-            return $this->duplicateIdentifierResponse($taken);
-        }
 
         if (!empty($validated['school_fee_id']) && !empty($validated['additional_fee_id'])) {
             return response()->json([
@@ -191,11 +187,12 @@ class StudentPaymentController extends Controller
 
         $payment->load(['schoolFee', 'additionalFee', 'student']);
 
-        return response()->json([
+        return response()->json(array_filter([
             'success' => true,
             'message' => 'Payment recorded successfully',
-            'data' => $payment
-        ], 201);
+            'data' => $payment,
+            'warnings' => $identifierWarnings,
+        ]), 201);
     }
 
     /**
@@ -247,19 +244,16 @@ class StudentPaymentController extends Controller
             ], $badAllocation['status']);
         }
 
-        // Both identifiers stay optional, but one the cashier does enter has to name
-        // this collection alone or it reconciles against nothing.
+        // Both identifiers stay optional and neither is held unique: one OR routinely
+        // covers several postings. A number already in use is reported back with the
+        // receipt rather than refused — see PaymentIdentifierRegistry.
         $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
         $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
 
-        $taken = PaymentIdentifierRegistry::conflicts($institutionId, [
+        $identifierWarnings = PaymentIdentifierRegistry::warnings($institutionId, [
             'or_number' => $orNumber,
             'reference_number' => $referenceNumber,
         ]);
-
-        if ($taken) {
-            return $this->duplicateIdentifierResponse($taken);
-        }
 
         $totalAmount = collect($validated['items'])->sum(fn ($item) => (float) $item['amount']);
         $totalAmount = round($totalAmount, 2);
@@ -320,11 +314,12 @@ class StudentPaymentController extends Controller
 
         $transaction->load(['items.schoolFee', 'items.additionalFee', 'student', 'receivedBy']);
 
-        return response()->json([
+        return response()->json(array_filter([
             'success' => true,
             'message' => 'Payment recorded successfully',
-            'data' => $transaction
-        ], 201);
+            'data' => $transaction,
+            'warnings' => $identifierWarnings,
+        ]), 201);
     }
 
     /**
@@ -412,15 +407,6 @@ class StudentPaymentController extends Controller
      *
      * @param  array<string, string[]>  $errors
      */
-    private function duplicateIdentifierResponse(array $errors): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => collect($errors)->flatten()->implode(' '),
-            'errors' => $errors,
-        ], 422);
-    }
-
     /**
      * Guard additional-fee allocations: every referenced charge must belong to this
      * institution, student, and academic year. Returns an error response, or null when

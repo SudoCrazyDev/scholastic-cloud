@@ -234,14 +234,10 @@ class PaymentReceiptSubmissionController extends Controller
         $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
         $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
 
-        $taken = PaymentIdentifierRegistry::conflicts($institutionId, [
+        $identifierWarnings = PaymentIdentifierRegistry::warnings($institutionId, [
             'or_number' => $orNumber,
             'reference_number' => $referenceNumber,
         ]);
-
-        if ($taken) {
-            return $this->duplicateIdentifierResponse($taken);
-        }
 
         $userId = $request->user()?->id;
         $label = $submission->installment_label
@@ -326,11 +322,12 @@ class PaymentReceiptSubmissionController extends Controller
             ]);
         });
 
-        return response()->json([
+        return response()->json(array_filter([
             'success' => true,
             'message' => 'Receipt approved. Payment posted to the student ledger.',
             'data' => $this->withReviewContext($submission),
-        ]);
+            'warnings' => $identifierWarnings,
+        ]));
     }
 
     /**
@@ -385,15 +382,11 @@ class PaymentReceiptSubmissionController extends Controller
         $orNumber = PaymentIdentifierRegistry::normalize($validated['or_number'] ?? null);
         $referenceNumber = PaymentIdentifierRegistry::normalize($validated['reference_number'] ?? null);
 
-        $taken = PaymentIdentifierRegistry::conflicts(
+        $identifierWarnings = PaymentIdentifierRegistry::warnings(
             $institutionId,
             ['or_number' => $orNumber, 'reference_number' => $referenceNumber],
             $transaction->id
         );
-
-        if ($taken) {
-            return $this->duplicateIdentifierResponse($taken);
-        }
 
         // Only what the request actually carried. A field that is absent is left exactly as
         // the approval posted it rather than being nulled by omission: the screen edits the
@@ -427,11 +420,12 @@ class PaymentReceiptSubmissionController extends Controller
             });
         }
 
-        return response()->json([
+        return response()->json(array_filter([
             'success' => true,
             'message' => 'Payment details updated.',
             'data' => $this->withReviewContext($submission),
-        ]);
+            'warnings' => $identifierWarnings,
+        ]));
     }
 
     /**
@@ -462,15 +456,6 @@ class PaymentReceiptSubmissionController extends Controller
     /**
      * @param  array<string, string[]>  $errors
      */
-    private function duplicateIdentifierResponse(array $errors): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => collect($errors)->flatten()->implode(' '),
-            'errors' => $errors,
-        ], 422);
-    }
-
     /**
      * Reject a pending submission with a required reason.
      */

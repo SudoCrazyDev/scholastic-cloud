@@ -1,25 +1,26 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     /**
-     * An OR number and a reference number stay optional, but each one a school does
-     * enter now names a single collection within that institution.
+     * Blanks in the two receipt identifiers become NULL: "not issued" is an absence, not
+     * the number "".
      *
-     * The index goes on `payment_transactions` only. Its `student_payments` line items
-     * repeat the header's number by design — a receipt settling four fees writes the
-     * same OR number on all four rows — so indexing them would forbid ordinary
-     * multi-fee receipts. Standalone payments (no `payment_transaction_id`) are held
-     * unique by PaymentIdentifierRegistry instead.
+     * This migration used to add unique indexes on (institution, or_number) and
+     * (institution, reference_number) as well. It no longer does, and the pair is not
+     * held unique anywhere — see
+     * 2026_08_27_000002_stop_holding_or_numbers_to_one_collection, which takes the
+     * indexes back out of the databases that ran this before the rule was reversed, and
+     * PaymentIdentifierRegistry, which explains why a school reuses an OR number
+     * legitimately. The index creation is dropped from here rather than left to be undone
+     * a migration later, because a school whose books already reuse a number could not
+     * get past it: the statement fails outright on its own data.
      *
-     * Blanks are normalized to NULL first: MySQL treats each NULL in a unique index as
-     * distinct, so any number of receipts may leave a number unissued, while two empty
-     * strings would have collided.
+     * The normalization stays. It is right whether or not anything is indexed, and the
+     * warning that now replaces the rule reads better for it.
      */
     public function up(): void
     {
@@ -27,18 +28,12 @@ return new class extends Migration
             DB::table($table)->where('or_number', '')->update(['or_number' => null]);
             DB::table($table)->where('reference_number', '')->update(['reference_number' => null]);
         }
-
-        Schema::table('payment_transactions', function (Blueprint $table) {
-            $table->unique(['institution_id', 'or_number'], 'payment_transactions_institution_or_unique');
-            $table->unique(['institution_id', 'reference_number'], 'payment_transactions_institution_reference_unique');
-        });
     }
 
     public function down(): void
     {
-        Schema::table('payment_transactions', function (Blueprint $table) {
-            $table->dropUnique('payment_transactions_institution_or_unique');
-            $table->dropUnique('payment_transactions_institution_reference_unique');
-        });
+        // Normalizing a blank to NULL is not worth restoring: "" and NULL both mean the
+        // school issued no number, and putting the empty strings back would only make
+        // two spellings of nothing again.
     }
 };
