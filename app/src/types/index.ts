@@ -561,6 +561,55 @@ export interface UpdateReceiptPaymentDetailsData {
   remarks?: string;
 }
 
+/** The two receipt identifiers a collection can be reconciled by. */
+export type PaymentIdentifierField = 'or_number' | 'reference_number';
+
+/**
+ * A live collection that already carries an identifier somebody is about to reuse.
+ *
+ * `kind` says which table it came from: a `transaction` is a cashiering receipt with line
+ * items, a `payment` is a standalone single-fee payment from the legacy path. Either way
+ * it is one collection with one number on it.
+ */
+export interface PaymentIdentifierHolder {
+  kind: 'transaction' | 'payment';
+  id: string;
+  receipt_number?: string | null;
+  or_number?: string | null;
+  reference_number?: string | null;
+  payment_method?: string | null;
+  payment_date?: string | null;
+  academic_year?: string | null;
+  remarks?: string | null;
+  amount: number;
+  posted_at?: string | null;
+  student?: {
+    id: string;
+    lrn?: string | null;
+    first_name: string;
+    middle_name?: string | null;
+    last_name: string;
+  } | null;
+  /**
+   * The receipt image behind this collection — present only when it was itself posted
+   * from a student upload, which is what lets a reviewer compare the two side by side.
+   */
+  receipt_submission?: {
+    id: string;
+    file_name: string;
+    mime_type?: string | null;
+    url?: string | null;
+    installment_sequence?: number | null;
+    installment_label?: string | null;
+    uploaded_at?: string | null;
+  } | null;
+}
+
+/** Keyed by field; a field with no holder is absent rather than an empty list. */
+export type PaymentIdentifierHolders = Partial<
+  Record<PaymentIdentifierField, PaymentIdentifierHolder[]>
+>;
+
 // Legacy enum kept for back-compat; plans are now identified by payment_plan_id + name.
 export type StudentPaymentPlanType = 'monthly' | 'quarterly';
 

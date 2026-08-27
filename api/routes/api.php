@@ -28,6 +28,7 @@ use App\Http\Controllers\IdCardTemplateController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\InternalPaymentCallbackController;
 use App\Http\Controllers\PaymentPlanController;
+use App\Http\Controllers\PaymentIdentifierController;
 use App\Http\Controllers\PaymentReceiptSubmissionController;
 use App\Http\Controllers\PaymentTransactionController;
 use App\Http\Controllers\PaymentVoidRequestController;
@@ -536,6 +537,10 @@ Route::middleware('auth.token')->group(function () {
 
     // Reusable student fees, searched and picked from the ledger
     Route::apiResource('student-fees', StudentFeeController::class)->middleware('module:school-fees,view');
+
+    // Is this OR / reference number already on a live collection? Read before posting, so
+    // the reviewer sees the duplicate while it is still theirs to avoid.
+    Route::get('payment-identifiers/holders', [PaymentIdentifierController::class, 'holders'])->middleware('module:finance,view');
 
     // Payment receipt submissions (student uploads proof of payment, finance verifies)
     Route::get('payment-receipt-submissions', [PaymentReceiptSubmissionController::class, 'index'])->middleware('module:finance,view,shared');

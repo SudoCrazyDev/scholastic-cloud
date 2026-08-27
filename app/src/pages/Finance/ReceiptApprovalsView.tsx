@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
-import { ChevronRightIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
+import { paymentIdentifierService } from '../../services/paymentIdentifierService'
 import { paymentReceiptService } from '../../services/paymentReceiptService'
 import type {
   ApproveReceiptSubmissionData,
+  PaymentIdentifierHolder,
   PaymentReceiptSubmission,
   ReceiptSubmissionStatus,
   StudentPayment,
@@ -42,6 +44,75 @@ const extractFieldErrors = (error: unknown): Record<string, string[]> => {
     return response?.data?.errors ?? {}
   }
   return {}
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? null
+    : parsed.toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+}
+
+const formatDay = (value?: string | null) => {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? null
+    : parsed.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const isImageMime = (mimeType?: string | null) => Boolean(mimeType?.startsWith('image/'))
+
+/**
+ * A receipt at thumbnail size, for recognising at a glance rather than reading.
+ *
+ * Falls back to a caption when the file cannot be shown: a PDF has no thumbnail, and an
+ * image whose object has gone missing renders as a broken-image icon with the alt text
+ * spilling out of the frame — which in a dialog that exists for comparing two receipts
+ * reads as though the comparison is the thing that failed.
+ */
+const ReceiptThumbnail: React.FC<{
+  url?: string | null
+  mimeType?: string | null
+  fileName?: string | null
+  alt: string
+  caption?: string
+}> = ({ url, mimeType, fileName, alt, caption = 'No receipt image' }) => {
+  const [failed, setFailed] = useState(false)
+  const showImage = Boolean(url) && isImageMime(mimeType) && !failed
+
+  return (
+    <div className="flex h-32 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 sm:w-40">
+      {showImage ? (
+        <a href={url!} target="_blank" rel="noreferrer" className="block h-full w-full">
+          <img
+            src={url!}
+            alt={alt}
+            onError={() => setFailed(true)}
+            className="h-full w-full object-contain"
+          />
+        </a>
+      ) : url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="px-2 text-center text-xs font-medium text-primary-600 hover:underline"
+        >
+          {fileName || 'Open file'}
+        </a>
+      ) : (
+        <span className="px-2 text-center text-xs text-gray-400">{caption}</span>
+      )}
+    </div>
+  )
 }
 
 /** What a line item settled, for reading the subdivision back off an approved receipt. */
@@ -87,6 +158,25 @@ const EMPTY_DETAILS: DetailsForm = {
   reference_number: '',
 }
 
+/**
+ * A reference number the reviewer is about to post that is already on live collections.
+ *
+ * Held while they look at those collections and decide, which is the whole point of
+ * checking before the write rather than after it: a reference number on two receipts
+ * usually means the student uploaded the same bank transfer twice, and once the second
+ * approval has posted, taking it back is a void request. It is not always a mistake — one
+ * transfer can genuinely settle two students' fees — so this is a stop, not a refusal.
+ *
+ * `amount` is the verified amount already entered, kept here so proceeding posts exactly
+ * what the reviewer was about to post rather than re-reading a field they may have since
+ * touched.
+ */
+type DuplicateReferencePrompt = {
+  value: string
+  amount: number
+  holders: PaymentIdentifierHolder[]
+}
+
 const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   embedded = false,
   studentId,
@@ -108,6 +198,8 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const [rejectMode, setRejectMode] = useState(false)
   const [rejectNote, setRejectNote] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [duplicateRef, setDuplicateRef] = useState<DuplicateReferencePrompt | null>(null)
+  const [checkingReference, setCheckingReference] = useState(false)
 
   const submissionsQuery = useQuery({
     queryKey: ['payment-receipt-submissions', 'queue', statusFilter, studentId ?? null],
@@ -134,6 +226,8 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     setFieldErrors({})
     setRejectMode(false)
     setRejectNote('')
+    setDuplicateRef(null)
+    setCheckingReference(false)
   }
 
   const invalidateAfterReview = () => {
@@ -202,6 +296,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
 
   const openReviewModal = (submission: PaymentReceiptSubmission) => {
     setReviewTarget(submission)
+    setDuplicateRef(null)
     setVerifiedAmount(submission.amount != null ? String(submission.amount) : '')
     setFieldErrors({})
     setRejectMode(false)
@@ -222,14 +317,9 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     }
   }, [submissions, reviewTarget])
 
-  const handleApprove = () => {
+  /** The write itself, once the reference number is settled one way or the other. */
+  const postApproval = (amount: number, reference: string) => {
     if (!reviewTarget) return
-    const amount = Number(verifiedAmount)
-    if (!amount || amount <= 0) {
-      toast.error('Enter the verified amount shown on the receipt.')
-      return
-    }
-
     setFieldErrors({})
     approveMutation.mutate({
       id: reviewTarget.id,
@@ -239,9 +329,56 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       // is what the API does when it is sent none.
       data: {
         amount,
-        reference_number: details.reference_number || undefined,
+        reference_number: reference || undefined,
       },
     })
+  }
+
+  const handleApprove = async () => {
+    if (!reviewTarget) return
+    const amount = Number(verifiedAmount)
+    if (!amount || amount <= 0) {
+      toast.error('Enter the verified amount shown on the receipt.')
+      return
+    }
+
+    const reference = details.reference_number.trim()
+    // Nothing to reuse, so nothing to check.
+    if (!reference) {
+      postApproval(amount, reference)
+      return
+    }
+
+    setCheckingReference(true)
+    try {
+      const response = await paymentIdentifierService.holders({ reference_number: reference })
+      const holders = response.data?.reference_number ?? []
+      if (holders.length) {
+        setDuplicateRef({ value: reference, amount, holders })
+        return
+      }
+    } catch (error) {
+      // A check that could not run is not evidence of a duplicate, and refusing to post on
+      // it would stop a reviewer working over a flaky connection from recording money that
+      // really arrived. Post, and say the check was skipped — the API still reports the
+      // reuse in the response it comes back with.
+      toast(extractErrorMessage(error, 'Could not check that reference number for reuse.'), {
+        icon: '⚠️',
+        duration: 6000,
+      })
+    } finally {
+      setCheckingReference(false)
+    }
+
+    postApproval(amount, reference)
+  }
+
+  /** They looked at the other collections and it is a separate payment after all. */
+  const handleProceedDespiteDuplicate = () => {
+    if (!duplicateRef) return
+    const { amount, value } = duplicateRef
+    setDuplicateRef(null)
+    postApproval(amount, value)
   }
 
   const handleSaveDetails = () => {
@@ -273,8 +410,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       ? `${submission.student.first_name} ${submission.student.last_name}`
       : '—'
 
-  const isImage = (submission: PaymentReceiptSubmission) =>
-    Boolean(submission.mime_type?.startsWith('image/'))
+  const isImage = (submission: PaymentReceiptSubmission) => isImageMime(submission.mime_type)
 
   const fieldError = (field: string) => fieldErrors[field]?.[0]
 
@@ -741,7 +877,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
                 </Button>
                 <Button
                   type="button"
-                  loading={approveMutation.isPending}
+                  loading={approveMutation.isPending || checkingReference}
                   onClick={handleApprove}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
@@ -771,6 +907,145 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     </div>
   )
 
+  const holderStudentName = (holder: PaymentIdentifierHolder) =>
+    holder.student ? `${holder.student.first_name} ${holder.student.last_name}` : 'Unknown student'
+
+  /** One label/value line in a holder card, skipped entirely when there is no value. */
+  const holderRow = (label: string, value?: string | null) =>
+    value ? (
+      <div className="flex justify-between gap-3">
+        <dt className="shrink-0 text-gray-500">{label}</dt>
+        <dd className="text-right text-gray-900">{value}</dd>
+      </div>
+    ) : null
+
+  /**
+   * Sits above the review modal when the reference number is already on the books, showing
+   * the reviewer what holds it — which collection, whose it is, and the receipt that was
+   * verified for it — so they can compare it with the image behind this dialog and say
+   * whether they are looking at one payment or two.
+   */
+  const duplicateDialog = duplicateRef && reviewTarget && (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-2xl">
+        <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4">
+          <ExclamationTriangleIcon
+            className="mt-0.5 h-6 w-6 shrink-0 text-amber-600"
+            aria-hidden="true"
+          />
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-amber-900">
+              Reference number <span className="font-mono">{duplicateRef.value}</span> is already
+              on{' '}
+              {duplicateRef.holders.length === 1
+                ? 'another collection'
+                : `${duplicateRef.holders.length} other collections`}
+            </h3>
+            <p className="mt-1 text-sm text-amber-800">
+              Compare what is below with the receipt you are reviewing. If it is the same
+              transfer uploaded twice, reject this one rather than posting it again — once it is
+              posted, taking it back needs a void request.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-5 px-5 py-4">
+          <section>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Now reviewing
+            </h4>
+            <div className="flex flex-col gap-4 rounded-lg border border-primary-200 bg-primary-50/40 p-3 sm:flex-row">
+              <ReceiptThumbnail
+                url={reviewTarget.url}
+                mimeType={reviewTarget.mime_type}
+                fileName={reviewTarget.file_name}
+                alt={`Receipt uploaded by ${studentName(reviewTarget)}`}
+              />
+              <dl className="min-w-0 flex-1 space-y-1 text-sm">
+                {holderRow('Student', studentName(reviewTarget))}
+                {holderRow(
+                  'Installment',
+                  reviewTarget.installment_label ||
+                    `Installment #${reviewTarget.installment_sequence}`
+                )}
+                {holderRow('Academic year', reviewTarget.academic_year)}
+                {holderRow('Verified amount', formatAmount(duplicateRef.amount))}
+                {holderRow('Uploaded', formatDateTime(reviewTarget.created_at))}
+              </dl>
+            </div>
+          </section>
+
+          <section>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Already posted with this reference
+            </h4>
+            <div className="space-y-3">
+              {duplicateRef.holders.map((holder) => {
+                const upload = holder.receipt_submission
+                return (
+                  <div
+                    key={`${holder.kind}-${holder.id}`}
+                    className="flex flex-col gap-4 rounded-lg border border-gray-200 p-3 sm:flex-row"
+                  >
+                    <ReceiptThumbnail
+                      url={upload?.url}
+                      mimeType={upload?.mime_type}
+                      fileName={upload?.file_name}
+                      alt={`Receipt behind ${holder.receipt_number || 'this collection'}`}
+                      caption="Recorded at the till"
+                    />
+                    <dl className="min-w-0 flex-1 space-y-1 text-sm">
+                      {holderRow(
+                        'Student',
+                        holder.student?.lrn
+                          ? `${holderStudentName(holder)} (${holder.student.lrn})`
+                          : holderStudentName(holder)
+                      )}
+                      {holderRow('Receipt no.', holder.receipt_number)}
+                      {holderRow('Amount', formatAmount(holder.amount))}
+                      {holderRow('Payment date', formatDay(holder.payment_date))}
+                      {holderRow('Mode', holder.payment_method)}
+                      {holderRow('OR no.', holder.or_number)}
+                      {holderRow('Academic year', holder.academic_year)}
+                      {holderRow(
+                        'Installment',
+                        upload
+                          ? upload.installment_label ||
+                            (upload.installment_sequence
+                              ? `Installment #${upload.installment_sequence}`
+                              : null)
+                          : null
+                      )}
+                      {holderRow('Posted', formatDateTime(holder.posted_at))}
+                      {holderRow('Remarks', holder.remarks)}
+                    </dl>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-5 py-4">
+          <Button type="button" variant="outline" onClick={() => setDuplicateRef(null)}>
+            Go back
+          </Button>
+          {/* `color` rather than a bg- class: the Button's own `bg-primary-600` outranks an
+              override passed through className, because which one wins is decided by the
+              order Tailwind emits them in and not by the order they are listed. */}
+          <Button
+            type="button"
+            color="warning"
+            loading={approveMutation.isPending}
+            onClick={handleProceedDespiteDuplicate}
+          >
+            Post anyway
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (embedded) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -787,6 +1062,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
         </div>
         <div className="p-4">{table}</div>
         {modal}
+        {duplicateDialog}
       </div>
     )
   }
@@ -806,6 +1082,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
 
       {table}
       {modal}
+      {duplicateDialog}
     </div>
   )
 }
