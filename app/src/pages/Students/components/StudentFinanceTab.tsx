@@ -99,6 +99,25 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   })
   const planOptions = planOptionsQuery.data?.data
 
+  /**
+   * The plans that may actually be picked — the school's active ones.
+   *
+   * The API prices a student's own plan even once the school has disabled it, so the one
+   * schedule they are really on is never missing from the projection. That is right for
+   * reading a schedule and wrong for a panel of choices: a retired plan sat among the cards
+   * as though it were still on offer. `planOptions` is left whole for everything that reads
+   * the current plan by id — the confirmation names it, and it would have no name here.
+   */
+  const selectablePlanOptions = useMemo(() => {
+    if (!planOptions) return planOptions
+    return { ...planOptions, options: planOptions.options.filter((option) => option.is_active) }
+  }, [planOptions])
+
+  /** Plans the student could move to: active, and not the one they are already on. */
+  const alternativePlanCount = (selectablePlanOptions?.options ?? []).filter(
+    (option) => !option.is_selected
+  ).length
+
   const onlinePaymentsQuery = useQuery({
     queryKey: ['student-online-payments', studentId, resolvedAcademicYear],
     queryFn: () =>
@@ -518,9 +537,16 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
   // A school offering one plan has nothing to switch to, so a family is not shown a way to
   // change. Staff keep theirs either way: an override is also how a wrong plan gets corrected.
+  //
+  // Counted as "plans they could move to" rather than "more than one plan on offer", because
+  // once retired plans are out of the count those stop being the same question. A student
+  // left on a plan the school has since disabled would otherwise be shown no way off it at
+  // the moment exactly one active plan remains — which is the moment they most need one.
   const canOfferPlanChange =
     !isStudentUser ||
-    (planOptionsQuery.isError ? activePlans.length > 1 : (planOptions?.options?.length ?? 0) > 1)
+    (planOptionsQuery.isError
+      ? activePlans.filter((plan) => plan.id !== paymentPlan?.payment_plan_id).length > 0
+      : alternativePlanCount > 0)
 
   if (isStudentUser && ledgerQuery.isLoading) {
     return (
@@ -555,7 +581,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           />
         ) : (
           <PaymentPlanComparison
-            data={planOptions}
+            data={selectablePlanOptions}
             loading={planOptionsQuery.isLoading}
             onSelect={(paymentPlanId) => handlePlanSubmit(paymentPlanId)}
             selecting={setPaymentPlanMutation.isPending}
@@ -619,7 +645,10 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                 <span className="text-primary-500">·</span>
                 {paymentPlan.installment_count} installments
               </span>
-              {canOfferPlanChange && (
+              {/* Staff only. A family's plan panel is on the page already, so for them this
+                  would toggle nothing; an override is a deliberate act on somebody else's
+                  account, so staff still open theirs. */}
+              {!isStudentUser && (
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-800"
@@ -644,8 +673,15 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
       {/* A family changes their own plan from the priced comparison, not from a list of names:
           the whole point of the switch is what it does to what they owe. Staff keep the picker,
-          which is where they record the reason for an override. */}
-      {isStudentUser && showPlanOverride && (
+          which is where they record the reason for an override.
+
+          Shown outright rather than behind a "Change plan" link. The comparison is the answer
+          to a question a family has while they are looking at what they owe — what would each
+          of the school's plans ask of us from here — and it was worth reading whether or not
+          they went on to switch. Behind a link it read as a settings screen for a decision
+          already made, so the figures that make the case were the ones nobody saw. Choosing
+          still takes a confirmation, so nothing moves by landing on the page. */}
+      {isStudentUser && canOfferPlanChange && (
         <div className="rounded-xl border border-primary-100 bg-primary-50/40 p-4 sm:p-6">
           <h4 className="text-base font-semibold text-gray-900 mb-1">Change your payment plan</h4>
           <p className="text-sm text-gray-600">
@@ -675,7 +711,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
             />
           ) : (
             <PaymentPlanComparison
-              data={planOptions}
+              data={selectablePlanOptions}
               loading={planOptionsQuery.isLoading}
               onSelect={(paymentPlanId) => setPendingPlanChange(paymentPlanId)}
               selecting={setPaymentPlanMutation.isPending}
@@ -1461,35 +1497,10 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         </div>
       )}
 
-      {/* Read-only on purpose: this answers "what would the other plans ask of us" while the
-          family is only looking. Switching is a deliberate act done from the Change plan panel
-          above, so no plan carries a choose button here. Hidden while that panel is open, or
-          the same comparison would be on screen twice. */}
-      {isStudentUser &&
-        paymentPlan &&
-        !showPlanOverride &&
-        (planOptions?.options?.length ?? 0) > 1 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
-            <h4 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <CalendarDaysIcon className="w-5 h-5 text-primary-600" />
-              Compare payment plans
-            </h4>
-            <p className="text-sm text-gray-600 mt-1 mb-4">
-              What each of the school&apos;s plans would ask of you from here, worked out from your
-              own balance. You are on {currentPlanName || 'your current plan'} for{' '}
-              {resolvedAcademicYear} —{' '}
-              <button
-                type="button"
-                className="font-medium text-primary-600 hover:text-primary-800 underline"
-                onClick={() => setShowPlanOverride(true)}
-              >
-                change your plan
-              </button>{' '}
-              if another one suits you better.
-            </p>
-            <PaymentPlanComparison data={planOptions} loading={planOptionsQuery.isLoading} />
-          </div>
-        )}
+      {/* The read-only "Compare payment plans" card that used to sit here is gone. It existed
+          to answer "what would the other plans ask of us" while the Change plan panel was
+          closed — and that panel now opens with the page, showing the same figures with a
+          choose button against each. Kept, it would put the same comparison on screen twice. */}
 
       {/* A plan change moves due dates and re-prices every remaining installment, so the
           family confirms the switch by name rather than committing on a single click. */}
