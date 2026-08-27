@@ -33,6 +33,7 @@ import { studentAdditionalFeeService } from '../../services/studentAdditionalFee
 import { studentFeeService } from '../../services/studentFeeService'
 import { paymentVoidService } from '../../services/paymentVoidService'
 import { paymentPlanService } from '../../services/paymentPlanService'
+import { paymentReceiptService } from '../../services/paymentReceiptService'
 import { useAuth } from '../../hooks/useAuth'
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo'
 import { usePermissions } from '../../hooks/usePermissions'
@@ -50,7 +51,7 @@ import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
 import NoticeOfAccountModal from './NoticeOfAccountModal'
 import DataClearingView from './DataClearingView'
-import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType, UserInstitution } from '../../types'
+import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentReceiptSubmission, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType, UpdateReceiptPaymentDetailsData, UserInstitution } from '../../types'
 
 const BILLING_TYPE_LABELS: Record<FeeBillingType, string> = {
   cash: 'Cash Basis',
@@ -277,7 +278,18 @@ const Finance: React.FC = () => {
   // each of which has to be unique within the school.
   const [cashierFieldErrors, setCashierFieldErrors] = useState<Record<string, string[]>>({})
   const [lastReceipt, setLastReceipt] = useState<PaymentTransaction | null>(null)
-  const [showReceiptModal, setShowReceiptModal] = useState(false)
+  /**
+   * An approved receipt opened at the till from the panel above it.
+   *
+   * The submission is held rather than its transaction, because the details write is
+   * addressed to the submission and a saved copy comes back the same way. Its amounts are
+   * read-only: what the receipt collected was settled when it was approved, and moving
+   * that afterwards is a void request, not an edit — only how the collection is described
+   * can be corrected here.
+   */
+  const [tillReceipt, setTillReceipt] = useState<PaymentReceiptSubmission | null>(null)
+  /** Whichever collection the print dialog is showing — one just taken, or one reopened. */
+  const [receiptToPrint, setReceiptToPrint] = useState<PaymentTransaction | null>(null)
 
   const [ledgerSearchTerm, setLedgerSearchTerm] = useState('')
   const [debouncedLedgerSearch, setDebouncedLedgerSearch] = useState('')
@@ -814,7 +826,7 @@ const Finance: React.FC = () => {
       studentPaymentService.createTransaction(payload),
     onSuccess: (response) => {
       setLastReceipt(response.data)
-      setShowReceiptModal(true)
+      setReceiptToPrint(response.data)
       setCashierLineAmounts({})
       setCashierGeneralAmount('')
       setCashierTendered('')
@@ -843,6 +855,32 @@ const Finance: React.FC = () => {
       setCashierError(message)
       // Validation errors come back keyed by field, so the cashier's own input is what
       // lights up rather than only a toast they have to trace back.
+      setCashierFieldErrors(error.response?.data?.errors ?? {})
+      toast.error(message)
+    },
+  })
+
+  const updateReceiptDetailsMutation = useMutation({
+    mutationFn: (payload: { id: string; data: UpdateReceiptPaymentDetailsData }) =>
+      paymentReceiptService.updatePaymentDetails(payload.id, payload.data),
+    onSuccess: (response) => {
+      // The receipt stays open so the correction is visible on it and it can be reprinted
+      // straight away, which is usually why the OR number was being written in.
+      setTillReceipt(response.data)
+      setCashierError(null)
+      setCashierFieldErrors({})
+      queryClient.invalidateQueries({ queryKey: ['payment-receipt-submissions'] })
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['student-ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['cashier-ledger'] })
+      toast.success(response.message || 'Receipt details updated.')
+      Object.values(response.warnings ?? {}).forEach((messages) => {
+        messages.forEach((message) => toast(message, { icon: '⚠️', duration: 8000 }))
+      })
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to update the receipt.'
+      setCashierError(message)
       setCashierFieldErrors(error.response?.data?.errors ?? {})
       toast.error(message)
     },
@@ -1153,15 +1191,99 @@ const Finance: React.FC = () => {
     [cashierLineItems]
   )
 
+  const tillTransaction = tillReceipt?.payment_transaction ?? null
+  // The till is either taking a new payment or correcting one already posted; almost every
+  // control in it reads differently depending on which.
+  const editingPostedReceipt = Boolean(tillTransaction)
+  const tillReceiptLines = tillTransaction?.items ?? []
+  const summaryItemCount = editingPostedReceipt ? tillReceiptLines.length : cashierLineItems.length
+  const summaryTotal = editingPostedReceipt
+    ? Number(tillTransaction?.total_amount ?? 0)
+    : cashierTotal
+  const cashierBusy =
+    createTransactionMutation.isPending || updateReceiptDetailsMutation.isPending
+
   const hasCashierFieldError = Object.values(cashierFieldErrors).some((messages) => messages?.length)
 
   const cashierTenderedValue = Number(cashierTendered) || 0
-  const cashierChangeDue = cashierTendered ? Math.max(cashierTenderedValue - cashierTotal, 0) : 0
+  // Measured against the open receipt's own total when there is one: the cart is empty
+  // then, and change counted against nothing would read as the whole tender coming back.
+  const cashierChangeDue = cashierTendered ? Math.max(cashierTenderedValue - summaryTotal, 0) : 0
+
+  /** Puts the till back to taking a new payment. */
+  const closeTillReceipt = () => {
+    setTillReceipt(null)
+    setCashierLineAmounts({})
+    setCashierGeneralAmount('')
+    setCashierTendered('')
+    setCashierError(null)
+    setCashierFieldErrors({})
+    setCashierPaymentForm((prev) => ({
+      ...prev,
+      payment_date: new Date().toISOString().split('T')[0],
+      payment_method: '',
+      or_number: '',
+      reference_number: '',
+      remarks: '',
+    }))
+  }
+
+  /**
+   * Loads an approved receipt from the panel above into the till, so the collection it
+   * posted can be corrected or printed without leaving the screen.
+   *
+   * The lines come off the transaction rather than off the student's outstanding
+   * balances: they are what was actually collected, and a fee since settled — or one paid
+   * as General / Other, which is how an approval posts by default — has no balance row
+   * left to read the amount back from.
+   */
+  const openReceiptAtTill = (submission: PaymentReceiptSubmission) => {
+    const transaction = submission.payment_transaction
+    if (!transaction) {
+      toast.error('This approval was posted without a transaction, so there is nothing to open.')
+      return
+    }
+    setTillReceipt(submission)
+    setCashierError(null)
+    setCashierFieldErrors({})
+    setCashierLineAmounts({})
+    setCashierGeneralAmount('')
+    setCashierTendered(
+      transaction.amount_tendered != null ? String(transaction.amount_tendered) : ''
+    )
+    setCashierPaymentForm({
+      academic_year: submission.academic_year || transaction.academic_year,
+      payment_date: (transaction.payment_date || '').slice(0, 10),
+      payment_method: transaction.payment_method ?? '',
+      or_number: transaction.or_number ?? '',
+      reference_number: transaction.reference_number ?? '',
+      remarks: transaction.remarks ?? '',
+    })
+  }
 
   const handleCashierTransactionSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     setCashierError(null)
     setCashierFieldErrors({})
+
+    // An open receipt writes only how its collection is described. The amounts were
+    // settled at approval and the API refuses to move them from here either.
+    if (tillReceipt && tillTransaction) {
+      updateReceiptDetailsMutation.mutate({
+        id: tillReceipt.id,
+        // Sent verbatim, empty string included: a field the cashier cleared has to reach
+        // the API as "" to read as "clear this" rather than "leave it as posted".
+        data: {
+          payment_method: cashierPaymentForm.payment_method,
+          payment_date: cashierPaymentForm.payment_date || undefined,
+          or_number: cashierPaymentForm.or_number,
+          reference_number: cashierPaymentForm.reference_number,
+          remarks: cashierPaymentForm.remarks,
+        },
+      })
+      return
+    }
+
     if (!selectedStudent) {
       setCashierError('Please select a student.')
       toast.error('Please select a student.')
@@ -1660,7 +1782,7 @@ const Finance: React.FC = () => {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowReceiptModal(true)}
+                onClick={() => setReceiptToPrint(lastReceipt)}
                 className="border-green-300 text-green-700 hover:bg-green-100"
               >
                 Print Receipt
@@ -1668,155 +1790,212 @@ const Finance: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleCashierTransactionSubmit} className="space-y-6">
-            {/* Customer + context */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-              <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-                <div className="flex-1 min-w-0">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
-                  {selectedStudent ? (
-                    <div className="flex items-center justify-between rounded-lg border border-primary-100 bg-primary-50 px-3 py-2.5">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
-                          {`${selectedStudent.first_name?.[0] ?? ''}${selectedStudent.last_name?.[0] ?? ''}`.toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-primary-900">
-                            {getStudentFullName(selectedStudent)}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-primary-700/80">
-                            {selectedStudent.lrn && <span>LRN: {selectedStudent.lrn}</span>}
-                            {(cashierGradeLevel || cashierSection) && (
-                              <>
-                                {selectedStudent.lrn && <span className="text-primary-300">•</span>}
-                                <span>
-                                  {[cashierGradeLevel, cashierSection].filter(Boolean).join(' — ')}
-                                </span>
-                              </>
-                            )}
-                            {cashierLedgerQuery.isFetching && !cashierGradeLevel && (
-                              <span className="text-primary-400">Loading…</span>
-                            )}
-                          </div>
-                        </div>
+          {/* Customer + context */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+              <div className="flex-1 min-w-0">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
+                {selectedStudent ? (
+                  <div className="flex items-center justify-between rounded-lg border border-primary-100 bg-primary-50 px-3 py-2.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-600 text-sm font-semibold text-white">
+                        {`${selectedStudent.first_name?.[0] ?? ''}${selectedStudent.last_name?.[0] ?? ''}`.toUpperCase()}
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedStudent(null)
-                          setStudentSearchTerm('')
-                          setCashierLineAmounts({})
-                          setCashierGeneralAmount('')
-                        }}
-                      >
-                        Change
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <Input
-                        value={studentSearchTerm}
-                        onChange={(e) => {
-                          setStudentSearchTerm(e.target.value)
-                          if (!e.target.value) setSelectedStudent(null)
-                        }}
-                        placeholder="Search by name or LRN (min 2 characters)"
-                        className="w-full"
-                      />
-                      {studentSearchQuery.isFetching && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                          Searching...
-                        </div>
-                      )}
-                      {debouncedStudentSearch.length >= 2 && !selectedStudent && (
-                        <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-auto">
-                          {studentSearchQuery.data?.data?.length ? (
-                            studentSearchQuery.data.data.map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedStudent(s)
-                                  setStudentSearchTerm(getStudentFullName(s))
-                                  setDebouncedStudentSearch('')
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-primary-50 flex flex-col"
-                              >
-                                <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
-                                {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
-                              </button>
-                            ))
-                          ) : (
-                            <div className="px-4 py-3 text-sm text-gray-500">No students found.</div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-primary-900">
+                          {getStudentFullName(selectedStudent)}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-primary-700/80">
+                          {selectedStudent.lrn && <span>LRN: {selectedStudent.lrn}</span>}
+                          {(cashierGradeLevel || cashierSection) && (
+                            <>
+                              {selectedStudent.lrn && <span className="text-primary-300">•</span>}
+                              <span>
+                                {[cashierGradeLevel, cashierSection].filter(Boolean).join(' — ')}
+                              </span>
+                            </>
+                          )}
+                          {cashierLedgerQuery.isFetching && !cashierGradeLevel && (
+                            <span className="text-primary-400">Loading…</span>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3 lg:w-[320px] shrink-0">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Academic year</label>
-                    <Select
-                      value={cashierPaymentForm.academic_year}
-                      onChange={(e) =>
-                        setCashierPaymentForm((prev) => ({ ...prev, academic_year: e.target.value }))
-                      }
-                      options={academicYearOptions}
-                      className="w-full"
-                      disabled={createTransactionMutation.isPending}
-                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedStudent(null)
+                        setStudentSearchTerm('')
+                        closeTillReceipt()
+                      }}
+                    >
+                      Change
+                    </Button>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment date</label>
+                ) : (
+                  <div className="relative">
                     <Input
-                      type="date"
-                      value={cashierPaymentForm.payment_date}
-                      onChange={(e) =>
-                        setCashierPaymentForm((prev) => ({ ...prev, payment_date: e.target.value }))
-                      }
-                      disabled={createTransactionMutation.isPending}
+                      value={studentSearchTerm}
+                      onChange={(e) => {
+                        setStudentSearchTerm(e.target.value)
+                        if (!e.target.value) setSelectedStudent(null)
+                      }}
+                      placeholder="Search by name or LRN (min 2 characters)"
+                      className="w-full"
                     />
+                    {studentSearchQuery.isFetching && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                        Searching...
+                      </div>
+                    )}
+                    {debouncedStudentSearch.length >= 2 && !selectedStudent && (
+                      <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-60 overflow-auto">
+                        {studentSearchQuery.data?.data?.length ? (
+                          studentSearchQuery.data.data.map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedStudent(s)
+                                setStudentSearchTerm(getStudentFullName(s))
+                                setDebouncedStudentSearch('')
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-primary-50 flex flex-col"
+                            >
+                              <span className="font-medium text-gray-900">{getStudentFullName(s)}</span>
+                              {s.lrn && <span className="text-xs text-gray-500">LRN: {s.lrn}</span>}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-gray-500">No students found.</div>
+                        )}
+                      </div>
+                    )}
                   </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:w-[320px] shrink-0">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Academic year</label>
+                  <Select
+                    value={cashierPaymentForm.academic_year}
+                    onChange={(e) =>
+                      setCashierPaymentForm((prev) => ({ ...prev, academic_year: e.target.value }))
+                    }
+                    options={academicYearOptions}
+                    className="w-full"
+                    disabled={cashierBusy || editingPostedReceipt}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment date</label>
+                  <Input
+                    type="date"
+                    value={cashierPaymentForm.payment_date}
+                    onChange={(e) =>
+                      setCashierPaymentForm((prev) => ({ ...prev, payment_date: e.target.value }))
+                    }
+                    disabled={cashierBusy}
+                  />
                 </div>
               </div>
             </div>
+          </div>
 
+          {/* Receipts this student uploaded, read at the counter. Above the till
+              because an approved one opens *in* it: the collection it posted fills the
+              fields below, ready to be corrected or reprinted. Empty until somebody is
+              picked — there is no queue to show for nobody. */}
+          <ReceiptApprovalsView
+            embedded
+            studentId={selectedStudent?.id ?? null}
+            onOpenApproved={openReceiptAtTill}
+          />
+
+          <form onSubmit={handleCashierTransactionSubmit} className="space-y-6">
             {/* Cart + checkout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               {/* Fees cart */}
               <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900">Fees to pay</h3>
-                    {cashierLedgerQuery.isFetching && (
-                      <span className="text-xs text-gray-400">Loading balances…</span>
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      {editingPostedReceipt ? 'Receipt lines' : 'Fees to pay'}
+                    </h3>
+                    {editingPostedReceipt ? (
+                      <span className="text-xs text-gray-400">
+                        Receipt #{tillTransaction?.receipt_number}
+                      </span>
+                    ) : (
+                      cashierLedgerQuery.isFetching && (
+                        <span className="text-xs text-gray-400">Loading balances…</span>
+                      )
                     )}
                   </div>
-                  {selectedStudent && cashierFeeBreakdown.some((f) => f.outstanding > 0) && (
+                  {editingPostedReceipt ? (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        setCashierLineAmounts((prev) => {
-                          const next = { ...prev }
-                          for (const fee of cashierFeeBreakdown) {
-                            if (fee.outstanding > 0) next[fee.fee_id] = String(fee.outstanding)
-                          }
-                          return next
-                        })
-                      }
-                      disabled={createTransactionMutation.isPending}
+                      onClick={closeTillReceipt}
+                      disabled={cashierBusy}
                     >
-                      Pay all balances
+                      Back to new payment
                     </Button>
+                  ) : (
+                    selectedStudent &&
+                    cashierFeeBreakdown.some((f) => f.outstanding > 0) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setCashierLineAmounts((prev) => {
+                            const next = { ...prev }
+                            for (const fee of cashierFeeBreakdown) {
+                              if (fee.outstanding > 0) next[fee.fee_id] = String(fee.outstanding)
+                            }
+                            return next
+                          })
+                        }
+                        disabled={cashierBusy}
+                      >
+                        Pay all balances
+                      </Button>
+                    )
                   )}
                 </div>
 
-                {!selectedStudent ? (
+                {editingPostedReceipt ? (
+                  <div className="divide-y divide-gray-100">
+                    {tillReceiptLines.length ? (
+                      tillReceiptLines.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-4 px-5 py-3"
+                        >
+                          <p className="min-w-0 truncate text-sm font-medium text-gray-900">
+                            {item.school_fee?.name || item.additional_fee?.name || 'General / Other'}
+                          </p>
+                          <span className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
+                            {formatCurrency(Number(item.amount))}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-5 py-10 text-center text-sm text-gray-500">
+                        This receipt posted without a per-fee breakdown.
+                      </div>
+                    )}
+                    <p className="px-5 py-3 text-xs text-gray-500">
+                      Amounts are fixed. What this receipt collected was settled when it was
+                      approved, so changing it is a void request rather than an edit — the
+                      details on the right can still be corrected, and the receipt reprinted.
+                    </p>
+                  </div>
+                ) : !selectedStudent ? (
                   <div className="px-5 py-16 text-center">
                     <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400">
                       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1881,7 +2060,7 @@ const Finance: React.FC = () => {
                                 }
                                 placeholder="0.00"
                                 className={`w-32 pl-6 text-right ${entered > 0 ? 'border-primary-300 ring-1 ring-primary-100' : ''}`}
-                                disabled={createTransactionMutation.isPending}
+                                disabled={cashierBusy}
                               />
                             </div>
                             <Button
@@ -1894,7 +2073,7 @@ const Finance: React.FC = () => {
                                   [fee.fee_id]: fee.outstanding > 0 ? String(fee.outstanding) : '',
                                 }))
                               }
-                              disabled={fee.outstanding <= 0 || createTransactionMutation.isPending}
+                              disabled={fee.outstanding <= 0 || cashierBusy}
                               title="Pay full balance"
                             >
                               Full
@@ -1906,33 +2085,38 @@ const Finance: React.FC = () => {
                   </div>
                 )}
 
-                <div className="border-t border-gray-100 px-5 py-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    General / Other payment <span className="font-normal text-gray-400">(optional)</span>
-                  </label>
-                  <div className="relative max-w-xs">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₱</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={cashierGeneralAmount}
-                      onChange={(e) => setCashierGeneralAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full pl-7"
-                      disabled={createTransactionMutation.isPending}
-                    />
+                {!editingPostedReceipt && (
+                  <div className="border-t border-gray-100 px-5 py-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      General / Other payment{' '}
+                      <span className="font-normal text-gray-400">(optional)</span>
+                    </label>
+                    <div className="relative max-w-xs">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₱</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={cashierGeneralAmount}
+                        onChange={(e) => setCashierGeneralAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full pl-7"
+                        disabled={cashierBusy}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Not tied to a specific fee — reduces the overall balance.
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Not tied to a specific fee — reduces the overall balance.
-                  </p>
-                </div>
+                )}
               </div>
 
               {/* Checkout summary */}
               <div className="lg:col-span-1 lg:sticky lg:top-6 bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="border-b border-gray-100 px-5 py-3.5">
-                  <h3 className="text-sm font-semibold text-gray-900">Payment summary</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    {editingPostedReceipt ? 'Receipt details' : 'Payment summary'}
+                  </h3>
                 </div>
                 <div className="space-y-4 px-5 py-4">
                   <div>
@@ -1944,7 +2128,7 @@ const Finance: React.FC = () => {
                       }
                       options={PAYMENT_METHOD_OPTIONS}
                       className="w-full"
-                      disabled={createTransactionMutation.isPending}
+                      disabled={cashierBusy}
                     />
                   </div>
                   <div className="grid grid-cols-1 gap-3">
@@ -1960,7 +2144,7 @@ const Finance: React.FC = () => {
                         }}
                         placeholder="Official Receipt no."
                         error={cashierFieldErrors.or_number?.[0]}
-                        disabled={createTransactionMutation.isPending}
+                        disabled={cashierBusy}
                       />
                     </div>
                     <div>
@@ -1975,7 +2159,7 @@ const Finance: React.FC = () => {
                         }}
                         placeholder="e.g. check no., transaction id"
                         error={cashierFieldErrors.reference_number?.[0]}
-                        disabled={createTransactionMutation.isPending}
+                        disabled={cashierBusy}
                       />
                     </div>
                     <div>
@@ -1988,7 +2172,7 @@ const Finance: React.FC = () => {
                           setCashierPaymentForm((prev) => ({ ...prev, remarks: e.target.value }))
                         }
                         placeholder="Optional notes"
-                        disabled={createTransactionMutation.isPending}
+                        disabled={cashierBusy}
                       />
                     </div>
                   </div>
@@ -1996,14 +2180,18 @@ const Finance: React.FC = () => {
                   <div className="rounded-lg bg-gray-50 p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-500">
-                        {cashierLineItems.length} item{cashierLineItems.length === 1 ? '' : 's'}
+                        {summaryItemCount} item{summaryItemCount === 1 ? '' : 's'}
                       </span>
-                      <span className="text-xs text-gray-400">Total due</span>
+                      <span className="text-xs text-gray-400">
+                        {editingPostedReceipt ? 'Collected' : 'Total due'}
+                      </span>
                     </div>
                     <div className="flex items-baseline justify-between">
-                      <span className="text-sm font-medium text-gray-700">Total to pay</span>
+                      <span className="text-sm font-medium text-gray-700">
+                        {editingPostedReceipt ? 'Receipt total' : 'Total to pay'}
+                      </span>
                       <span className="text-2xl font-bold text-gray-900 tabular-nums">
-                        {formatCurrency(cashierTotal)}
+                        {formatCurrency(summaryTotal)}
                       </span>
                     </div>
                     <div>
@@ -2018,7 +2206,7 @@ const Finance: React.FC = () => {
                           onChange={(e) => setCashierTendered(e.target.value)}
                           placeholder="0.00"
                           className="w-full pl-7 text-right"
-                          disabled={createTransactionMutation.isPending}
+                          disabled={cashierBusy || editingPostedReceipt}
                         />
                       </div>
                     </div>
@@ -2027,10 +2215,10 @@ const Finance: React.FC = () => {
                         <span className="text-sm font-medium text-gray-700">Change due</span>
                         <span
                           className={`text-lg font-bold tabular-nums ${
-                            cashierTenderedValue < cashierTotal ? 'text-red-600' : 'text-green-700'
+                            cashierTenderedValue < summaryTotal ? 'text-red-600' : 'text-green-700'
                           }`}
                         >
-                          {cashierTenderedValue < cashierTotal
+                          {cashierTenderedValue < summaryTotal
                             ? 'Insufficient'
                             : formatCurrency(cashierChangeDue)}
                         </span>
@@ -2044,33 +2232,49 @@ const Finance: React.FC = () => {
                     <p className="text-sm text-red-600">{cashierError}</p>
                   )}
 
-                  <Button
-                    type="submit"
-                    loading={createTransactionMutation.isPending}
-                    disabled={!selectedStudent || cashierLineItems.length === 0}
-                    className="w-full bg-primary-600 hover:bg-primary-700 text-white"
-                  >
-                    {createTransactionMutation.isPending
-                      ? 'Recording...'
-                      : `Record payment${cashierTotal > 0 ? ` · ${formatCurrency(cashierTotal)}` : ''}`}
-                  </Button>
+                  {editingPostedReceipt ? (
+                    <div className="space-y-2">
+                      <Button
+                        type="submit"
+                        loading={updateReceiptDetailsMutation.isPending}
+                        className="w-full bg-primary-600 hover:bg-primary-700 text-white"
+                      >
+                        {updateReceiptDetailsMutation.isPending
+                          ? 'Saving...'
+                          : 'Save receipt details'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setReceiptToPrint(tillTransaction)}
+                      >
+                        Print receipt
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="submit"
+                      loading={createTransactionMutation.isPending}
+                      disabled={!selectedStudent || cashierLineItems.length === 0}
+                      className="w-full bg-primary-600 hover:bg-primary-700 text-white"
+                    >
+                      {createTransactionMutation.isPending
+                        ? 'Recording...'
+                        : `Record payment${cashierTotal > 0 ? ` · ${formatCurrency(cashierTotal)}` : ''}`}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
           </form>
 
-          {/* Receipts the student at the counter uploaded, waiting on this same cashier.
-              Kept below the till so taking a payment is still the first thing on the screen,
-              and scoped to the selection so it answers "what has this student already sent
-              in?" rather than listing the whole school's queue. */}
-          <ReceiptApprovalsView embedded studentId={selectedStudent?.id ?? null} />
-
-          {showReceiptModal && lastReceipt && selectedStudent && (
+          {receiptToPrint && selectedStudent && (
             <ReceiptPrintModal
-              transaction={lastReceipt}
+              transaction={receiptToPrint}
               studentName={getStudentFullName(selectedStudent)}
               studentLrn={selectedStudent.lrn}
-              onClose={() => setShowReceiptModal(false)}
+              onClose={() => setReceiptToPrint(null)}
             />
           )}
         </div>

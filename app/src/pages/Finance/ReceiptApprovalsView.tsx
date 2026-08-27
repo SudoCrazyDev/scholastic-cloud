@@ -138,6 +138,12 @@ interface ReceiptApprovalsViewProps {
    * receipts are somebody else's problem right now.
    */
   studentId?: string | null
+  /**
+   * Hands an approved receipt back to the screen this is embedded in, instead of opening
+   * the review dialog. Cashiering uses it to load the collection the approval posted into
+   * the till, where it can be corrected or printed as a receipt.
+   */
+  onOpenApproved?: (submission: PaymentReceiptSubmission) => void
 }
 
 /**
@@ -192,17 +198,23 @@ type DuplicateReferencePrompt = {
 const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   embedded = false,
   studentId,
+  onOpenApproved,
 }) => {
   const queryClient = useQueryClient()
   // Scoped by the caller passing the prop at all, so "no student picked" stays distinct from
   // "show everyone" — the first waits, the second queries.
   const scopedToStudent = studentId !== undefined
   const hasStudent = Boolean(studentId)
-  // The sweep is left off the embedded copy: a cashier at the till is looking at one
-  // student in front of them, and auditing the whole institution's books is not that job.
-  const tabs: QueueTab[] = embedded
-    ? ['pending', 'approved']
-    : ['pending', 'approved', 'rejected', 'duplicates']
+  const tabs: QueueTab[] = ['pending', 'approved', 'rejected', 'duplicates']
+
+  /**
+   * The embedded copy is one list rather than a tabbed queue: the cashier is asking what
+   * the student in front of them has sent in, and a receipt still waiting and one already
+   * posted are both answers to that — behind tabs, half the answer is hidden. Rejected
+   * receipts are left out because they settled nothing, and the duplicates sweep with
+   * them: auditing the whole institution's books is not a job for the till.
+   */
+  const combined = embedded
 
   const [statusFilter, setStatusFilter] = useState<QueueTab>('pending')
   const [reviewTarget, setReviewTarget] = useState<PaymentReceiptSubmission | null>(null)
@@ -218,16 +230,30 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const showingDuplicates = statusFilter === 'duplicates'
 
   const submissionsQuery = useQuery({
-    queryKey: ['payment-receipt-submissions', 'queue', statusFilter, studentId ?? null],
-    queryFn: () =>
-      paymentReceiptService.list({
-        status: statusFilter as ReceiptSubmissionStatus,
+    queryKey: [
+      'payment-receipt-submissions',
+      'queue',
+      combined ? 'open' : statusFilter,
+      studentId ?? null,
+    ],
+    queryFn: async () => {
+      const response = await paymentReceiptService.list({
+        status: combined ? undefined : (statusFilter as ReceiptSubmissionStatus),
         student_id: studentId ?? undefined,
-      }),
+      })
+      if (!combined) return response
+      // Waiting before posted — what still needs the cashier outranks what is already
+      // done — and within each group the API's newest-first order stands.
+      const rank = (status: ReceiptSubmissionStatus) => (status === 'pending' ? 0 : 1)
+      const rows = (response.data ?? [])
+        .filter((submission) => submission.status !== 'rejected')
+        .sort((a, b) => rank(a.status) - rank(b.status))
+      return { ...response, data: rows }
+    },
     // Nothing to ask for until the cashier has picked somebody — and nothing to ask this
     // endpoint at all while the duplicates sweep is the thing on screen.
     enabled: !showingDuplicates && (!scopedToStudent || hasStudent),
-    refetchInterval: statusFilter === 'pending' ? 60000 : false,
+    refetchInterval: combined || statusFilter === 'pending' ? 60000 : false,
   })
   // Memoized because the refresh effect below depends on it: a fresh array identity every
   // render would re-run that effect on every render.
@@ -458,6 +484,28 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const showStudentColumn = !scopedToStudent
   const columnCount = 5 + (showStudentColumn ? 1 : 0) + (embedded ? 0 : 2)
 
+  /**
+   * Whether this row is one the embedding screen asked to handle itself. Only an approved
+   * receipt is handed back: a pending one still has to be reviewed against its image, and
+   * a rejected one posted nothing there is anything to open.
+   */
+  const opensElsewhere = (submission: PaymentReceiptSubmission) =>
+    Boolean(onOpenApproved) && submission.status === 'approved'
+
+  const openSubmission = (submission: PaymentReceiptSubmission) => {
+    if (opensElsewhere(submission)) {
+      onOpenApproved!(submission)
+      return
+    }
+    openReviewModal(submission)
+  }
+
+  const actionLabel = (submission: PaymentReceiptSubmission) => {
+    if (submission.status === 'pending') return 'Review'
+    if (submission.status !== 'approved') return 'View'
+    return onOpenApproved ? 'Open at till' : 'Edit details'
+  }
+
   /** The per-fee split of a posted approval, or null when there is nothing to show. */
   const subdivisionOf = (submission: PaymentReceiptSubmission): StudentPayment[] | null => {
     const items = submission.payment_transaction?.items
@@ -496,7 +544,10 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     canExpand ? (
       <button
         type="button"
-        onClick={() => setExpandedId(isExpanded ? null : submission.id)}
+        onClick={(event) => {
+          event.stopPropagation()
+          setExpandedId(isExpanded ? null : submission.id)
+        }}
         aria-expanded={isExpanded}
         aria-label={isExpanded ? 'Hide the payment breakdown' : 'Show the payment breakdown'}
         className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -564,7 +615,16 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
 
               return (
                 <React.Fragment key={submission.id}>
-                  <tr className={isExpanded ? 'bg-gray-50/60' : undefined}>
+                  <tr
+                    className={`${isExpanded ? 'bg-gray-50/60' : ''} ${
+                      opensElsewhere(submission)
+                        ? 'cursor-pointer hover:bg-primary-50/50'
+                        : ''
+                    }`}
+                    onClick={
+                      opensElsewhere(submission) ? () => openSubmission(submission) : undefined
+                    }
+                  >
                     {showStudentColumn && (
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <div className="flex items-center gap-1.5">
@@ -630,18 +690,17 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
                         type="button"
                         size="sm"
                         variant={submission.status === 'pending' ? undefined : 'outline'}
-                        onClick={() => openReviewModal(submission)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openSubmission(submission)
+                        }}
                         className={
                           submission.status === 'pending'
                             ? 'bg-primary-600 hover:bg-primary-700 text-white'
                             : undefined
                         }
                       >
-                        {submission.status === 'pending'
-                          ? 'Review'
-                          : submission.status === 'approved'
-                            ? 'Edit details'
-                            : 'View'}
+                        {actionLabel(submission)}
                       </Button>
                     </td>
                   </tr>
@@ -702,7 +761,11 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
             !submissions.length && (
               <tr>
                 <td colSpan={columnCount} className="px-4 py-8 text-center text-gray-500">
-                  No {statusFilter} receipt submissions{scopedToStudent ? ' for this student' : ''}.
+                  {combined
+                    ? 'No receipts uploaded by this student yet.'
+                    : `No ${statusFilter} receipt submissions${
+                        scopedToStudent ? ' for this student' : ''
+                      }.`}
                 </td>
               </tr>
             )}
@@ -1239,12 +1302,15 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Receipt approvals</h3>
             <p className="text-xs text-gray-500">
-              {scopedToStudent
-                ? 'Proof of payment this student uploaded — verify the amount, say which fees it settles, then post it.'
-                : 'Proof of payment students uploaded — verify the amount, say which fees it settles, then post it.'}
+              {!scopedToStudent
+                ? 'Proof of payment students uploaded — verify the amount, say which fees it settles, then post it.'
+                : !hasStudent
+                  ? 'Pick a student above to see the receipts they have uploaded.'
+                  : onOpenApproved
+                    ? 'Receipts this student uploaded. Review a pending one to post it; open an approved one to correct or print it at the till.'
+                    : 'Proof of payment this student uploaded — verify the amount, say which fees it settles, then post it.'}
             </p>
           </div>
-          {statusTabs}
         </div>
         <div className="p-4">{table}</div>
         {modal}
