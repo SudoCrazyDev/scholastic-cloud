@@ -9,6 +9,7 @@ use App\Models\StudentPaymentPlan;
 use App\Models\StudentPaymentPlanChange;
 use App\Services\PaymentPlanService;
 use App\Services\PaymentScheduleBasis;
+use App\Support\AcademicYear;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,11 +24,11 @@ class StudentPaymentPlanController extends Controller
     /**
      * Every plan the school offers, each priced against this student's own account.
      *
-     * A student picks their plan once and cannot change it themselves, so they were choosing
-     * between names with no idea what any of them would cost. This answers "what would three
-     * terms look like for me" using their real charges, discounts and payments — only the plan
-     * is swapped — so the comparison is what they would actually be billed rather than a
-     * worked example.
+     * A family choosing between plan names had no idea what any of them would cost. This
+     * answers "what would three terms look like for me" using their real charges, discounts
+     * and payments — only the plan is swapped — so the comparison is what they would actually
+     * be billed rather than a worked example. It is what both the first selection and a later
+     * change are made from.
      *
      * Strictly read-only. It does not select a plan, and it deliberately does not run
      * LateFeeService: booking a surcharge is a side effect of reading a ledger, and a plan
@@ -247,21 +248,27 @@ class StudentPaymentPlanController extends Controller
             ], 422);
         }
 
+        // A family may choose and re-choose their own plan, but only for the year the school
+        // is currently running. A closed year's schedule is settled bookkeeping — re-amortizing
+        // it would move due dates and re-assess surcharges on a ledger already reconciled — so
+        // a correction there stays with staff, who can still set any year.
+        if ($isStudent) {
+            $currentYear = AcademicYear::forInstitution($institutionId);
+            if ($validated['academic_year'] !== $currentYear) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "You can only change your payment plan for the current school year ({$currentYear}). Contact your school registrar about an earlier year.",
+                ], 422);
+            }
+        }
+
         $existing = StudentPaymentPlan::where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $validated['academic_year'])
             ->first();
 
-        // Students may make their first selection only. Any change to an existing
-        // selection must go through admin/registrar staff.
-        if ($existing && $isStudent) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Payment plan is already set for this academic year. Contact your school registrar to change it.',
-            ], 409);
-        }
-
         $selectedById = $this->resolveActorUserId($request);
+        $actorLabel = $this->resolveActorLabel($request);
         $previousPlanId = $existing?->payment_plan_id;
 
         // plan_type kept for backward compatibility with legacy readers.
@@ -277,6 +284,7 @@ class StudentPaymentPlanController extends Controller
             $definition,
             $legacyType,
             $selectedById,
+            $actorLabel,
             $isStudent,
             $previousPlanId
 
@@ -314,6 +322,7 @@ class StudentPaymentPlanController extends Controller
                     'changed_at' => now(),
                     'changed_by' => $selectedById,
                     'changed_by_student' => $isStudent,
+                    'changed_by_label' => $actorLabel,
                     'note' => $validated['note'] ?? null,
                 ]);
             }
@@ -388,6 +397,37 @@ class StudentPaymentPlanController extends Controller
         }
 
         return Student::where('user_id', $user->id)->value('id');
+    }
+
+    /**
+     * The actor in words, stored with the change so finance can see who moved this student.
+     *
+     * A portal login is not a row in `users`, so `changed_by` is null for a self-service
+     * change and the history had nothing to name but the boolean. The portal account is
+     * the closest thing to an identity a family has — one login is shared by student and
+     * parent — so it is the login that gets recorded.
+     */
+    private function resolveActorLabel(Request $request): ?string
+    {
+        $user = $request->user();
+        if (! $user) {
+            return null;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            $name = trim(($user->student->first_name ?? '').' '.($user->student->last_name ?? ''));
+            $email = $user->studentAuth->email ?? null;
+
+            if ($name !== '' && $email) {
+                return "{$name} ({$email})";
+            }
+
+            return $name !== '' ? $name : $email;
+        }
+
+        $name = trim(($user->first_name ?? '').' '.($user->last_name ?? ''));
+
+        return $name !== '' ? $name : ($user->email ?? null);
     }
 
     private function resolveActorUserId(Request $request): ?string

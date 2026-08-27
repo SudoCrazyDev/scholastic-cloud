@@ -686,6 +686,7 @@ export interface PaymentPlanOptionsResponse {
 export interface PaymentPlanChange {
   id: string;
   student_id: string;
+  student_name?: string | null;
   academic_year: string;
   payment_plan_id?: string | null;
   plan_name?: string | null;
@@ -693,6 +694,10 @@ export interface PaymentPlanChange {
   previous_plan_name?: string | null;
   changed_at?: string | null;
   changed_by?: string | null;
+  /**
+   * Who made the change, as recorded at the time. A portal login is not a user row, so a
+   * family's own change has no `changed_by` and this is the only thing naming the actor.
+   */
   changed_by_name?: string | null;
   changed_by_student: boolean;
   note?: string | null;

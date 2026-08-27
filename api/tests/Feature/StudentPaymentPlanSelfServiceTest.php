@@ -13,11 +13,15 @@ use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
- * A student/parent portal login choosing their own payment plan for the first
- * time. The `payment-plans` listing and the `students/{id}/payment-plan` store
- * route both need the `shared` audience tag for a StudentPortalUser to reach
- * them at all — EnsureModuleAccess otherwise 403s before the controller (which
- * already enforces its own, narrower rules) ever runs.
+ * A student/parent portal login choosing their own payment plan, and later changing
+ * it. The `payment-plans` listing and the `students/{id}/payment-plan` store route
+ * both need the `shared` audience tag for a StudentPortalUser to reach them at all —
+ * EnsureModuleAccess otherwise 403s before the controller (which already enforces its
+ * own, narrower rules) ever runs.
+ *
+ * A family may re-choose freely, but only for the year the school is currently running,
+ * and every change is written to `student_payment_plan_changes` naming the portal account
+ * that made it — that history is the only place finance can see a self-service change.
  */
 class StudentPaymentPlanSelfServiceTest extends TestCase
 {
@@ -39,7 +43,9 @@ class StudentPaymentPlanSelfServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->institution = Institution::factory()->create();
+        $this->institution = Institution::factory()->create([
+            'current_academic_year' => self::YEAR,
+        ]);
 
         $this->student = Student::create([
             'first_name' => 'Portal',
@@ -115,7 +121,38 @@ class StudentPaymentPlanSelfServiceTest extends TestCase
         ]);
     }
 
-    public function test_a_student_cannot_change_an_already_selected_plan(): void
+    public function test_a_student_can_change_an_already_selected_plan(): void
+    {
+        $this->asStudent()->postJson("/api/students/{$this->student->id}/payment-plan", [
+            'academic_year' => self::YEAR,
+            'payment_plan_id' => $this->monthly->id,
+        ])->assertOk();
+
+        $this->asStudent()
+            ->postJson("/api/students/{$this->student->id}/payment-plan", [
+                'academic_year' => self::YEAR,
+                'payment_plan_id' => $this->quarterly->id,
+                'note' => 'Switching to quarterly terms',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Quarterly');
+
+        // One selection row per student per year: the change replaces it rather than
+        // leaving two plans in force.
+        $this->assertDatabaseCount('student_payment_plans', 1);
+        $this->assertDatabaseHas('student_payment_plans', [
+            'student_id' => $this->student->id,
+            'payment_plan_id' => $this->quarterly->id,
+            'selected_by_student' => true,
+        ]);
+    }
+
+    /**
+     * The change history is what finance reads, so a self-service change has to name the
+     * account that made it. A portal login is not a row in `users` — `changed_by` stays
+     * null — which is why the actor is recorded as a label at the time of the change.
+     */
+    public function test_a_student_change_is_recorded_against_their_portal_account(): void
     {
         $this->asStudent()->postJson("/api/students/{$this->student->id}/payment-plan", [
             'academic_year' => self::YEAR,
@@ -125,12 +162,67 @@ class StudentPaymentPlanSelfServiceTest extends TestCase
         $this->asStudent()->postJson("/api/students/{$this->student->id}/payment-plan", [
             'academic_year' => self::YEAR,
             'payment_plan_id' => $this->quarterly->id,
-        ])->assertStatus(409);
+            'note' => 'Parent asked to move to quarterly',
+        ])->assertOk();
 
-        $this->assertDatabaseHas('student_payment_plans', [
+        $this->assertDatabaseHas('student_payment_plan_changes', [
             'student_id' => $this->student->id,
+            'academic_year' => self::YEAR,
             'payment_plan_id' => $this->monthly->id,
+            'previous_payment_plan_id' => null,
+            'changed_by' => null,
+            'changed_by_student' => true,
+            'changed_by_label' => 'Portal Picker (portal-picker@portal.test)',
         ]);
+
+        // The change away from Monthly records where the student came from and why.
+        $this->assertDatabaseHas('student_payment_plan_changes', [
+            'student_id' => $this->student->id,
+            'academic_year' => self::YEAR,
+            'payment_plan_id' => $this->quarterly->id,
+            'previous_payment_plan_id' => $this->monthly->id,
+            'changed_by_student' => true,
+            'changed_by_label' => 'Portal Picker (portal-picker@portal.test)',
+            'note' => 'Parent asked to move to quarterly',
+        ]);
+    }
+
+    public function test_re_selecting_the_same_plan_records_no_change(): void
+    {
+        foreach ([1, 2] as $ignored) {
+            $this->asStudent()->postJson("/api/students/{$this->student->id}/payment-plan", [
+                'academic_year' => self::YEAR,
+                'payment_plan_id' => $this->monthly->id,
+            ])->assertOk();
+        }
+
+        $this->assertDatabaseCount('student_payment_plan_changes', 1);
+    }
+
+    /**
+     * A closed year's schedule is settled bookkeeping. Re-amortizing it would move due
+     * dates and re-assess surcharges on a reconciled ledger, so only staff may correct one.
+     */
+    public function test_a_student_cannot_change_a_plan_for_another_academic_year(): void
+    {
+        $this->asStudent()
+            ->postJson("/api/students/{$this->student->id}/payment-plan", [
+                'academic_year' => '2025-2026',
+                'payment_plan_id' => $this->quarterly->id,
+            ])
+            ->assertStatus(422);
+
+        $this->assertDatabaseMissing('student_payment_plans', [
+            'student_id' => $this->student->id,
+            'academic_year' => '2025-2026',
+        ]);
+    }
+
+    public function test_a_student_cannot_see_the_change_history(): void
+    {
+        $this->asStudent()
+            ->getJson('/api/payment-plan-changes')
+            ->assertStatus(403);
     }
 
     public function test_a_student_cannot_select_an_inactive_plan(): void

@@ -21,6 +21,7 @@ import { studentFinanceService } from '../../../services/studentFinanceService'
 import { paymentPlanService } from '../../../services/paymentPlanService'
 import { studentOnlinePaymentService } from '../../../services/studentOnlinePaymentService'
 import { paymentReceiptService } from '../../../services/paymentReceiptService'
+import { ConfirmationModal } from '../../../components/ConfirmationModal'
 import { StudentNOAPDF } from '../../../components/StudentNOAPDF'
 import { PaymentPlanPicker } from '../../../components/payment-plan-picker'
 import { PaymentPlanComparison } from '../../../components/payment-plan-comparison'
@@ -56,6 +57,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   const [onlinePaymentError, setOnlinePaymentError] = useState<string | null>(null)
   const [onlinePaymentMessage, setOnlinePaymentMessage] = useState<string | null>(null)
   const [showPlanOverride, setShowPlanOverride] = useState(false)
+  // A family changing their own plan says why (optional) and confirms before it is sent.
+  const [planChangeNote, setPlanChangeNote] = useState('')
+  const [pendingPlanChange, setPendingPlanChange] = useState<string | null>(null)
   const [payingInstallment, setPayingInstallment] = useState<number | null>(null)
   const receiptFileInputRef = useRef<HTMLInputElement | null>(null)
   const [receiptUploadTarget, setReceiptUploadTarget] = useState<{
@@ -212,15 +216,19 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
   })
 
   const setPaymentPlanMutation = useMutation({
-    mutationFn: (paymentPlanId: string) =>
+    mutationFn: (payload: { paymentPlanId: string; note?: string }) =>
       studentFinanceService.setPaymentPlan(studentId, {
         academic_year: resolvedAcademicYear,
-        payment_plan_id: paymentPlanId,
+        payment_plan_id: payload.paymentPlanId,
+        note: payload.note,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-ledger', studentId] })
       queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
       queryClient.invalidateQueries({ queryKey: ['payment-plan-changes', studentId] })
+      // The projections carry "Your plan" and are priced under the old schedule, so they
+      // are stale the moment a plan changes.
+      queryClient.invalidateQueries({ queryKey: ['student-plan-options', studentId] })
       toast.success('Payment plan saved.')
     },
     onError: (error: any) => {
@@ -487,11 +495,32 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     )
   }, [latestReceiptBySequence, installments])
 
-  const handlePlanSubmit = (paymentPlanId: string) => {
-    setPaymentPlanMutation.mutate(paymentPlanId, {
-      onSuccess: () => setShowPlanOverride(false),
-    })
+  const handlePlanSubmit = (paymentPlanId: string, note?: string) => {
+    setPaymentPlanMutation.mutate(
+      { paymentPlanId, note },
+      {
+        onSuccess: () => {
+          setShowPlanOverride(false)
+          setPlanChangeNote('')
+        },
+        onSettled: () => setPendingPlanChange(null),
+      }
+    )
   }
+
+  const planNameById = (paymentPlanId?: string | null) =>
+    (planOptions?.options ?? []).find((option) => option.payment_plan_id === paymentPlanId)?.name ||
+    activePlans.find((plan) => plan.id === paymentPlanId)?.name ||
+    null
+
+  const pendingPlanName = planNameById(pendingPlanChange)
+  const currentPlanName = paymentPlan?.name || planNameById(paymentPlan?.payment_plan_id)
+
+  // A school offering one plan has nothing to switch to, so a family is not shown a way to
+  // change. Staff keep theirs either way: an override is also how a wrong plan gets corrected.
+  const canOfferPlanChange =
+    !isStudentUser ||
+    (planOptionsQuery.isError ? activePlans.length > 1 : (planOptions?.options?.length ?? 0) > 1)
 
   if (isStudentUser && ledgerQuery.isLoading) {
     return (
@@ -509,9 +538,9 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
           <h3 className="text-xl font-semibold text-gray-900">Choose your payment plan</h3>
           <p className="text-gray-600 mt-1">
             Before viewing your finance page, please choose how you would like to pay your fees for
-            academic year <span className="font-medium">{resolvedAcademicYear}</span>. This selection
-            is permanent for the school year — contact your school registrar if you need to change it
-            later.
+            academic year <span className="font-medium">{resolvedAcademicYear}</span>. You can
+            change this later from your finance page — every change is recorded for the finance
+            office.
           </p>
         </div>
         {/* Priced against this student's own account, so the choice is made on real figures
@@ -530,7 +559,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
             loading={planOptionsQuery.isLoading}
             onSelect={(paymentPlanId) => handlePlanSubmit(paymentPlanId)}
             selecting={setPaymentPlanMutation.isPending}
-            selectingPlanId={setPaymentPlanMutation.variables ?? null}
+            selectingPlanId={setPaymentPlanMutation.variables?.paymentPlanId ?? null}
           />
         )}
       </div>
@@ -590,7 +619,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                 <span className="text-primary-500">·</span>
                 {paymentPlan.installment_count} installments
               </span>
-              {!isStudentUser && (
+              {canOfferPlanChange && (
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-800"
@@ -613,6 +642,49 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         </div>
       </div>
 
+      {/* A family changes their own plan from the priced comparison, not from a list of names:
+          the whole point of the switch is what it does to what they owe. Staff keep the picker,
+          which is where they record the reason for an override. */}
+      {isStudentUser && showPlanOverride && (
+        <div className="rounded-xl border border-primary-100 bg-primary-50/40 p-4 sm:p-6">
+          <h4 className="text-base font-semibold text-gray-900 mb-1">Change your payment plan</h4>
+          <p className="text-sm text-gray-600">
+            Choose a different plan for{' '}
+            <span className="font-medium">{resolvedAcademicYear}</span> and the rest of your fees
+            are re-worked under its schedule. Your change is recorded for the finance office along
+            with your account and the date.
+          </p>
+          <div className="mt-4 mb-4 max-w-xl">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason for the change (optional)
+            </label>
+            <Input
+              value={planChangeNote}
+              onChange={(event) => setPlanChangeNote(event.target.value)}
+              placeholder="e.g. Monthly instalments suit our payday better"
+              maxLength={255}
+            />
+          </div>
+          {planOptionsQuery.isError ? (
+            <PaymentPlanPicker
+              plans={activePlans}
+              loading={setPaymentPlanMutation.isPending}
+              plansLoading={activePlansQuery.isLoading}
+              currentPlanId={paymentPlan?.payment_plan_id ?? undefined}
+              onSelect={(paymentPlanId) => setPendingPlanChange(paymentPlanId)}
+            />
+          ) : (
+            <PaymentPlanComparison
+              data={planOptions}
+              loading={planOptionsQuery.isLoading}
+              onSelect={(paymentPlanId) => setPendingPlanChange(paymentPlanId)}
+              selecting={setPaymentPlanMutation.isPending}
+              selectingPlanId={setPaymentPlanMutation.variables?.paymentPlanId ?? null}
+            />
+          )}
+        </div>
+      )}
+
       {!isStudentUser && (showPlanOverride || !paymentPlan) && (
         <div className="rounded-xl border border-primary-100 bg-primary-50/40 p-6">
           <h4 className="text-base font-semibold text-gray-900 mb-1">
@@ -628,6 +700,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
             loading={setPaymentPlanMutation.isPending}
             plansLoading={activePlansQuery.isLoading}
             currentPlanId={paymentPlan?.payment_plan_id ?? undefined}
+            withNote
             onSelect={handlePlanSubmit}
           />
         </div>
@@ -1388,23 +1461,58 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
         </div>
       )}
 
-      {/* A student cannot switch plans themselves, so this answers "what would the other plans
-          have cost us" rather than offering an action — the registrar handles a real change.
-          Their own plan is marked, and no plan carries a choose button once one is set. */}
-      {isStudentUser && paymentPlan && (planOptions?.options?.length ?? 0) > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
-          <h4 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <CalendarDaysIcon className="w-5 h-5 text-primary-600" />
-            Compare payment plans
-          </h4>
-          <p className="text-sm text-gray-600 mt-1 mb-4">
-            What each of the school&apos;s plans would ask of you from here, worked out from your
-            own balance. Your plan is set for {resolvedAcademicYear} — contact the registrar if
-            you would like to change it.
-          </p>
-          <PaymentPlanComparison data={planOptions} loading={planOptionsQuery.isLoading} />
-        </div>
-      )}
+      {/* Read-only on purpose: this answers "what would the other plans ask of us" while the
+          family is only looking. Switching is a deliberate act done from the Change plan panel
+          above, so no plan carries a choose button here. Hidden while that panel is open, or
+          the same comparison would be on screen twice. */}
+      {isStudentUser &&
+        paymentPlan &&
+        !showPlanOverride &&
+        (planOptions?.options?.length ?? 0) > 1 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm">
+            <h4 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <CalendarDaysIcon className="w-5 h-5 text-primary-600" />
+              Compare payment plans
+            </h4>
+            <p className="text-sm text-gray-600 mt-1 mb-4">
+              What each of the school&apos;s plans would ask of you from here, worked out from your
+              own balance. You are on {currentPlanName || 'your current plan'} for{' '}
+              {resolvedAcademicYear} —{' '}
+              <button
+                type="button"
+                className="font-medium text-primary-600 hover:text-primary-800 underline"
+                onClick={() => setShowPlanOverride(true)}
+              >
+                change your plan
+              </button>{' '}
+              if another one suits you better.
+            </p>
+            <PaymentPlanComparison data={planOptions} loading={planOptionsQuery.isLoading} />
+          </div>
+        )}
+
+      {/* A plan change moves due dates and re-prices every remaining installment, so the
+          family confirms the switch by name rather than committing on a single click. */}
+      <ConfirmationModal
+        isOpen={Boolean(pendingPlanChange)}
+        onClose={() => setPendingPlanChange(null)}
+        onConfirm={() => {
+          if (pendingPlanChange) {
+            handlePlanSubmit(pendingPlanChange, planChangeNote.trim() || undefined)
+          }
+        }}
+        title="Change your payment plan?"
+        message={
+          `You are moving${currentPlanName ? ` from ${currentPlanName}` : ''}` +
+          `${pendingPlanName ? ` to ${pendingPlanName}` : ''} for ${resolvedAcademicYear}. ` +
+          'The rest of your fees will be re-worked under the new schedule, so your due dates ' +
+          'and the amount asked each time can change. This is recorded for the finance office ' +
+          'along with your account and the date.'
+        }
+        confirmText="Yes, change my plan"
+        variant="warning"
+        loading={setPaymentPlanMutation.isPending}
+      />
 
       {(() => {
       // Students see only active transactions; voided ones are hidden from My Finance

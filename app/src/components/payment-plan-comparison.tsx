@@ -7,9 +7,9 @@ export interface PaymentPlanComparisonProps {
   data?: PaymentPlanOptionsResponse
   loading?: boolean
   /**
-   * Offered only where the viewer may actually commit — a student choosing for the first
-   * time, or staff setting a plan on their behalf. Left out and the comparison is purely
-   * something to read, which is what a student who has already chosen gets.
+   * Offered only where the viewer may actually commit — a family choosing or changing their
+   * own plan, or staff setting one on their behalf. Left out and the comparison is purely
+   * something to read, which is what the passive panel on the finance page shows.
    */
   onSelect?: (paymentPlanId: string) => void
   selecting?: boolean
@@ -29,9 +29,9 @@ const shortDate = (iso: string) =>
 /**
  * The school's plans, each priced against one student's own account.
  *
- * A plan is chosen once and a student cannot change it themselves, so the choice used to be
- * made from names alone. Every figure here is what that family would actually be billed —
- * their charges, their discounts, their payments — with only the plan swapped.
+ * The choice used to be made from plan names alone. Every figure here is what that family
+ * would actually be billed — their charges, their discounts, their payments — with only the
+ * plan swapped, which is what makes it the surface a plan is both chosen and changed from.
  */
 export const PaymentPlanComparison: React.FC<PaymentPlanComparisonProps> = ({
   data,

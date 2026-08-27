@@ -19,8 +19,10 @@ export interface PaymentPlanPickerProps {
 }
 
 /**
- * Plan chooser shared by the student portal (first selection) and the staff
- * surfaces that override a plan on the student's behalf.
+ * Plan chooser shared by the student portal and the staff surfaces that set or override a
+ * plan on a student's behalf. It is the fallback for both: the priced comparison is what a
+ * plan is normally chosen from, and this stands in when that projection cannot be built —
+ * no plan should ever be unchoosable.
  */
 export const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({
   plans,
@@ -81,9 +83,9 @@ export const PaymentPlanPicker: React.FC<PaymentPlanPickerProps> = ({
                       plan.installment_count === 1 ? '' : 's'
                     }.`}
             </p>
-            {/* A student picks their plan once and cannot change it themselves, so the
-                difference between a fixed and a recalculated schedule has to be on the card
-                they are choosing from — not only in the schedule they see afterwards. */}
+            {/* The difference between a fixed and a recalculated schedule belongs on the card
+                being chosen from, not only in the schedule shown afterwards — it is the whole
+                basis of the choice. */}
             {plan.schedule_mode === 'reamortizing' ? (
               <p className="mt-2 text-xs text-gray-500">
                 <span className="font-medium text-gray-700">Amount changes each month.</span>{' '}

@@ -19,6 +19,7 @@ class StudentPaymentPlanChange extends Model
         'changed_at',
         'changed_by',
         'changed_by_student',
+        'changed_by_label',
         'note',
     ];
 
