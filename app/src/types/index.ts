@@ -1042,6 +1042,9 @@ export interface LedgerFeeBreakdown {
   charge: number;
   discount: number;
   paid: number;
+  // Part of `paid` that came from a General / Other collection spread across the fees
+  // that still owed, rather than from a receipt naming this fee.
+  general_applied?: number;
   outstanding: number;
 }
 

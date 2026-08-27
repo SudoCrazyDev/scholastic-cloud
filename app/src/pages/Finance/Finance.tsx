@@ -2043,6 +2043,12 @@ const Finance: React.FC = () => {
                                 <>Balance: <span className="font-medium text-gray-700">{formatCurrency(fee.outstanding)}</span></>
                               )}
                             </p>
+                            {Number(fee.general_applied ?? 0) > 0.01 && (
+                              <p className="text-xs text-gray-400">
+                                {formatCurrency(Number(fee.general_applied))} of a general
+                                payment already applied here
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5">
                             <div className="relative">
@@ -3728,6 +3734,7 @@ const Finance: React.FC = () => {
                                   {group.rows.map((fee) => {
                                     const outstanding = Number(fee.outstanding ?? 0)
                                     const paid = Number(fee.paid ?? 0)
+                                    const generalApplied = Number(fee.general_applied ?? 0)
                                     const isSettled = outstanding <= 0.01
                                     const isLateFee = fee.source === 'late_fee'
 
@@ -3757,7 +3764,17 @@ const Finance: React.FC = () => {
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">{formatCurrency(Number(fee.charge ?? 0))}</td>
                                         <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(Number(fee.discount ?? 0))}</td>
-                                        <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">{formatCurrency(paid)}</td>
+                                        <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">
+                                          {formatCurrency(paid)}
+                                          {generalApplied > 0.01 && (
+                                            <span
+                                              className="block text-xs font-normal text-gray-400"
+                                              title="Collected as General / Other and shared across the fees that still owed"
+                                            >
+                                              incl. {formatCurrency(generalApplied)} general
+                                            </span>
+                                          )}
+                                        </td>
                                         <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 tabular-nums">{formatCurrency(outstanding)}</td>
                                         <td className="px-4 py-3 text-center">
                                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${

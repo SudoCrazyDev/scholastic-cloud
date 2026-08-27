@@ -1188,11 +1188,58 @@ class StudentFinanceController extends Controller
             $discountByFee[$feeId] = round(($discountByFee[$feeId] ?? 0) + $share, 2);
         }
 
-        $breakdown = collect($feeDefaults)->map(function ($default) use ($paidByFee, $discountByFee) {
+        // A General / Other collection names no fee, so no row below claims it. Left
+        // there it is money the ledger balance has already taken off while every fee
+        // still reports its whole charge outstanding — the cashier is handed a bill the
+        // student has partly settled, and a fee the money fully covered never reads paid.
+        //
+        // It is applied the way the schedule already reads it (see $principalPayments in
+        // ledger()): against the principal the plan divides — the standard fees and the
+        // amortized ad-hoc ones — in proportion to what each still owes, so a fee already
+        // settled takes no share. Late fees and cash-basis fees sit outside the schedule
+        // and are settled only by money named to them, so they take none either.
+        $generalTotal = round((float) $activePayments
+            ->filter(fn ($payment) => !$payment->school_fee_id && !$payment->student_additional_fee_id)
+            ->sum('amount'), 2);
+
+        $unpaidRoom = [];
+        foreach ($feeDefaults as $default) {
+            $feeId = $default->school_fee_id;
+            $room = round(
+                (float) $default->amount
+                    - (float) ($discountByFee[$feeId] ?? 0)
+                    - (float) ($paidByFee[$feeId] ?? 0),
+                2
+            );
+            if ($room > 0) {
+                $unpaidRoom[$feeId] = $room;
+            }
+        }
+        foreach ($manualAdditionalFees as $additionalFee) {
+            if (! $additionalFee->isInstallmentBased()) {
+                continue;
+            }
+            $room = round(
+                (float) $additionalFee->amount
+                    - (float) ($discountByFee[$additionalFee->id] ?? 0)
+                    - (float) ($paidByAdditionalFee[$additionalFee->id] ?? 0),
+                2
+            );
+            if ($room > 0) {
+                $unpaidRoom[$additionalFee->id] = $room;
+            }
+        }
+
+        // Capped at what the fees still owe: money past that is an advance the student is
+        // owed back, not a row to drive negative, so it stays unapplied below.
+        $generalShares = $this->spreadProportionally($generalTotal, $unpaidRoom);
+
+        $breakdown = collect($feeDefaults)->map(function ($default) use ($paidByFee, $discountByFee, $generalShares) {
             $feeId = $default->school_fee_id;
             $charge = (float) $default->amount;
             $discount = (float) ($discountByFee[$feeId] ?? 0);
-            $paid = (float) ($paidByFee[$feeId] ?? 0);
+            $general = (float) ($generalShares[$feeId] ?? 0);
+            $paid = (float) ($paidByFee[$feeId] ?? 0) + $general;
 
             return [
                 'fee_id' => $feeId,
@@ -1203,6 +1250,9 @@ class StudentFinanceController extends Controller
                 'charge' => round($charge, 2),
                 'discount' => round($discount, 2),
                 'paid' => round($paid, 2),
+                // The part of `paid` that came from a General / Other collection instead
+                // of a receipt naming this fee, so the row can say why it is down.
+                'general_applied' => round($general, 2),
                 'outstanding' => round($charge - $discount - $paid, 2),
             ];
         })->toBase()->merge(
@@ -1210,10 +1260,11 @@ class StudentFinanceController extends Controller
             // its own collectible line, already in installment order.
             collect($manualAdditionalFees)
                 ->merge($chargedLateFees)
-                ->map(function ($af) use ($paidByAdditionalFee, $discountByFee) {
+                ->map(function ($af) use ($paidByAdditionalFee, $discountByFee, $generalShares) {
                     $charge = (float) $af->amount;
                     $discount = (float) ($discountByFee[$af->id] ?? 0);
-                    $paid = (float) ($paidByAdditionalFee[$af->id] ?? 0);
+                    $general = (float) ($generalShares[$af->id] ?? 0);
+                    $paid = (float) ($paidByAdditionalFee[$af->id] ?? 0) + $general;
 
                     return [
                         'fee_id' => $af->id,
@@ -1231,14 +1282,16 @@ class StudentFinanceController extends Controller
                         'charge' => round($charge, 2),
                         'discount' => round($discount, 2),
                         'paid' => round($paid, 2),
+                        'general_applied' => round($general, 2),
                         'outstanding' => round($charge - $discount - $paid, 2),
                     ];
                 })
         )->values();
 
-        $unallocatedPayments = round((float) $activePayments
-            ->filter(fn ($payment) => !$payment->school_fee_id && !$payment->student_additional_fee_id)
-            ->sum('amount'), 2);
+        // Only what the fees could not absorb is still unapplied — the Fees view and the
+        // notice of account both name this rather than folding it into a line, and it is
+        // what keeps the per-fee rows reconciling with the ledger balance.
+        $unallocatedPayments = round($generalTotal - array_sum($generalShares), 2);
 
         return [$breakdown, $unallocatedPayments];
     }
