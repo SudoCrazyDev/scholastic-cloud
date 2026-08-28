@@ -16,17 +16,16 @@ export interface PayslipSheetData {
   hourlyRate: number
   totalWorkingDays: number
   totalHours: number
-  // The salary before late, undertime and absences — those are charged under
-  // deductions instead, so the slip can say what it took off and why.
+  // The salary before late and undertime — those are charged under deductions
+  // instead, so the slip can say what it took off and why. An absent day is
+  // simply never earned, so it reaches neither figure.
   grossPay: number
   deductions: { name: string; amount: number }[]
   lateMinutes: number
   lateAmount: number
   undertimeMinutes: number
   undertimeAmount: number
-  absentDays: number
-  absenceAmount: number
-  // Deduction lines plus the three attendance charges above.
+  // Deduction lines plus the two attendance charges above.
   totalDeductions: number
   employerBenefits: { name: string; amount: number }[]
   employerShareTotal: number
@@ -52,7 +51,6 @@ export const PAYSLIP_ELEMENT_PALETTE: { type: PayslipTemplateElementType; label:
   // their own rows.
   { type: 'late_deduction', label: 'Late (deduction)' },
   { type: 'undertime_deduction', label: 'Undertime (deduction)' },
-  { type: 'absences_deduction', label: 'Absences (deduction)' },
   { type: 'total_deductions', label: 'Total Deductions' },
   { type: 'employer_benefits_list', label: "Employer's Share (itemized)" },
   { type: 'net_pay', label: 'Net Pay' },
@@ -92,11 +90,11 @@ export const SAMPLE_SHEET_DATA: PayslipSheetData = {
   coveredPeriod: 'June 1 – June 30, 2026',
   dailyRate: 750,
   hourlyRate: 93.75,
-  // 21 scheduled days with one absence, so the preview shows every deduction
-  // line a real slip can carry.
-  totalWorkingDays: 21,
+  // 21 scheduled days with one absence, which is simply unpaid — the day drops
+  // out of the count and out of the salary alike.
+  totalWorkingDays: 20,
   totalHours: 160,
-  grossPay: 15750,
+  grossPay: 15000,
   deductions: [
     { name: 'Vale', amount: 500 },
     { name: 'S.S.S.', amount: 540 },
@@ -107,9 +105,7 @@ export const SAMPLE_SHEET_DATA: PayslipSheetData = {
   lateAmount: 70,
   undertimeMinutes: 10,
   undertimeAmount: 20,
-  absentDays: 1,
-  absenceAmount: 750,
-  totalDeductions: 2361.25,
+  totalDeductions: 1611.25,
   employerBenefits: [
     { name: 'S.S.S.', amount: 1060 },
     { name: 'PhilHealth', amount: 281.25 },
@@ -128,11 +124,15 @@ export const sheetDataFromPayslip = (payslip: Payslip): PayslipSheetData => {
     ? `${parseYmd(period.date_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} – ${parseYmd(period.date_to).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
     : ''
 
-  // Late, undertime and absences are already out of gross_pay. The slip charges
-  // them under deductions instead, so the salary has to carry them again —
-  // salary − (contributions + attendance) is still the same net pay.
+  // Late and undertime are already out of gross_pay. The slip charges them under
+  // deductions instead, so the salary has to carry them again — salary −
+  // (contributions + attendance) is still the same net pay.
+  //
+  // Absences are deliberately not added back. A daily-rate slip pays for the
+  // days worked, so an absent day is simply never earned rather than being paid
+  // and then taken away, and the day count below stays the days actually paid.
   const charges = payslip.attendance_charges
-  const attendanceTotal = charges.late + charges.undertime + charges.absences
+  const attendanceTotal = charges.late + charges.undertime
 
   return {
     institutionName: payslip.institution_name || '',
@@ -144,10 +144,7 @@ export const sheetDataFromPayslip = (payslip: Payslip): PayslipSheetData => {
     coveredPeriod: range,
     dailyRate: payslip.daily_rate,
     hourlyRate: payslip.hourly_rate,
-    // Scheduled days, not days present: the salary below is the full period's
-    // and absences come off under deductions, so a slip counting only the days
-    // worked prints a rate times a day count that misses its own salary.
-    totalWorkingDays: payslip.days_worked + charges.absent_days,
+    totalWorkingDays: payslip.days_worked,
     totalHours: payslip.hours_worked,
     grossPay: round2(payslip.gross_pay + attendanceTotal),
     deductions: payslip.deductions.map((d) => ({ name: d.name, amount: d.amount })),
@@ -155,8 +152,6 @@ export const sheetDataFromPayslip = (payslip: Payslip): PayslipSheetData => {
     lateAmount: charges.late,
     undertimeMinutes: payslip.undertime_minutes,
     undertimeAmount: charges.undertime,
-    absentDays: charges.absent_days,
-    absenceAmount: charges.absences,
     totalDeductions: round2(payslip.total_deductions + attendanceTotal),
     employerBenefits: payslip.deductions
       .filter((d) => d.employer_amount > 0)

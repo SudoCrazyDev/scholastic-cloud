@@ -14,10 +14,8 @@ function LabeledRow({ label, value, bold }: { label: string; value: string; bold
   )
 }
 
-const plural = (count: number, unit: string) => `${count} ${unit}${count === 1 ? '' : 's'}`
-
 /**
- * Late, undertime and absences as deduction lines.
+ * Late and undertime as deduction lines.
  *
  * The salary the slip prints is the one before them, so they belong in the
  * itemized list alongside the contributions — that is the only place a staff
@@ -32,9 +30,6 @@ const attendanceLines = (data: PayslipSheetData): { name: string; amount: number
   }
   if (data.undertimeAmount > 0) {
     lines.push({ name: `Undertime (${data.undertimeMinutes} min)`, amount: data.undertimeAmount })
-  }
-  if (data.absenceAmount > 0) {
-    lines.push({ name: `Absences (${plural(data.absentDays, 'day')})`, amount: data.absenceAmount })
   }
 
   return lines
@@ -70,8 +65,8 @@ function ElementView({ element, data }: { element: PayslipTemplateElement; data:
       return <LabeledRow label="Total Working Days:" value={String(data.totalWorkingDays)} />
     case 'total_hours':
       return <LabeledRow label="Total Hours Worked:" value={String(data.totalHours)} />
-    // The salary before late, undertime and absences: those are charged under
-    // deductions, so subtracting them here as well would take them twice.
+    // The salary before late and undertime: those are charged under deductions,
+    // so subtracting them here as well would take them twice.
     case 'total_salary_earned':
       return <LabeledRow label="TOTAL SALARY EARNED:" value={money(data.grossPay)} bold />
     case 'deductions_list': {
@@ -112,13 +107,11 @@ function ElementView({ element, data }: { element: PayslipTemplateElement; data:
           value={money(data.undertimeAmount)}
         />
       )
+    // Retired: an absence is unpaid rather than deducted, so it has no figure
+    // to print. Kept as a case so a saved template still carrying one skips the
+    // row instead of falling through to the designer's unknown-element hole.
     case 'absences_deduction':
-      return (
-        <LabeledRow
-          label={`Absences (${plural(data.absentDays, 'day')}):`}
-          value={money(data.absenceAmount)}
-        />
-      )
+      return null
     case 'total_deductions':
       return <LabeledRow label="TOTAL DEDUCTIONS:" value={money(data.totalDeductions)} bold />
     case 'employer_benefits_list':

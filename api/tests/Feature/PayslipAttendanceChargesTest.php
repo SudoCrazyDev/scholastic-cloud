@@ -14,11 +14,15 @@ use Tests\TestCase;
 
 /**
  * A pay slip is what the staff member takes home, so it has to say why the pay
- * is short. Late, undertime and absences never come off a deduction line — they
- * are taken out of the salary itself — so the slip adds them back into TOTAL
- * SALARY EARNED and itemizes them under DEDUCTIONS. That only stays honest if
- * the figures it charges are the ones the salary actually gave up, and if no day
- * is charged twice.
+ * is short. Late and undertime never come off a deduction line — they are taken
+ * out of the salary itself — so the slip adds them back into TOTAL SALARY EARNED
+ * and itemizes them under DEDUCTIONS. That only stays honest if the figures it
+ * charges are the ones the salary actually gave up, and if no day is charged
+ * twice.
+ *
+ * An absence is counted here but never charged: a daily-rate slip pays for the
+ * days worked, so an absent day is simply never earned rather than being paid
+ * and then taken away.
  */
 class PayslipAttendanceChargesTest extends TestCase
 {
@@ -194,16 +198,18 @@ class PayslipAttendanceChargesTest extends TestCase
             ->assertOk()
             ->json('data');
 
+        // Absences are left out on purpose: the third day earned nothing and is
+        // not paid for, so it belongs in neither figure.
         $attendance = (float) $slip['attendance_charges']['late']
-            + (float) $slip['attendance_charges']['undertime']
-            + (float) $slip['attendance_charges']['absences'];
+            + (float) $slip['attendance_charges']['undertime'];
 
         // What the slip prints: the salary before the attendance charges, less
         // every deduction including them, is the net pay on the payslip.
         $salaryEarned = (float) $slip['gross_pay'] + $attendance;
         $totalDeductions = (float) $slip['total_deductions'] + $attendance;
 
-        $this->assertSame(1500.0, $salaryEarned);
+        // Two ₱500 days paid in full; the absent day never reaches the salary.
+        $this->assertSame(1000.0, $salaryEarned);
         $this->assertSame((float) $slip['net_pay'], $salaryEarned - $totalDeductions);
     }
 }
