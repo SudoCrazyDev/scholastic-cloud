@@ -13,11 +13,12 @@
 const DB_NAME = 'scholastic-gate'
 
 /**
- * 2 adds the outbox. Bumped rather than recreated on purpose: an upgrade must
- * leave a fielded kiosk's roster and faces exactly where they are — that cache
- * took a long time to fill over the link this whole feature exists to avoid.
+ * 2 adds the outbox; 3 adds the case-folded card index. Bumped rather than
+ * recreated on purpose: an upgrade must leave a fielded kiosk's roster and faces
+ * exactly where they are — that cache took a long time to fill over the link
+ * this whole feature exists to avoid.
  */
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 export const STORE_STUDENTS = 'students'
 export const STORE_PHOTOS = 'photos'
@@ -46,6 +47,32 @@ export interface QueuedScan {
   queued_at: number
 }
 
+/**
+ * How a card UID is compared.
+ *
+ * `student_rfid_tags.rfid_uid` is `utf8mb4_unicode_ci`, so **MySQL matches
+ * case-insensitively and ignores trailing spaces** — the server's
+ * `where('rfid_uid', $value)` does no folding of its own, but its collation
+ * does. An IndexedDB index, by contrast, matches bytes. Left alone, a reader
+ * emitting a different case from the enrolled value resolves online and fails on
+ * the local roster: the gate shows a name from the server reply and a blank face
+ * from the empty local hit, and offline it rejects the card outright. That is
+ * exactly backwards — the local copy has to be at least as permissive as the
+ * server, or the network is still load-bearing.
+ *
+ * Deliberately narrower than the collation in one respect: `_ci` also equates
+ * accented characters with their base letters, and this does not. Card UIDs are
+ * hex in practice, and the error direction matters — matching *less* than the
+ * server costs a fallback to the server, while matching *more* would resolve a
+ * card locally that ingest then rejects, which is the failure this whole feature
+ * exists to remove.
+ */
+export function normalizeUid(uid: string): string {
+  // Trailing spaces only. MySQL's PAD SPACE ignores those; it does *not* ignore
+  // leading ones, so trimming the front here would out-match the server.
+  return uid.toLowerCase().replace(/ +$/, '')
+}
+
 /** One roster row, exactly as `/api/gate/roster` sends it, plus a sync mark. */
 export interface CachedStudent {
   id: string
@@ -56,6 +83,11 @@ export interface CachedStudent {
   grade_level: string | null
   section: string | null
   rfid_uids: string[]
+  /**
+   * `rfid_uids` under `normalizeUid`, and the field the lookup index is built
+   * on. Derived — `putStudents` is the only writer, so no caller can forget it.
+   */
+  uid_keys?: string[]
   photo_hash: string | null
   /**
    * Which full sync last wrote this row. A full snapshot is the only thing that
@@ -81,6 +113,29 @@ export function openDb(): Promise<IDBDatabase> {
         // multiEntry: one student can hold several cards, and every one of them
         // has to resolve to the same row.
         students.createIndex('by_uid', 'rfid_uids', { multiEntry: true })
+        students.createIndex('by_uid_key', 'uid_keys', { multiEntry: true })
+      } else {
+        const students = request.transaction!.objectStore(STORE_STUDENTS)
+
+        if (!students.indexNames.contains('by_uid_key')) {
+          students.createIndex('by_uid_key', 'uid_keys', { multiEntry: true })
+
+          // Backfill inside the upgrade, because a new index over a field no
+          // existing row carries is an *empty* index: a kiosk that upgraded and
+          // waited for the next sync to populate it would resolve nothing at all
+          // in the meantime. Rewriting the rows we already hold keeps the cache
+          // — the point of versioning rather than recreating — and costs one
+          // pass over a few thousand small records.
+          const cursorRequest = students.openCursor()
+          cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result
+            if (!cursor) return
+
+            const row = cursor.value as CachedStudent
+            cursor.update({ ...row, uid_keys: (row.rfid_uids ?? []).map(normalizeUid) })
+            cursor.continue()
+          }
+        }
       }
 
       if (!db.objectStoreNames.contains(STORE_PHOTOS)) {
@@ -165,7 +220,10 @@ export async function putStudents(rows: CachedStudent[]): Promise<void> {
   const db = await openDb()
   const tx = db.transaction(STORE_STUDENTS, 'readwrite')
   const store = tx.objectStore(STORE_STUDENTS)
-  rows.forEach((row) => store.put(row))
+  // Derived here rather than by the callers: the roster sync and the USB seed
+  // both land through this function, and a row written without its keys is a
+  // student who silently stops resolving.
+  rows.forEach((row) => store.put({ ...row, uid_keys: (row.rfid_uids ?? []).map(normalizeUid) }))
   await done(tx)
 }
 
@@ -212,9 +270,16 @@ export async function pruneStudentsNotMarked(mark: string): Promise<number> {
 
 export async function findStudentByUid(uid: string): Promise<CachedStudent | null> {
   const db = await openDb()
-  const index = db.transaction(STORE_STUDENTS, 'readonly').objectStore(STORE_STUDENTS).index('by_uid')
-  const row = await promisify(index.get(uid))
-  return (row as CachedStudent | undefined) ?? null
+  const store = db.transaction(STORE_STUDENTS, 'readonly').objectStore(STORE_STUDENTS)
+
+  const folded = await promisify(store.index('by_uid_key').get(normalizeUid(uid)))
+  if (folded) return folded as CachedStudent
+
+  // The verbatim index is kept as a floor. It cannot match anything the folded
+  // one missed unless a row lost its keys, and a gate that stops recognising
+  // cards is not the place to find out that an upgrade backfill went wrong.
+  const exact = await promisify(store.index('by_uid').get(uid))
+  return (exact as CachedStudent | undefined) ?? null
 }
 
 export async function findStudentById(id: string): Promise<CachedStudent | null> {

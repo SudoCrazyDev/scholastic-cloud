@@ -9,10 +9,13 @@ import { findStudentById, findStudentByUid, getPhoto, type CachedStudent } from 
  * only the first and QR users silently stop being recognised at a gate that
  * otherwise looks fine.
  *
- * The UID comparison is **exact**, deliberately. The server does no case
- * folding or trimming beyond the outer trim, so normalising here would resolve
- * cards locally that the server then rejects at ingest — which is precisely the
- * mismatch this whole feature is built to avoid.
+ * The UID comparison is **case-folded**, and has to be: `rfid_uid` is a
+ * `utf8mb4_unicode_ci` column, so the server matches a card regardless of case
+ * whether it means to or not. It was exact here once, on the reasoning that the
+ * server does no folding — true of the query, false of the collation — and the
+ * result was a card that resolved online and not off, showing a name from the
+ * server's reply above an empty face. See `normalizeUid` for what is folded and
+ * what deliberately is not.
  */
 
 /** A tap the kiosk can draw straight away. */
@@ -31,9 +34,11 @@ export async function resolveLocally(scanned: string): Promise<ResolvedStudent |
 
   let student = await findStudentByUid(value)
 
-  // The QR fallback: the scanned value is the student's own id.
+  // The QR fallback: the scanned value is the student's own id. Lowercased for
+  // the same reason as the UID — `students.id` is a `_ci` column too, so the
+  // server resolves an upper-case UUID and a byte-exact keyPath lookup does not.
   if (!student && UUID_PATTERN.test(value)) {
-    student = await findStudentById(value)
+    student = await findStudentById(value.toLowerCase())
   }
 
   if (!student) return null

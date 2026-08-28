@@ -490,6 +490,35 @@ reads on the main thread during the slowest pass the kiosk runs. Progress is now
 counted in memory, and a full disk (`QuotaExceededError`) stops the pass instead of retrying it
 2,000 more times.
 
+### The case-folding bug the review missed
+
+Found in the field, on a real gate: a card resolved **online but not offline**, so the screen showed
+the student's name — from the server's reply — above the placeholder silhouette, because nothing
+local had matched and there was no cached photo to inherit.
+
+`student_rfid_tags.rfid_uid` is a `utf8mb4_unicode_ci` column. The server's
+`where('rfid_uid', $value)` does no case folding, but **its collation does**, and it ignores trailing
+spaces too. An IndexedDB index matches bytes. So a reader emitting a case other than the enrolled one
+worked everywhere in the system except the local roster — and the comment in `resolve.ts` argued
+*for* exact matching on the premise that the server was strict, which is true of the query and false
+of the column.
+
+The local copy has to be **at least as permissive as the server**, or the network stays load-bearing
+for the cards that differ. `normalizeUid` now folds case and trailing spaces, `putStudents` derives a
+`uid_keys` field from it, and lookups go through a `by_uid_key` index. Checked pair by pair against
+MySQL: the folding agrees on case, trailing space, leading space, truncation and zero-padding, and
+diverges only on accent folding (`ábc` = `abc` in the collation, not in JS) — deliberately left
+stricter, because matching *less* than the server costs a fallback to the server while matching
+*more* would resolve a card locally that ingest then rejects.
+
+The QR fallback had the same flaw: `students.id` is also `_ci`, so an upper-case UUID resolved on the
+server and missed a byte-exact keyPath lookup.
+
+`DB_VERSION` went to 3 for the new index, and the upgrade **backfills `uid_keys` across the rows
+already on the device**. A new multiEntry index over a field no existing row carries is an empty
+index — without the backfill, an upgraded kiosk would have resolved nothing at all until its next
+full sync, which is the one thing the version bump exists to avoid.
+
 ### The offline modules
 
 `app/src/pages/Gate/offline/`:
