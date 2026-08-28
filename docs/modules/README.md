@@ -64,6 +64,9 @@ modules should consume its data.
   unregistered tag stops being invisible. Unpaired kiosks keep working on `?institution_id=`.
   **Boot still needs the network** — see the known gaps. Read it before touching
   `RfidScanLogController::kioskScan`, `GateSmsNotifier`, or `app/src/pages/Gate/`.
+  [Running a gate kiosk](GATE_KIOSK/RUNNING_A_GATE_KIOSK.md) is the operator-facing companion:
+  register → pair → seed, what the office watches, and what each warning means. Hand that one to a
+  technician or a school; the design doc is for us.
 
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder
