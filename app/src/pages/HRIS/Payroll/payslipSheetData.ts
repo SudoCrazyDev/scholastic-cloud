@@ -94,7 +94,7 @@ export const SAMPLE_SHEET_DATA: PayslipSheetData = {
   hourlyRate: 93.75,
   // 21 scheduled days with one absence, so the preview shows every deduction
   // line a real slip can carry.
-  totalWorkingDays: 20,
+  totalWorkingDays: 21,
   totalHours: 160,
   grossPay: 15750,
   deductions: [
@@ -144,7 +144,10 @@ export const sheetDataFromPayslip = (payslip: Payslip): PayslipSheetData => {
     coveredPeriod: range,
     dailyRate: payslip.daily_rate,
     hourlyRate: payslip.hourly_rate,
-    totalWorkingDays: payslip.days_worked,
+    // Scheduled days, not days present: the salary below is the full period's
+    // and absences come off under deductions, so a slip counting only the days
+    // worked prints a rate times a day count that misses its own salary.
+    totalWorkingDays: payslip.days_worked + charges.absent_days,
     totalHours: payslip.hours_worked,
     grossPay: round2(payslip.gross_pay + attendanceTotal),
     deductions: payslip.deductions.map((d) => ({ name: d.name, amount: d.amount })),
