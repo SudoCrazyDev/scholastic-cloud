@@ -17,6 +17,12 @@ class GateSmsSetting extends Model
 
     public const GATE_TYPES = ['enter', 'exit'];
 
+    /**
+     * Minutes after a tap past which a notification is dropped rather than sent.
+     * Matters from the moment kiosks upload backlogs — see GateSmsNotifier.
+     */
+    public const DEFAULT_LATE_THRESHOLD_MINUTES = 15;
+
     protected $fillable = [
         'institution_id',
         'gate_type',
@@ -24,12 +30,14 @@ class GateSmsSetting extends Model
         'sms_gateway_id',
         'message_template',
         'cooldown_minutes',
+        'late_threshold_minutes',
         'timezone',
     ];
 
     protected $casts = [
         'is_enabled' => 'boolean',
         'cooldown_minutes' => 'integer',
+        'late_threshold_minutes' => 'integer',
     ];
 
     /**
@@ -39,6 +47,7 @@ class GateSmsSetting extends Model
     protected $attributes = [
         'is_enabled' => false,
         'cooldown_minutes' => 0,
+        'late_threshold_minutes' => self::DEFAULT_LATE_THRESHOLD_MINUTES,
         'timezone' => 'Asia/Manila',
     ];
 

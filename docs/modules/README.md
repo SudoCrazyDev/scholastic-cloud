@@ -53,6 +53,17 @@ modules should consume its data.
   from the portal. Clones the HRIS bridge pattern: per-device agent, pairing-code → hashed token,
   heartbeat, pull-based outbox queue. Other modules send by calling `SmsService::queue()` — no
   producers wired yet. Three admin pages: **Gateways**, **Messages**, **Settings**.
+- [Gate Kiosk — Offline Mode](GATE_KIOSK/OFFLINE_KIOSK_V1.md) — **Built.** The `/gate-enter` /
+  `/gate-exit` kiosks on a slow or dead link: paired device tokens, a delta roster + thumbnail cache
+  in IndexedDB, a USB seed bundle for a campus too large to sync, and an **idempotent scan outbox** —
+  a tap is recorded on the device before anything touches the network and uploaded later carrying the
+  time of the tap. Gate SMS **suppresses notifications for scans older than
+  `late_threshold_minutes`** (default 15, editable per gate), which is what stops a backlog texting
+  parents hours late. The portal shows each kiosk's cache/queue/clock, marks a scan whose timestamp
+  the device could not vouch for, and lists **cards that tapped and could not be matched** so an
+  unregistered tag stops being invisible. Unpaired kiosks keep working on `?institution_id=`.
+  **Boot still needs the network** — see the known gaps. Read it before touching
+  `RfidScanLogController::kioskScan`, `GateSmsNotifier`, or `app/src/pages/Gate/`.
 
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder

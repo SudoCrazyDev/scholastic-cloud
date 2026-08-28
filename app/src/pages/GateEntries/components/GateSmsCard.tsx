@@ -74,6 +74,7 @@ export default function GateSmsCard({ gateType }: GateSmsCardProps) {
         sms_gateway_id: form.sms_gateway_id || null,
         message_template: form.message_template ?? '',
         cooldown_minutes: form.cooldown_minutes ?? 0,
+        late_threshold_minutes: form.late_threshold_minutes ?? 15,
         timezone: form.timezone || 'Asia/Manila',
       }),
     onSuccess: () => {
@@ -201,6 +202,22 @@ export default function GateSmsCard({ gateType }: GateSmsCardProps) {
               max={1440}
               value={form.cooldown_minutes ?? 0}
               onChange={(e) => setForm((f) => ({ ...f, cooldown_minutes: Number(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Late cut-off (minutes)</label>
+            <p className="text-xs text-gray-400 mb-1">
+              Drop the text if the scan reaches the server more than this long after the tap — a
+              kiosk that was offline can upload a whole morning at once, and "your child has
+              entered" sent hours late is worse than not sent. The scan is still recorded. 0 = always
+              send.
+            </p>
+            <Input
+              type="number"
+              min={0}
+              max={1440}
+              value={form.late_threshold_minutes ?? 15}
+              onChange={(e) => setForm((f) => ({ ...f, late_threshold_minutes: Number(e.target.value) }))}
             />
           </div>
           <div>

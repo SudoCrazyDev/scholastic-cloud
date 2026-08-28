@@ -5,7 +5,9 @@ import { ScanLine, Copy, ExternalLink, LogIn, LogOut, Search, X } from 'lucide-r
 import { useAuth } from '../../hooks/useAuth'
 import { useDebounce } from '../../hooks/useDebounce'
 import { rfidScanLogService } from '../../services/rfidScanLogService'
+import GateDevicesCard from './components/GateDevicesCard'
 import GateSmsCard from './components/GateSmsCard'
+import GateUnresolvedCard from './components/GateUnresolvedCard'
 import type { RfidScanLog } from '../../types'
 
 type GateTab = 'enter' | 'exit'
@@ -187,6 +189,16 @@ export default function GateEntries() {
           </p>
         )}
 
+        {/* Paired kiosks on this gate */}
+        {institutionId && <GateDevicesCard key={`devices-${activeTab}`} gateType={activeTab} />}
+
+        {/* Cards that tapped and could not be placed. Renders nothing when empty. */}
+        {institutionId && (
+          <div className="mb-4">
+            <GateUnresolvedCard key={`unresolved-${activeTab}`} gateType={activeTab} />
+          </div>
+        )}
+
         {/* SMS notification config for this gate */}
         {institutionId && <GateSmsCard key={activeTab} gateType={activeTab} />}
 
@@ -278,7 +290,17 @@ export default function GateEntries() {
                       <td className="px-4 py-3 text-sm text-gray-900">{studentName(log)}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{log.student?.lrn ?? '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{log.device_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatScannedAt(log.scanned_at)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {formatScannedAt(log.scanned_at)}
+                        {log.clock_suspect && (
+                          <span
+                            className="ml-2 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 align-middle"
+                            title="This scan was taken by a kiosk that had not reached the server, so its clock was unverified. The time — and possibly the date — may be wrong."
+                          >
+                            time unverified
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

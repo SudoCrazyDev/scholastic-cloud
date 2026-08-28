@@ -61,6 +61,8 @@ class GateSmsSettingController extends Controller
             'sms_gateway_id' => 'nullable|uuid',
             'message_template' => 'nullable|string|max:1600',
             'cooldown_minutes' => 'nullable|integer|min:0|max:1440',
+            // 0 disables suppression: always send, however late the scan arrives.
+            'late_threshold_minutes' => 'nullable|integer|min:0|max:1440',
             'timezone' => 'nullable|string|timezone',
         ]);
 

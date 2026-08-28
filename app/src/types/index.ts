@@ -84,7 +84,7 @@ export interface ApiResponse<T = any> {
   message?: string;
   success: boolean;
   /**
-   * Notes that ride along with a successful write â€” the write happened regardless.
+   * Notes that ride along with a successful write — the write happened regardless.
    * Keyed by field so a screen can render one beside the input it belongs to, the
    * way it renders a validation error. Cashiering uses it to say an OR number is
    * already on another collection, which is allowed but worth a second look.
@@ -2424,11 +2424,38 @@ export interface RfidScanLog {
   scanned_at: string;
   type: 'enter' | 'exit';
   device_name?: string;
+  /**
+   * Set when a kiosk uploaded this scan from its offline queue. Null for a scan
+   * recorded online and for admin-created rows.
+   */
+  client_scan_id?: string | null;
+  /**
+   * The device could not vouch for `scanned_at` — it had never reached a server
+   * to learn the time, or the stamp arrived in the future. Worth showing: these
+   * rows feed attendance, and a wrong day cannot be reconstructed later.
+   */
+  clock_suspect?: boolean;
   created_at: string;
   updated_at: string;
   student?: Student;
   student_rfid_tag?: StudentRfidTag;
   institution?: Institution;
+}
+
+/**
+ * A card that tapped at a gate and could not be matched to a student — almost
+ * always a new enrolment or a replacement tag nobody has registered yet. One row
+ * per card per school; see `docs/modules/GATE_KIOSK/OFFLINE_KIOSK_V1.md`.
+ */
+export interface GateUnresolvedScan {
+  id: string;
+  rfid_uid: string;
+  type: 'enter' | 'exit';
+  device_name: string | null;
+  attempts: number;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+  clock_suspect: boolean;
 }
 
 export interface CreateRfidScanLogData {
@@ -3318,6 +3345,33 @@ export interface SmsGateway {
   updated_at: string;
 }
 
+/** A paired gate kiosk. The token, not the URL, says which gate this is. */
+export interface GateDevice {
+  id: string;
+  institution_id: string;
+  name: string;
+  location: string | null;
+  gate_type: 'enter' | 'exit' | 'both';
+  /** Derived from `last_seen_at`; a kiosk is expected to go quiet on a bad link. */
+  status: 'online' | 'offline' | 'unknown';
+  is_paired: boolean;
+  /** What the device says it holds locally. Reported, not authoritative. */
+  roster_count: number | null;
+  pending_count: number | null;
+  /** Device clock minus server clock, in ms. */
+  clock_offset_ms: number | null;
+  /** True when the drift is large enough to distrust the device's timestamps. */
+  clock_suspect: boolean;
+  app_version: string | null;
+  last_seen_at: string | null;
+  last_sync_at: string | null;
+  /** Only ever present on the response that mints it — never in a listing. */
+  pairing_code?: string;
+  pairing_code_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type SmsMessageStatus =
   | 'queued'
   | 'sending'
@@ -3358,6 +3412,13 @@ export interface GateSmsSetting {
   sms_gateway_id: string | null;
   message_template: string;
   cooldown_minutes: number;
+  /**
+   * Minutes after the tap past which the notification is dropped rather than
+   * sent. Matters because an offline kiosk can upload a whole morning at once:
+   * "your child has entered school" three hours late is not a late message, it
+   * is a false one. 0 disables the suppression. Default 15.
+   */
+  late_threshold_minutes: number;
   timezone: string;
   created_at: string;
   updated_at: string;

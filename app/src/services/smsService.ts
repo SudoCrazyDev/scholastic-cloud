@@ -175,7 +175,17 @@ class SmsService {
 
   async updateGateSetting(
     gateType: 'enter' | 'exit',
-    payload: Partial<Pick<GateSmsSetting, 'is_enabled' | 'sms_gateway_id' | 'message_template' | 'cooldown_minutes' | 'timezone'>>,
+    payload: Partial<
+      Pick<
+        GateSmsSetting,
+        | 'is_enabled'
+        | 'sms_gateway_id'
+        | 'message_template'
+        | 'cooldown_minutes'
+        | 'late_threshold_minutes'
+        | 'timezone'
+      >
+    >,
   ) {
     const response = await api.put<ApiResponse<GateSmsSetting>>(`/sms/gate-settings/${gateType}`, payload)
     return response.data

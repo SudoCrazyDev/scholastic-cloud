@@ -1,26 +1,86 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { rfidScanLogService } from '../../services/rfidScanLogService';
-import type { KioskScanResponse } from '../../types';
+import { correctedNow } from './offline/clock';
+import { resolveLocally } from './offline/resolve';
+import GateStatusChip from './GateStatusChip';
+import type { GateSyncState } from './offline/useGateSync';
 
 interface GateKioskProps {
   type: 'enter' | 'exit';
   institutionId: string;
   deviceName?: string;
+  /**
+   * Sync state when this kiosk is paired and holds a local roster. Absent means
+   * the legacy `?institution_id=` mode, which behaves exactly as it always has.
+   */
+  sync?: GateSyncState;
 }
 
 const DISPLAY_DURATION_MS = 5000;
 
-const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }) => {
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [scanResult, setScanResult] = useState<KioskScanResponse | null>(null);
+/**
+ * What is on screen right now.
+ *
+ * The three states are not decoration; they are what the gate can honestly
+ * claim at each moment:
+ *
+ *  - **pending** — the face is drawn from the local roster the instant the card
+ *    is read, and the scan is already on disk, but nothing has acknowledged it.
+ *  - **recorded** — the server has it.
+ *  - **queued** — the server could not be reached, and the scan is waiting on
+ *    this device. Not an error: the record exists and will go up. Saying so is
+ *    the difference between a kiosk that looks broken during an outage and one
+ *    that tells the truth about it.
+ */
+interface DisplayResult {
+  name: string;
+  gradeAndSection: string | null;
+  photoUrl: string | null;
+  scannedAt: Date;
+  status: 'pending' | 'recorded' | 'queued';
+}
+
+const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, sync }) => {
+  /**
+   * `correctedNow`, not `new Date()`: on a device with no real-time clock the
+   * raw reading can be days out, and this is the number rendered in 6.5rem type
+   * above the scanner. Showing the wrong day on the wall while stamping scans
+   * with the corrected time would be the worst of both — the staff standing
+   * there would have no reason to doubt it.
+   */
+  const [currentTime, setCurrentTime] = useState(correctedNow);
+  const [result, setResult] = useState<DisplayResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  /**
+   * The consoling half of a refusal. A card this device cannot name may still be
+   * perfectly valid — issued after its last roster sync — so when the scan has
+   * been queued for the server to resolve, the red card says so rather than
+   * implying the tap went nowhere.
+   */
+  const [errorNote, setErrorNote] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * Which tap the display belongs to. A scan that is still in flight when the
+   * next student taps must not be allowed to overwrite the newer card — that is
+   * precisely the queue-forming behaviour the local roster exists to remove.
+   */
+  const scanSeq = useRef(0);
+
+  /** The object URL currently on screen, revoked when it stops being. */
+  const photoUrlRef = useRef<string | null>(null);
+
+  const releasePhoto = useCallback(() => {
+    if (photoUrlRef.current) {
+      URL.revokeObjectURL(photoUrlRef.current);
+      photoUrlRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+    const interval = setInterval(() => setCurrentTime(correctedNow()), 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -50,43 +110,184 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      releasePhoto();
     };
-  }, []);
+  }, [releasePhoto]);
 
-  const handleScan = async (rfidUid: string) => {
-    if (!rfidUid.trim() || isScanning) return;
-
-    setIsScanning(true);
-    setError(null);
-    setScanResult(null);
-
+  const scheduleClear = useCallback((seq: number) => {
     if (timerRef.current) clearTimeout(timerRef.current);
 
+    timerRef.current = setTimeout(() => {
+      // Only clear if nothing newer has taken the screen since.
+      if (scanSeq.current !== seq) return;
+      setResult(null);
+      setError(null);
+      setErrorNote(null);
+      releasePhoto();
+      focusInput();
+    }, DISPLAY_DURATION_MS);
+  }, [focusInput, releasePhoto]);
+
+  const handleScan = async (scanned: string) => {
+    const value = scanned.trim();
+    if (!value) return;
+
+    const seq = ++scanSeq.current;
+
+    setError(null);
+    setErrorNote(null);
+    focusInput();
+
+    if (sync) {
+      await handlePairedScan(value, seq);
+      return;
+    }
+
+    await handleLegacyScan(value, seq);
+  };
+
+  /**
+   * A tap on a paired kiosk. **Nothing here waits on the network.**
+   *
+   * The roster answers who tapped and the outbox takes the record, both from
+   * local storage; the upload attempt that follows only decides which of two
+   * true things the card says — "recorded" or "saved, waiting to upload".
+   */
+  const handlePairedScan = async (value: string, seq: number) => {
+    if (!sync) return;
+
+    const local = await resolveLocally(value);
+
+    if (local && scanSeq.current === seq) {
+      releasePhoto();
+      const photoUrl = local.photo ? URL.createObjectURL(local.photo) : null;
+      photoUrlRef.current = photoUrl;
+
+      setResult({
+        name: local.name,
+        gradeAndSection: local.gradeAndSection,
+        photoUrl,
+        scannedAt: correctedNow(),
+        status: 'pending',
+      });
+      scheduleClear(seq);
+    }
+
+    // Returns once the scan is durable, saying whether it also got through.
+    const submission = await sync.recordScan(value, type);
+
+    if (scanSeq.current !== seq) return;
+
+    // The server refused the card outright. When this happens to a tap the
+    // local roster *did* resolve, the two disagree — and the server wins, so
+    // the welcome card has to come down.
+    if (submission.status === 'rejected') {
+      releasePhoto();
+      setResult(null);
+      setError(
+        submission.reason === 'unknown_tag'
+          ? 'Card not recognised'
+          : 'Scan could not be recorded',
+      );
+      setErrorNote(null);
+      scheduleClear(seq);
+      return;
+    }
+
+    const named = submission.student
+      ? [
+          submission.student.first_name,
+          submission.student.middle_name,
+          submission.student.last_name,
+          submission.student.ext_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : '';
+
+    const serverSection = submission.student?.grade_level && submission.student?.section
+      ? `${submission.student.grade_level} — ${submission.student.section}`
+      : (submission.student?.grade_level ?? submission.student?.section ?? null);
+
+    // Nobody can name this tap: not the roster, and not the reply — because
+    // there was no reply. The scan is saved either way.
+    if (!local && !named) {
+      releasePhoto();
+      setResult(null);
+      setError('Card not recognised');
+      setErrorNote('Saved on this kiosk — it will upload when the link returns');
+      scheduleClear(seq);
+      return;
+    }
+
+    setResult((current) => ({
+      // The local roster's answer first: it is what is already on screen, and
+      // re-fetching a photo over the same slow link would undo the caching.
+      name: current?.name || named,
+      gradeAndSection: current?.gradeAndSection ?? serverSection,
+      photoUrl: current?.photoUrl ?? null,
+      // The device's own stamp is the record now — see `outbox.ts`.
+      scannedAt: current?.scannedAt ?? correctedNow(),
+      status: submission.status === 'recorded' ? 'recorded' : 'queued',
+    }));
+
+    scheduleClear(seq);
+  };
+
+  /**
+   * A tap on an unpaired kiosk, still on `?institution_id=`: one round trip,
+   * online only, exactly as this page worked before any of this existed. Kept so
+   * a kiosk in the field keeps working until someone pairs it.
+   */
+  const handleLegacyScan = async (value: string, seq: number) => {
     try {
       const response = await rfidScanLogService.kioskScan({
-        rfid_uid: rfidUid.trim(),
+        rfid_uid: value,
         institution_id: institutionId,
         type,
         device_name: deviceName,
       });
 
-      setScanResult(response.data);
+      if (scanSeq.current !== seq) return;
 
-      timerRef.current = setTimeout(() => {
-        setScanResult(null);
-        setError(null);
-        focusInput();
-      }, DISPLAY_DURATION_MS);
-    } catch (err: any) {
-      const message = err.response?.data?.message || 'Scan failed. Please try again.';
+      const student = response.data.student;
+      const section = response.data.class_section;
+
+      const name = student
+        ? [student.first_name, student.middle_name, student.last_name, student.ext_name]
+            .filter(Boolean)
+            .join(' ')
+        : '';
+
+      setResult((current) => {
+        // Keep the cached photo already on screen; re-fetching the server's URL
+        // over the same slow link would undo the point of caching it.
+        const photoUrl = current?.photoUrl ?? student?.profile_picture ?? null;
+
+        return {
+          name: name || current?.name || '',
+          gradeAndSection: section
+            ? `${section.grade_level} — ${section.title}`
+            : (current?.gradeAndSection ?? null),
+          photoUrl,
+          scannedAt: new Date(response.data.scanned_at),
+          status: 'recorded',
+        };
+      });
+
+      scheduleClear(seq);
+    } catch (err: unknown) {
+      if (scanSeq.current !== seq) return;
+
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Scan failed. Please try again.';
+
+      releasePhoto();
+      setResult(null);
       setError(message);
-
-      timerRef.current = setTimeout(() => {
-        setError(null);
-        focusInput();
-      }, DISPLAY_DURATION_MS);
+      scheduleClear(seq);
     } finally {
-      setIsScanning(false);
       focusInput();
     }
   };
@@ -115,21 +316,6 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
 
   const isEnter = type === 'enter';
   const label = isEnter ? 'ENTRANCE GATE' : 'EXIT GATE';
-
-  const studentName = scanResult?.student
-    ? [
-        scanResult.student.first_name,
-        scanResult.student.middle_name,
-        scanResult.student.last_name,
-        scanResult.student.ext_name,
-      ]
-        .filter(Boolean)
-        .join(' ')
-    : '';
-
-  const gradeAndSection = scanResult?.class_section
-    ? `${scanResult.class_section.grade_level} — ${scanResult.class_section.title}`
-    : null;
 
   return (
     <div
@@ -177,9 +363,10 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
           </span>
         </div>
 
-        <span className="text-sm text-gray-400 tabular-nums font-medium">
-          {formattedTime}
-        </span>
+        <div className="flex items-center gap-3">
+          {sync && <GateStatusChip state={sync} />}
+          <span className="text-sm text-gray-400 tabular-nums font-medium">{formattedTime}</span>
+        </div>
       </header>
 
       {/* ───── Main Content ───── */}
@@ -201,13 +388,13 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
         {/* Scan Area */}
         <div className="w-full">
           <AnimatePresence mode="wait">
-            {scanResult ? (
+            {result ? (
               /* ── Scan Result Card ── */
               <motion.div
                 key="result"
                 initial={{ opacity: 0, scale: 0.92, y: 24 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.92, y: -24 }}
+                exit={{ opacity: 0, scale: 0.92, y: -24, transition: { duration: 0.15 } }}
                 transition={{ duration: 0.35, ease: 'easeOut' }}
                 className={`rounded-3xl border backdrop-blur-sm p-10 text-center ${
                   isEnter
@@ -256,10 +443,10 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                       isEnter ? 'border-emerald-300' : 'border-rose-300'
                     } bg-gray-100`}
                   >
-                    {scanResult.student?.profile_picture ? (
+                    {result.photoUrl ? (
                       <img
-                        src={scanResult.student.profile_picture}
-                        alt={studentName}
+                        src={result.photoUrl}
+                        alt={result.name}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -280,18 +467,18 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   transition={{ delay: 0.25 }}
                   className="text-6xl font-bold text-gray-900 mb-3"
                 >
-                  {studentName}
+                  {result.name}
                 </motion.h2>
 
                 {/* Grade level and section */}
-                {gradeAndSection && (
+                {result.gradeAndSection && (
                   <motion.p
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.35 }}
                     className="text-3xl text-gray-500"
                   >
-                    {gradeAndSection}
+                    {result.gradeAndSection}
                   </motion.p>
                 )}
 
@@ -303,12 +490,16 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   className="text-sm text-gray-400 mt-5"
                 >
                   Scanned at{' '}
-                  {new Date(scanResult.scanned_at).toLocaleTimeString('en-US', {
+                  {result.scannedAt.toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
                     second: '2-digit',
                     hour12: true,
                   })}
+                  {result.status === 'pending' && <span className="text-gray-300"> · saving…</span>}
+                  {result.status === 'queued' && (
+                    <span className="text-amber-600"> · saved, waiting to upload</span>
+                  )}
                 </motion.p>
 
                 {/* Auto-dismiss progress bar */}
@@ -331,7 +522,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                 key="error"
                 initial={{ opacity: 0, scale: 0.92, y: 24 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.92, y: -24 }}
+                exit={{ opacity: 0, scale: 0.92, y: -24, transition: { duration: 0.15 } }}
                 transition={{ duration: 0.3 }}
                 className="rounded-3xl border border-red-200 bg-white/80 backdrop-blur-sm p-10 text-center shadow-[0_4px_40px_-8px_rgba(239,68,68,0.12)]"
               >
@@ -343,7 +534,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                   </svg>
                 </div>
                 <p className="text-xl font-semibold text-red-600 mb-1">{error}</p>
-                <p className="text-sm text-gray-400">Please try again</p>
+                <p className="text-sm text-gray-400">{errorNote ?? 'Please try again'}</p>
                 <div className="mt-8 mx-auto max-w-[12rem]">
                   <div className="h-px bg-gray-200 rounded-full overflow-hidden">
                     <motion.div
@@ -361,7 +552,16 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName }
                 key="idle"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                /*
+                 * Explicit, and short, on purpose. `AnimatePresence mode="wait"`
+                 * holds the incoming card until this subtree has finished
+                 * leaving, and this one contains two `repeat: Infinity` pulse
+                 * rings on a three-second cycle — left to the default, the
+                 * result card waited on wherever that cycle happened to be,
+                 * which measured 1.5–2s. The network round trip used to hide
+                 * that; with the roster local it *is* the latency.
+                 */
+                exit={{ opacity: 0, transition: { duration: 0.12 } }}
                 className="text-center"
               >
                 {/* Pulsing scan indicator */}

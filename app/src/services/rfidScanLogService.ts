@@ -10,6 +10,9 @@ import type {
   ClassSectionDailyAttendanceSummary,
 } from '../types'
 
+/** See the comment on `kioskScan`. */
+const KIOSK_SCAN_TIMEOUT_MS = 15_000
+
 class RfidScanLogService {
   private baseUrl = '/rfid-scan-logs'
 
@@ -116,7 +119,14 @@ class RfidScanLogService {
   async kioskScan(data: KioskScanRequest) {
     const response = await api.post<{ success: boolean; message: string; data: KioskScanResponse }>(
       '/kiosk/scan',
-      data
+      data,
+      // Bounded on purpose. The shared client sets no timeout, so a gate kiosk
+      // on a dead link holds the tap's write open for however long the OS takes
+      // to give up on the connection — a minute or more — and the failure card
+      // then lands long after that student has walked off, in front of whoever
+      // is standing there next. Fifteen seconds is far longer than a healthy
+      // scan needs and short enough to stay in the same conversation.
+      { timeout: KIOSK_SCAN_TIMEOUT_MS }
     )
     return response.data
   }

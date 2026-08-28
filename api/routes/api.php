@@ -13,6 +13,9 @@ use App\Http\Controllers\SmsBridgeController;
 use App\Http\Controllers\SmsGatewayController;
 use App\Http\Controllers\SmsMessageController;
 use App\Http\Controllers\SmsSettingsController;
+use App\Http\Controllers\GateDeviceController;
+use App\Http\Controllers\GateKioskController;
+use App\Http\Controllers\GateUnresolvedScanController;
 use App\Http\Controllers\GateSmsSettingController;
 use App\Http\Controllers\InstitutionFeatureController;
 use App\Http\Controllers\DepartmentController;
@@ -111,6 +114,17 @@ Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackControll
 
 // Public kiosk endpoint for RFID gate scanners
 Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan'])->middleware('throttle:pairing');
+
+// Gate kiosk device pairing (public — one-time code)
+Route::post('/gate/pair', [GateKioskController::class, 'pair'])->middleware('throttle:pairing');
+
+// Gate kiosk device endpoints (authenticated with per-device token)
+Route::middleware('auth.gate.token')->group(function () {
+    Route::post('/gate/heartbeat', [GateKioskController::class, 'heartbeat']);
+    Route::get('/gate/roster', [GateKioskController::class, 'roster']);
+    Route::get('/gate/photo/{student}', [GateKioskController::class, 'photo']);
+    Route::post('/gate/scans', [GateKioskController::class, 'scans']);
+});
 
 // Chat membership repair, called by the chat Worker's cron trigger. Outside the
 // user-token group because it is machine-to-machine: it carries the tenant
@@ -610,6 +624,18 @@ Route::middleware('auth.token')->group(function () {
     Route::post('rfid-scan-logs/scan', [RfidScanLogController::class, 'scan'])->middleware('module:gate-entries,manage');
     Route::get('rfid-scan-logs/class-section-daily', [RfidScanLogController::class, 'classSectionDaily'])->middleware('module:gate-entries,view');
     Route::apiResource('rfid-scan-logs', RfidScanLogController::class)->only(['index', 'store', 'show', 'destroy'])->middleware('module:gate-entries,view');
+
+    // Gate kiosk devices — the paired identity behind each gate reader. Shares
+    // the gate-entries permission: same job, same people.
+    Route::get('gate/devices', [GateDeviceController::class, 'index'])->middleware('module:gate-entries,view');
+    Route::post('gate/devices', [GateDeviceController::class, 'store'])->middleware('module:gate-entries,manage');
+    Route::get('gate/devices/{id}', [GateDeviceController::class, 'show'])->middleware('module:gate-entries,view');
+    Route::patch('gate/devices/{id}', [GateDeviceController::class, 'update'])->middleware('module:gate-entries,manage');
+    Route::delete('gate/devices/{id}', [GateDeviceController::class, 'destroy'])->middleware('module:gate-entries,manage');
+    Route::post('gate/devices/{id}/refresh-pairing-code', [GateDeviceController::class, 'refreshPairingCode'])->middleware('module:gate-entries,manage');
+    Route::post('gate/devices/{id}/unpair', [GateDeviceController::class, 'unpair'])->middleware('module:gate-entries,manage');
+    Route::get('gate/unresolved-scans', [GateUnresolvedScanController::class, 'index'])->middleware('module:gate-entries,view');
+    Route::delete('gate/unresolved-scans/{id}', [GateUnresolvedScanController::class, 'destroy'])->middleware('module:gate-entries,manage');
     // Core Value Marking routes
     Route::apiResource('core-value-markings', CoreValueMarkingController::class)->middleware('module:proficiency,view');
     // SF9 routes

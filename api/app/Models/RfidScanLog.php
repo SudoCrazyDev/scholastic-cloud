@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class RfidScanLog extends Model
 {
@@ -18,10 +18,13 @@ class RfidScanLog extends Model
         'scanned_at',
         'type',
         'device_name',
+        'client_scan_id',
+        'clock_suspect',
     ];
 
     protected $casts = [
         'scanned_at' => 'datetime',
+        'clock_suspect' => 'boolean',
     ];
 
     public function studentRfidTag()

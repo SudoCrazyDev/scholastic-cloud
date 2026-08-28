@@ -33,9 +33,7 @@ class GateSmsNotifier
         '{school}',
     ];
 
-    public function __construct(private SmsService $sms)
-    {
-    }
+    public function __construct(private SmsService $sms) {}
 
     /**
      * @return string[] IDs of the queued messages (empty when nothing was sent)
@@ -61,6 +59,12 @@ class GateSmsNotifier
             ->first();
 
         if (! $setting || ! $setting->is_enabled) {
+            return [];
+        }
+
+        // Before anything else, because a backlog flush arrives here in bulk and
+        // this is the cheapest way to say no.
+        if ($this->tooLate($log, (int) $setting->late_threshold_minutes)) {
             return [];
         }
 
@@ -95,6 +99,45 @@ class GateSmsNotifier
             'source_id' => $log->id,
             'gateway_id' => $setting->sms_gateway_id,
         ]);
+    }
+
+    /**
+     * A scan old enough that telling a parent about it now would misinform them.
+     *
+     * Notifications fire on insert, and a kiosk that spent the morning offline
+     * inserts the morning all at once. "Your child has entered school" sent at
+     * 3pm about a 7am tap is not a late notification, it is a false one — and the
+     * school cannot un-send it. The scan itself is still recorded; only the text
+     * is dropped, and loudly enough to be found in the log.
+     *
+     * Measured against the *server's* clock deliberately: `scanned_at` may have
+     * come from a device that had no idea what time it was.
+     */
+    private function tooLate(RfidScanLog $log, int $minutes): bool
+    {
+        if ($minutes <= 0) {
+            return false;
+        }
+
+        $scannedAt = $log->scanned_at instanceof CarbonInterface ? $log->scanned_at : null;
+        if ($scannedAt === null) {
+            return false;
+        }
+
+        $lateBy = $scannedAt->diffInMinutes(now(), false);
+
+        if ($lateBy <= $minutes) {
+            return false;
+        }
+
+        Log::info('Gate SMS skipped — scan reached the server too late to be worth sending', [
+            'scan_log_id' => $log->id,
+            'scanned_at' => $scannedAt->toISOString(),
+            'late_by_minutes' => $lateBy,
+            'threshold_minutes' => $minutes,
+        ]);
+
+        return true;
     }
 
     /**
