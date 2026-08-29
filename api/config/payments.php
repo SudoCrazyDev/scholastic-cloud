@@ -53,7 +53,15 @@ return [
                 ],
                 'live' => [
                     'label' => 'Live',
-                    'base_url' => 'https://pg.paymaya.com',
+                    /*
+                     * pg.maya.ph, not pg.paymaya.com. Maya moved the
+                     * production hostname when it rebranded and gave the old
+                     * one a deadline of 2023; keys issued by the current
+                     * Business Manager are refused there with a bare 401,
+                     * which reads exactly like a wrong key. Sandbox did not
+                     * move and is still on the paymaya.com domain.
+                     */
+                    'base_url' => 'https://pg.maya.ph',
                 ],
             ],
 

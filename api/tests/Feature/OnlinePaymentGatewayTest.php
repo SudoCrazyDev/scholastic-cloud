@@ -12,6 +12,7 @@ use App\Models\StudentPayment;
 use App\Models\User;
 use App\Models\UserInstitution;
 use App\Services\Payments\PaymentGatewayManager;
+use App\Support\PaymentProviders;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -108,7 +109,13 @@ class OnlinePaymentGatewayTest extends TestCase
         $this->checkout('south-cashier', $this->southStudent)->assertCreated();
 
         Http::assertSent(function ($request) {
-            $this->assertStringStartsWith('https://pg.paymaya.com', $request->url());
+            /*
+             * pg.maya.ph, not pg.paymaya.com — see config/payments.php. Pinned
+             * because the two are indistinguishable from the outside: the dead
+             * host answers a perfectly good key with a bare 401, so getting
+             * this wrong presents as every live school having bad keys.
+             */
+            $this->assertStringStartsWith('https://pg.maya.ph', $request->url());
             $this->assertSame(
                 'Basic '.base64_encode('south-public:'),
                 $request->header('Authorization')[0],
@@ -116,6 +123,18 @@ class OnlinePaymentGatewayTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_the_live_and_sandbox_hosts_are_the_ones_maya_publishes(): void
+    {
+        /*
+         * Maya moved production to pg.maya.ph at the rebrand and left sandbox
+         * where it was, so the two modes do not share a domain and neither can
+         * be derived from the other. Both are written down here so a tidy-up
+         * that "fixes" the inconsistency has to argue with a test.
+         */
+        $this->assertSame('https://pg-sandbox.paymaya.com', PaymentProviders::baseUrl('maya', 'sandbox'));
+        $this->assertSame('https://pg.maya.ph', PaymentProviders::baseUrl('maya', 'live'));
     }
 
     public function test_the_transaction_remembers_which_merchant_account_took_it(): void

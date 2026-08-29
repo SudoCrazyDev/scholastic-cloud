@@ -186,6 +186,12 @@ keys was sent. That sentence reaches the log always, and the `detail` field when
 A `401` on create-checkout is never transient and never Maya being down — the request arrived and
 the key was refused. It is nearly always one of:
 
+- **The wrong production hostname.** Maya moved production to `https://pg.maya.ph` at the rebrand
+  and gave `https://pg.paymaya.com` a deadline of 2023. Sandbox did **not** move and is still
+  `https://pg-sandbox.paymaya.com`, so the two modes do not share a domain and neither can be
+  derived from the other. The dead host answers a perfectly good key with a bare 401, so this
+  presents as every live school having bad keys while sandbox works fine. Both hostnames are pinned
+  by `test_the_live_and_sandbox_hosts_are_the_ones_maya_publishes`.
 - **Mode does not match the key pair.** Sandbox keys against `pg.paymaya.com`, or live keys against
   `pg-sandbox.paymaya.com`. The Payment Gateways screen lets these be set independently, and nothing
   about a key's text says which environment issued it.
@@ -200,6 +206,21 @@ the key was refused. It is nearly always one of:
 
 The payer is told to speak to the finance office rather than to try again, because every retry
 against a refused key fails the same way.
+
+### Where the keys come from
+
+Maya has more than one merchant console and they are easy to mix up:
+
+| Console | What it issues |
+|---|---|
+| `pbm.paymaya.com` | Maya Business Manager. **Production** Checkout keys only — there is no sandbox sign-up. |
+| `manager-sandbox.paymaya.com` | Maya Manager, **sandbox**. |
+| `manager.paymaya.com` | Maya Manager 1.0, the older console. |
+
+Keys carry no marking that says which environment issued them — both are `pk-…` / `sk-…` — so the
+only way to tell a sandbox key from a live one is to remember where it came from. This is why the
+mode picks the host in `config/payments.php` rather than being a flag the driver reads separately:
+a school set up on sandbox cannot accidentally take real money, and a mismatch fails closed.
 
 ### The legacy URL
 
