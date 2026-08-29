@@ -352,6 +352,7 @@ Two details worth preserving if you touch this:
 | GET | `/api/sms/messages/{id}` | — | |
 | POST | `/api/sms/messages/{id}/retry` | — | re-queue a failed row |
 | POST | `/api/sms/messages/{id}/cancel` | — | cancel a not-yet-claimed row |
+| POST | `/api/sms/messages/cancel-queued` | — | **bulk**: cancels every `queued` outbound row for the institution. Ignores list filters, leaves `sending` alone; safe against a concurrent claim (the `status = queued` predicate). `canceled` is terminal — Retry needs `failed`, so this cannot be undone |
 | GET | `/api/sms/settings` | — | |
 | PUT | `/api/sms/settings` | `{ default_gateway_id?, rate_limit_per_minute?(1–600), send_window_start?(H:i), send_window_end?(H:i), opt_out_keywords?, sender_name? }` | upsert per institution |
 | GET | `/api/sms/gate-settings` | — | both gate rows (created with defaults on first read); `meta.variables` lists the template placeholders |
@@ -368,8 +369,12 @@ Two details worth preserving if you touch this:
   arrives via the kiosk's own poll and the page has to watch `modem_checked_at` move to know it landed.
   `LogViewer` polls `/logs` every 3s with a `since_seq` cursor and resets when `run_id` changes
   (the agent restarted and its sequence numbers began again).
-- **Messages** (`pages/SMS/Messages.tsx`) — Outbound/Inbound tabs, filters, **Compose** modal
+- **Messages** (`pages/SMS/Messages.tsx`) — Outbound/Inbound tabs, filters, **paginated** (50/page; `meta.total`
+  and prev/next, reset to page 1 on any filter change), **Compose** modal
   (recipients as manual/comma-separated numbers in V1, GSM-7 segment counter, gateway picker, optional schedule).
+  An amber **backlog banner** appears whenever `meta.queued_total` (an unfiltered institution-wide count) is
+  non-zero: it names the count, points at the Gateways screen, and offers **Cancel all N queued** behind a
+  `confirm()` that spells out that it is institution-wide and irreversible.
 - **Settings** (`pages/SMS/Settings.tsx`) — default gateway, rate limit, send window, opt-out keywords, sender name.
 - Service `services/smsService.ts`; types in `types/index.ts`.
 - **Gate Entries** (`pages/GateEntries/GateEntries.tsx`) — the Entrance/Exit tabs each render a

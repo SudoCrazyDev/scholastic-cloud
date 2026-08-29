@@ -747,6 +747,9 @@ Route::middleware('auth.token')->group(function () {
     Route::get('sms/messages/{id}', [SmsMessageController::class, 'show'])->middleware('module:sms-messages,view');
     Route::post('sms/messages/{id}/retry', [SmsMessageController::class, 'retry'])->middleware('module:sms-messages,manage');
     Route::post('sms/messages/{id}/cancel', [SmsMessageController::class, 'cancel'])->middleware('module:sms-messages,manage');
+    // Bulk clear of the queue. Declared after the {id} routes but never shadowed by them:
+    // those are GET, or carry a /retry|/cancel suffix.
+    Route::post('sms/messages/cancel-queued', [SmsMessageController::class, 'cancelQueued'])->middleware('module:sms-messages,manage');
 
     // SMS Gateway — settings
     Route::get('sms/settings', [SmsSettingsController::class, 'show'])->middleware('module:sms-settings,view');

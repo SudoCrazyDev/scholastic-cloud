@@ -6,6 +6,8 @@ export interface SmsMessageListMeta {
   last_page: number
   per_page: number
   total: number
+  /** Queued outbound rows for the whole institution — unaffected by the active filters. */
+  queued_total: number
 }
 
 export interface SmsMessageListResponse {
@@ -150,6 +152,12 @@ class SmsService {
 
   async cancelMessage(id: string) {
     const response = await api.post<ApiResponse<SmsMessage>>(`/sms/messages/${id}/cancel`)
+    return response.data
+  }
+
+  /** Cancels every queued outbound message for the institution, ignoring list filters. */
+  async cancelQueuedMessages() {
+    const response = await api.post<ApiResponse<{ canceled: number }>>('/sms/messages/cancel-queued')
     return response.data
   }
 

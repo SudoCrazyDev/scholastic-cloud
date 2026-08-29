@@ -71,6 +71,12 @@ class SmsMessageController extends Controller
                 'last_page' => $messages->lastPage(),
                 'per_page' => $messages->perPage(),
                 'total' => $messages->total(),
+                // Deliberately unfiltered: the backlog banner and Cancel all queued are
+                // institution-wide, so this must not move when the user narrows the list.
+                'queued_total' => SmsMessage::where('institution_id', $institutionId)
+                    ->where('direction', 'outbound')
+                    ->where('status', 'queued')
+                    ->count(),
             ],
         ]);
     }
@@ -159,6 +165,40 @@ class SmsMessageController extends Controller
         $message->update(['status' => 'canceled']);
 
         return response()->json(['success' => true, 'data' => $message->fresh()]);
+    }
+
+    /**
+     * Cancel every queued outbound message for the institution. This is the escape hatch
+     * for a backlog that built up while no kiosk was claiming — a gate rush against an
+     * offline agent leaves hundreds of rows that are stale by the time anyone notices.
+     *
+     * Institution-wide on purpose: it ignores whatever filters the Messages screen has
+     * applied, so the UI must say so before asking for confirmation.
+     *
+     * `queued` only. A `sending` row is already in a kiosk's hands and may be mid-CMGS;
+     * canceling it would either be a lie or be overwritten by the agent's own status
+     * report, and a row that never reports is the reaper's job.
+     *
+     * The status predicate makes this safe against a concurrent outbox claim: rows the
+     * agent grabs in the meantime are no longer `queued` and are simply not touched.
+     */
+    public function cancelQueued(Request $request): JsonResponse
+    {
+        $institutionId = $this->institutionId($request);
+        if (! $institutionId) {
+            return response()->json(['success' => false, 'message' => 'No default institution'], 403);
+        }
+
+        $canceled = SmsMessage::where('institution_id', $institutionId)
+            ->where('direction', 'outbound')
+            ->where('status', 'queued')
+            ->update(['status' => 'canceled']);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['canceled' => $canceled],
+            'message' => $canceled.' queued message(s) canceled.',
+        ]);
     }
 
     private function findScoped(Request $request, string $id): ?SmsMessage

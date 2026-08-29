@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
-import { MessageSquare, Send, Inbox, RotateCcw, Ban, X, Search } from 'lucide-react'
+import { MessageSquare, Send, Inbox, RotateCcw, Ban, X, Search, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { smsService } from '../../services/smsService'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
@@ -134,18 +134,27 @@ const Messages: React.FC = () => {
   const [direction, setDirection] = useState<'outbound' | 'inbound'>('outbound')
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [showCompose, setShowCompose] = useState(false)
+
+  // Any filter change re-slices the result set, so page 3 of the old one is meaningless.
+  useEffect(() => { setPage(1) }, [direction, status, search])
 
   const { data: gatewaysData } = useQuery({ queryKey: ['sms-gateways'], queryFn: () => smsService.getGateways() })
   const gateways: SmsGateway[] = gatewaysData?.data ?? []
 
   const { data, isLoading } = useQuery({
-    queryKey: ['sms-messages', direction, status, search],
-    queryFn: () => smsService.getMessages({ direction, status: status || undefined, search: search || undefined }),
+    queryKey: ['sms-messages', direction, status, search, page],
+    queryFn: () => smsService.getMessages({ direction, status: status || undefined, search: search || undefined, page }),
     refetchInterval: 15_000,
   })
 
   const messages: SmsMessage[] = data?.data ?? []
+  const meta = data?.meta
+  const lastPage = meta?.last_page ?? 1
+  const total = meta?.total ?? 0
+  // Institution-wide, so the banner keeps telling the truth even while a filter is on.
+  const queuedTotal = meta?.queued_total ?? 0
 
   const retryMutation = useMutation({
     mutationFn: (id: string) => smsService.retryMessage(id),
@@ -158,6 +167,25 @@ const Messages: React.FC = () => {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sms-messages'] }); toast.success('Canceled') },
     onError: () => toast.error('Cancel failed'),
   })
+
+  const cancelQueuedMutation = useMutation({
+    mutationFn: () => smsService.cancelQueuedMessages(),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['sms-messages'] })
+      toast.success(res.message ?? `${res.data?.canceled ?? 0} message(s) canceled`)
+    },
+    onError: () => toast.error('Could not cancel the queue'),
+  })
+
+  const confirmCancelQueued = () => {
+    const ok = confirm(
+      `Cancel all ${queuedTotal} queued message(s)?\n\n` +
+        'This applies to every queued outbound message for this institution — not just the ones ' +
+        'matching your current filters. Messages already sending are left alone.\n\n' +
+        'Canceled messages cannot be resent.',
+    )
+    if (ok) cancelQueuedMutation.mutate()
+  }
 
   const statusOptions =
     direction === 'outbound'
@@ -209,6 +237,36 @@ const Messages: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {direction === 'outbound' && queuedTotal > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+          <div className="text-sm text-amber-900">
+            <span className="font-semibold">{queuedTotal}</span> message{queuedTotal === 1 ? '' : 's'} waiting to be
+            sent. Nothing leaves the queue until a paired kiosk claims it — check{' '}
+            <a href="/sms/gateways" className="font-medium underline underline-offset-2">SMS Gateways</a> if this keeps growing.
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {status !== 'queued' && (
+              <Button type="button" variant="outline" color="secondary" size="sm" onClick={() => setStatus('queued')}>
+                Show queued
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              color="danger"
+              size="sm"
+              loading={cancelQueuedMutation.isPending}
+              disabled={cancelQueuedMutation.isPending}
+              leftIcon={<Ban className="w-4 h-4" />}
+              onClick={confirmCancelQueued}
+            >
+              {cancelQueuedMutation.isPending ? 'Canceling…' : `Cancel all ${queuedTotal} queued`}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
@@ -263,6 +321,36 @@ const Messages: React.FC = () => {
             ))}
           </tbody>
         </table>
+
+        {total > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-xs text-gray-500">
+            <span>
+              Showing {(page - 1) * (meta?.per_page ?? 50) + 1}–{(page - 1) * (meta?.per_page ?? 50) + messages.length} of{' '}
+              {total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                title="Previous page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="px-2">Page {page} of {lastPage}</span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+                disabled={page >= lastPage}
+                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                title="Next page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showCompose && <ComposeModal gateways={gateways} onClose={() => setShowCompose(false)} />}
