@@ -377,8 +377,9 @@ const GatewayForm: React.FC<GatewayFormProps> = ({
         <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5">
           <p className="text-xs font-medium text-zinc-700">Webhook URL</p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            Paste this into the provider&rsquo;s dashboard. It is how payments get recorded when the
-            payer closes the tab before returning.
+            Paste this into <strong className="font-medium text-zinc-700">every</strong> event slot
+            in the provider&rsquo;s dashboard — Maya lists seven, and the same URL handles all of
+            them. It is how a payment gets recorded when the payer closes the tab before returning.
           </p>
           <div className="mt-2 flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-800">

@@ -13,15 +13,27 @@ use Illuminate\Support\Facades\Log;
 /**
  * Where providers tell us a payment happened.
  *
- * Public and unauthenticated — a provider has no session — so the signature is
- * the only thing standing between this endpoint and anyone who can post JSON.
- * Two rules hold everywhere in this class:
+ * Public and unauthenticated — a provider has no session — so this endpoint is
+ * reachable by anyone who can post JSON. Two rules hold everywhere in it:
  *
- *   1. Nothing is written before the signature verifies. Reading the body to
- *      work out *which* school's key to check is fine; acting on it is not.
- *   2. A callback that cannot be verified is rejected, including when the
- *      school has no signing key stored. The previous implementation trusted
- *      an unsigned callback whenever no key was configured, which made this an
+ *   1. Nothing is written until the callback has been established as real.
+ *      Reading the body, and reading the database to work out which school and
+ *      which transaction it is about, are both fine; acting on it is not.
+ *   2. There are exactly two ways to establish that, and a callback with
+ *      neither is rejected:
+ *
+ *        - a signature made with the school's own signing key, or
+ *        - the provider confirming the payment when asked with the school's
+ *          own secret key.
+ *
+ *      Maya is the second kind. It does not sign Checkout callbacks — its
+ *      webhook screen is seven URL slots and no signing key — so the body is a
+ *      nudge and the truth is fetched. That is stronger than a signature, not
+ *      weaker: a forged callback causes a lookup that returns what really
+ *      happened, which for an invented payment is nothing.
+ *
+ *      What must never happen is the previous behaviour, where an unsigned
+ *      callback was trusted whenever no key was configured. That made this an
  *      endpoint for minting paid receipts against real students.
  *
  * Providers retry, so a callback we cannot match is answered 202 rather than
@@ -109,19 +121,6 @@ class PaymentWebhookController extends Controller
             return $this->acknowledged();
         }
 
-        if (! $driver->verifyWebhook($request)) {
-            Log::warning('Payment webhook failed signature verification', [
-                'gateway_id' => $gateway->id,
-                'institution_id' => $gateway->institution_id,
-                'provider' => $gateway->provider,
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid webhook signature.',
-            ], 401);
-        }
-
         $event = $driver->parseWebhook($request);
 
         if (! $event->identifiesATransaction()) {
@@ -165,6 +164,39 @@ class PaymentWebhookController extends Controller
 
             return $this->acknowledged();
         }
+
+        /*
+         * Only now is the callback allowed to mean anything, and it takes one
+         * of two things: a signature made with the school's key, or the
+         * provider itself confirming the payment when asked with the school's
+         * secret key.
+         *
+         * Maya is the second kind — it does not sign Checkout callbacks — so
+         * the body is treated as an unauthenticated nudge and the status is
+         * fetched rather than read. A forged callback achieves nothing: the
+         * lookup returns whatever really happened, which for an invented
+         * payment is nothing at all.
+         *
+         * The confirmed event replaces the parsed one outright. What a callback
+         * claims never survives past this point.
+         */
+        $confirmed = $driver->confirmWebhook($event);
+
+        if (! $confirmed && ! $driver->verifyWebhook($request)) {
+            Log::warning('Payment webhook could be neither verified nor confirmed with the provider', [
+                'gateway_id' => $gateway->id,
+                'institution_id' => $gateway->institution_id,
+                'provider' => $gateway->provider,
+                'transaction_id' => $transaction->id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Callback could not be verified.',
+            ], 401);
+        }
+
+        $event = $confirmed ?? $event;
 
         $updated = $this->transactionService->applyGatewayUpdate(
             $transaction,

@@ -22,7 +22,7 @@ because the second and third schools will not be on Maya.
 | `api/app/Support/PaymentProviders.php` | Reads the catalog. Everything else asks this — validation, the driver factory, the admin screen. |
 | `api/app/Models/InstitutionPaymentGateway.php` | One school's merchant account. `credentials` is an `encrypted:array`; `readinessProblems()` says why it cannot take money. |
 | `api/app/Services/Payments/Contracts/PaymentGatewayDriver.php` | What a provider must be able to do: open a checkout, read one back, verify a callback, parse a callback, name itself on a receipt. |
-| `api/app/Services/Payments/Drivers/MayaDriver.php` | Maya. Both products (`payby`, `checkout`), signature verification, and Maya's several status vocabularies collapsed into ours. |
+| `api/app/Services/Payments/Drivers/MayaDriver.php` | Maya. Both products (`payby`, `checkout`), read-back confirmation of callbacks, and Maya's several status vocabularies collapsed into ours. |
 | `api/app/Services/Payments/PaymentGatewayManager.php` | Which account a school pays through, and a driver holding its keys. Singleton per request. |
 | `api/app/Services/Payments/GatewayStatus.php` | The only status words the platform speaks: `pending`, `authorized`, `completed`, `failed`, `expired`, `cancelled`. |
 | `api/app/Services/Payments/Data/*.php` | `CheckoutRequest`, `CheckoutSession`, `GatewayEvent` — provider-neutral shapes. |
@@ -89,15 +89,45 @@ logs, and a tenant identifier there is an enumeration handle given away for noth
 
 Three rules hold in `PaymentWebhookController`:
 
-1. **Nothing is written before the signature verifies.** Reading the body to work out which key to
-   check is fine; acting on it is not.
-2. **No signing key means no trust.** A gateway without one cannot be switched on, and its callbacks
-   are refused.
+1. **Nothing is written until the callback is established as real.** Reading the body, and reading
+   the database to find which school and which transaction it concerns, are both fine; acting on it
+   is not.
+2. **There are exactly two ways to establish that**, and a callback with neither is refused:
+   a signature made with the school's signing key, or **the provider confirming the payment when
+   asked with the school's secret key**. What must never happen is the old behaviour, where an
+   unsigned callback was trusted whenever no key was configured.
 3. **A verified callback for one school cannot move another school's transaction.** Checked
    explicitly, because a school holding valid keys would otherwise be able to complete any reference
    it could guess.
 
 An unmatched callback is answered **202**, not 404 — providers retry, and retrying will not help.
+
+### Maya does not sign its Checkout callbacks
+
+This is the thing to know before touching webhook code. Maya Business Manager's webhook screen is
+**seven URL slots and no signing key** — `paymaya-signature` is a [Biller API](https://developers.maya.ph/docs/biller-api)
+facility, not a Checkout one. So `MayaDriver::verifyWebhook()` returning false is the ordinary case.
+
+What makes a Maya callback trustworthy is `confirmWebhook()`: the payment is read back from
+`GET /payments/v1/payments/{id}` with the school's **secret key**, and that answer replaces whatever
+the callback claimed. In Maya Checkout the `checkoutId` doubles as the `paymentId`, so one lookup
+serves both products.
+
+This is stronger than a signature, not a concession. A forged callback costs the attacker a lookup
+that returns what really happened — for an invented payment, a 404 and a 401 back to them. It also
+settles what an event *means*, which matters because Maya's own status list is ambiguous: `DONE` is
+"final" but sits beside `PAYMENT_FAILED`, so it means the checkout finished, **not** that it was
+paid. `mapStatus()` deliberately leaves `DONE` as `pending` and lets the read-back's `paymentStatus`
+decide. Reading it as success would post money for a declined card.
+
+`webhook_signature_key` is therefore **optional** in the catalog and `secret_key` is required —
+without the secret key a callback could never be confirmed, so the gateway cannot be switched on.
+
+### Filling in Maya Business Manager
+
+Paste the school's one webhook URL into **every** slot on that screen — Payment success, Payment
+failed, Payment expired, One-time payment success/failure/dropout, Authorized. The event is in the
+body, not the URL, and the read-back overrules it anyway.
 
 ### The legacy URL
 
@@ -112,8 +142,9 @@ Keep it until every live Maya dashboard has been repointed.
 Worth knowing about, because both were silent:
 
 - **Unsigned callbacks were trusted.** The old verifier returned `true` when no signature key was
-  configured. Anyone who could guess a reference number could POST a `PAYMENT_SUCCESS` and mint a
-  real `StudentPayment` against a real student.
+  configured — which, given Maya issues none for Checkout, was always. Anyone who could guess a
+  reference number could POST a `PAYMENT_SUCCESS` and mint a real `StudentPayment` against a real
+  student.
 - **Signed callbacks could never verify.** The header was split on its first `=` and the right-hand
   side kept — but a base64 SHA-256 is 44 characters ending in `=` padding, so that destroyed every
   well-formed bare signature. The two bugs hid each other: the only callbacks it ever accepted were

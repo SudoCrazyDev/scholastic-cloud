@@ -25,9 +25,11 @@ use Tests\TestCase;
  * school's webhook moving another school's transaction.
  *
  * The other half is the webhook itself. It is public and unauthenticated — a
- * provider has no session — so the signature is the only thing between it and
- * anyone who can post JSON, and an unsigned callback that posts a payment is
- * money invented out of an HTTP request.
+ * provider has no session — so anyone who can post JSON can reach it, and a
+ * callback that posts a payment on its own say-so is money invented out of an
+ * HTTP request. Maya does not sign its Checkout callbacks, so what stands in
+ * for a signature is reading the payment back from Maya with the school's own
+ * secret key. Several tests below are about that being airtight.
  */
 class OnlinePaymentGatewayTest extends TestCase
 {
@@ -64,6 +66,14 @@ class OnlinePaymentGatewayTest extends TestCase
 
         $this->cashierAt($this->north, 'north-cashier');
         $this->cashierAt($this->south, 'south-cashier');
+
+        /*
+         * Nothing here may reach a real provider. Every test declares what Maya
+         * answers; anything unfaked throws instead of quietly succeeding, which
+         * matters most for the callbacks whose whole safety rests on what the
+         * read-back said.
+         */
+        Http::preventStrayRequests();
     }
 
     // ---------------------------------------------------------------- checkout
@@ -139,8 +149,10 @@ class OnlinePaymentGatewayTest extends TestCase
     public function test_a_gateway_missing_a_key_cannot_take_a_payment(): void
     {
         Http::fake();
+        // The secret key. Without it a callback can never be confirmed, so a
+        // payment taken on this account could never be shown to have happened.
         $this->northGateway->update([
-            'credentials' => ['public_key' => 'north-public', 'secret_key' => 'north-secret'],
+            'credentials' => ['public_key' => 'north-public'],
         ]);
         app(PaymentGatewayManager::class)->flush();
 
@@ -151,11 +163,19 @@ class OnlinePaymentGatewayTest extends TestCase
 
     // ----------------------------------------------------------------- webhook
 
-    public function test_a_signed_callback_posts_the_payment_to_the_ledger(): void
+    /**
+     * Maya does not sign its Checkout callbacks — its webhook screen is seven
+     * URL slots and no signing key — so this is the ordinary path, and the one
+     * that has to be safe: the callback is a nudge, and the status is fetched
+     * from Maya with the school's own secret key.
+     */
+    public function test_an_unsigned_callback_posts_once_maya_confirms_it(): void
     {
         $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
 
-        $this->postWebhook($this->northGateway, self::NORTH_WEBHOOK_KEY, [
+        $this->mayaSays('pay-north', 'PAYMENT_SUCCESS');
+
+        $this->postJson($this->webhookUrl($this->northGateway), [
             'requestReferenceNumber' => $transaction->request_reference_number,
             'paymentId' => 'pay-north',
             'status' => 'PAYMENT_SUCCESS',
@@ -169,12 +189,59 @@ class OnlinePaymentGatewayTest extends TestCase
         $this->assertSame($this->north->id, $payment->institution_id);
         $this->assertSame('2500.00', (string) $payment->amount);
         $this->assertSame('Online - Pay With Maya', $payment->payment_method);
+
+        // Read back with the school's secret key, on the school's own host.
+        Http::assertSent(function ($request) {
+            $this->assertStringStartsWith('https://pg-sandbox.paymaya.com/payments/v1/payments/pay-north', $request->url());
+            $this->assertSame('Basic '.base64_encode('north-secret:'), $request->header('Authorization')[0]);
+
+            return true;
+        });
     }
 
-    public function test_an_unsigned_callback_is_refused(): void
+    /**
+     * The attack the old endpoint was open to: a stranger posting a success for
+     * a reference they guessed. It now costs them a lookup and nothing else.
+     */
+    public function test_a_forged_success_cannot_invent_a_payment_maya_never_took(): void
     {
         $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
 
+        // Maya's record says otherwise, and Maya's record is what counts.
+        $this->mayaSays('pay-north', 'PAYMENT_FAILED');
+
+        $this->postJson($this->webhookUrl($this->northGateway), [
+            'requestReferenceNumber' => $transaction->request_reference_number,
+            'paymentId' => 'pay-north',
+            'status' => 'PAYMENT_SUCCESS',
+        ])->assertOk();
+
+        $this->assertSame('failed', $transaction->fresh()->status);
+        $this->assertSame(0, StudentPayment::count(), 'a forged callback minted a payment');
+    }
+
+    public function test_an_unsigned_callback_maya_does_not_recognise_is_refused(): void
+    {
+        $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
+
+        Http::fake(['*' => Http::response(['error' => 'not found'], 404)]);
+
+        $this->postJson($this->webhookUrl($this->northGateway), [
+            'requestReferenceNumber' => $transaction->request_reference_number,
+            'paymentId' => 'pay-north',
+            'status' => 'PAYMENT_SUCCESS',
+        ])->assertStatus(401);
+
+        $this->assertSame('pending', $transaction->fresh()->status);
+        $this->assertSame(0, StudentPayment::count());
+    }
+
+    public function test_a_callback_with_nothing_to_confirm_and_no_signature_is_refused(): void
+    {
+        $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
+
+        // No payment id, so there is nothing to ask Maya about, and no
+        // signature either. Neither route to trust is open.
         $this->postJson($this->webhookUrl($this->northGateway), [
             'requestReferenceNumber' => $transaction->request_reference_number,
             'status' => 'PAYMENT_SUCCESS',
@@ -184,14 +251,39 @@ class OnlinePaymentGatewayTest extends TestCase
         $this->assertSame(0, StudentPayment::count());
     }
 
+    /**
+     * Where a provider does sign — Maya's Biller API, and the providers coming
+     * after it — the signature stands on its own, with no call out.
+     */
+    public function test_a_signed_callback_is_trusted_without_asking_the_provider(): void
+    {
+        $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
+
+        // Maya cannot be reached at all. The signature is enough.
+        Http::fake(['*' => Http::response(null, 500)]);
+
+        $this->postWebhook($this->northGateway, self::NORTH_WEBHOOK_KEY, [
+            'requestReferenceNumber' => $transaction->request_reference_number,
+            'paymentId' => 'pay-north',
+            'status' => 'PAYMENT_SUCCESS',
+        ])->assertOk();
+
+        $this->assertSame('completed', $transaction->fresh()->status);
+        $this->assertSame(1, StudentPayment::count());
+    }
+
     public function test_a_callback_signed_with_the_wrong_schools_key_is_refused(): void
     {
         $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
 
-        // A real signature — just not made with North's key. This is the case a
-        // single shared webhook secret could never have caught.
+        // A real signature — just not made with North's key — and Maya does not
+        // vouch for the payment either. This is the case a single shared
+        // webhook secret could never have caught.
+        Http::fake(['*' => Http::response(['error' => 'not found'], 404)]);
+
         $this->postWebhook($this->northGateway, self::SOUTH_WEBHOOK_KEY, [
             'requestReferenceNumber' => $transaction->request_reference_number,
+            'paymentId' => 'pay-north',
             'status' => 'PAYMENT_SUCCESS',
         ])->assertStatus(401);
 
@@ -218,6 +310,8 @@ class OnlinePaymentGatewayTest extends TestCase
     public function test_a_replayed_callback_does_not_credit_the_student_twice(): void
     {
         $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
+
+        $this->mayaSays('pay-north', 'PAYMENT_SUCCESS');
 
         $payload = [
             'requestReferenceNumber' => $transaction->request_reference_number,
@@ -269,6 +363,8 @@ class OnlinePaymentGatewayTest extends TestCase
     public function test_the_legacy_maya_url_still_works_and_still_verifies(): void
     {
         $transaction = $this->pendingTransaction($this->north, $this->northStudent, $this->northGateway, 'pay-north');
+
+        $this->mayaSays('pay-north', 'PAYMENT_SUCCESS');
 
         $payload = [
             'requestReferenceNumber' => $transaction->request_reference_number,
@@ -394,11 +490,11 @@ class OnlinePaymentGatewayTest extends TestCase
                 'mode' => 'sandbox',
                 'product' => 'payby',
                 'is_active' => true,
-                'credentials' => ['public_key' => 'south-public', 'secret_key' => 'south-secret'],
+                'credentials' => ['public_key' => 'south-public'],
             ])
             ->assertStatus(422)
             ->assertJsonPath('success', false)
-            ->assertJsonPath('errors.webhook_signature_key.0', 'Webhook signature key is required.');
+            ->assertJsonPath('errors.secret_key.0', 'Secret key is required.');
     }
 
     public function test_a_half_filled_gateway_may_be_saved_so_long_as_it_stays_off(): void
@@ -416,11 +512,11 @@ class OnlinePaymentGatewayTest extends TestCase
                 'mode' => 'sandbox',
                 'product' => 'payby',
                 'is_active' => false,
-                'credentials' => ['public_key' => 'south-public', 'secret_key' => 'south-secret'],
+                'credentials' => ['public_key' => 'south-public'],
             ])
             ->assertOk()
             ->assertJsonPath('data.ready', false)
-            ->assertJsonPath('outstanding.webhook_signature_key.0', 'Webhook signature key is required.');
+            ->assertJsonPath('outstanding.secret_key.0', 'Secret key is required.');
 
         $this->assertNotNull(
             InstitutionPaymentGateway::forInstitution($this->south->id)->first()?->webhookUrl(),
@@ -618,6 +714,22 @@ class OnlinePaymentGatewayTest extends TestCase
             'request_reference_number' => 'STUPAY-'.strtoupper($providerPaymentId),
             'provider_payment_id' => $providerPaymentId,
             'provider_charge_id' => $providerPaymentId,
+        ]);
+    }
+
+    /**
+     * What Maya answers when the payment is read back.
+     */
+    private function mayaSays(string $paymentId, string $paymentStatus): void
+    {
+        Http::fake([
+            '*/payments/v1/payments/*' => Http::response([
+                'id' => $paymentId,
+                'requestReferenceNumber' => 'STUPAY-'.strtoupper($paymentId),
+                'status' => $paymentStatus,
+                'paymentStatus' => $paymentStatus,
+                'paymentAt' => now()->toIso8601String(),
+            ], 200),
         ]);
     }
 

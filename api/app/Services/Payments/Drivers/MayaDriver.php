@@ -14,6 +14,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -167,12 +168,17 @@ class MayaDriver implements PaymentGatewayDriver
     }
 
     /**
-     * Maya signs the raw body with the school's webhook signature key.
+     * The cheap first check, where Maya has given the school a signing key.
      *
-     * No key, no trust. The previous implementation returned true when the key
-     * was unset, which left the endpoint open to anyone who could guess a
-     * reference number — and a forged PAYMENT_SUCCESS posts a real payment
-     * against a real student's balance.
+     * Usually it has not: Maya's Checkout webhook screen is seven URL slots and
+     * no signing key, and `paymaya-signature` is a Biller API facility. So this
+     * returning false is the ordinary case, not an error — confirmWebhook()
+     * is what makes a Maya callback trustworthy.
+     *
+     * What it must never do is return true because no key is configured. That
+     * is what the previous implementation did, and it left the endpoint open to
+     * anyone who could guess a reference number: a forged PAYMENT_SUCCESS
+     * posted a real payment against a real student's balance.
      */
     public function verifyWebhook(Request $request): bool
     {
@@ -243,6 +249,38 @@ class MayaDriver implements PaymentGatewayDriver
             failureReason: $this->failureReason($payload, $status),
             raw: $payload,
         );
+    }
+
+    /**
+     * Ask Maya what really happened.
+     *
+     * Maya does not sign Checkout callbacks, so this is what makes one
+     * trustworthy: the payment is read back with the school's secret key, and
+     * that answer wins over anything the callback claimed. In Maya Checkout the
+     * checkoutId doubles as the paymentId, so the same lookup serves both
+     * products.
+     */
+    public function confirmWebhook(GatewayEvent $event): ?GatewayEvent
+    {
+        $paymentId = $event->providerPaymentId ?: $event->providerChargeId;
+
+        if (! $paymentId) {
+            // Nothing to look up. A callback carrying only our own reference
+            // cannot be confirmed, and must not be acted on.
+            return null;
+        }
+
+        try {
+            return $this->fetchCheckout($paymentId);
+        } catch (PaymentGatewayException $e) {
+            Log::info('Maya could not confirm a callback', [
+                'provider_payment_id' => $paymentId,
+                'status' => $e->status,
+                'message' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     public function paymentMethodLabel(): string
@@ -383,15 +421,20 @@ class MayaDriver implements PaymentGatewayDriver
             return GatewayStatus::COMPLETED;
         }
 
-        if ($says(['AUTHORIZED'])) {
+        /*
+         * An authorisation is a hold, not money. So is a passed 3-D Secure
+         * check: the cardholder proved who they were and the payment has still
+         * not been taken. Neither may post to a ledger.
+         */
+        if ($says(['AUTHORIZED', 'AUTH_SUCCESS', '3DS_PAYMENT_SUCCESS'])) {
             return GatewayStatus::AUTHORIZED;
         }
 
-        if ($says(['FAILED', 'DECLINED', 'PAYMENT_FAILED'])) {
+        if ($says(['FAILED', 'DECLINED', 'PAYMENT_FAILED', 'AUTH_FAILED', '3DS_PAYMENT_FAILURE'])) {
             return GatewayStatus::FAILED;
         }
 
-        if ($says(['EXPIRED', 'PAYMENT_EXPIRED'])) {
+        if ($says(['EXPIRED', 'PAYMENT_EXPIRED', 'CAPTURE_HOLD_EXPIRED', '3DS_PAYMENT_DROPOUT'])) {
             return GatewayStatus::EXPIRED;
         }
 
@@ -399,6 +442,13 @@ class MayaDriver implements PaymentGatewayDriver
             return GatewayStatus::CANCELLED;
         }
 
+        /*
+         * Everything else is pending, and that includes Maya's DONE. DONE is
+         * final in Maya's own list but sits beside PAYMENT_FAILED there — it
+         * says the checkout finished, not that it was paid. Reading it as
+         * success would post money for a card that was declined. The read-back
+         * carries paymentStatus alongside it, and that is what decides.
+         */
         return GatewayStatus::PENDING;
     }
 

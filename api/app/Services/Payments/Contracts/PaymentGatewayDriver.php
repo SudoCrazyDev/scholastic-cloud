@@ -50,16 +50,38 @@ interface PaymentGatewayDriver
      * Returning true when no signing key is configured is not acceptable — a
      * webhook that is trusted without a signature is an endpoint anyone can
      * use to post a completed payment into the ledger. A driver that cannot
-     * verify must return false.
+     * verify must return false and rely on confirmWebhook() instead.
      */
     public function verifyWebhook(Request $request): bool;
 
     /**
-     * Read a verified callback into the platform's own vocabulary.
+     * Read a callback into the platform's own vocabulary.
      *
-     * Only ever called after verifyWebhook() has passed.
+     * Pure translation, so it is safe to call on an unverified request — that
+     * is how the caller works out which transaction a callback is even about.
+     * What it returns is not trustworthy until verifyWebhook() has passed or
+     * confirmWebhook() has answered.
      */
     public function parseWebhook(Request $request): GatewayEvent;
+
+    /**
+     * Ask the provider whether this actually happened.
+     *
+     * The answer to a provider that does not sign its callbacks. Maya's
+     * Checkout webhooks carry no signature — its webhook screen has seven URL
+     * slots and no signing key — so a callback is treated as an unauthenticated
+     * nudge and the truth is fetched with the school's own secret key. A forged
+     * callback then achieves nothing: the lookup returns the real status, or
+     * the provider does not know the payment at all.
+     *
+     * This is stronger than a signature rather than weaker. It also settles
+     * what an event *means*: the status comes from the provider's own record
+     * rather than from the name of the event it happened to send.
+     *
+     * Returns null when the provider cannot be asked or does not recognise the
+     * payment — which the caller must treat as "do not act", not as a failure.
+     */
+    public function confirmWebhook(GatewayEvent $event): ?GatewayEvent;
 
     /**
      * How this provider should be named on the payment it posts, e.g.

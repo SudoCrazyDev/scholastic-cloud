@@ -69,17 +69,17 @@ return new class extends Migration
         ]);
 
         /*
-         * A deployment that never had a signing key is the one that changes
-         * behaviour here: unsigned callbacks used to be trusted and are now
-         * refused. Said loudly, because the symptom — payments that complete at
-         * Maya but never post — otherwise looks like nothing at all.
+         * No signing key is the ordinary case — Maya does not issue one for
+         * Checkout — and callbacks are confirmed against Maya instead, so this
+         * is not a problem to fix. It is logged because the webhook URL has
+         * changed shape and somebody has to paste the new one into Maya's
+         * dashboard.
          */
-        if ($webhookKey === '') {
-            Log::warning('Maya keys moved onto this institution, but no webhook signature key was configured. Callbacks are now refused until one is set on the Payment Gateways screen.', [
-                'institution_id' => $gateway->institution_id,
-                'webhook_url' => $gateway->webhookUrl(),
-            ]);
-        }
+        Log::info('Maya keys moved from the environment onto this institution. Paste its webhook URL into every event slot in Maya Business Manager.', [
+            'institution_id' => $gateway->institution_id,
+            'webhook_url' => $gateway->webhookUrl(),
+            'signature_key_configured' => $webhookKey !== '',
+        ]);
     }
 
     /**

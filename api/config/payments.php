@@ -84,13 +84,24 @@ return [
                 ],
                 'secret_key' => [
                     'label' => 'Secret key',
-                    'hint' => 'sk-… — used to read a payment back from Maya.',
+                    'hint' => 'sk-… — reads a payment back from Maya. This is what makes a callback trustworthy, so it is required even though only the public key opens a checkout.',
                     'required' => true,
                 ],
+
+                /*
+                 * Optional, because Maya does not issue one for Checkout —
+                 * its webhook screen has seven URL slots and no signing key.
+                 * The `paymaya-signature` header is a Biller API facility.
+                 *
+                 * A callback is never trusted on its own account either way:
+                 * where there is no signature the driver confirms it against
+                 * Maya before anything is posted. Supplying a key here only
+                 * adds a cheaper first check.
+                 */
                 'webhook_signature_key' => [
                     'label' => 'Webhook signature key',
-                    'hint' => 'Signs the callbacks Maya sends. Without it we cannot tell a real payment notice from a forged one, so it is required.',
-                    'required' => true,
+                    'hint' => 'Only if Maya issued one — its Checkout webhook screen does not. Callbacks are confirmed with Maya directly when this is blank.',
+                    'required' => false,
                 ],
             ],
         ],
