@@ -139,6 +139,36 @@ const PaymentGateways: React.FC = () => {
   )
 }
 
+/**
+ * A school's webhook URL, with a copy button.
+ *
+ * Shown on the card rather than only inside the edit form, because the job it
+ * belongs to is pasting one URL per school into a provider's dashboard — and
+ * doing that from a list you have to open a form to read, school by school, is
+ * how the wrong URL ends up against the wrong merchant.
+ */
+const WebhookUrl: React.FC<{ url: string; label?: string }> = ({ url, label }) => {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {label && <span className="shrink-0 text-xs font-medium text-zinc-500">{label}</span>}
+      <code className="min-w-0 flex-1 truncate rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-800">
+        {url}
+      </code>
+      <Button type="button" variant="outline" size="sm" onClick={copy}>
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </Button>
+    </div>
+  )
+}
+
 interface InstitutionCardProps {
   institution: InstitutionGatewayRow
   providers: PaymentProvider[]
@@ -220,6 +250,27 @@ const InstitutionCard: React.FC<InstitutionCardProps> = ({
         </div>
       )}
 
+      {/*
+        Every account this school has, whether or not it is the one in use — a
+        school being moved from one provider to the next still has to have the
+        new one's URL registered before it can be switched on.
+      */}
+      {institution.gateways.length > 0 && (
+        <div className="space-y-2 border-t border-zinc-100 px-4 py-3">
+          {institution.gateways.map(gateway => (
+            <WebhookUrl
+              key={gateway.id}
+              url={gateway.webhook_url}
+              label={
+                institution.gateways.length > 1 || providers.length > 1
+                  ? gateway.provider_label
+                  : 'Webhook'
+              }
+            />
+          ))}
+        </div>
+      )}
+
       {editingProvider && (
         <GatewayForm
           institutionId={institution.id}
@@ -257,7 +308,6 @@ const GatewayForm: React.FC<GatewayFormProps> = ({
   )
   const [isActive, setIsActive] = useState(gateway?.is_active ?? false)
   const [credentials, setCredentials] = useState<Record<string, string>>({})
-  const [copied, setCopied] = useState(false)
 
   const save = useMutation({
     mutationFn: () =>
@@ -287,13 +337,6 @@ const GatewayForm: React.FC<GatewayFormProps> = ({
    */
   const fieldErrors = (save.error as { response?: { data?: { errors?: Record<string, string[]> } } })
     ?.response?.data?.errors
-
-  const copyWebhookUrl = async () => {
-    if (!gateway) return
-    await navigator.clipboard.writeText(gateway.webhook_url)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
-  }
 
   return (
     <form
@@ -373,24 +416,29 @@ const GatewayForm: React.FC<GatewayFormProps> = ({
         })}
       </div>
 
-      {gateway && (
-        <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5">
-          <p className="text-xs font-medium text-zinc-700">Webhook URL</p>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            Paste this into <strong className="font-medium text-zinc-700">every</strong> event slot
-            in the provider&rsquo;s dashboard — Maya lists seven, and the same URL handles all of
-            them. It is how a payment gets recorded when the payer closes the tab before returning.
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-800">
-              {gateway.webhook_url}
-            </code>
-            <Button type="button" variant="outline" size="sm" onClick={copyWebhookUrl}>
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            </Button>
+      <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5">
+        <p className="text-xs font-medium text-zinc-700">Webhook URL</p>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Paste this into <strong className="font-medium text-zinc-700">every</strong> event slot in
+          the provider&rsquo;s dashboard — Maya lists seven, and the same URL handles all of them. It
+          is how a payment gets recorded when the payer closes the tab before returning.
+        </p>
+        {gateway ? (
+          <div className="mt-2">
+            <WebhookUrl url={gateway.webhook_url} />
           </div>
-        </div>
-      )}
+        ) : (
+          /*
+            The URL is created with the account, so there is nothing to show
+            until this saves. Said here rather than left blank, because the
+            obvious reading of an empty box is that something is broken.
+          */
+          <p className="mt-2 rounded bg-zinc-100 px-2 py-1.5 text-xs text-zinc-600">
+            This school&rsquo;s URL is issued when the account is saved. Save the keys with the
+            switch off, register the URL with the provider, then switch it on.
+          </p>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
