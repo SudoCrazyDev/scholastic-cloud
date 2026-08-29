@@ -38,11 +38,15 @@ interface StudentFinanceTabProps {
   studentId: string
 }
 
-// Temporarily hidden; flip back to true to restore the Pay Online (Maya Checkout) form.
-const SHOW_PAY_ONLINE_SECTION = false
+/**
+ * Survives the trip to the provider's own site and back, which a component's
+ * state does not: the browser leaves this origin entirely and returns on a
+ * fresh page load. Session-scoped so a second tab cannot claim it.
+ */
+const PENDING_PAYMENT_KEY = 'pendingOnlinePaymentId'
 
-// Temporarily hidden; flip back to true to restore the per-installment Pay button.
-const SHOW_PAY_INSTALLMENT_BUTTON = false
+/** How long to keep asking whether a payment landed, after the payer returns. */
+const CONFIRMATION_BACKOFF_MS = [0, 2000, 4000, 6000]
 
 export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, studentId }) => {
   const queryClient = useQueryClient()
@@ -118,6 +122,33 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     (option) => !option.is_selected
   ).length
 
+  /**
+   * Whether this school takes online payments at all, and through whom.
+   *
+   * Asked before a Pay button is drawn rather than after it is pressed. Which
+   * school pays through which provider is set per school on the platform's
+   * Payment Gateways screen, so nothing here may assume there is one — a
+   * button that always fails at the last step is worse than no button, and
+   * "your school has not set this up" is a different thing to say than "your
+   * payment failed".
+   */
+  const paymentAvailabilityQuery = useQuery({
+    queryKey: ['online-payment-availability'],
+    queryFn: () => studentOnlinePaymentService.getAvailability(),
+    enabled: isStudentUser,
+    staleTime: 5 * 60 * 1000,
+  })
+  const paymentAvailability = paymentAvailabilityQuery.data?.data
+  const canPayOnline = Boolean(isStudentUser && paymentAvailability?.ready)
+  // Named only where naming it helps the payer recognise the page they land on.
+  const gatewayLabel = paymentAvailability?.provider_label || 'your school’s payment provider'
+  /*
+   * A sandbox merchant account takes fake cards and settles nothing. Saying so
+   * is not optional: a payer who believes a test payment cleared will stop
+   * chasing a balance that is still owed.
+   */
+  const isTestGateway = paymentAvailability?.mode === 'sandbox'
+
   const onlinePaymentsQuery = useQuery({
     queryKey: ['student-online-payments', studentId, resolvedAcademicYear],
     queryFn: () =>
@@ -150,12 +181,38 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     }
   }, [ledgerData?.academic_year, selectedAcademicYear])
 
+  /**
+   * The payer coming back from the provider's site.
+   *
+   * Runs once per return, guarded by a ref rather than by the URL so a
+   * remount cannot restart it and StrictMode's double-invoke cannot kill the
+   * confirmation mid-flight.
+   */
+  const paymentReturnHandled = useRef(false)
+
   useEffect(() => {
     if (!isStudentUser) return
+    if (paymentReturnHandled.current) return
 
     const params = new URLSearchParams(window.location.search)
     const paymentResult = params.get('payment_result')
     if (!paymentResult) return
+
+    paymentReturnHandled.current = true
+
+    /*
+     * Take the marker out of the address bar. Left there, a refresh months
+     * later still announces "payment received" for a payment that finished
+     * once, and re-runs the confirmation against a transaction id that is no
+     * longer in session storage.
+     */
+    params.delete('payment_result')
+    const remaining = params.toString()
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}${remaining ? `?${remaining}` : ''}`
+    )
 
     const invalidateAll = () => {
       queryClient.invalidateQueries({ queryKey: ['student-online-payments', studentId] })
@@ -163,35 +220,76 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       queryClient.invalidateQueries({ queryKey: ['student-noa', studentId] })
     }
 
-    if (paymentResult === 'success') {
-      setOnlinePaymentMessage('Payment completed. We are syncing your ledger now.')
-      setOnlinePaymentError(null)
-    } else if (paymentResult === 'failure') {
-      setOnlinePaymentError('Payment failed. You may retry the checkout.')
+    const pendingId = sessionStorage.getItem(PENDING_PAYMENT_KEY)
+    sessionStorage.removeItem(PENDING_PAYMENT_KEY)
+
+    if (paymentResult !== 'success') {
+      const cancelled = paymentResult === 'cancel'
       setOnlinePaymentMessage(null)
-    } else if (paymentResult === 'cancel') {
-      setOnlinePaymentMessage('Payment was cancelled.')
-      setOnlinePaymentError(null)
-    }
+      setOnlinePaymentError(
+        cancelled
+          ? 'That payment was cancelled. Nothing has been charged.'
+          : 'That payment did not go through. Nothing has been charged, and you can try again.'
+      )
 
-    const pendingId = sessionStorage.getItem('pendingMayaTransactionId')
-    if (pendingId) {
-      sessionStorage.removeItem('pendingMayaTransactionId')
-      const outcome =
-        paymentResult === 'failure'
-          ? 'failed'
-          : paymentResult === 'cancel'
-            ? 'cancelled'
-            : null
-
-      const work = outcome
-        ? studentOnlinePaymentService.recordOutcome(pendingId, outcome).catch(() => undefined)
-        : studentOnlinePaymentService.getTransaction(pendingId).catch(() => undefined)
+      const work = pendingId
+        ? studentOnlinePaymentService
+            .recordOutcome(pendingId, cancelled ? 'cancelled' : 'failed')
+            .catch(() => undefined)
+        : Promise.resolve()
 
       work.finally(invalidateAll)
-    } else {
+      return
+    }
+
+    setOnlinePaymentError(null)
+    setOnlinePaymentMessage('Payment received. Confirming it with your school…')
+
+    if (!pendingId) {
+      invalidateAll()
+      return
+    }
+
+    /*
+     * A provider hands the payer back the moment the card clears, which can be
+     * before its own callback reaches us — and a callback can be late, or
+     * never arrive. Each of these reads asks the provider directly what
+     * happened, so the ledger settles here on its own rather than waiting on a
+     * message that may not come.
+     */
+    const confirm = async () => {
+      for (const wait of CONFIRMATION_BACKOFF_MS) {
+        if (wait) await new Promise((resolve) => window.setTimeout(resolve, wait))
+
+        const response = await studentOnlinePaymentService
+          .getTransaction(pendingId)
+          .catch(() => undefined)
+        const status = response?.data?.status
+
+        if (status === 'completed') {
+          setOnlinePaymentMessage('Payment confirmed. It is now on your ledger.')
+          invalidateAll()
+          return
+        }
+
+        // Anything settled that is not "completed" means no money moved.
+        if (status && status !== 'pending' && status !== 'authorized') {
+          setOnlinePaymentMessage(null)
+          setOnlinePaymentError('That payment did not go through. Nothing has been charged.')
+          invalidateAll()
+          return
+        }
+      }
+
+      // Still open. Deliberately not called a failure — the money may well
+      // have moved, and telling a payer it did not would invite a second one.
+      setOnlinePaymentMessage(
+        'Payment received. It will appear on your ledger once the provider confirms it — usually within a few minutes.'
+      )
       invalidateAll()
     }
+
+    void confirm()
   }, [isStudentUser, queryClient, studentId])
 
   useEffect(() => {
@@ -216,21 +314,41 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       studentOnlinePaymentService.createCheckout(payload),
     onSuccess: (response) => {
       setOnlinePaymentError(null)
-      setOnlinePaymentMessage('Redirecting to Maya Checkout...')
+      setOnlinePaymentMessage('Taking you to the payment page…')
       const redirectUrl = response.data.redirect_url || response.data.checkout_url
       if (redirectUrl) {
         const transactionId = response.data?.id
         if (transactionId) {
-          sessionStorage.setItem('pendingMayaTransactionId', transactionId)
+          // Written before the redirect, so the return trip knows which
+          // payment to confirm even though it arrives on a fresh page load.
+          sessionStorage.setItem(PENDING_PAYMENT_KEY, transactionId)
         }
         window.location.href = redirectUrl
       } else {
-        setOnlinePaymentError('Checkout created but no redirect URL was returned.')
+        setOnlinePaymentError(
+          'The payment page could not be opened. Nothing has been charged — please try again.'
+        )
+        setOnlinePaymentMessage(null)
       }
     },
     onError: (error: any) => {
-      setOnlinePaymentError(error.response?.data?.message || 'Failed to create online checkout.')
+      /*
+       * 409 is the school, not the payment: no merchant account is set up, or
+       * it was switched off between the page loading and the button being
+       * pressed. Saying "payment failed" for that sends the payer round the
+       * same loop instead of to the finance office.
+       */
+      const status = error?.response?.status
+      setOnlinePaymentError(
+        status === 409
+          ? 'Your school is not taking online payments at the moment. Please pay at the cashier or upload a receipt.'
+          : error.response?.data?.message ||
+              'We could not start that payment. Nothing has been charged.'
+      )
       setOnlinePaymentMessage(null)
+      setPayingInstallment(null)
+      // The school's setup may be what changed; re-ask rather than keep offering.
+      queryClient.invalidateQueries({ queryKey: ['online-payment-availability'] })
     },
   })
 
@@ -330,7 +448,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     .filter(Boolean)
     .join(' ')
 
-  const startMayaCheckout = (
+  const startOnlineCheckout = (
     amount: number,
     extras?: {
       item_name?: string
@@ -393,7 +511,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     }
 
     // Forward the discount breakdown only when paying the full installment
-    // amount (so Maya's reconciliation: subtotal - discount == amount holds).
+    // amount (so the provider's reconciliation, subtotal - discount == amount, holds).
     const original = installment.original_amount
     const discount = installment.discount_amount
     const includeBreakdown =
@@ -403,7 +521,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
       Math.abs(original - discount - amount) < 0.01
 
     setPayingInstallment(sequence)
-    startMayaCheckout(amount, {
+    startOnlineCheckout(amount, {
       item_name: buildInstallmentItemName(installment),
       item_description: studentFullName || undefined,
       ...(includeBreakdown ? { original_amount: original, discount_amount: discount } : {}),
@@ -428,7 +546,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
     }
 
     setPayingInstallment(null)
-    startMayaCheckout(amountValue)
+    startOnlineCheckout(amountValue)
   }
 
   const totals = ledgerData?.totals
@@ -793,15 +911,25 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
 
       {isStudentUser && (
         <div className="space-y-6">
-          {SHOW_PAY_ONLINE_SECTION && (
+          {canPayOnline && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h4 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
               <CreditCardIcon className="w-5 h-5 text-primary-600" />
-              Pay Online (Maya Checkout)
+              Pay Online
             </h4>
             <p className="text-sm text-gray-600 mb-4">
-              Use Maya Checkout to pay your balance online. Your ledger updates automatically after confirmation.
+              Pay any part of your balance through {gatewayLabel}. Your ledger updates as soon as
+              the payment is confirmed.
             </p>
+            {isTestGateway && (
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  Your school is set up in test mode. Payments made here are not real and will not
+                  settle anything you owe.
+                </span>
+              </div>
+            )}
             <form className="space-y-4" onSubmit={handleOnlinePaymentSubmit}>
               <Input
                 label="Payment Amount"
@@ -822,12 +950,15 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                 loading={createOnlinePaymentMutation.isPending}
                 className="bg-primary-600 hover:bg-primary-700 text-white"
               >
-                {createOnlinePaymentMutation.isPending ? 'Creating Checkout...' : 'Proceed to Maya Checkout'}
+                {createOnlinePaymentMutation.isPending
+                  ? 'Opening payment page…'
+                  : 'Continue to payment'}
               </Button>
             </form>
           </div>
           )}
 
+          {(canPayOnline || onlineTransactions.length > 0) && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h4 className="text-lg font-semibold text-gray-900 mb-4">Recent Online Payments</h4>
             {onlinePaymentsQuery.isLoading ? (
@@ -873,6 +1004,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
               </div>
             )}
           </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h4 className="text-lg font-semibold text-gray-900 mb-1">Uploaded Payment Receipts</h4>
@@ -1279,8 +1411,8 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                             </span>
                           </div>
                         )}
-                        <div className={SHOW_PAY_INSTALLMENT_BUTTON ? 'grid grid-cols-2' : 'grid grid-cols-1'}>
-                          {SHOW_PAY_INSTALLMENT_BUTTON && (
+                        <div className={canPayOnline ? 'grid grid-cols-2' : 'grid grid-cols-1'}>
+                          {canPayOnline && (
                           <button
                             type="button"
                             disabled={createOnlinePaymentMutation.isPending}
@@ -1311,7 +1443,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                             type="button"
                             disabled={uploadReceiptMutation.isPending || receiptStatus === 'pending'}
                             onClick={() => handleUploadReceiptClick(installment)}
-                            className={`flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 active:bg-primary-200 disabled:opacity-60 disabled:cursor-not-allowed transition${SHOW_PAY_INSTALLMENT_BUTTON ? ' border-l border-gray-100' : ''}`}
+                            className={`flex items-center justify-center gap-2 py-3 text-sm font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 active:bg-primary-200 disabled:opacity-60 disabled:cursor-not-allowed transition${canPayOnline ? ' border-l border-gray-100' : ''}`}
                           >
                             {isUploading ? (
                               <>
@@ -1431,7 +1563,7 @@ export const StudentFinanceTab: React.FC<StudentFinanceTabProps> = ({ student, s
                           ) : (
                             <div className="flex flex-col items-end gap-1.5">
                               <div className="flex items-center justify-end gap-2">
-                                {SHOW_PAY_INSTALLMENT_BUTTON && (
+                                {canPayOnline && (
                                 <Button
                                   size="sm"
                                   loading={isPaying}

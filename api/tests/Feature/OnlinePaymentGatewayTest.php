@@ -161,6 +161,97 @@ class OnlinePaymentGatewayTest extends TestCase
         Http::assertNothingSent();
     }
 
+    // ------------------------------------------------------------ availability
+
+    /*
+     * The student portal asks this before it draws a Pay button, so what it
+     * answers decides whether a payer is offered a path that works. Wrong in
+     * one direction hides a working payment method; wrong in the other sends
+     * the payer to a checkout that cannot be created.
+     */
+
+    public function test_a_school_with_a_working_merchant_account_can_be_paid(): void
+    {
+        $this->withToken('north-cashier')
+            ->getJson('/api/student-online-payments/availability')
+            ->assertOk()
+            ->assertJsonPath('data.ready', true)
+            ->assertJsonPath('data.provider', 'maya')
+            ->assertJsonPath('data.provider_label', 'Maya (PayMaya)')
+            ->assertJsonPath('data.mode', 'sandbox')
+            ->assertJsonPath('data.currency', 'PHP');
+    }
+
+    public function test_the_answer_is_the_asking_schools_own(): void
+    {
+        // North is on sandbox above. South is live, and neither may be told
+        // about the other's account.
+        $this->withToken('south-cashier')
+            ->getJson('/api/student-online-payments/availability')
+            ->assertOk()
+            ->assertJsonPath('data.ready', true)
+            ->assertJsonPath('data.mode', 'live');
+    }
+
+    public function test_a_school_nobody_has_set_up_says_so_plainly(): void
+    {
+        $this->northGateway->delete();
+
+        $this->withToken('north-cashier')
+            ->getJson('/api/student-online-payments/availability')
+            ->assertOk()
+            ->assertJsonPath('data.ready', false)
+            ->assertJsonPath('data.provider', null)
+            ->assertJsonPath('data.reason', 'Online payments have not been set up for this school.');
+    }
+
+    public function test_a_switched_off_account_cannot_be_paid_through(): void
+    {
+        $this->northGateway->forceFill(['is_active' => false])->save();
+
+        $this->withToken('north-cashier')
+            ->getJson('/api/student-online-payments/availability')
+            ->assertOk()
+            ->assertJsonPath('data.ready', false);
+    }
+
+    public function test_a_half_set_up_account_is_not_offered_and_names_no_keys(): void
+    {
+        $this->northGateway->forceFill([
+            'credentials' => ['public_key' => 'north-public'],
+        ])->save();
+
+        $response = $this->withToken('north-cashier')
+            ->getJson('/api/student-online-payments/availability')
+            ->assertOk()
+            ->assertJsonPath('data.ready', false);
+
+        /*
+         * Which key is missing is the platform's problem, not the payer's.
+         * A portal that names it tells anyone who can sign in as a student
+         * exactly what their school's merchant account is missing.
+         */
+        $this->assertStringNotContainsString('secret', strtolower($response->getContent()));
+    }
+
+    public function test_availability_never_carries_the_keys(): void
+    {
+        $body = $this->withToken('north-cashier')
+            ->getJson('/api/student-online-payments/availability')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringNotContainsString('north-public', $body);
+        $this->assertStringNotContainsString('north-secret', $body);
+        $this->assertStringNotContainsString(self::NORTH_WEBHOOK_KEY, $body);
+        $this->assertStringNotContainsString($this->northGateway->webhook_slug, $body);
+    }
+
+    public function test_availability_needs_a_signed_in_person(): void
+    {
+        $this->getJson('/api/student-online-payments/availability')->assertUnauthorized();
+    }
+
     // ----------------------------------------------------------------- webhook
 
     /**

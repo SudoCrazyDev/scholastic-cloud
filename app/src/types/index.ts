@@ -355,6 +355,22 @@ export interface StudentOnlinePaymentTransaction {
   redirect_url?: string;
 }
 
+/**
+ * Whether the signed-in person's school can take an online payment right now.
+ *
+ * Asked before any Pay button is drawn. Which provider it is, and whether it is
+ * a test account, are the school's business and change per school — so no
+ * screen names a provider it has not been told about.
+ */
+export interface OnlinePaymentAvailability {
+  ready: boolean;
+  provider?: string | null;
+  provider_label?: string | null;
+  mode?: 'sandbox' | 'live' | null;
+  currency?: string | null;
+  reason?: string | null;
+}
+
 export interface CreateStudentOnlinePaymentCheckoutData {
   student_id?: string;
   academic_year: string;

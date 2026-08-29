@@ -56,7 +56,55 @@ because the second and third schools will not be on Maya.
 | `app/src/pages/PaymentGateways/PaymentGateways.tsx` | The platform screen. Form fields render from the catalog. |
 | `app/src/services/paymentGatewayService.ts` | Its service and types. |
 | `app/src/services/studentOnlinePaymentService.ts` | The student/cashier side. |
-| `app/src/pages/Students/components/StudentFinanceTab.tsx` | Where a payment is started today. |
+| `app/src/pages/Students/components/StudentFinanceTab.tsx` | Where a payment is started. Rendered by both the staff student profile and the student's own `/my-finance`. |
+| `app/src/pages/MyFinance.tsx` | The student portal page. Loads the student and hands off to the tab above. |
+
+---
+
+## The payer's side (`/my-finance`)
+
+`StudentFinanceTab` is one component serving two audiences, so everything a payer may do is behind
+`isStudentUser`. A cashier looking at the same student sees the ledger and none of the buttons.
+
+**Nothing is offered until the school is asked.** On load the portal calls
+`GET /student-online-payments/availability`; only a `ready: true` answer draws the Pay Online form
+and the per-installment Pay buttons. This is the reason the endpoint exists — the merchant account
+is per school now, so no screen may assume there is one. A school that has never been set up shows
+the receipt-upload path alone, with no dead button and no mention of a provider.
+
+The provider is **named from the answer, never hardcoded**. The screen says "Pay any part of your
+balance through Maya (PayMaya)" because `provider_label` said so; against a school on Xendit the same
+line would name Xendit, with no change here.
+
+A **sandbox account warns the payer in as many words**. A test merchant takes fake cards and settles
+nothing, and a payer who believes a test payment cleared stops chasing a balance that is still owed.
+
+### The trip out and back
+
+1. `POST /checkout` returns a redirect URL. The transaction id goes into `sessionStorage`
+   (`pendingOnlinePaymentId`) *before* `window.location.href` is set — the browser leaves this origin
+   entirely, so component state does not survive; session storage does, and is not shared with a
+   second tab.
+2. The provider sends the payer back to `?payment_result=success|failure|cancel` on the same path.
+3. The marker is read once and **stripped from the address bar** with `replaceState`, guarded by a
+   ref rather than by the URL so a remount cannot replay it and StrictMode's double-invoke cannot
+   kill the confirmation mid-flight.
+4. `failure`/`cancel` call `POST /{id}/outcome`, which only ever narrows `pending → failed/cancelled`.
+   It cannot post money, so a payer lying about their own redirect gains nothing.
+5. `success` **polls `GET /{id}`** at 0/2/4/6 seconds. That endpoint reads the payment back from the
+   provider, so this settles the ledger on its own rather than waiting on the webhook. A provider
+   hands the payer back the moment the card clears, which is often before its own callback lands —
+   and Maya's callbacks can be late or absent entirely.
+6. Still open after the last read, the payer is told the payment is *received and being confirmed* —
+   deliberately **not** called a failure. The money may well have moved, and telling a payer it did
+   not invites a second payment.
+
+A `409` from checkout is reported as *"your school is not taking online payments at the moment"*,
+not as a failed payment, and re-asks availability — the school's setup is the likeliest thing to
+have changed between the page loading and the button being pressed.
+
+Past transactions stay listed even when the school later switches online payments off: they are the
+payer's own record of what they paid.
 
 ---
 
@@ -203,8 +251,11 @@ and a payer who cancels, goes back and pays must not lose the money.
   payer's total over provider-specific split-payment features (Stripe Connect application fees,
   Xendit split rules) — those would fragment the driver contract badly.
 - **No scheduled reconciliation.** Anything still `pending` is only read back when someone opens
-  `GET /student-online-payments/{id}`. A payment whose webhook never arrived and whose payer never
-  returns stays pending indefinitely. A sweep is the obvious next job.
+  `GET /student-online-payments/{id}` — which the portal now does for a few seconds after the payer
+  returns. A payment whose webhook never arrived *and* whose payer closed the tab on the provider's
+  site stays pending indefinitely. A sweep is the obvious next job.
+- **The payer cannot retry from the list.** A `pending` row on `/my-finance` shows its status and
+  nothing else; resuming an abandoned checkout means starting a new one.
 - **One live account per school.** Switching one on stands the others down. A school offering two
   providers at once and letting the payer choose is not supported and would need a real choice in
   the checkout flow, not just a second active row.

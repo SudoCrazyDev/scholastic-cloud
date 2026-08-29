@@ -3,10 +3,24 @@ import type {
   ApiResponse,
   StudentOnlinePaymentTransaction,
   CreateStudentOnlinePaymentCheckoutData,
+  OnlinePaymentAvailability,
 } from '../types'
 
 class StudentOnlinePaymentService {
   private baseUrl = '/student-online-payments'
+
+  /**
+   * Whether this school takes online payments at all, and through whom.
+   *
+   * Cheap and safe to call on load: it reads the school's merchant account
+   * without touching the provider, and returns no keys.
+   */
+  async getAvailability() {
+    const response = await api.get<ApiResponse<OnlinePaymentAvailability>>(
+      `${this.baseUrl}/availability`
+    )
+    return response.data
+  }
 
   async getTransactions(params?: { student_id?: string; academic_year?: string }) {
     const queryParams = new URLSearchParams()
