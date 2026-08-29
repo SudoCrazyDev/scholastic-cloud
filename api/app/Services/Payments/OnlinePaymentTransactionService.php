@@ -4,76 +4,75 @@ namespace App\Services\Payments;
 
 use App\Models\StudentOnlinePaymentTransaction;
 use App\Models\StudentPayment;
-use Carbon\Carbon;
+use App\Services\Payments\Data\GatewayEvent;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Turns a gateway status change into a posting on the student's ledger.
+ *
+ * Provider-blind by construction: it is handed a GatewayEvent, which a driver
+ * has already translated out of its provider's own vocabulary. Adding a second
+ * provider must never mean touching this class — it is the one place a payment
+ * becomes money owed against a student, and one place is the point.
+ */
 class OnlinePaymentTransactionService
 {
     /**
-     * Apply a gateway status update and post to ledger on completion.
+     * Apply a status change and, on completion, post to the ledger.
+     *
+     * @param  string|null  $paymentMethodLabel  how the provider should read on the receipt
      */
-    public function applyGatewayUpdate(StudentOnlinePaymentTransaction $transaction, array $payload): StudentOnlinePaymentTransaction
-    {
-        return DB::transaction(function () use ($transaction, $payload) {
+    public function applyGatewayUpdate(
+        StudentOnlinePaymentTransaction $transaction,
+        GatewayEvent $event,
+        ?string $paymentMethodLabel = null,
+    ): StudentOnlinePaymentTransaction {
+        return DB::transaction(function () use ($transaction, $event, $paymentMethodLabel) {
+            /*
+             * Re-read under a lock rather than trusting what was passed in.
+             * Providers retry callbacks, and a payer refreshing the return page
+             * while a webhook lands means two requests reaching here for the
+             * same transaction at once.
+             */
             /** @var StudentOnlinePaymentTransaction $locked */
             $locked = StudentOnlinePaymentTransaction::where('id', $transaction->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $incomingStatus = $this->resolveStatus($payload);
-            $currentStatus = (string) $locked->status;
-            $status = $this->resolveNextStatus($currentStatus, $incomingStatus);
+            $status = $this->resolveNextStatus((string) $locked->status, $event->status);
 
-            $providerPaymentId = (string) (
-                data_get($payload, 'provider_payment_id')
-                ?? data_get($payload, 'checkout_id')
-                ?? data_get($payload, 'id')
-                ?? $locked->provider_payment_id
-                ?? ''
-            );
+            $providerPaymentId = $event->providerPaymentId ?: $locked->provider_payment_id;
+            $providerChargeId = $event->providerChargeId ?: $locked->provider_charge_id;
 
-            $providerChargeId = (string) (
-                data_get($payload, 'provider_charge_id')
-                ?? data_get($payload, 'charge_id')
-                ?? data_get($payload, 'id')
-                ?? $locked->provider_charge_id
-                ?? ''
-            );
-
-            $paidAt = $this->resolvePaidAt($payload, $status);
-            $failureReason = (string) (
-                data_get($payload, 'failure_reason')
-                ?? data_get($payload, 'message')
-                ?? data_get($payload, 'error')
-                ?? data_get($payload, 'statusReason')
-                ?? ''
-            );
+            $paidAt = $event->paidAt
+                ?? ($status === GatewayStatus::COMPLETED ? now() : null);
 
             $updateData = [
                 'status' => $status,
-                'provider_payment_id' => $providerPaymentId !== '' ? $providerPaymentId : $locked->provider_payment_id,
-                'provider_charge_id' => $providerChargeId !== '' ? $providerChargeId : $locked->provider_charge_id,
+                'provider_payment_id' => $providerPaymentId,
+                'provider_charge_id' => $providerChargeId,
                 'paid_at' => $paidAt ?? $locked->paid_at,
-                'failure_reason' => in_array($status, ['failed', 'expired', 'cancelled'], true)
-                    ? ($failureReason !== '' ? $failureReason : $locked->failure_reason)
+                'failure_reason' => in_array($status, [GatewayStatus::FAILED, GatewayStatus::EXPIRED, GatewayStatus::CANCELLED], true)
+                    ? ($event->failureReason ?: $locked->failure_reason)
                     : null,
-                'provider_response' => is_array(data_get($payload, 'provider_response'))
-                    ? data_get($payload, 'provider_response')
-                    : (is_array(data_get($payload, 'raw')) ? data_get($payload, 'raw') : $payload),
+                'provider_response' => $event->raw !== [] ? $event->raw : $locked->provider_response,
             ];
 
-            if ($status === 'completed' && !$locked->completed_payment_id) {
-                $paymentDate = ($paidAt ?? now())->toDateString();
-
+            /*
+             * `completed_payment_id` is the idempotency guard, and it is the
+             * reason this whole method is inside a lock: without it a retried
+             * webhook credits the student twice.
+             */
+            if ($status === GatewayStatus::COMPLETED && ! $locked->completed_payment_id) {
                 $studentPayment = StudentPayment::create([
                     'institution_id' => $locked->institution_id,
                     'student_id' => $locked->student_id,
                     'school_fee_id' => $locked->school_fee_id,
                     'academic_year' => $locked->academic_year,
                     'amount' => $locked->amount,
-                    'payment_date' => $paymentDate,
-                    'payment_method' => 'Online - Maya Checkout',
-                    'reference_number' => $providerPaymentId !== '' ? $providerPaymentId : $locked->request_reference_number,
+                    'payment_date' => ($paidAt ?? now())->toDateString(),
+                    'payment_method' => $paymentMethodLabel ?: 'Online payment',
+                    'reference_number' => $providerPaymentId ?: $locked->request_reference_number,
                     'receipt_number' => StudentPayment::generateUniqueReceiptNumber(),
                     'remarks' => 'Posted automatically from online payment gateway',
                     'received_by' => null,
@@ -89,78 +88,32 @@ class OnlinePaymentTransactionService
         });
     }
 
-    public function resolveStatus(array $payload): string
-    {
-        $status = strtoupper((string) (data_get($payload, 'status') ?? ''));
-        $paymentStatus = strtoupper((string) (data_get($payload, 'payment_status') ?? data_get($payload, 'paymentStatus') ?? ''));
-
-        if (
-            in_array($status, ['COMPLETED', 'CAPTURED', 'SUCCESS', 'PAID', 'PAYMENT_SUCCESS'], true) ||
-            $paymentStatus === 'PAYMENT_SUCCESS'
-        ) {
-            return 'completed';
-        }
-
-        if ($status === 'AUTHORIZED' || $paymentStatus === 'AUTHORIZED') {
-            return 'authorized';
-        }
-
-        if (
-            in_array($status, ['FAILED', 'DECLINED'], true) ||
-            $paymentStatus === 'PAYMENT_FAILED'
-        ) {
-            return 'failed';
-        }
-
-        if ($status === 'EXPIRED' || $paymentStatus === 'PAYMENT_EXPIRED') {
-            return 'expired';
-        }
-
-        if (
-            in_array($status, ['CANCELLED', 'VOIDED'], true) ||
-            $paymentStatus === 'PAYMENT_CANCELLED'
-        ) {
-            return 'cancelled';
-        }
-
-        return 'pending';
-    }
-
+    /**
+     * Which status wins when an incoming event disagrees with what we hold.
+     *
+     * Two rules, both about not losing money that was actually collected:
+     *
+     *   - Completed is absorbing. A late "expired" callback for a payment that
+     *     already posted must not unpost it.
+     *   - A settled failure is not reopened by a "pending". But it *is* reopened
+     *     by a "completed", deliberately: the browser marks a transaction
+     *     cancelled when the payer is redirected back through the cancel URL,
+     *     and a payer who cancels, goes back and pays would otherwise have a
+     *     real payment discarded.
+     */
     private function resolveNextStatus(string $currentStatus, string $incomingStatus): string
     {
-        $current = strtolower($currentStatus);
-        $incoming = strtolower($incomingStatus);
+        $current = GatewayStatus::normalize($currentStatus);
+        $incoming = GatewayStatus::normalize($incomingStatus);
 
-        if ($current === 'completed' && $incoming !== 'completed') {
-            return 'completed';
+        if ($current === GatewayStatus::COMPLETED) {
+            return GatewayStatus::COMPLETED;
         }
 
-        if (in_array($current, ['failed', 'expired', 'cancelled'], true) && $incoming === 'pending') {
+        if (GatewayStatus::isTerminal($current) && $incoming === GatewayStatus::PENDING) {
             return $current;
         }
 
         return $incoming;
-    }
-
-    private function resolvePaidAt(array $payload, string $status): ?Carbon
-    {
-        $candidate = data_get($payload, 'payment_at')
-            ?? data_get($payload, 'paymentAt')
-            ?? data_get($payload, 'paid_at')
-            ?? data_get($payload, 'updatedAt');
-
-        if (is_string($candidate) && $candidate !== '') {
-            try {
-                return Carbon::parse($candidate);
-            } catch (\Throwable) {
-                // Ignore parse errors and fall back.
-            }
-        }
-
-        if ($status === 'completed') {
-            return now();
-        }
-
-        return null;
     }
 }

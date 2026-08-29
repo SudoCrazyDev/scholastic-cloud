@@ -14,6 +14,7 @@ import {
   Shield,
   CreditCard,
   ToggleRight,
+  KeyRound,
   Wallet,
   Menu,
   GraduationCap,
@@ -444,6 +445,13 @@ const menuGroups: MenuGroup[] = [
         icon: <ToggleRight className="w-5 h-5" />,
         path: '/feature-access',
         module: 'feature-access',
+      },
+      {
+        id: 'payment-gateways',
+        label: 'Payment Gateways',
+        icon: <KeyRound className="w-5 h-5" />,
+        path: '/payment-gateways',
+        module: 'payment-gateways',
       },
       {
         id: 'subscriptions',

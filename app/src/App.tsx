@@ -14,6 +14,7 @@ import Institutions from './pages/Institutions';
 import Roles from './pages/Roles';
 import Subscriptions from './pages/Subscriptions';
 import FeatureAccess from './pages/FeatureAccess';
+import PaymentGateways from './pages/PaymentGateways';
 import Staffs from './pages/Staffs';
 import ClassSections from './pages/ClassSections/ClassSections';
 import Students from './pages/Students/Students';
@@ -117,6 +118,12 @@ function App() {
                 is the entire point of the screen.
               */}
               <Route path="feature-access" element={<RequireModule module="feature-access"><FeatureAccess /></RequireModule>} />
+              {/*
+                Likewise platform-only. A school's own administrator cannot be
+                granted `payment-gateways` in its role builder, so it never sees
+                — or sets — the keys its online payments run on.
+              */}
+              <Route path="payment-gateways" element={<RequireModule module="payment-gateways"><PaymentGateways /></RequireModule>} />
               <Route path="staffs" element={<RequireModule module="staffs"><Staffs /></RequireModule>} />
               <Route path="students" element={<RequireModule module="students" ability="manage"><Students /></RequireModule>} />
               <Route path="admission-forms" element={<RequireModule module="admission-forms"><AdmissionForms /></RequireModule>} />

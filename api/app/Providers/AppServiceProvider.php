@@ -8,6 +8,7 @@ use App\Models\StudentSubject;
 use App\Models\Subject;
 use App\Observers\ChatMembershipObserver;
 use App\Services\Chat\ChatSyncQueue;
+use App\Services\Payments\PaymentGatewayManager;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -23,6 +24,10 @@ class AppServiceProvider extends ServiceProvider
         // One queue per request, so forty enrolment writes collapse into one
         // re-derivation of the section instead of forty.
         $this->app->singleton(ChatSyncQueue::class);
+
+        // Resolving a school's gateway decrypts its keys. Once per request is
+        // enough — a checkout asks for the gateway and then for a driver.
+        $this->app->singleton(PaymentGatewayManager::class);
     }
 
     /**

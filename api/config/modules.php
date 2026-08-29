@@ -352,6 +352,11 @@ return [
                     'description' => 'Decide which institutions have which features. Not the same as a role: a feature switched off here is closed to the whole school, including its own administrator.',
                     'system_only' => true,
                 ],
+                'payment-gateways' => [
+                    'label' => 'Payment Gateways',
+                    'description' => 'Which merchant account each institution takes online payments through, and the keys it does so with. Platform-only: a school can neither set nor read its own keys, though the money lands in that school\'s own account.',
+                    'system_only' => true,
+                ],
             ],
         ],
 

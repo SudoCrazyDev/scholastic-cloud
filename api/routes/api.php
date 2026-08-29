@@ -9,32 +9,29 @@ use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ClassSectionController;
 use App\Http\Controllers\CoreValueMarkingController;
-use App\Http\Controllers\SmsBridgeController;
-use App\Http\Controllers\SmsGatewayController;
-use App\Http\Controllers\SmsMessageController;
-use App\Http\Controllers\SmsSettingsController;
-use App\Http\Controllers\GateDeviceController;
-use App\Http\Controllers\GateKioskController;
-use App\Http\Controllers\GateUnresolvedScanController;
-use App\Http\Controllers\GateSmsSettingController;
-use App\Http\Controllers\InstitutionFeatureController;
+use App\Http\Controllers\DefaultDiscountController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DisbursementComponentTypeController;
 use App\Http\Controllers\DisbursementController;
 use App\Http\Controllers\DisbursementTypeController;
-use App\Http\Controllers\FinanceDataClearController;
 use App\Http\Controllers\FinanceDashboardController;
+use App\Http\Controllers\FinanceDataClearController;
+use App\Http\Controllers\GateDeviceController;
+use App\Http\Controllers\GateKioskController;
+use App\Http\Controllers\GateSmsSettingController;
+use App\Http\Controllers\GateUnresolvedScanController;
 use App\Http\Controllers\GradeLevelController;
-use App\Http\Controllers\DefaultDiscountController;
 use App\Http\Controllers\GradeLevelDiscountController;
 use App\Http\Controllers\IdCardTemplateController;
 use App\Http\Controllers\InstitutionController;
-use App\Http\Controllers\InternalPaymentCallbackController;
-use App\Http\Controllers\PaymentPlanController;
+use App\Http\Controllers\InstitutionFeatureController;
+use App\Http\Controllers\InstitutionPaymentGatewayController;
 use App\Http\Controllers\PaymentIdentifierController;
+use App\Http\Controllers\PaymentPlanController;
 use App\Http\Controllers\PaymentReceiptSubmissionController;
 use App\Http\Controllers\PaymentTransactionController;
 use App\Http\Controllers\PaymentVoidRequestController;
+use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\RfidScanLogController;
@@ -45,15 +42,19 @@ use App\Http\Controllers\SchoolFeeDefaultController;
 use App\Http\Controllers\SectionConsolidatedGradesController;
 use App\Http\Controllers\SF9Controller;
 use App\Http\Controllers\SiblingGroupController;
+use App\Http\Controllers\SmsBridgeController;
+use App\Http\Controllers\SmsGatewayController;
+use App\Http\Controllers\SmsMessageController;
+use App\Http\Controllers\SmsSettingsController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StrandController;
 use App\Http\Controllers\StudentAdditionalFeeController;
-use App\Http\Controllers\StudentFeeController;
 use App\Http\Controllers\StudentAttendanceController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentDiscountController;
 use App\Http\Controllers\StudentDocumentController;
 use App\Http\Controllers\StudentEcrItemScoreController;
+use App\Http\Controllers\StudentFeeController;
 use App\Http\Controllers\StudentFinanceController;
 use App\Http\Controllers\StudentOnlinePaymentController;
 use App\Http\Controllers\StudentPaymentController;
@@ -108,9 +109,27 @@ Route::middleware('auth.sms.token')->group(function () {
 
 // Public routes (no authentication required)
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
-Route::post('/payments/webhooks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
-// Backward-compatible alias.
-Route::post('/internal/payment-callbacks/maya', [InternalPaymentCallbackController::class, 'mayaStatus']);
+/*
+ * Where providers tell us a payment happened. Public by necessity — a provider
+ * has no session — so the signature check inside is the only gate, and a
+ * callback that cannot be verified against the school's own key is rejected.
+ *
+ * The slug in the URL names the merchant account, which is how the right key is
+ * in hand before the body is trusted. It is random rather than the institution
+ * id: this URL sits in a third party's dashboard.
+ */
+Route::post('/payments/webhooks/{provider}/{slug}', [PaymentWebhookController::class, 'handle'])
+    ->where('provider', '[a-z0-9_-]+')
+    ->where('slug', '[a-zA-Z0-9]+');
+
+/*
+ * The single fixed URL Maya merchants were configured with before credentials
+ * moved per institution. Live in at least one school's Maya dashboard, so it
+ * keeps working — it finds the merchant account by way of the transaction and
+ * verifies against that.
+ */
+Route::post('/payments/webhooks/maya', [PaymentWebhookController::class, 'legacyMaya']);
+Route::post('/internal/payment-callbacks/maya', [PaymentWebhookController::class, 'legacyMaya']);
 
 // Public kiosk endpoint for RFID gate scanners
 Route::post('/kiosk/scan', [RfidScanLogController::class, 'kioskScan'])->middleware('throttle:pairing');
@@ -510,6 +529,8 @@ Route::middleware('auth.token')->group(function () {
     Route::get('payment-transactions/{id}', [PaymentTransactionController::class, 'show'])->middleware('module:finance,view,shared');
     Route::get('payment-transactions/{id}/receipt', [PaymentTransactionController::class, 'receipt'])->middleware('module:finance,view,shared');
     // Online payments are initiated by the student from their own portal.
+    // Declared before the {id} route so it is not read as a transaction id.
+    Route::get('student-online-payments/availability', [StudentOnlinePaymentController::class, 'availability'])->middleware('module:finance,view,shared');
     Route::get('student-online-payments', [StudentOnlinePaymentController::class, 'index'])->middleware('module:finance,view,shared');
     Route::post('student-online-payments/checkout', [StudentOnlinePaymentController::class, 'createCheckout'])->middleware('module:finance,manage,shared');
     Route::get('student-online-payments/{id}', [StudentOnlinePaymentController::class, 'show'])->middleware('module:finance,view,shared');
@@ -784,6 +805,19 @@ Route::middleware('auth.token')->group(function () {
         ->middleware('module:feature-access,view');
     Route::put('institution-features/{institutionId}/{feature}', [InstitutionFeatureController::class, 'update'])
         ->middleware('module:feature-access,manage');
+
+    /*
+     * Which merchant account each school takes online payments through, and the
+     * keys it does so with. Platform administration for the same reason as
+     * Feature Access — `payment-gateways` is `system_only`, so a school can
+     * neither set nor read its own keys.
+     */
+    Route::get('institution-payment-gateways', [InstitutionPaymentGatewayController::class, 'index'])
+        ->middleware('module:payment-gateways,view');
+    Route::put('institution-payment-gateways/{institutionId}/{provider}', [InstitutionPaymentGatewayController::class, 'update'])
+        ->middleware('module:payment-gateways,manage');
+    Route::delete('institution-payment-gateways/{institutionId}/{provider}', [InstitutionPaymentGatewayController::class, 'destroy'])
+        ->middleware('module:payment-gateways,manage');
 
     /*
      * Chat is gated on the institution having the feature, not on a role — see

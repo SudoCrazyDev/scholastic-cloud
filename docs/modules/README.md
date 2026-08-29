@@ -13,6 +13,14 @@ modules should consume its data.
   cashiering (POS with printed receipts), per-student ledgers/NOA, collections reports, three
   discount mechanisms, receipt templates, payment plans, and a payment-void approval queue. One
   page (`/finance/*`) with a grouped two-level nav; Payment Plans is a standalone sibling page.
+- [Online Payments](Finance/ONLINE_PAYMENTS.md) — Finance. Taking money through a third-party
+  provider. The point of the module is **whose merchant account it lands in**: credentials are
+  per institution, encrypted, and set only by the platform (`payment-gateways` is `system_only`) —
+  never in `.env`, because two schools on one server are never the same merchant. Provider catalog
+  in `config/payments.php` + a `PaymentGatewayDriver` per provider; **only Maya (PayMaya) has a
+  driver today**. Webhooks are public, signature-verified per school, and routed by a random slug.
+  Read before adding a provider, touching `PaymentWebhookController`, or changing how a completed
+  payment posts to the ledger.
 - [Finance Announcements](Finance/Announcements/FINANCE_ANNOUNCEMENTS.md) — Finance office's
   announcements channel (`/finance-announcements`, below Payment Plans in the sidebar). A thin
   surface over the Announcements module: posts get `category='finance'` and are **always for all

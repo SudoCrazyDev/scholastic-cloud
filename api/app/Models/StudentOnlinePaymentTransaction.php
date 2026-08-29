@@ -12,6 +12,7 @@ class StudentOnlinePaymentTransaction extends Model
 
     protected $fillable = [
         'institution_id',
+        'institution_payment_gateway_id',
         'student_id',
         'school_fee_id',
         'completed_payment_id',
@@ -55,6 +56,17 @@ class StudentOnlinePaymentTransaction extends Model
     public function institution()
     {
         return $this->belongsTo(Institution::class);
+    }
+
+    /**
+     * The merchant account this payment was taken through. Held on the
+     * transaction rather than looked up when a callback lands, so a school that
+     * changes provider can still have last term's payments verified and read
+     * back with the keys they were started under.
+     */
+    public function gateway()
+    {
+        return $this->belongsTo(InstitutionPaymentGateway::class, 'institution_payment_gateway_id');
     }
 
     public function completedPayment()

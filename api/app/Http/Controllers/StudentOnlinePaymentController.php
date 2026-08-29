@@ -3,22 +3,57 @@
 namespace App\Http\Controllers;
 
 use App\Auth\StudentPortalUser;
+use App\Models\InstitutionPaymentGateway;
 use App\Models\SchoolFee;
 use App\Models\Student;
 use App\Models\StudentOnlinePaymentTransaction;
+use App\Services\Payments\Contracts\PaymentGatewayDriver;
+use App\Services\Payments\Data\CheckoutRequest;
 use App\Services\Payments\OnlinePaymentTransactionService;
-use App\Services\Payments\PaymentGatewayClient;
+use App\Services\Payments\PaymentGatewayException;
+use App\Services\Payments\PaymentGatewayManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
+/**
+ * Online payments, from the student's side.
+ *
+ * Which provider a payment goes through is never decided here — the manager
+ * hands back a driver already holding the school's own keys, and everything
+ * below talks to the driver in the platform's own vocabulary. See
+ * config/payments.php.
+ */
 class StudentOnlinePaymentController extends Controller
 {
     public function __construct(
-        private PaymentGatewayClient $gatewayClient,
+        private PaymentGatewayManager $gateways,
         private OnlinePaymentTransactionService $transactionService
-    ) {
+    ) {}
+
+    /**
+     * Whether this school can take an online payment at all.
+     *
+     * The finance screen asks before it renders a Pay Online button. A button
+     * that always fails is worse than no button, and "your school has not set
+     * this up" is a different thing to say than "the payment failed".
+     */
+    public function availability(Request $request): JsonResponse
+    {
+        $institutionId = $this->resolveInstitutionId($request);
+
+        if (! $institutionId) {
+            return response()->json([
+                'success' => true,
+                'data' => ['ready' => false, 'reason' => 'No institution is assigned to this account.'],
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->gateways->describe($institutionId),
+        ]);
     }
 
     /**
@@ -32,10 +67,10 @@ class StudentOnlinePaymentController extends Controller
         ]);
 
         $institutionId = $this->resolveInstitutionId($request);
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json([
                 'success' => false,
-                'message' => 'User does not have any institution assigned'
+                'message' => 'User does not have any institution assigned',
             ], 400);
         }
 
@@ -46,12 +81,12 @@ class StudentOnlinePaymentController extends Controller
             $studentId = $filters['student_id'] ?? null;
         }
 
-        if (!$studentId) {
+        if (! $studentId) {
             return response()->json([
                 'success' => false,
                 'message' => $this->isStudentActor($request)
                     ? 'Student record not found for this account'
-                    : 'student_id is required'
+                    : 'student_id is required',
             ], $this->isStudentActor($request) ? 403 : 422);
         }
 
@@ -61,10 +96,10 @@ class StudentOnlinePaymentController extends Controller
             })
             ->exists();
 
-        if (!$belongsToInstitution) {
+        if (! $belongsToInstitution) {
             return response()->json([
                 'success' => false,
-                'message' => 'Student not found in this institution'
+                'message' => 'Student not found in this institution',
             ], 404);
         }
 
@@ -72,7 +107,7 @@ class StudentOnlinePaymentController extends Controller
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId);
 
-        if (!empty($filters['academic_year'])) {
+        if (! empty($filters['academic_year'])) {
             $query->where('academic_year', $filters['academic_year']);
         }
 
@@ -80,7 +115,7 @@ class StudentOnlinePaymentController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $transactions
+            'data' => $transactions,
         ]);
     }
 
@@ -90,10 +125,10 @@ class StudentOnlinePaymentController extends Controller
     public function createCheckout(Request $request): JsonResponse
     {
         $institutionId = $this->resolveInstitutionId($request);
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json([
                 'success' => false,
-                'message' => 'User does not have any institution assigned'
+                'message' => 'User does not have any institution assigned',
             ], 400);
         }
 
@@ -112,7 +147,7 @@ class StudentOnlinePaymentController extends Controller
             'redirect_url.failure' => 'required|url|max:2000',
             'redirect_url.cancel' => 'required|url|max:2000',
         ];
-        if (!$isStudentActor) {
+        if (! $isStudentActor) {
             $rules['student_id'] = 'required|uuid|exists:students,id';
         }
 
@@ -122,10 +157,10 @@ class StudentOnlinePaymentController extends Controller
             ? $this->resolveSelfStudentId($request)
             : $validated['student_id'];
 
-        if (!$studentId) {
+        if (! $studentId) {
             return response()->json([
                 'success' => false,
-                'message' => 'Student record not found for this account'
+                'message' => 'Student record not found for this account',
             ], 403);
         }
 
@@ -136,34 +171,56 @@ class StudentOnlinePaymentController extends Controller
             })
             ->first();
 
-        if (!$student) {
+        if (! $student) {
             return response()->json([
                 'success' => false,
-                'message' => 'Student not found in this institution'
+                'message' => 'Student not found in this institution',
             ], 404);
         }
 
-        if (!empty($validated['school_fee_id'])) {
+        if (! empty($validated['school_fee_id'])) {
             $feeExists = SchoolFee::where('institution_id', $institutionId)
                 ->where('id', $validated['school_fee_id'])
                 ->exists();
-            if (!$feeExists) {
+            if (! $feeExists) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'School fee not found for this institution'
+                    'message' => 'School fee not found for this institution',
                 ], 404);
             }
         }
 
-        $requestReferenceNumber = 'STUPAY-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(8));
-        $currency = strtoupper((string) ($validated['currency'] ?? 'PHP'));
+        /*
+         * The school's own merchant account. Resolved before anything is
+         * written, so a school nobody has set up yet gets a clear answer
+         * instead of a transaction row that could never have been paid.
+         */
+        $gateway = $this->gateways->gatewayFor($institutionId);
+        $driver = $gateway && $gateway->isUsable() ? $this->gateways->driverFor($gateway) : null;
+
+        if (! $gateway || ! $driver) {
+            Log::warning('Online checkout attempted with no usable payment gateway', [
+                'institution_id' => $institutionId,
+                'gateway_id' => $gateway?->id,
+                'problems' => $gateway?->readinessProblems(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Online payments are not available for this school.',
+            ], 409);
+        }
+
+        $requestReferenceNumber = 'STUPAY-'.now()->format('YmdHis').'-'.Str::upper(Str::random(8));
+        $currency = strtoupper((string) ($validated['currency'] ?? $gateway->currency ?? 'PHP'));
 
         $transaction = StudentOnlinePaymentTransaction::create([
             'institution_id' => $institutionId,
+            'institution_payment_gateway_id' => $gateway->id,
             'student_id' => $studentId,
             'school_fee_id' => $validated['school_fee_id'] ?? null,
             'created_by' => $request->user() instanceof StudentPortalUser ? null : $request->user()?->id,
-            'provider' => 'maya_checkout',
+            'provider' => $gateway->provider,
             'status' => 'pending',
             'academic_year' => $validated['academic_year'],
             'amount' => $validated['amount'],
@@ -181,69 +238,66 @@ class StudentOnlinePaymentController extends Controller
             ],
         ]);
 
-        $defaultDescription = 'Student balance payment for ' . $validated['academic_year'];
-        $description = !empty($validated['item_description'])
+        $defaultDescription = 'Student balance payment for '.$validated['academic_year'];
+        $description = ! empty($validated['item_description'])
             ? $validated['item_description']
             : $defaultDescription;
-        $itemName = !empty($validated['item_name'])
+        $itemName = ! empty($validated['item_name'])
             ? $validated['item_name']
             : 'Student Account Balance';
         $amountValue = (float) $validated['amount'];
 
-        // If frontend provides a discount breakdown that reconciles with the
-        // charged amount, surface it on the Maya receipt as Subtotal / Discount.
-        $originalAmount = isset($validated['original_amount']) ? (float) $validated['original_amount'] : null;
-        $discountAmount = isset($validated['discount_amount']) ? (float) $validated['discount_amount'] : null;
-        $applyDiscount =
-            $originalAmount !== null
-            && $discountAmount !== null
-            && $discountAmount > 0
-            && abs(($originalAmount - $discountAmount) - $amountValue) < 0.01;
-
-        $buyer = $this->buildBuyerPayload($student);
-
-        $gatewayPayload = [
-            'request_reference_number' => $requestReferenceNumber,
-            'amount' => $amountValue,
-            'currency' => $currency,
-            'description' => $description,
-            'success_url' => $validated['redirect_url']['success'],
-            'failure_url' => $validated['redirect_url']['failure'],
-            'cancel_url' => $validated['redirect_url']['cancel'],
-            'items' => [
-                [
-                    'name' => $itemName,
-                    'code' => $requestReferenceNumber,
-                    'description' => $description,
-                    'quantity' => '1',
-                    'amount' => ['value' => $amountValue, 'currency' => $currency],
-                    'totalAmount' => ['value' => $amountValue, 'currency' => $currency],
-                ],
-            ],
-            'metadata' => [
+        // A discount breakdown is passed along for the provider's receipt to
+        // show; whether it is usable is CheckoutRequest's judgement, not ours.
+        $checkout = new CheckoutRequest(
+            reference: $requestReferenceNumber,
+            amount: $amountValue,
+            currency: $currency,
+            itemName: $itemName,
+            description: $description,
+            successUrl: $validated['redirect_url']['success'],
+            failureUrl: $validated['redirect_url']['failure'],
+            cancelUrl: $validated['redirect_url']['cancel'],
+            buyer: $this->buildBuyer($student),
+            metadata: [
                 'transaction_id' => $transaction->id,
                 'institution_id' => $institutionId,
                 'student_id' => $studentId,
                 'academic_year' => $validated['academic_year'],
             ],
-        ];
-
-        if ($applyDiscount) {
-            $gatewayPayload['amount_details'] = [
-                'subtotal' => round($originalAmount, 2),
-                'discount' => round($discountAmount, 2),
-            ];
-        }
-
-        if ($buyer !== null) {
-            $gatewayPayload['buyer'] = $buyer;
-        }
+            subtotal: isset($validated['original_amount']) ? (float) $validated['original_amount'] : null,
+            discount: isset($validated['discount_amount']) ? (float) $validated['discount_amount'] : null,
+        );
 
         try {
-            $gatewayResponse = $this->gatewayClient->createCharge($gatewayPayload);
-        } catch (\Throwable $e) {
-            Log::warning('Maya checkout createCharge failed', [
+            $session = $driver->createCheckout($checkout);
+        } catch (PaymentGatewayException $e) {
+            // The provider's own words go to the log; the payer gets a sentence
+            // that names no keys and no merchant ids.
+            Log::warning('Online checkout was refused by the provider', [
                 'transaction_id' => $transaction->id,
+                'institution_id' => $institutionId,
+                'provider' => $gateway->provider,
+                'status' => $e->status,
+                'message' => $e->getMessage(),
+                'provider_body' => $e->providerBody,
+            ]);
+
+            $transaction->update([
+                'status' => 'failed',
+                'failure_reason' => $e->getMessage(),
+            ]);
+
+            return response()->json(array_filter([
+                'success' => false,
+                'message' => $e->publicMessage(),
+                'detail' => config('app.debug') ? $e->getMessage() : null,
+            ]), 502);
+        } catch (\Throwable $e) {
+            Log::error('Online checkout failed unexpectedly', [
+                'transaction_id' => $transaction->id,
+                'institution_id' => $institutionId,
+                'provider' => $gateway->provider,
                 'message' => $e->getMessage(),
                 'exception' => get_class($e),
             ]);
@@ -253,40 +307,23 @@ class StudentOnlinePaymentController extends Controller
                 'failure_reason' => $e->getMessage(),
             ]);
 
-            $message = 'Unable to create online payment checkout at the moment';
-            $detail = config('app.debug') ? $e->getMessage() : null;
-
             return response()->json(array_filter([
                 'success' => false,
-                'message' => $message,
-                'detail' => $detail,
+                'message' => 'Unable to create an online payment at the moment.',
+                'detail' => config('app.debug') ? $e->getMessage() : null,
             ]), 502);
         }
 
-        $providerChargeId = (string) (
-            data_get($gatewayResponse, 'charge_id')
-            ?? data_get($gatewayResponse, 'id')
-            ?? ''
-        );
-        $providerPaymentId = (string) (
-            data_get($gatewayResponse, 'checkout_id')
-            ?? data_get($gatewayResponse, 'id')
-            ?? ''
-        );
-        $checkoutUrl = (string) (
-            data_get($gatewayResponse, 'redirect_url')
-            ?? data_get($gatewayResponse, 'redirectUrl')
-            ?? ''
-        );
-
         $transaction->update([
-            'provider_charge_id' => $providerChargeId !== '' ? $providerChargeId : null,
-            'provider_payment_id' => $providerPaymentId !== '' ? $providerPaymentId : null,
-            'checkout_url' => $checkoutUrl !== '' ? $checkoutUrl : null,
-            'provider_response' => $gatewayResponse,
-            'status' => $this->transactionService->resolveStatus($gatewayResponse),
+            'provider_charge_id' => $session->providerChargeId ?: null,
+            'provider_payment_id' => $session->providerPaymentId ?: null,
+            'checkout_url' => $session->redirectUrl ?: null,
+            'provider_response' => $session->raw,
+            'status' => $session->status,
             'expires_at' => now()->addHour(),
         ]);
+
+        $gateway->forceFill(['last_used_at' => now()])->saveQuietly();
 
         $transaction = $transaction->fresh(['schoolFee', 'completedPayment']);
 
@@ -295,7 +332,7 @@ class StudentOnlinePaymentController extends Controller
             'message' => 'Online payment checkout created successfully',
             'data' => [
                 ...$transaction->toArray(),
-                'redirect_url' => $checkoutUrl,
+                'redirect_url' => $session->redirectUrl,
             ],
         ], 201);
     }
@@ -312,7 +349,7 @@ class StudentOnlinePaymentController extends Controller
         ]);
 
         $institutionId = $this->resolveInstitutionId($request);
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json([
                 'success' => false,
                 'message' => 'User does not have any institution assigned',
@@ -322,7 +359,7 @@ class StudentOnlinePaymentController extends Controller
         $transaction = StudentOnlinePaymentTransaction::where('institution_id', $institutionId)
             ->find($id);
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json([
                 'success' => false,
                 'message' => 'Online payment transaction not found',
@@ -331,7 +368,7 @@ class StudentOnlinePaymentController extends Controller
 
         if ($this->isStudentActor($request)) {
             $selfStudentId = $this->resolveSelfStudentId($request);
-            if (!$selfStudentId || $selfStudentId !== $transaction->student_id) {
+            if (! $selfStudentId || $selfStudentId !== $transaction->student_id) {
                 return response()->json([
                     'success' => false,
                     'message' => 'You can only update your own online payment transactions',
@@ -360,10 +397,10 @@ class StudentOnlinePaymentController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $institutionId = $this->resolveInstitutionId($request);
-        if (!$institutionId) {
+        if (! $institutionId) {
             return response()->json([
                 'success' => false,
-                'message' => 'User does not have any institution assigned'
+                'message' => 'User does not have any institution assigned',
             ], 400);
         }
 
@@ -371,46 +408,70 @@ class StudentOnlinePaymentController extends Controller
             ->where('institution_id', $institutionId)
             ->find($id);
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json([
                 'success' => false,
-                'message' => 'Online payment transaction not found'
+                'message' => 'Online payment transaction not found',
             ], 404);
         }
 
         if ($this->isStudentActor($request)) {
             $selfStudentId = $this->resolveSelfStudentId($request);
-            if (!$selfStudentId || $selfStudentId !== $transaction->student_id) {
+            if (! $selfStudentId || $selfStudentId !== $transaction->student_id) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You can only access your own online payment transactions'
+                    'message' => 'You can only access your own online payment transactions',
                 ], 403);
             }
         }
 
+        /*
+         * Ask the provider what actually happened, for anything still open.
+         * This is the path that rescues a payment whose webhook never arrived
+         * — and the payer refreshing this page is usually how we find out.
+         *
+         * The driver is built from the transaction's own gateway rather than
+         * the school's current one, so a payment started before the school
+         * changed merchant accounts is still read back with the keys it was
+         * started under.
+         */
         if (
             in_array($transaction->status, ['pending', 'authorized'], true) &&
             $transaction->provider_charge_id
         ) {
-            try {
-                $gatewayStatus = $this->gatewayClient->getCharge($transaction->provider_charge_id);
-                $transaction = $this->transactionService->applyGatewayUpdate($transaction, $gatewayStatus);
-            } catch (\Throwable) {
-                // Status polling is best-effort; if gateway is down, return last known local state.
-                $transaction = $transaction->fresh(['schoolFee', 'completedPayment']);
+            $driver = $this->driverForTransaction($transaction);
+
+            if ($driver) {
+                try {
+                    $event = $driver->fetchCheckout($transaction->provider_charge_id);
+                    $transaction = $this->transactionService->applyGatewayUpdate(
+                        $transaction,
+                        $event,
+                        $driver->paymentMethodLabel(),
+                    );
+                } catch (\Throwable $e) {
+                    // Best effort. A provider being down must not stop a
+                    // student seeing the state we already hold.
+                    Log::info('Could not reconcile an online payment with its provider', [
+                        'transaction_id' => $transaction->id,
+                        'message' => $e->getMessage(),
+                    ]);
+
+                    $transaction = $transaction->fresh(['schoolFee', 'completedPayment']);
+                }
             }
         }
 
         return response()->json([
             'success' => true,
-            'data' => $transaction
+            'data' => $transaction,
         ]);
     }
 
     private function resolveInstitutionId(Request $request): ?string
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
@@ -423,14 +484,14 @@ class StudentOnlinePaymentController extends Controller
         }
 
         $institutionId = $user->getDefaultInstitutionId();
-        if (!$institutionId) {
+        if (! $institutionId) {
             $firstUserInstitution = $user->userInstitutions()->first();
             if ($firstUserInstitution) {
                 $institutionId = $firstUserInstitution->institution_id;
             }
         }
 
-        if (!$institutionId && $this->isStudentActor($request)) {
+        if (! $institutionId && $this->isStudentActor($request)) {
             $selfStudentId = $this->resolveSelfStudentId($request);
             if ($selfStudentId) {
                 $selfStudent = Student::find($selfStudentId);
@@ -444,7 +505,7 @@ class StudentOnlinePaymentController extends Controller
     private function isStudentActor(Request $request): bool
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -453,48 +514,52 @@ class StudentOnlinePaymentController extends Controller
         }
 
         $role = method_exists($user, 'getRole') ? $user->getRole() : null;
+
         return (string) ($role->slug ?? '') === 'student';
     }
 
     /**
-     * Build Maya buyer payload with the camelCase keys Maya requires.
-     * Returns null if we cannot produce a contact object — Maya rejects a
-     * partial buyer (firstName/lastName/contact are all required when buyer
-     * is present), so omitting it is safer than sending it incomplete.
+     * Who is paying, in plain fields.
+     *
+     * Deliberately not any provider's shape — each driver renames these into
+     * whatever its provider wants, and decides for itself whether a partial
+     * buyer is worth sending. Returned even when incomplete for the same
+     * reason: that judgement is not this controller's to make.
+     *
+     * @return array<string, string|null>|null
      */
-    private function buildBuyerPayload(Student $student): ?array
+    private function buildBuyer(Student $student): ?array
     {
-        $firstName = trim((string) $student->first_name);
-        $lastName = trim((string) $student->last_name);
-        if ($firstName === '' || $lastName === '') {
-            return null;
-        }
-
-        $email = trim((string) ($student->studentAuth?->email ?? $student->user?->email ?? ''));
-        if ($email === '') {
-            return null;
-        }
-
-        $contact = ['email' => $email];
-
-        $buyer = [
-            'firstName' => $firstName,
-            'lastName' => $lastName,
-            'contact' => $contact,
+        return [
+            'first_name' => trim((string) $student->first_name),
+            'middle_name' => trim((string) $student->middle_name),
+            'last_name' => trim((string) $student->last_name),
+            'email' => trim((string) ($student->studentAuth?->email ?? $student->user?->email ?? '')),
         ];
+    }
 
-        $middleName = trim((string) $student->middle_name);
-        if ($middleName !== '') {
-            $buyer['middleName'] = $middleName;
-        }
+    /**
+     * The driver for the merchant account a transaction was taken through.
+     *
+     * Transactions predating per-institution credentials carry no gateway, so
+     * they fall back to the school's active one — which is the right guess,
+     * since at the time there was only ever the one.
+     */
+    private function driverForTransaction(StudentOnlinePaymentTransaction $transaction): ?PaymentGatewayDriver
+    {
+        $gateway = $transaction->institution_payment_gateway_id
+            ? InstitutionPaymentGateway::find($transaction->institution_payment_gateway_id)
+            : null;
 
-        return $buyer;
+        $gateway ??= $this->gateways->gatewayFor((string) $transaction->institution_id);
+
+        return $gateway ? $this->gateways->driverFor($gateway) : null;
     }
 
     private function resolveSelfStudentId(Request $request): ?string
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
