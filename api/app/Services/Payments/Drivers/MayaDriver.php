@@ -67,6 +67,7 @@ class MayaDriver implements PaymentGatewayDriver
         $decoded = $this->decode(
             $this->requestWithPublicKey()->post('/payby/v2/paymaya/payments', $payload),
             'create Pay With Maya payment',
+            'public_key',
         );
 
         $paymentId = (string) ($decoded['paymentId'] ?? '');
@@ -134,6 +135,7 @@ class MayaDriver implements PaymentGatewayDriver
                 ->withHeaders(['Request-Reference-No' => $request->reference])
                 ->post('/checkout/v1/checkouts', $payload),
             'create checkout',
+            'public_key',
         );
 
         $checkoutId = (string) ($decoded['checkoutId'] ?? '');
@@ -379,11 +381,42 @@ class MayaDriver implements PaymentGatewayDriver
     /**
      * @return array<string, mixed>
      */
-    private function decode(Response $response, string $operation): array
+    /**
+     * What went wrong, in terms someone can act on.
+     *
+     * A 401 here is never transient and never Maya being down — the request
+     * arrived and the credential was refused. Saying only "failed (401)" sends
+     * whoever is debugging it looking at the network, when the answer is
+     * always one of a small set of setup mistakes: keys from the sandbox
+     * pasted against the live host (or the reverse), keys issued for the other
+     * Maya product, or the public and secret keys swapped. Maya's own body is
+     * unhelpfully terse about which, so the message names what we sent —
+     * the host, the mode, the product and which key — and never the key
+     * itself.
+     */
+    private function failureMessage(Response $response, string $operation, string $keyUsed): string
+    {
+        if (! in_array($response->status(), [401, 403], true)) {
+            return sprintf('Maya %s failed (%s).', $operation, $response->status());
+        }
+
+        return sprintf(
+            'Maya refused the %s (%s) for %s. Sent to %s as the "%s" mode with the "%s" product. '
+            .'Check that this key pair was issued for that mode and that product.',
+            str_replace('_', ' ', $keyUsed),
+            $response->status(),
+            $operation,
+            $this->gateway->baseUrl(),
+            $this->gateway->mode,
+            $this->gateway->resolvedProduct() ?? 'default',
+        );
+    }
+
+    private function decode(Response $response, string $operation, string $keyUsed = 'secret_key'): array
     {
         if (! $response->successful()) {
             throw new PaymentGatewayException(
-                sprintf('Maya %s failed (%s).', $operation, $response->status()),
+                $this->failureMessage($response, $operation, $keyUsed),
                 provider: 'maya',
                 status: $response->status(),
                 providerBody: $response->body(),

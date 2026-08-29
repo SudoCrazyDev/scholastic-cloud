@@ -161,6 +161,67 @@ class OnlinePaymentGatewayTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_a_refused_key_is_not_reported_to_the_payer_as_a_blip(): void
+    {
+        Http::fake(['*' => Http::response(['error' => 'Unauthorized'], 401)]);
+
+        $response = $this->checkout('north-cashier', $this->northStudent)->assertStatus(502);
+
+        /*
+         * A 401 is the school's setup and will refuse every retry. Telling the
+         * payer to try again in a moment sends them round the same failure and
+         * keeps the one person who could fix it from ever hearing about it.
+         */
+        $this->assertStringContainsString('finance office', $response->json('message'));
+        $this->assertStringNotContainsString('try again', $response->json('message'));
+    }
+
+    public function test_a_refused_key_says_what_was_sent_so_it_can_be_fixed(): void
+    {
+        config()->set('app.debug', true);
+        Http::fake(['*' => Http::response(['error' => 'Unauthorized'], 401)]);
+
+        $detail = $this->checkout('north-cashier', $this->northStudent)
+            ->assertStatus(502)
+            ->json('detail');
+
+        /*
+         * Maya answers a mismatched key pair with a bare 401 and no hint as to
+         * which half is wrong, so the message names our side of it: the host,
+         * the mode and the product. Nearly every real occurrence is sandbox
+         * keys against the live host or keys issued for the other product,
+         * and both are visible the moment those three are written down.
+         */
+        $this->assertStringContainsString('sandbox', $detail);
+        $this->assertStringContainsString('payby', $detail);
+        $this->assertStringContainsString('pg-sandbox.paymaya.com', $detail);
+        $this->assertStringContainsString('public key', $detail);
+    }
+
+    public function test_a_refused_key_never_puts_the_key_in_the_message(): void
+    {
+        config()->set('app.debug', true);
+        Http::fake(['*' => Http::response(['error' => 'Unauthorized'], 401)]);
+
+        $body = $this->checkout('north-cashier', $this->northStudent)
+            ->assertStatus(502)
+            ->getContent();
+
+        $this->assertStringNotContainsString('north-public', $body);
+        $this->assertStringNotContainsString('north-secret', $body);
+    }
+
+    public function test_a_provider_that_is_actually_down_still_says_try_again(): void
+    {
+        Http::fake(['*' => Http::response(['error' => 'Bad gateway'], 502)]);
+
+        $message = $this->checkout('north-cashier', $this->northStudent)
+            ->assertStatus(502)
+            ->json('message');
+
+        $this->assertStringContainsString('try again', $message);
+    }
+
     // ------------------------------------------------------------ availability
 
     /*

@@ -177,6 +177,30 @@ Paste the school's one webhook URL into **every** slot on that screen — Paymen
 failed, Payment expired, One-time payment success/failure/dropout, Authorized. The event is in the
 body, not the URL, and the read-back overrules it anyway.
 
+### When Maya answers 401
+
+Maya refuses a mismatched credential with a bare `401` and no indication of which half is wrong, so
+the driver writes down our side of it instead: the host, the mode, the product, and which of the two
+keys was sent. That sentence reaches the log always, and the `detail` field when `APP_DEBUG` is on.
+
+A `401` on create-checkout is never transient and never Maya being down — the request arrived and
+the key was refused. It is nearly always one of:
+
+- **Mode does not match the key pair.** Sandbox keys against `pg.paymaya.com`, or live keys against
+  `pg-sandbox.paymaya.com`. The Payment Gateways screen lets these be set independently, and nothing
+  about a key's text says which environment issued it.
+- **Live keys that are not live yet.** Maya issues them before the merchant account finishes
+  activation, and they 401 until it does. Nothing on our side can tell this from a wrong key.
+- **Keys issued for the other product.** Maya's Checkout and Pay With Maya key pairs are different.
+  Checkout keys against `/payby/v2/paymaya/payments` — which is what `product: payby` calls — is a
+  401, and so is the reverse.
+- **Public and secret swapped.** Create-checkout sends the *public* key; only the read-back in
+  `fetchCheckout()` sends the secret one. A gateway with the two transposed therefore fails at
+  checkout and would also fail every webhook confirmation.
+
+The payer is told to speak to the finance office rather than to try again, because every retry
+against a refused key fails the same way.
+
 ### The legacy URL
 
 `POST /api/payments/webhooks/maya` still works and is still verified. It has no slug, so it finds
