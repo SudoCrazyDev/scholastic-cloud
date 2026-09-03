@@ -6,9 +6,12 @@ import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { paymentIdentifierService } from '../../services/paymentIdentifierService'
 import { paymentReceiptService } from '../../services/paymentReceiptService'
+import { studentFinanceService } from '../../services/studentFinanceService'
 import type {
   ApproveReceiptSubmissionData,
+  CreatePaymentTransactionItem,
   DuplicateReferenceGroup,
+  LedgerFeeBreakdown,
   PaymentIdentifierHolder,
   PaymentReceiptSubmission,
   ReceiptSubmissionStatus,
@@ -120,6 +123,62 @@ const ReceiptThumbnail: React.FC<{
 const lineLabel = (item: StudentPayment) =>
   item.school_fee?.name ?? item.additional_fee?.name ?? 'General / Other'
 
+/**
+ * Splits `amount` across `weights` in proportion to each weight, to the centavo.
+ *
+ * A port of the API's own `spreadProportionally`, and it has to stay one: that is already
+ * how a General / Other collection is read back against the fees that still owe, so a
+ * suggested subdivision computed any other way would shift a student's per-fee balances
+ * the moment it was posted, purely by being named.
+ *
+ * Every share is floored and the leftover centavos go to the largest remainders, so the
+ * shares add back to `amount` rather than to `amount` less a few centavos.
+ */
+const spreadProportionally = (
+  amount: number,
+  weights: Record<string, number>
+): Record<string, number> => {
+  const base = Object.values(weights).reduce((sum, weight) => sum + weight, 0)
+  if (amount <= 0 || base <= 0) return {}
+
+  // Never more than the fees can absorb: anything past that is an advance the student is
+  // owed back, not a row to drive past settled, so it stays General / Other.
+  const spread = Math.min(amount, base)
+
+  const shares: Record<string, number> = {}
+  const remainders: [string, number][] = []
+  for (const [key, weight] of Object.entries(weights)) {
+    const exact = spread * (weight / base)
+    const floored = Math.floor(exact * 100) / 100
+    shares[key] = floored
+    remainders.push([key, exact - floored])
+  }
+
+  let leftover = Math.round(
+    (spread - Object.values(shares).reduce((sum, share) => sum + share, 0)) * 100
+  )
+  remainders.sort((a, b) => b[1] - a[1])
+  while (leftover > 0) {
+    for (const [key] of remainders) {
+      if (leftover <= 0) break
+      shares[key] = Math.round((shares[key] + 0.01) * 100) / 100
+      leftover--
+    }
+  }
+
+  return shares
+}
+
+/**
+ * Whether a suggested split is allowed to put money on this fee unasked.
+ *
+ * Late fees and cash-basis fees sit outside the payment schedule and are settled only by
+ * money named to them, so they take no share of the suggestion — matching how the ledger
+ * spreads a general collection. The reviewer can still type an amount against one.
+ */
+const takesGeneralShare = (fee: LedgerFeeBreakdown) =>
+  fee.source !== 'late_fee' && fee.billing_type !== 'cash'
+
 interface ReceiptApprovalsViewProps {
   /**
    * Renders without the page card and heading, for the panel on Cashiering. A cashier
@@ -185,13 +244,14 @@ type QueueTab = ReceiptSubmissionStatus | 'duplicates'
  * approval has posted, taking it back is a void request. It is not always a mistake — one
  * transfer can genuinely settle two students' fees — so this is a stop, not a refusal.
  *
- * `amount` is the verified amount already entered, kept here so proceeding posts exactly
- * what the reviewer was about to post rather than re-reading a field they may have since
- * touched.
+ * `amount` and `allocations` are the verified amount and the subdivision already entered,
+ * kept here so proceeding posts exactly what the reviewer was about to post rather than
+ * re-reading fields they may have since touched.
  */
 type DuplicateReferencePrompt = {
   value: string
   amount: number
+  allocations: CreatePaymentTransactionItem[]
   holders: PaymentIdentifierHolder[]
 }
 
@@ -226,6 +286,13 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [duplicateRef, setDuplicateRef] = useState<DuplicateReferencePrompt | null>(null)
   const [checkingReference, setCheckingReference] = useState(false)
+  /**
+   * The reviewer's own per-fee amounts, keyed by fee id and held as the raw input text so a
+   * half-typed "1." is not rounded out from under them. A fee missing from the map is
+   * following the suggested split; one present as "" has been deliberately cleared.
+   */
+  const [splitOverrides, setSplitOverrides] = useState<Record<string, string>>({})
+  const [splitTouched, setSplitTouched] = useState(false)
 
   const showingDuplicates = statusFilter === 'duplicates'
 
@@ -284,6 +351,105 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   const isPendingTarget = reviewTarget?.status === 'pending'
   const postedTransaction = reviewTarget?.payment_transaction ?? null
 
+  /**
+   * What the student still owes, so the verified amount can be subdivided across the fees
+   * it settles instead of posting as one unnamed General / Other line — which is what the
+   * till then shows when the approval is opened there, and what the receipt prints.
+   *
+   * Only read while a pending receipt is open: an approved one has already moved the
+   * ledger, so the balances left behind are not the ones it was posted against.
+   */
+  const ledgerQuery = useQuery({
+    queryKey: ['student-ledger', reviewTarget?.student_id, reviewTarget?.academic_year],
+    queryFn: () =>
+      studentFinanceService.getLedger(reviewTarget!.student_id, reviewTarget!.academic_year),
+    enabled: Boolean(isPendingTarget && reviewTarget?.student_id && reviewTarget?.academic_year),
+  })
+
+  /** The fees with something left on them, in the order the ledger reports them. */
+  const owingFees = useMemo(
+    () => (ledgerQuery.data?.data?.fee_breakdown ?? []).filter((fee) => fee.outstanding > 0.001),
+    [ledgerQuery.data]
+  )
+
+  const verifiedAmountValue = Number(verifiedAmount) || 0
+
+  /**
+   * Where the verified amount lands if the reviewer changes nothing: in proportion to what
+   * each fee still owes, which is exactly how the ledger already reads a General / Other
+   * collection. Accepting it therefore leaves every balance where it stands today, and
+   * only gives the collection fee names.
+   */
+  const suggestedSplit = useMemo(() => {
+    const weights: Record<string, number> = {}
+    for (const fee of owingFees) {
+      if (takesGeneralShare(fee)) weights[fee.fee_id] = fee.outstanding
+    }
+    return spreadProportionally(verifiedAmountValue, weights)
+  }, [owingFees, verifiedAmountValue])
+
+  /** The split as it actually stands — the reviewer's amount wherever they gave one. */
+  const splitAmounts = useMemo(() => {
+    const amounts: Record<string, number> = {}
+    for (const fee of owingFees) {
+      const override = splitOverrides[fee.fee_id]
+      amounts[fee.fee_id] =
+        override !== undefined ? Number(override) || 0 : (suggestedSplit[fee.fee_id] ?? 0)
+    }
+    return amounts
+  }, [owingFees, splitOverrides, suggestedSplit])
+
+  const allocatedTotal = useMemo(
+    () =>
+      Math.round(Object.values(splitAmounts).reduce((sum, amount) => sum + amount, 0) * 100) / 100,
+    [splitAmounts]
+  )
+
+  // Whatever the reviewer left unnamed was still collected, so it posts as it always did.
+  const unallocatedTotal = Math.round((verifiedAmountValue - allocatedTotal) * 100) / 100
+  const overAllocated = unallocatedTotal < -0.001
+
+  /** What an amount field shows: the reviewer's own text, or the suggestion. */
+  const splitFieldValue = (feeId: string) => {
+    const override = splitOverrides[feeId]
+    if (override !== undefined) return override
+    const suggested = suggestedSplit[feeId]
+    return suggested ? suggested.toFixed(2) : ''
+  }
+
+  const setSplitAmount = (feeId: string, value: string) => {
+    setSplitOverrides((prev) => {
+      // The first edit freezes every other line where it stands. Left following the
+      // suggestion they would re-spread themselves around the one just typed, so the
+      // reviewer names Tuition and watches Books move on its own.
+      const base = splitTouched
+        ? prev
+        : Object.fromEntries(
+            Object.entries(splitAmounts).map(([id, amount]) => [
+              id,
+              amount ? amount.toFixed(2) : '',
+            ])
+          )
+      return { ...base, [feeId]: value }
+    })
+    setSplitTouched(true)
+  }
+
+  const resetSplit = () => {
+    setSplitOverrides({})
+    setSplitTouched(false)
+  }
+
+  /** The subdivision as the API takes it: the named lines only. */
+  const buildAllocations = (): CreatePaymentTransactionItem[] =>
+    owingFees
+      .filter((fee) => (splitAmounts[fee.fee_id] ?? 0) > 0)
+      .map((fee) => ({
+        school_fee_id: fee.is_additional ? null : fee.fee_id,
+        additional_fee_id: fee.is_additional ? fee.fee_id : null,
+        amount: splitAmounts[fee.fee_id],
+      }))
+
   const closeReviewModal = () => {
     setReviewTarget(null)
     setVerifiedAmount('')
@@ -293,6 +459,8 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     setRejectNote('')
     setDuplicateRef(null)
     setCheckingReference(false)
+    setSplitOverrides({})
+    setSplitTouched(false)
   }
 
   const invalidateAfterReview = () => {
@@ -366,6 +534,9 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
     setFieldErrors({})
     setRejectMode(false)
     setRejectNote('')
+    // A fresh receipt starts on the suggested split, not the last one's overrides.
+    setSplitOverrides({})
+    setSplitTouched(false)
 
     const transaction = submission.payment_transaction
     setDetails({
@@ -383,18 +554,23 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
   }, [visibleSubmissions, reviewTarget])
 
   /** The write itself, once the reference number is settled one way or the other. */
-  const postApproval = (amount: number, reference: string) => {
+  const postApproval = (
+    amount: number,
+    reference: string,
+    allocations: CreatePaymentTransactionItem[]
+  ) => {
     if (!reviewTarget) return
     setFieldErrors({})
     approveMutation.mutate({
       id: reviewTarget.id,
       // Only what the review form actually asked for. Mode, date and remark are left to the
       // API's defaults rather than posted as blanks from fields that are no longer rendered.
-      // No allocations: the whole verified amount posts as one General / Other line, which
-      // is what the API does when it is sent none.
+      // Whatever the subdivision left unnamed the API posts as a General / Other line, so a
+      // receipt approved against no fee at all behaves exactly as it did before.
       data: {
         amount,
         reference_number: reference || undefined,
+        allocations: allocations.length ? allocations : undefined,
       },
     })
   }
@@ -406,11 +582,20 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       toast.error('Enter the verified amount shown on the receipt.')
       return
     }
+    // The API refuses this too, but the sum is the reviewer's own arithmetic and saying so
+    // here beats a round trip to be told the receipt does not add up.
+    if (overAllocated) {
+      toast.error('The fees you subdivided across add up to more than the verified amount.')
+      return
+    }
 
+    // Read before the duplicate check, so what posts is the split that was on screen when
+    // they pressed Approve.
+    const allocations = buildAllocations()
     const reference = details.reference_number.trim()
     // Nothing to reuse, so nothing to check.
     if (!reference) {
-      postApproval(amount, reference)
+      postApproval(amount, reference, allocations)
       return
     }
 
@@ -419,7 +604,7 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       const response = await paymentIdentifierService.holders({ reference_number: reference })
       const holders = response.data?.reference_number ?? []
       if (holders.length) {
-        setDuplicateRef({ value: reference, amount, holders })
+        setDuplicateRef({ value: reference, amount, allocations, holders })
         return
       }
     } catch (error) {
@@ -435,15 +620,15 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
       setCheckingReference(false)
     }
 
-    postApproval(amount, reference)
+    postApproval(amount, reference, allocations)
   }
 
   /** They looked at the other collections and it is a separate payment after all. */
   const handleProceedDespiteDuplicate = () => {
     if (!duplicateRef) return
-    const { amount, value } = duplicateRef
+    const { amount, value, allocations } = duplicateRef
     setDuplicateRef(null)
-    postApproval(amount, value)
+    postApproval(amount, value, allocations)
   }
 
   const handleSaveDetails = () => {
@@ -861,6 +1046,126 @@ const ReceiptApprovalsView: React.FC<ReceiptApprovalsViewProps> = ({
                 placeholder="0.00"
               />
 
+              {/* The subdivision, so the collection posts against the fees it settles rather
+                  than as one unnamed line. It is prefilled and not merely offered: a
+                  reviewer approving a queue of receipts is not going to type out a
+                  proportional split by hand, and left empty every receipt goes back to
+                  telling the school nothing about what it collected. */}
+              <div className="rounded-lg border border-gray-200">
+                <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-2.5">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900">
+                      What this receipt settles
+                    </h4>
+                    <p className="text-xs text-gray-500">
+                      Shared across the fees that still owe. Adjust any line before approving.
+                    </p>
+                  </div>
+                  {splitTouched && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={resetSplit}
+                      disabled={approveMutation.isPending}
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+
+                {ledgerQuery.isLoading ? (
+                  <p className="px-4 py-6 text-center text-sm text-gray-500">
+                    Loading the fees this student still owes…
+                  </p>
+                ) : ledgerQuery.isError ? (
+                  <p className="px-4 py-3 text-sm text-amber-800">
+                    Those balances could not be loaded, so this receipt will post as a single
+                    General / Other line. The ledger still shares it across the fees that owe
+                    — the receipt just will not name them.
+                  </p>
+                ) : owingFees.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-gray-500">
+                    Nothing outstanding for {reviewTarget.academic_year}, so the whole amount
+                    posts as General / Other.
+                  </p>
+                ) : (
+                  <>
+                    <div className="divide-y divide-gray-100">
+                      {owingFees.map((fee) => (
+                        <div key={fee.fee_id} className="flex items-center gap-3 px-4 py-2.5">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-gray-900">
+                              {fee.fee_name}
+                              {fee.is_additional && (
+                                <span
+                                  className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                                    fee.source === 'late_fee'
+                                      ? 'bg-red-50 text-red-600'
+                                      : 'bg-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  {fee.source === 'late_fee' ? 'Late fee' : 'Additional'}
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Balance:{' '}
+                              <span className="font-medium text-gray-700">
+                                {formatAmount(fee.outstanding)}
+                              </span>
+                              {!takesGeneralShare(fee) && (
+                                <span className="text-gray-400">
+                                  {' · '}outside the schedule, so it takes no share unless you
+                                  name it
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="relative shrink-0">
+                            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                              ₱
+                            </span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={splitFieldValue(fee.fee_id)}
+                              onChange={(event) => setSplitAmount(fee.fee_id, event.target.value)}
+                              placeholder="0.00"
+                              className="w-32 pl-6 text-right"
+                              disabled={approveMutation.isPending}
+                              aria-label={`Amount settling ${fee.fee_name}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50 px-4 py-2.5 text-sm">
+                      <span className="text-gray-500">
+                        Subdivided{' '}
+                        <span className="font-medium tabular-nums text-gray-900">
+                          {formatAmount(allocatedTotal)}
+                        </span>
+                      </span>
+                      {overAllocated ? (
+                        <span className="font-medium text-red-600">
+                          {formatAmount(Math.abs(unallocatedTotal))} more than the verified
+                          amount
+                        </span>
+                      ) : (
+                        <span className="text-gray-500">
+                          General / Other{' '}
+                          <span className="font-medium tabular-nums text-gray-900">
+                            {formatAmount(unallocatedTotal)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div className="rounded-lg border border-gray-200 p-4 space-y-3">
                 <h4 className="text-sm font-semibold text-gray-900">Payment summary</h4>
