@@ -29,6 +29,8 @@ class StudentPayment extends Model
         'voided_at',
         'voided_by',
         'void_note',
+        'fee_naming_run_id',
+        'fee_naming_original_amount',
     ];
 
     protected $casts = [

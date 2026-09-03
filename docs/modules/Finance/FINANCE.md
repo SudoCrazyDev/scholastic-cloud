@@ -19,7 +19,7 @@ routes — only `auth.token` plus in-controller checks (see [Roles & permissions
 
 ---
 
-## Page architecture: one component, eleven URLs
+## Page architecture: one component, twelve URLs
 
 `app/src/pages/Finance/Finance.tsx` is a single ~4,000-line component that renders one of eleven
 **views** based on `location.pathname` (the `view` memo near the top of the component). Every
@@ -293,6 +293,19 @@ views' requests.
 
 ---
 
+### Fee naming (the General / Other backfill)
+
+| File | What it is |
+|---|---|
+| `api/app/Services/Finance/FeeBreakdownBuilder.php` | The per-fee reading of a student's year, lifted out of `StudentFinanceController` so there is exactly one implementation. `build()` is the old private `buildFeeBreakdown`; `priceDiscounts()` the old `applyDiscounts`; the controller keeps thin delegating wrappers so the ledger and the notice read unchanged. `forStudent()` loads the rows itself and is a **deliberate line-for-line mirror of `ledger()`'s loading** — same eager loads, same `orderBy`s — because `spreadProportionally` breaks tie remainders in iteration order, so loading `feeDefaults` unordered can move a centavo. |
+| `api/app/Services/Finance/FeeNamingService.php` | `preview()` / `apply()` / `revert()`. Decides nothing: the shares come from `FeeBreakdownBuilder` and are only handed out across the unnamed lines. |
+| `api/app/Http/Controllers/FeeNamingController.php` | The four endpoints, behind `module:finance,name-fees`. |
+| `api/app/Models/FeeNamingRun.php` | One run. `reverted_at` is its only state. |
+| `api/database/migrations/2026_09_03_000001_create_fee_naming_runs_table.php` | `fee_naming_runs`, plus `student_payments.fee_naming_run_id` and `fee_naming_original_amount` — set only on the renamed original, which is how an undo tells "restore this to this amount" from "delete this" without a second table. |
+| `app/src/pages/Finance/FeeNamingView.tsx` | The Setup screen: preview, confirm, run, undo, run history. |
+| `app/src/services/feeNamingService.ts` | The four calls. |
+| `api/tests/Feature/FeeNamingBackfillTest.php` | 10 tests, all ultimately the balance-neutrality claim. |
+
 ## Views in detail
 
 ### Dashboard (`/finance`)
@@ -422,12 +435,28 @@ A scoped queue also drops the **Student** column (their name on every row of the
 noise) and moves the expand chevron into the installment cell so the chevrons still line up.
 
 **Pending → "Review"** opens the receipt image (or a file link for PDFs), a verified-amount input,
-and a **Payment summary** block. There is no allocation step: the reviewer reads the amount off the
-image and posts it, and the whole amount lands as one "General / Other" line — which is what the
-API does when it is sent no allocations. (An earlier build let the reviewer subdivide the amount
-across the student's outstanding fees here; that was removed on request. The approve endpoint still
-takes `allocations[]`, so the panel could come back without a backend change, and the queue still
-renders whatever split a transaction happens to carry.)
+a **What this receipt settles** panel, and a **Payment summary** block.
+- **What this receipt settles** subdivides the verified amount across the fees that still owe, so
+  the collection posts with fee names on it rather than as one anonymous "General / Other" line —
+  which is what the till showed when the approval was opened there, and what the receipt printed.
+  It reads `fee_breakdown` off `GET /students/{id}/ledger` (query key `student-ledger`, enabled
+  only while a *pending* receipt is open — an approved one has already moved the ledger, so the
+  balances left behind are not the ones it was posted against).
+- It arrives **prefilled**, and that is the point. `spreadProportionally` in the view is a port of
+  the API's function of the same name, so the suggestion is *exactly* the split the ledger already
+  applies to a General / Other collection: in proportion to what each fee still owes, with late
+  fees and cash-basis fees taking no share (they sit outside the schedule and are settled only by
+  money named to them — `takesGeneralShare`). Approving the suggestion untouched therefore leaves
+  every per-fee balance where it already stood and only gives the collection fee names. The
+  reviewer can retype any line, including onto a late fee; **Reset** goes back to the suggestion.
+- The first edit freezes every other line where it stands (`splitTouched`), so changing the
+  verified amount afterwards does not re-spread the untouched lines around the one just typed.
+  Anything left over stays a "General / Other" line, the footer names it, and over-allocating is
+  refused client-side before the round trip (the API 422s it too).
+- An earlier build (removed on request in `f71dad0`, Aug 2026) had a panel here that started
+  **empty** with a "Fill from balances" shortcut — allocation was work the reviewer had to do per
+  receipt. This one asks for nothing unless they disagree with it. If the ledger fetch fails the
+  panel says so and the receipt still posts as one General / Other line, exactly as before.
 - Payment summary is **only the reference number** — on a review and on an approved receipt
   alike, and it is the single thing this screen writes. Everything else about how the money
   arrived is already settled by the uploaded receipt: the mode is an online transfer, the date
@@ -551,6 +580,58 @@ Drag-and-drop (dnd-kit) template designer with a palette of ~17 element types (i
 logo/name/address, receipt number, student fields, fee/amount rows, signature line, custom text,
 divider, spacer…). CRUD via `/receipt-templates`. `ReceiptPrintModal` renders the active template.
 
+### Setup → Fee Naming (`/finance/fee-naming`) — `FeeNamingView.tsx`
+
+Writes down the fees that collections posted as **General / Other** already settled.
+
+**Why it exists.** A general collection names no fee, so the receipt it posted names none
+either — the till, a reprint and the queue's row expansion all fall back to
+"General / Other". The per-fee *balances* were never wrong: `FeeBreakdownBuilder` shares
+that money across the fees that still owe every time a ledger is read (`general_applied`).
+What was missing was the money written down, so an individual collection could be
+reconciled fee by fee. Approvals made from Sep 2026 onward name their fees at approval
+time (see [Receipt Approvals](#receipt-approvals-financereceipt-approvals--receiptapprovalsviewtsx));
+this clears the backlog that predates that.
+
+**The safety property, and it is the whole design.** Every figure a run writes is one the
+ledger is already reporting — the shares come from `FeeBreakdownBuilder::forStudent()` and
+are never recomputed. So the receipt total never moves and **no per-fee balance changes**:
+a student's Fees view is identical before and after. `FeeNamingBackfillTest` asserts
+exactly that, snapshotting the ledger either side of a run.
+
+**The trade-off it makes**, and the reason it is a recorded run rather than a quiet fix:
+general money *floats* — add a charge later and it re-spreads to cover it. Named money
+stays put. Pinning it is the point, but it is a decision about the books, so who ran it and
+when is kept, and it can be undone.
+
+- **Preview → run → undo.** The run button does not exist until a preview has been fetched,
+  and changing the year or scope discards the preview rather than leaving a stale list next
+  to a button that would act on something else. `apply()` recomputes its own plan rather
+  than trusting the preview it was shown, so a payment posted in between cannot turn the
+  preview into a stale instruction.
+- **Scope.** `receipts` (the default) covers only collections behind an approved receipt
+  submission — the actual backlog. `all` also sweeps General / Other lines a cashier typed
+  at the till, which were a deliberate choice not to name a fee; the screen says so.
+- **What it leaves alone**, each reported in the preview's "Left alone" list with a reason:
+  a student who paid **more than the fees owe** (the surplus names no fee, so guessing would
+  be wrong), a student whose general money is **partly out of scope** (naming a subset would
+  write figures the ledger never reported), one with **no outstanding fees**, and any
+  transaction with a **pending or approved void request** — money somebody is disputing.
+- **How it writes.** Shares are handed out across a student's unnamed lines oldest-first, so
+  three collections across four fees become a handful of lines naming one or two fees each
+  rather than twelve slivers. The existing row is **renamed in place** to carry the first
+  part and siblings are inserted beside it — never deleted and rewritten — because
+  `payment_receipt_submissions.student_payment_id` points at it, and the undo needs a row it
+  can restore rather than reconstruct.
+- **Undo** restores each renamed original to its `fee_naming_original_amount` (unnamed) and
+  deletes the siblings the run inserted. Also total-neutral, so it is the exact inverse.
+  **Refused** if any line the run named has since been voided: that is somebody's
+  correction, and collapsing it here would quietly undo that too. `can_revert` is answered
+  by the API, since the browser cannot know what was voided since.
+- Its own ability — **`finance.name-fees`**, not `finance.manage` — because it rewrites
+  lines on collections already posted. Gated on the route *and* in the render, so a
+  hand-typed URL shows a refusal rather than the run button.
+
 ### Setup → Data Clearing (`/finance/data-clearing`) — `DataClearingView.tsx`
 Permanently deletes a school's finance records. **Gated on `finance.clear-data`**, a special
 ability outside `finance.manage` — running the cashier does not carry the power to erase what it
@@ -642,6 +723,17 @@ the academic year. Routed as a sibling of `/finance` in `App.tsx` with its own s
 All requests go through `src/lib/api.ts` (base `VITE_API_URL`, token auth).
 
 ---
+
+### Fee naming
+
+| Method | Endpoint | Notes |
+|---|---|---|
+| POST | `/finance/fee-naming/preview` | `{academic_year?, scope}` → the plan. Writes nothing. |
+| POST | `/finance/fee-naming` | Runs it, recomputing its own plan. Returns the run. |
+| GET | `/finance/fee-naming/runs` | Last 50, newest first, each with `can_revert`. |
+| POST | `/finance/fee-naming/runs/{id}/revert` | Undo. 422 if already undone, or if a named line was voided since. |
+
+All four behind `module:finance,name-fees`.
 
 ## Data model (tables at a glance)
 

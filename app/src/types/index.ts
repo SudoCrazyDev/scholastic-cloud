@@ -1227,6 +1227,73 @@ export interface CreateGradeLevelDiscountData {
 }
 
 // Student additional fee types
+/**
+ * Naming the fees on collections posted as "General / Other".
+ *
+ * The per-fee balances were never wrong — the ledger shares general money across the fees
+ * that still owe every time it is read (`general_applied` on LedgerFeeBreakdown). What a
+ * run does is write that share down as real line items, so the till, a reprint and any
+ * fee-by-fee reconciliation stop reading "General / Other". It moves no balance.
+ */
+export type FeeNamingScope = 'receipts' | 'all';
+
+/** One line a run would rewrite, and the fees it would name. */
+export interface FeeNamingLine {
+  payment_id: string;
+  payment_transaction_id: string | null;
+  receipt_number: string | null;
+  amount: number;
+  parts: {
+    fee_id: string;
+    fee_name: string;
+    is_additional: boolean;
+    amount: number;
+  }[];
+}
+
+export interface FeeNamingPlanStudent {
+  student_id: string;
+  student_name: string;
+  academic_year: string;
+  general_total: number;
+  lines: FeeNamingLine[];
+}
+
+/** A student left alone, and why — an overpayment names no fee, so it is not guessed at. */
+export interface FeeNamingSkipped {
+  student_id: string;
+  student_name: string;
+  academic_year: string;
+  general_total: number;
+  reason: string;
+}
+
+export interface FeeNamingPlan {
+  students: FeeNamingPlanStudent[];
+  receipt_count: number;
+  line_count: number;
+  total_amount: number;
+  skipped: FeeNamingSkipped[];
+}
+
+export interface FeeNamingRun {
+  id: string;
+  institution_id: string;
+  academic_year?: string | null;
+  receipt_count: number;
+  line_count: number;
+  total_amount: number;
+  created_by?: string | null;
+  created_at?: string;
+  reverted_at?: string | null;
+  reverted_by?: string | null;
+  creator?: { id: string; first_name: string; last_name: string } | null;
+  reverter?: { id: string; first_name: string; last_name: string } | null;
+  /** Answered by the API: the browser cannot know whether anything was voided since. */
+  can_revert: boolean;
+  blocked_by_void: boolean;
+}
+
 export type StudentAdditionalFeeSource = 'manual' | 'late_fee';
 
 export interface StudentAdditionalFee {

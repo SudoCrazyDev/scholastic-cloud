@@ -232,6 +232,7 @@ function App() {
               <Route path="finance/void-requests" element={<RequireModule module="finance"><Finance /></RequireModule>} />
               {/* Data clearing needs the ability, not just Finance access — the
                   page itself gates on it again, as does every endpoint. */}
+              <Route path="finance/fee-naming" element={<RequireModule module="finance" ability="name-fees"><Finance /></RequireModule>} />
               <Route path="finance/data-clearing" element={<RequireModule module="finance" ability="clear-data"><Finance /></RequireModule>} />
               <Route path="settings" element={<RequireModule module="settings"><Settings /></RequireModule>} />
               <Route path="hris/devices" element={<RequireModule module="biometric-devices"><HrisDevices /></RequireModule>} />

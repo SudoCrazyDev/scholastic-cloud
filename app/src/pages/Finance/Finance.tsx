@@ -51,6 +51,7 @@ import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
 import NoticeOfAccountModal from './NoticeOfAccountModal'
 import DataClearingView from './DataClearingView'
+import FeeNamingView from './FeeNamingView'
 import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentReceiptSubmission, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType, UpdateReceiptPaymentDetailsData, UserInstitution } from '../../types'
 
 const BILLING_TYPE_LABELS: Record<FeeBillingType, string> = {
@@ -77,6 +78,7 @@ type FinanceView =
   | 'receipt-builder'
   | 'receipt-approvals'
   | 'void-requests'
+  | 'fee-naming'
   | 'data-clearing'
 
 const SETUP_VIEWS: FinanceView[] = [
@@ -87,6 +89,7 @@ const SETUP_VIEWS: FinanceView[] = [
   'default-discounts',
   'sibling-discounts',
   'receipt-builder',
+  'fee-naming',
   'data-clearing',
 ]
 
@@ -125,6 +128,7 @@ const SETUP_NAV: {
   to: string
   view: FinanceView
   requiresClearData?: boolean
+  requiresNameFees?: boolean
 }[] = [
   { label: 'School Fees', to: '/finance/school-fees', view: 'school-fees' },
   { label: 'School Fees Amounts', to: '/finance/default-amounts', view: 'default-amounts' },
@@ -133,6 +137,7 @@ const SETUP_NAV: {
   { label: 'Default Discounts', to: '/finance/default-discounts', view: 'default-discounts' },
   { label: 'Sibling Discounts', to: '/finance/sibling-discounts', view: 'sibling-discounts' },
   { label: 'Receipt Builder', to: '/finance/receipt-builder', view: 'receipt-builder' },
+  { label: 'Fee Naming', to: '/finance/fee-naming', view: 'fee-naming', requiresNameFees: true },
   // Last in the row, and only for a role holding the ability: this is the one
   // Finance action with no undo.
   { label: 'Data Clearing', to: '/finance/data-clearing', view: 'data-clearing', requiresClearData: true },
@@ -152,6 +157,8 @@ const VIEW_SUBTITLES: Record<FinanceView, string> = {
   'default-discounts': 'Maintain reusable discount templates for the cashier and ledger.',
   'sibling-discounts': "Link students as siblings and apply each sibling's own discount for the academic year.",
   'receipt-builder': 'Customize the layout of printed receipts.',
+  'fee-naming':
+    'Rewrite collections posted as General / Other so they name the fees the ledger already shares them across. Moves no balance, and can be undone.',
   'data-clearing':
     'Permanently delete a year\'s finance records. Payment plans, announcements and disbursements are never touched.',
 }
@@ -173,6 +180,7 @@ const Finance: React.FC = () => {
     if (pathname.endsWith('/receipt-builder')) return 'receipt-builder'
     if (pathname.endsWith('/receipt-approvals')) return 'receipt-approvals'
     if (pathname.endsWith('/void-requests')) return 'void-requests'
+    if (pathname.endsWith('/fee-naming')) return 'fee-naming'
     if (pathname.endsWith('/data-clearing')) return 'data-clearing'
     return 'dashboard'
   }, [location.pathname])
@@ -215,6 +223,7 @@ const Finance: React.FC = () => {
   // `finance.manage` — running the cashier does not carry the power to erase
   // what it recorded. The API refuses regardless of what this renders.
   const canClearFinanceData = can('finance', 'clear-data')
+  const canNameFees = can('finance', 'name-fees')
 
   const currentYear = new Date().getFullYear()
   const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
@@ -1380,7 +1389,11 @@ const Finance: React.FC = () => {
             aria-label="Finance setup"
             className="flex flex-wrap gap-1 border-t border-gray-100 bg-gray-50 rounded-b-xl px-2 py-2"
           >
-            {SETUP_NAV.filter((item) => !item.requiresClearData || canClearFinanceData).map((item) => {
+            {SETUP_NAV.filter(
+              (item) =>
+                (!item.requiresClearData || canClearFinanceData) &&
+                (!item.requiresNameFees || canNameFees)
+            ).map((item) => {
               const isActive = view === item.view
               return (
                 <NavLink
@@ -3849,6 +3862,23 @@ const Finance: React.FC = () => {
       {view === 'sibling-discounts' && <SiblingDiscountsView />}
 
       {view === 'receipt-builder' && <ReceiptBuilderView />}
+
+      {/* Gated on the ability as well as the route, for the same reason as Data
+          Clearing below: a hand-typed URL should render nothing, not the run button. */}
+      {view === 'fee-naming' && canNameFees && (
+        <FeeNamingView
+          academicYearOptions={academicYearOptions}
+          defaultAcademicYear={defaultAcademicYear}
+        />
+      )}
+
+      {view === 'fee-naming' && !canNameFees && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <p className="text-gray-600">
+            Your role is not allowed to rename General / Other collections.
+          </p>
+        </div>
+      )}
 
       {/* Gated on the ability as well as the route, so a URL typed by hand by a
           role without it renders nothing rather than the delete form. */}

@@ -15,6 +15,7 @@ use App\Http\Controllers\DisbursementComponentTypeController;
 use App\Http\Controllers\DisbursementController;
 use App\Http\Controllers\DisbursementTypeController;
 use App\Http\Controllers\FinanceDashboardController;
+use App\Http\Controllers\FeeNamingController;
 use App\Http\Controllers\FinanceDataClearController;
 use App\Http\Controllers\GateDeviceController;
 use App\Http\Controllers\GateKioskController;
@@ -601,6 +602,14 @@ Route::middleware('auth.token')->group(function () {
     // Finance data clearing. Behind its own ability rather than `finance,manage`:
     // running the POS must not carry the power to delete what it recorded.
     // `preview` is a POST only because it takes an array of groups — it reads.
+    // Naming the fees on General / Other collections. Its own ability rather than
+    // finance.manage: it rewrites lines on collections already posted, and although it
+    // moves no balance it pins money that would otherwise re-spread itself.
+    Route::get('finance/fee-naming/runs', [FeeNamingController::class, 'index'])->middleware('module:finance,name-fees');
+    Route::post('finance/fee-naming/preview', [FeeNamingController::class, 'preview'])->middleware('module:finance,name-fees');
+    Route::post('finance/fee-naming', [FeeNamingController::class, 'store'])->middleware('module:finance,name-fees');
+    Route::post('finance/fee-naming/runs/{id}/revert', [FeeNamingController::class, 'revert'])->middleware('module:finance,name-fees');
+
     Route::get('finance/data-clear/groups', [FinanceDataClearController::class, 'groups'])->middleware('module:finance,clear-data');
     Route::get('finance/data-clear/history', [FinanceDataClearController::class, 'history'])->middleware('module:finance,clear-data');
     Route::post('finance/data-clear/preview', [FinanceDataClearController::class, 'preview'])->middleware('module:finance,clear-data');

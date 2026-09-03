@@ -209,6 +209,10 @@ return [
                             'label' => 'Void without approval',
                             'description' => 'Void a payment outright, skipping the request queue.',
                         ],
+                        'name-fees' => [
+                            'label' => 'Name the fees on General / Other collections',
+                            'description' => 'Rewrite collections posted as General / Other so their lines name the fees the ledger already shares them across. Moves no balance and can be undone, but it pins money that would otherwise re-spread itself as new charges appear.',
+                        ],
                         'clear-data' => [
                             'label' => 'Clear Finance data',
                             'description' => 'Permanently delete a year\'s payments, charges, discounts and fee setup. Payment plans, finance announcements and disbursements are never touched. This cannot be undone — grant it only to the people who would be asked to authorise it.',
