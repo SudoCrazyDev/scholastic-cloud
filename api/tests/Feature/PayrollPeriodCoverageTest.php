@@ -19,7 +19,12 @@ use Tests\TestCase;
  * calendar — Jun 26 – Jul 25, so finance can process before month end — is
  * typed by hand, so both failures become reachable: an overlap pays a day
  * twice, and a gap pays it to nobody. Nothing downstream reports either one,
- * which is why the boundary is checked at the point the period is saved.
+ * which is why both are checked at the point the period is saved.
+ *
+ * Neither is refused. A payroll manager has legitimate reasons for both — a
+ * re-run alongside the original, a correction period, a bonus run over dates
+ * already covered, or a deliberate break in coverage — and the period existing
+ * pays nobody. So the save goes through and the response says what it found.
  */
 class PayrollPeriodCoverageTest extends TestCase
 {
@@ -136,31 +141,67 @@ class PayrollPeriodCoverageTest extends TestCase
         $this->assertNull($response->json('warning'));
     }
 
-    public function test_an_overlapping_period_is_rejected(): void
+    public function test_an_overlapping_period_is_saved_but_reported(): void
     {
         $this->julyPeriod();
 
-        // Jul 20–25 would be paid by both periods.
-        $this->createPeriod([
+        // Jul 20–25 would be paid by both periods if both were released.
+        $response = $this->createPeriod([
             'name' => 'August 2026',
             'date_from' => '2026-07-20',
             'date_to' => '2026-08-25',
-        ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('date_from');
+        ])->assertCreated();
 
-        $this->assertSame(1, PayrollPeriod::count());
+        $this->assertSame(2, PayrollPeriod::count());
+        $this->assertStringContainsString('July 2026', $response->json('warning'));
+        $this->assertStringContainsString('paid twice', $response->json('warning'));
     }
 
-    public function test_a_period_swallowing_an_existing_one_is_rejected(): void
+    /**
+     * The case this was relaxed for: re-running a month that already has a
+     * period, to regenerate payslips against corrected attendance without
+     * touching the original.
+     */
+    public function test_a_period_repeating_an_existing_ones_dates_exactly_is_allowed(): void
     {
         $this->julyPeriod();
 
-        $this->createPeriod([
+        $response = $this->createPeriod([
+            'name' => 'July 2026 — Re-run',
+            'date_from' => '2026-06-26',
+            'date_to' => '2026-07-25',
+        ])->assertCreated();
+
+        $this->assertSame(2, PayrollPeriod::count());
+        $this->assertStringContainsString('July 2026', $response->json('warning'));
+    }
+
+    public function test_a_period_swallowing_an_existing_one_is_saved_but_reported(): void
+    {
+        $this->julyPeriod();
+
+        $response = $this->createPeriod([
             'name' => 'Whole year 2026',
             'date_from' => '2026-01-01',
             'date_to' => '2026-12-31',
-        ])->assertStatus(422)->assertJsonValidationErrors('date_from');
+        ])->assertCreated();
+
+        $this->assertStringContainsString('July 2026', $response->json('warning'));
+    }
+
+    public function test_every_overlapping_period_is_named_not_just_the_first(): void
+    {
+        $this->julyPeriod();
+        $this->julyPeriod(['name' => 'August 2026', 'date_from' => '2026-07-26', 'date_to' => '2026-08-25']);
+
+        $response = $this->createPeriod([
+            'name' => 'Mid-year bonus 2026',
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-08-31',
+        ])->assertCreated();
+
+        $this->assertStringContainsString('July 2026', $response->json('warning'));
+        $this->assertStringContainsString('August 2026', $response->json('warning'));
     }
 
     public function test_editing_a_period_does_not_conflict_with_itself(): void
@@ -203,7 +244,7 @@ class PayrollPeriodCoverageTest extends TestCase
         $this->assertSame(2, PayrollPeriod::count());
     }
 
-    public function test_two_periods_sharing_one_schedule_still_conflict(): void
+    public function test_two_periods_sharing_one_schedule_are_reported(): void
     {
         $teaching = $this->schedule('Teaching');
         $support = $this->schedule('Support');
@@ -217,16 +258,18 @@ class PayrollPeriodCoverageTest extends TestCase
         ])->assertCreated();
 
         // Teaching staff would be paid twice for these dates.
-        $this->createPeriod([
+        $response = $this->createPeriod([
             'name' => 'July 2026 — Everyone else',
             'date_from' => '2026-07-01',
             'date_to' => '2026-07-25',
             'schedule_scope' => 'schedules',
             'staff_schedule_ids' => [$support->id, $teaching->id],
-        ])->assertStatus(422)->assertJsonValidationErrors('date_from');
+        ])->assertCreated();
+
+        $this->assertStringContainsString('July 2026 — Teaching', $response->json('warning'));
     }
 
-    public function test_an_all_staff_period_conflicts_with_a_scoped_one(): void
+    public function test_an_all_staff_period_overlapping_a_scoped_one_is_reported(): void
     {
         $teaching = $this->schedule('Teaching');
 
@@ -238,11 +281,13 @@ class PayrollPeriodCoverageTest extends TestCase
             'staff_schedule_ids' => [$teaching->id],
         ])->assertCreated();
 
-        $this->createPeriod([
+        $response = $this->createPeriod([
             'name' => 'July 2026 — All',
             'date_from' => '2026-06-26',
             'date_to' => '2026-07-25',
-        ])->assertStatus(422)->assertJsonValidationErrors('date_from');
+        ])->assertCreated();
+
+        $this->assertStringContainsString('July 2026 — Teaching', $response->json('warning'));
     }
 
     public function test_a_gap_is_measured_against_the_previous_period_for_the_same_staff(): void

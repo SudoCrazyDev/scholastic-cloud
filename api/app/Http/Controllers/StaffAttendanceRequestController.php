@@ -371,21 +371,30 @@ class StaffAttendanceRequestController extends Controller
     /**
      * An approval only reaches a payslip when the period is regenerated, so
      * say so rather than letting the admin assume pay already changed.
+     *
+     * Every overlapping period is named, not just the first: periods may now
+     * overlap deliberately (a re-run, a bonus run), and regenerating one of
+     * two would leave the other still paying the un-excused day.
      */
     private function regenerateHint(string $institutionId, StaffAttendanceRequest $attendanceRequest): string
     {
-        $period = PayrollPeriod::where('institution_id', $institutionId)
+        $periods = PayrollPeriod::where('institution_id', $institutionId)
             ->whereDate('date_from', '<=', $attendanceRequest->date_to->toDateString())
             ->whereDate('date_to', '>=', $attendanceRequest->date_from->toDateString())
-            ->first();
+            ->orderBy('date_from')
+            ->get();
 
-        if (! $period) {
+        if ($periods->isEmpty()) {
             return '';
         }
 
-        return $period->isFinalized()
-            ? " Payroll period \"{$period->name}\" is already finalized — reopen and regenerate it to apply this."
-            : " Regenerate payroll period \"{$period->name}\" to apply this to payslips.";
+        $names = $periods->map(fn (PayrollPeriod $period) => "\"{$period->name}\"")->implode(', ');
+
+        // A finalized period cannot simply be regenerated, so it changes the
+        // instruction — one in the set is enough to say so.
+        return $periods->contains(fn (PayrollPeriod $period) => $period->isFinalized())
+            ? sprintf(' Payroll period %s covers these dates and at least one is already finalized — reopen and regenerate to apply this.', $names)
+            : sprintf(' Regenerate payroll period %s to apply this to payslips.', $names);
     }
 
     /**

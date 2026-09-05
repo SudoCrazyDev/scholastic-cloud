@@ -67,7 +67,7 @@ class PayrollPeriodController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Payroll period created successfully',
-            'warning' => $this->coverageGap($period),
+            'warning' => $this->periodWarning($period),
             'data' => $this->serialize($period->loadCount('payslips')),
         ], 201);
     }
@@ -135,7 +135,7 @@ class PayrollPeriodController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Payroll period updated successfully. Regenerate payslips if the dates or covered schedules changed.',
-            'warning' => $this->coverageGap($period),
+            'warning' => $this->periodWarning($period),
             'data' => $this->serialize($period->loadCount('payslips')),
         ]);
     }
@@ -384,47 +384,71 @@ class PayrollPeriodController extends Controller
         $validated['schedule_scope'] = $scope;
         $validated['staff_schedule_ids'] = $scheduleIds;
 
-        $conflict = $this->overlappingPeriod($institutionId, $validated, $ignoreId);
-
-        if ($conflict !== null) {
-            throw ValidationException::withMessages([
-                'date_from' => sprintf(
-                    '%s already covers %s – %s. Two periods paying the same staff cannot overlap, or those days are paid twice.',
-                    $conflict->name,
-                    $conflict->date_from->format('M j, Y'),
-                    $conflict->date_to->format('M j, Y'),
-                ),
-            ]);
-        }
-
         return $validated;
     }
 
     /**
-     * An existing period that overlaps these dates *and* pays some of the same
-     * staff.
+     * The dates this period shares with an existing one paying the same staff,
+     * as a sentence — or null when nothing overlaps.
      *
-     * Overlapping in time alone is legitimate: one period per staff schedule
-     * across the same dates is exactly what schedule scoping is for. Paying one
-     * employee twice for the same day is not, so the staff scopes have to
-     * intersect before this is a conflict.
+     * Overlapping in time alone was always legitimate: one period per staff
+     * schedule across the same dates is exactly what schedule scoping is for.
+     * An overlap that *does* share staff used to be rejected outright, but a
+     * payroll manager has good reasons to want one — a re-run of a month
+     * alongside the original, a correction period, a one-off thirteenth-month
+     * or bonus run over dates a regular period already covers.
      *
-     * @param  array<string, mixed>  $validated
+     * So it is reported rather than refused, like a coverage gap. Payslips are
+     * per period, so nothing is paid twice by the existence of the second
+     * period — it is the releasing of both that would double-pay, and that is
+     * the payroll manager's call to make.
      */
-    private function overlappingPeriod(string $institutionId, array $validated, ?string $ignoreId): ?PayrollPeriod
+    private function overlapWarning(PayrollPeriod $period): ?string
     {
-        return PayrollPeriod::with('staffSchedules:id')
-            ->where('institution_id', $institutionId)
-            ->when($ignoreId !== null, fn ($query) => $query->whereKeyNot($ignoreId))
-            ->whereDate('date_from', '<=', $validated['date_to'])
-            ->whereDate('date_to', '>=', $validated['date_from'])
+        $others = PayrollPeriod::with('staffSchedules:id')
+            ->where('institution_id', $period->institution_id)
+            ->whereKeyNot($period->id)
+            ->whereDate('date_from', '<=', $period->date_to->toDateString())
+            ->whereDate('date_to', '>=', $period->date_from->toDateString())
             ->orderBy('date_from')
             ->get()
-            ->first(fn (PayrollPeriod $other) => $this->sharesStaff(
-                $validated['schedule_scope'],
-                $validated['staff_schedule_ids'],
+            ->filter(fn (PayrollPeriod $other) => $this->sharesStaff(
+                $period->schedule_scope ?? PayrollPeriod::SCOPE_ALL,
+                $period->staffSchedules->pluck('id')->all(),
                 $other
             ));
+
+        if ($others->isEmpty()) {
+            return null;
+        }
+
+        $names = $others
+            ->map(fn (PayrollPeriod $other) => sprintf(
+                '"%s" (%s – %s)',
+                $other->name,
+                $other->date_from->format('M j, Y'),
+                $other->date_to->format('M j, Y'),
+            ))
+            ->implode(', ');
+
+        return sprintf(
+            'These dates overlap %s, which pay some of the same staff. Release only one of them, or those days are paid twice.',
+            $names,
+        );
+    }
+
+    /**
+     * Everything worth telling a payroll manager about the period they just
+     * saved, as one sentence or two. Neither finding blocks the save.
+     */
+    private function periodWarning(PayrollPeriod $period): ?string
+    {
+        $warnings = array_filter([
+            $this->overlapWarning($period),
+            $this->coverageGap($period),
+        ]);
+
+        return $warnings === [] ? null : implode(' ', $warnings);
     }
 
     /**

@@ -239,8 +239,10 @@ const PeriodsTab: React.FC = () => {
       invalidate()
       setShowForm(false)
       toast.success(payload.id ? 'Period updated.' : 'Period created.')
-      // Saving still succeeded — but days that no period covers are paid to
-      // nobody, and nothing downstream would ever report it.
+      // Saving still succeeded — but a boundary problem is worth saying out
+      // loud, because nothing downstream would ever report it: days no period
+      // covers are paid to nobody, and days two periods both cover are paid
+      // twice if both are released.
       if (result.warning) {
         toast(result.warning, { icon: '⚠️', duration: 12000 })
       }
