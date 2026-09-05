@@ -861,14 +861,22 @@ class PayrollService
      * Attendance is deliberately ignored. A contribution charged as a
      * percentage of salary must not shrink because somebody was late, absent,
      * or on unpaid leave — that is the whole point of "5% of the gross, no
-     * deductions, no lates". Rest days are the one exclusion: they were never
-     * part of the salary to begin with.
+     * deductions, no lates".
+     *
+     * Two kinds of day are excluded, because neither was ever part of the
+     * salary: rest days, and days an unpaid suspension zeroed out. The second
+     * is a school decision, not an attendance one — the day pays nothing to
+     * anybody, so charging a percentage contribution against it would bill
+     * staff for a day the school did not buy.
      *
      * @param  \Illuminate\Support\Collection<int, PayslipDay>  $days
      */
     private function basicPay(Payslip $payslip, \Illuminate\Support\Collection $days): float
     {
-        $scheduledDays = $days->reject(fn (PayslipDay $day) => (bool) $day->is_rest_day)->count();
+        $scheduledDays = $days
+            ->reject(fn (PayslipDay $day) => (bool) $day->is_rest_day)
+            ->reject(fn (PayslipDay $day) => $day->pay_policy === PayslipDay::PAY_NO_PAY)
+            ->count();
 
         return round($scheduledDays * (float) $payslip->daily_rate, 2);
     }
@@ -1027,9 +1035,12 @@ class PayrollService
 
         $payslip->update([
             // A fully-paid exception day counts as worked even with no punches
-            // (approved official business, a paid suspension).
-            'days_worked' => $days->filter(fn ($day) => (float) $day->hours_worked > 0
-                || $day->pay_policy === PayslipDay::PAY_FULL_DAY)->count(),
+            // (approved official business, a paid suspension). An unpaid day
+            // never counts, punches or not: a suspension the school declared
+            // no-pay is not a working day, and a staff member who reported
+            // anyway must not have it read back as a day the payslip paid for.
+            'days_worked' => $days->filter(fn (PayslipDay $day) => $day->pay_policy !== PayslipDay::PAY_NO_PAY
+                && ((float) $day->hours_worked > 0 || $day->pay_policy === PayslipDay::PAY_FULL_DAY))->count(),
             // How much of this payslip rests on punches that had not been made
             // when it was generated.
             'assumed_days' => $days->filter(fn (PayslipDay $day) => $day->isAssumed())->count(),

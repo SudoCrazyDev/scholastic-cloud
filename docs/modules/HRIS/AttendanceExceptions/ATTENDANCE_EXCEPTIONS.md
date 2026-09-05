@@ -122,6 +122,27 @@ covering the same dates is rejected.
 
 ---
 
+## An unpaid day is not a working day
+
+A day that resolved to `no_pay` earns nothing, so `PayrollService::recomputeTotals()` and
+`basicPay()` both drop it:
+
+- **`payslips.days_worked`** — printed as *Total Working Days* on the slip and *Working Days* on
+  the payroll sheet. A `no_pay` day is excluded **even when it has punches**: staff often report
+  on a suspended day anyway, and the hours are recorded, but the day is still not one the payslip
+  pays for.
+- **`payslips.basic_pay`** — the scheduled-days basis percentage and bracket deductions are
+  charged against. Rest days were already out; `no_pay` days join them, so a contribution is not
+  billed against a day the school did not buy.
+
+Note what is *not* excluded: an ordinary **absence** still counts toward `basic_pay` (that is the
+whole point of "5% of the gross, no lates"). The exclusion is written against the **pay policy**,
+not against zero earnings, precisely to keep those two apart.
+
+Regression suite: `tests/Feature/UnpaidSuspensionWorkingDaysTest.php`.
+
+---
+
 ## Regeneration is required
 
 Approving a request does **not** retroactively edit an existing payslip. Payroll periods are
