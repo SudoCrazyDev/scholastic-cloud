@@ -1,0 +1,205 @@
+---
+/**
+ * The Features mega menu panel.
+ *
+ * Renders the panel only. Its trigger lives in the navbar in index.astro and is
+ * found by id, because the two sit at different depths of the nav layout: the
+ * button is one item in the flex row, while the panel spans the whole container
+ * beneath it. Linking them by id keeps the panel full width without wrapping
+ * the button in a positioning context that would constrain it.
+ *
+ * The panel must be a child of the navbar's `relative` container — the
+ * open/close handlers watch that container's pointer events, and the browser
+ * treats an absolutely-positioned descendant as inside it, so moving from the
+ * button down into the panel does not read as leaving.
+ */
+import { megaMenuColumns } from '../data/features';
+---
+
+<div
+	id="features-mega"
+	class="mega-panel absolute left-0 right-0 top-full hidden pt-3 md:block"
+	aria-labelledby="features-mega-trigger"
+>
+	<div class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-2xl shadow-pine-950/10">
+		<div class="grid gap-px bg-ink-200/60 lg:grid-cols-[repeat(3,minmax(0,1fr))_19rem]">
+
+			{megaMenuColumns.map((column) => (
+				<div class="flex flex-col gap-1 bg-white p-3">
+					{column.map((group) => (
+						<a
+							href={`#features-${group.id}`}
+							class="mega-link flex flex-1 items-center gap-3 rounded-xl p-3 transition-colors hover:bg-paper-alt focus-visible:bg-paper-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-500"
+						>
+							<span class={`icon-tile h-9 w-9 ${group.tint}`}>
+								<svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+									{group.icon.map((d) => (
+										<path stroke-linecap="round" stroke-linejoin="round" d={d}></path>
+									))}
+								</svg>
+							</span>
+							<span class="min-w-0">
+								<span class="flex items-baseline gap-2">
+									<span class="font-display text-[15px] leading-tight text-ink-900">{group.label}</span>
+									<span class="text-[10px] font-semibold tabular-nums text-ink-400">{group.items.length}</span>
+								</span>
+								<span class="mt-1 block text-[13px] leading-snug text-ink-500">{group.tagline}</span>
+							</span>
+						</a>
+					))}
+				</div>
+			))}
+
+			<!-- Rail: the three things that actually differ, then a way out of the menu. -->
+			<div class="flex flex-col bg-paper-alt p-6">
+				<p class="eyebrow eyebrow-pine">Why it fits</p>
+				<ul class="mt-5 flex flex-col gap-4">
+					<li>
+						<p class="text-[13px] font-semibold text-ink-900">You decide who sees what</p>
+						<p class="mt-1 text-[13px] leading-snug text-ink-500">Build your own roles. Approving is a separate permission from editing.</p>
+					</li>
+					<li>
+						<p class="text-[13px] font-semibold text-ink-900">It runs with your campus</p>
+						<p class="mt-1 text-[13px] leading-snug text-ink-500">Fingerprint terminals, gate scanners and your own prepaid SIMs — no inbound port, no static IP.</p>
+					</li>
+					<li>
+						<p class="text-[13px] font-semibold text-ink-900">AI that drafts, never writes</p>
+						<p class="mt-1 text-[13px] leading-snug text-ink-500">Tala proposes; a teacher approves. Nothing reaches a record on its own.</p>
+					</li>
+				</ul>
+				<div class="mt-auto flex flex-col gap-2 pt-6">
+					<a href="#features" class="mega-link inline-flex items-center justify-center gap-2 rounded-full bg-pine-700 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-pine-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-500 focus-visible:ring-offset-2">
+						See the full breakdown
+					</a>
+					<a href="#cta" class="mega-link inline-flex items-center justify-center rounded-full border border-ink-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-ink-800 transition hover:border-pine-300 hover:bg-pine-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-500">
+						Book a walkthrough
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<style>
+	/*
+	 * `hidden` is removed the moment the menu is armed, so the panel can animate.
+	 * Until then it stays display:none, which keeps its links out of the tab order
+	 * and out of the accessibility tree without needing aria-hidden bookkeeping.
+	 */
+	.mega-panel:not(.hidden) {
+		opacity: 0;
+		visibility: hidden;
+		transform: translateY(-6px);
+		pointer-events: none;
+		transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 180ms;
+	}
+
+	.mega-panel.open {
+		opacity: 1;
+		visibility: visible;
+		transform: translateY(0);
+		pointer-events: auto;
+		transition: opacity 180ms ease, transform 180ms ease, visibility 0s;
+	}
+
+	/*
+	 * Below md the phone gets the accordion instead (FeaturesMobileNav), so the
+	 * panel is taken out entirely rather than left armed-but-invisible — the
+	 * `hidden` utility it ships with is dropped as soon as JS runs.
+	 */
+	@media (max-width: 767px) {
+		.mega-panel {
+			display: none !important;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.mega-panel:not(.hidden),
+		.mega-panel.open {
+			transition: none;
+		}
+	}
+</style>
+
+<script>
+	/*
+	 * Opens on hover for a pointer, on click or keyboard for everyone else.
+	 *
+	 * The close is delayed because the gap between the button and the panel is
+	 * real estate the pointer crosses on its way in; closing on the first
+	 * mouseleave would make the menu impossible to reach.
+	 */
+	document.addEventListener('DOMContentLoaded', () => {
+		const trigger = document.getElementById('features-mega-trigger');
+		const panel = document.getElementById('features-mega');
+		const region = document.getElementById('nav-inner');
+		if (!trigger || !panel || !region) return;
+
+		// Armed only once JS is running, so a no-JS visitor never gets a panel
+		// that cannot be dismissed.
+		panel.classList.remove('hidden');
+
+		let closeTimer: ReturnType<typeof setTimeout> | undefined;
+		const hoverable = window.matchMedia('(hover: hover) and (pointer: fine)');
+
+		const open = () => {
+			clearTimeout(closeTimer);
+			panel.classList.add('open');
+			trigger.setAttribute('aria-expanded', 'true');
+		};
+
+		const close = () => {
+			clearTimeout(closeTimer);
+			panel.classList.remove('open');
+			trigger.setAttribute('aria-expanded', 'false');
+		};
+
+		const closeSoon = () => {
+			clearTimeout(closeTimer);
+			closeTimer = setTimeout(close, 180);
+		};
+
+		const isOpen = () => panel.classList.contains('open');
+
+		trigger.addEventListener('click', (event) => {
+			event.preventDefault();
+			isOpen() ? close() : open();
+		});
+
+		if (hoverable.matches) {
+			trigger.addEventListener('mouseenter', open);
+			region.addEventListener('mouseleave', closeSoon);
+			region.addEventListener('mouseenter', () => clearTimeout(closeTimer));
+			// Moving sideways to another nav item is a decision to leave.
+			region.querySelectorAll('a[href^="#"]').forEach((link) => {
+				if (panel.contains(link)) return;
+				link.addEventListener('mouseenter', closeSoon);
+			});
+		}
+
+		// Following a link inside the panel should not leave it hanging open
+		// over the section it just scrolled to.
+		panel.querySelectorAll('.mega-link').forEach((link) => {
+			link.addEventListener('click', close);
+		});
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key !== 'Escape' || !isOpen()) return;
+			close();
+			(trigger as HTMLElement).focus();
+		});
+
+		// Tabbing out of the panel closes it; clicking anywhere else does too.
+		document.addEventListener('focusin', (event) => {
+			const target = event.target as Node;
+			if (!isOpen() || panel.contains(target) || trigger.contains(target)) return;
+			close();
+		});
+
+		document.addEventListener('click', (event) => {
+			const target = event.target as Node;
+			if (!isOpen() || panel.contains(target) || trigger.contains(target)) return;
+			close();
+		});
+	});
+</script>

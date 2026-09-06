@@ -1,0 +1,55 @@
+---
+/**
+ * The Features menu on a phone.
+ *
+ * A mega panel has nowhere to go on a 375px screen, so the same groups collapse
+ * into a disclosure inside the existing mobile menu. Same data as the desktop
+ * panel — see src/data/features.ts.
+ */
+import { featureGroups } from '../data/features';
+---
+
+<div class="rounded-lg">
+	<button
+		type="button"
+		id="features-mobile-toggle"
+		class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-ink-800 hover:bg-paper-alt"
+		aria-expanded="false"
+		aria-controls="features-mobile-list"
+	>
+		<span>Features</span>
+		<svg id="features-mobile-chevron" class="h-4 w-4 shrink-0 text-ink-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+		</svg>
+	</button>
+
+	<div id="features-mobile-list" class="hidden pb-1 pl-3 pr-1 pt-1">
+		<div class="flex flex-col gap-0.5 border-l border-ink-200 pl-3">
+			{featureGroups.map((group) => (
+				<a
+					href={`#features-${group.id}`}
+					class="flex items-baseline justify-between gap-3 rounded-lg px-2 py-2 text-[13px] text-ink-600 hover:bg-paper-alt hover:text-pine-800"
+				>
+					<span>{group.label}</span>
+					<span class="shrink-0 text-[10px] font-semibold tabular-nums text-ink-400">{group.items.length}</span>
+				</a>
+			))}
+		</div>
+	</div>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const toggle = document.getElementById('features-mobile-toggle');
+		const list = document.getElementById('features-mobile-list');
+		const chevron = document.getElementById('features-mobile-chevron');
+		if (!toggle || !list || !chevron) return;
+
+		toggle.addEventListener('click', () => {
+			list.classList.toggle('hidden');
+			const open = !list.classList.contains('hidden');
+			toggle.setAttribute('aria-expanded', String(open));
+			chevron.classList.toggle('rotate-180', open);
+		});
+	});
+</script>

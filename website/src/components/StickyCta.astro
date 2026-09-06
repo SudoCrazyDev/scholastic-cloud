@@ -1,0 +1,67 @@
+---
+/**
+ * A persistent way back into the funnel.
+ *
+ * The page is long — roughly twelve screens — so a visitor who decides halfway
+ * down would otherwise have to scroll to either end to act. This appears once
+ * they are past the hero and hides itself when the form is actually on screen,
+ * so it never competes with the thing it points at.
+ */
+---
+
+<div
+	id="sticky-cta"
+	class="pointer-events-none fixed inset-x-0 bottom-0 z-40 translate-y-full opacity-0 transition-all duration-300 ease-out sm:inset-x-auto sm:bottom-6 sm:right-6"
+	aria-hidden="true"
+>
+	<div class="pointer-events-auto flex items-center gap-3 border-t border-ink-200 bg-white/95 px-4 py-3 shadow-2xl shadow-pine-950/15 backdrop-blur sm:rounded-full sm:border sm:py-2.5 sm:pl-5 sm:pr-2.5">
+		<p class="min-w-0 flex-1 text-sm leading-snug text-ink-700 sm:flex-none">
+			<span class="font-semibold text-ink-900">See it with your own data.</span>
+			<span class="hidden sm:inline"> Takes about a minute.</span>
+		</p>
+		<a
+			href="#cta"
+			class="shrink-0 rounded-full bg-pine-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-pine-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-500 focus-visible:ring-offset-2"
+			data-sticky-cta
+		>
+			Book a walkthrough
+		</a>
+	</div>
+</div>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const bar = document.getElementById('sticky-cta');
+		const target = document.getElementById('cta');
+		if (!bar || !target) return;
+
+		let pastHero = false;
+		let formVisible = false;
+
+		const apply = () => {
+			const show = pastHero && !formVisible;
+			bar.classList.toggle('translate-y-full', !show);
+			bar.classList.toggle('opacity-0', !show);
+			bar.setAttribute('aria-hidden', String(!show));
+			// Keep the links out of the tab order while it is off screen.
+			bar.querySelector('a')?.setAttribute('tabindex', show ? '0' : '-1');
+		};
+
+		const hero = document.querySelector('section');
+		if (hero) {
+			new IntersectionObserver(([e]) => { pastHero = !e.isIntersecting; apply(); }, { threshold: 0 })
+				.observe(hero);
+		}
+
+		// Never overlap the form it is advertising.
+		new IntersectionObserver(([e]) => { formVisible = e.isIntersecting; apply(); }, { threshold: 0.1 })
+			.observe(target);
+
+		bar.querySelector('[data-sticky-cta]')?.addEventListener('click', () => {
+			(window as any).dataLayer?.push({ event: 'funnel_cta_click', source: 'sticky' });
+			document.dispatchEvent(new CustomEvent('sc:funnel', { detail: { name: 'funnel_cta_click', source: 'sticky' } }));
+		});
+
+		apply();
+	});
+</script>

@@ -1,0 +1,466 @@
+---
+/**
+ * The conversion step of the funnel: a three-step qualifying form.
+ *
+ * Delivery is configured, never assumed. `PUBLIC_LEAD_ENDPOINT` receives a JSON
+ * POST; `PUBLIC_LEAD_EMAIL` is the fallback the browser composes when no
+ * endpoint is set, and the last resort if a POST fails. If neither is
+ * configured the form refuses to pretend — see the notice below.
+ *
+ * That refusal is the important part. A lead form that shows "Thanks, we'll be
+ * in touch" while dropping the submission on the floor is worse than no form:
+ * the visitor stops looking for another way to reach you. Every path here ends
+ * in either a real delivery or a visible failure with a way out.
+ */
+import { schoolTypes, learnerBands, timelines, roles, priorityAreas, steps } from '../data/funnel';
+
+const endpoint = import.meta.env.PUBLIC_LEAD_ENDPOINT ?? '';
+const leadEmail = import.meta.env.PUBLIC_LEAD_EMAIL ?? '';
+const unconfigured = !endpoint && !leadEmail;
+---
+
+<div class="mx-auto w-full max-w-2xl text-left" data-lead-root data-endpoint={endpoint} data-lead-email={leadEmail}>
+
+	{unconfigured && (
+		/*
+		 * Deliberately loud and deliberately not hidden in production. If this
+		 * ships, the form cannot deliver anything, and a silent broken form
+		 * costs more than an ugly banner. Set either variable to remove it.
+		 */
+		<div class="mb-6 rounded-xl border border-marigold-300 bg-marigold-50 p-4 text-sm text-marigold-900" role="alert">
+			<p class="font-semibold">This form has nowhere to send leads yet.</p>
+			<p class="mt-1 leading-relaxed">
+				Set <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[12px]">PUBLIC_LEAD_ENDPOINT</code>
+				(a URL that accepts a JSON POST) or
+				<code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[12px]">PUBLIC_LEAD_EMAIL</code>
+				in <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[12px]">website/.env</code>, then rebuild.
+			</p>
+		</div>
+	)}
+
+	<div class="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl shadow-pine-950/[0.06]">
+
+		<!-- Progress -->
+		<div class="border-b border-ink-200 bg-paper-sunk px-6 py-4" data-progress>
+			<div class="flex items-center justify-between gap-4">
+				<p class="text-sm font-semibold text-ink-900" data-step-title>{steps[0].title}</p>
+				<p class="text-xs font-medium tabular-nums text-ink-500">
+					Step <span data-step-now>1</span> of {steps.length}
+				</p>
+			</div>
+			<div class="mt-3 flex gap-1.5" aria-hidden="true">
+				{steps.map((s) => (
+					<span class="h-1 flex-1 rounded-full bg-ink-200 transition-colors duration-300" data-bar={s.n}></span>
+				))}
+			</div>
+			<p class="mt-2.5 text-xs leading-relaxed text-ink-500" data-step-hint>{steps[0].hint}</p>
+		</div>
+
+		<form class="p-6 sm:p-7" novalidate data-lead-form>
+			<!-- Bot trap: real people never see it, so anything in it is spam. -->
+			<div class="absolute left-[-9999px]" aria-hidden="true">
+				<label>Leave this empty<input type="text" name="company_website" tabindex="-1" autocomplete="off" /></label>
+			</div>
+
+			<!-- Step 1 -->
+			<fieldset data-step="1">
+				<legend class="sr-only">Your school</legend>
+				<div class="grid gap-5">
+					<div>
+						<label class="lead-label" for="lf-school">School name</label>
+						<input class="lead-input" id="lf-school" name="school" type="text" autocomplete="organization" required placeholder="e.g. Sacred Heart Academy" />
+						<p class="lead-error" data-error-for="school"></p>
+					</div>
+					<div>
+						<label class="lead-label" for="lf-type">What kind of school?</label>
+						<select class="lead-input" id="lf-type" name="schoolType" required>
+							<option value="">Choose one…</option>
+							{schoolTypes.map((o) => <option value={o.value}>{o.label}</option>)}
+						</select>
+						<p class="lead-error" data-error-for="schoolType"></p>
+					</div>
+					<div>
+						<label class="lead-label" for="lf-learners">How many learners?</label>
+						<select class="lead-input" id="lf-learners" name="learners" required>
+							<option value="">Choose one…</option>
+							{learnerBands.map((o) => <option value={o.value}>{o.label}</option>)}
+						</select>
+						<p class="lead-error" data-error-for="learners"></p>
+					</div>
+				</div>
+			</fieldset>
+
+			<!-- Step 2 -->
+			<fieldset data-step="2" hidden>
+				<legend class="sr-only">What you need</legend>
+				<div class="grid gap-5">
+					<div>
+						<span class="lead-label">Which areas matter most? <span class="font-normal text-ink-400">Pick any.</span></span>
+						<div class="mt-2 flex flex-wrap gap-2">
+							{priorityAreas.map((a) => (
+								<label class="lead-chip">
+									<input type="checkbox" name="areas" value={a.value} class="sr-only" />
+									<span>{a.label}</span>
+								</label>
+							))}
+						</div>
+					</div>
+					<div>
+						<label class="lead-label" for="lf-timeline">When are you looking to move?</label>
+						<select class="lead-input" id="lf-timeline" name="timeline" required>
+							<option value="">Choose one…</option>
+							{timelines.map((o) => <option value={o.value}>{o.label}</option>)}
+						</select>
+						<p class="lead-error" data-error-for="timeline"></p>
+					</div>
+				</div>
+			</fieldset>
+
+			<!-- Step 3 -->
+			<fieldset data-step="3" hidden>
+				<legend class="sr-only">Where to reach you</legend>
+				<div class="grid gap-5 sm:grid-cols-2">
+					<div>
+						<label class="lead-label" for="lf-name">Your name</label>
+						<input class="lead-input" id="lf-name" name="name" type="text" autocomplete="name" required />
+						<p class="lead-error" data-error-for="name"></p>
+					</div>
+					<div>
+						<label class="lead-label" for="lf-role">Your role</label>
+						<select class="lead-input" id="lf-role" name="role" required>
+							<option value="">Choose one…</option>
+							{roles.map((o) => <option value={o.value}>{o.label}</option>)}
+						</select>
+						<p class="lead-error" data-error-for="role"></p>
+					</div>
+					<div>
+						<label class="lead-label" for="lf-email">Work email</label>
+						<input class="lead-input" id="lf-email" name="email" type="email" autocomplete="email" required inputmode="email" />
+						<p class="lead-error" data-error-for="email"></p>
+					</div>
+					<div>
+						<label class="lead-label" for="lf-mobile">Mobile <span class="font-normal text-ink-400">optional</span></label>
+						<input class="lead-input" id="lf-mobile" name="mobile" type="tel" autocomplete="tel" inputmode="tel" placeholder="09XX XXX XXXX" />
+						<p class="lead-error" data-error-for="mobile"></p>
+					</div>
+					<div class="sm:col-span-2">
+						<label class="lead-label" for="lf-notes">Anything we should know? <span class="font-normal text-ink-400">optional</span></label>
+						<textarea class="lead-input min-h-[84px] resize-y" id="lf-notes" name="notes" rows="3" placeholder="Current system, pain points, deadlines…"></textarea>
+					</div>
+				</div>
+				<p class="mt-4 text-xs leading-relaxed text-ink-500">
+					We use this to prepare your walkthrough and to reply once. No newsletter, no reselling your details.
+				</p>
+			</fieldset>
+
+			<!-- Controls -->
+			<div class="mt-7 flex flex-col-reverse gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+				<button type="button" class="lead-back inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-ink-600 transition hover:text-pine-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pine-500" data-back hidden>
+					<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"></path></svg>
+					Back
+				</button>
+				<button type="submit" class="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-pine-700 px-7 py-3 text-base font-semibold text-white shadow-lg shadow-pine-900/15 transition hover:bg-pine-800 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none" data-next>
+					<span data-next-label>Continue</span>
+					<svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"></path></svg>
+				</button>
+			</div>
+
+			<p class="mt-4 hidden rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert" data-form-error></p>
+		</form>
+
+		<!-- Success -->
+		<div class="hidden p-8 text-center" data-success>
+			<span class="icon-tile mx-auto h-12 w-12 rounded-full bg-pine-50 text-pine-700 ring-pine-200/70">
+				<svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path></svg>
+			</span>
+			<h3 class="mt-4 font-display text-2xl text-ink-900">Got it — thank you.</h3>
+			<p class="mx-auto mt-2 max-w-md text-ink-600" data-success-body>
+				We'll read what you sent and reply within one working day with a walkthrough built around your own grade levels and fee structure.
+			</p>
+			<dl class="mx-auto mt-6 grid max-w-md gap-2 text-left text-sm">
+				<div class="flex gap-3 rounded-lg bg-paper-alt px-4 py-3">
+					<span class="font-semibold text-ink-900">1.</span>
+					<span class="text-ink-600">We reply from a real address — check spam if nothing lands.</span>
+				</div>
+				<div class="flex gap-3 rounded-lg bg-paper-alt px-4 py-3">
+					<span class="font-semibold text-ink-900">2.</span>
+					<span class="text-ink-600">Bring your fee table and one section's class record to the call.</span>
+				</div>
+			</dl>
+		</div>
+	</div>
+</div>
+
+<style>
+	.lead-label {
+		@apply mb-1.5 block text-sm font-semibold text-ink-900;
+	}
+
+	.lead-input {
+		@apply w-full rounded-xl border border-ink-300 bg-white px-3.5 py-2.5 text-[15px] text-ink-900 transition placeholder:text-ink-400;
+	}
+
+	.lead-input:focus {
+		@apply border-pine-500 outline-none ring-2 ring-pine-500/25;
+	}
+
+	.lead-input[aria-invalid='true'] {
+		@apply border-rose-400 ring-2 ring-rose-400/20;
+	}
+
+	.lead-error {
+		@apply mt-1.5 hidden text-[13px] font-medium text-rose-700;
+	}
+
+	.lead-error.show {
+		@apply block;
+	}
+
+	/* Checkbox chips — the input stays in the tab order, the label is the target. */
+	.lead-chip {
+		@apply cursor-pointer select-none rounded-full border border-ink-300 bg-white px-3.5 py-1.5 text-[13px] font-medium text-ink-700 transition;
+	}
+
+	.lead-chip:hover {
+		@apply border-pine-300 bg-pine-50;
+	}
+
+	.lead-chip:has(input:checked) {
+		@apply border-pine-600 bg-pine-700 text-white;
+	}
+
+	.lead-chip:has(input:focus-visible) {
+		@apply ring-2 ring-pine-500 ring-offset-2;
+	}
+</style>
+
+<script>
+	// Astro bundles this through Vite, so the scorer that the form config
+	// defines is the same one that runs in the browser — no duplicated weights.
+	import { scoreLead } from '../data/funnel';
+
+	document.addEventListener('DOMContentLoaded', () => {
+		const root = document.querySelector<HTMLElement>('[data-lead-root]');
+		if (!root) return;
+
+		const form = root.querySelector<HTMLFormElement>('[data-lead-form]')!;
+		const endpoint = root.dataset.endpoint || '';
+		const leadEmail = root.dataset.leadEmail || '';
+		const fieldsets = Array.from(root.querySelectorAll<HTMLFieldSetElement>('[data-step]'));
+		const backBtn = root.querySelector<HTMLButtonElement>('[data-back]')!;
+		const nextBtn = root.querySelector<HTMLButtonElement>('[data-next]')!;
+		const nextLabel = root.querySelector<HTMLElement>('[data-next-label]')!;
+		const formError = root.querySelector<HTMLElement>('[data-form-error]')!;
+		const successPanel = root.querySelector<HTMLElement>('[data-success]')!;
+		const successBody = root.querySelector<HTMLElement>('[data-success-body]')!;
+		const progress = root.querySelector<HTMLElement>('[data-progress]')!;
+		const stepTitle = root.querySelector<HTMLElement>('[data-step-title]')!;
+		const stepHint = root.querySelector<HTMLElement>('[data-step-hint]')!;
+		const stepNow = root.querySelector<HTMLElement>('[data-step-now]')!;
+
+		const META = [
+			{ title: 'Your school', hint: 'No contact details yet — just the shape of the school.' },
+			{ title: 'What you need', hint: 'So the walkthrough shows your work, not a generic tour.' },
+			{ title: 'Where to reach you', hint: 'One reply from a person, not an autoresponder sequence.' },
+		];
+
+		const openedAt = Date.now();
+		let step = 1;
+		const last = fieldsets.length;
+
+		/* Fire-and-forget analytics. Works with GTM or gtag if present, and always
+		   emits a DOM event so anything else can listen without us knowing about it. */
+		const track = (name: string, detail: Record<string, unknown> = {}) => {
+			(window as any).dataLayer?.push({ event: name, ...detail });
+			(window as any).gtag?.('event', name, detail);
+			document.dispatchEvent(new CustomEvent('sc:funnel', { detail: { name, ...detail } }));
+		};
+
+		const setError = (name: string, message: string) => {
+			const field = form.elements.namedItem(name) as HTMLElement | null;
+			const slot = root.querySelector<HTMLElement>(`[data-error-for="${name}"]`);
+			if (slot) { slot.textContent = message; slot.classList.toggle('show', Boolean(message)); }
+			if (field instanceof HTMLElement) {
+				if (message) field.setAttribute('aria-invalid', 'true');
+				else field.removeAttribute('aria-invalid');
+			}
+		};
+
+		const REQUIRED: Record<number, [string, string][]> = {
+			1: [['school', 'Tell us the school name.'], ['schoolType', 'Pick the closest match.'], ['learners', 'Roughly how many learners?']],
+			2: [['timeline', 'Pick a rough timeline.']],
+			3: [['name', 'Your name, please.'], ['role', 'Pick your role.'], ['email', 'We need an email to reply to.']],
+		};
+
+		const validate = (n: number) => {
+			let ok = true;
+			let firstBad: HTMLElement | null = null;
+
+			for (const [name, message] of REQUIRED[n] ?? []) {
+				const el = form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null;
+				const value = (el?.value ?? '').trim();
+				if (!value) { setError(name, message); ok = false; firstBad ??= el; }
+				else setError(name, '');
+			}
+
+			if (n === 3) {
+				const email = (form.elements.namedItem('email') as HTMLInputElement)?.value.trim() ?? '';
+				// Deliberately permissive: reject the obviously-wrong, not the unusual.
+				if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+					setError('email', 'That address looks incomplete.');
+					ok = false; firstBad ??= form.elements.namedItem('email') as HTMLElement;
+				}
+				const mobile = (form.elements.namedItem('mobile') as HTMLInputElement)?.value.trim() ?? '';
+				// PH mobile: 09XXXXXXXXX, +639XXXXXXXXX, or 639XXXXXXXXX.
+				if (mobile && !/^(\+?63|0)9\d{9}$/.test(mobile.replace(/[\s()-]/g, ''))) {
+					setError('mobile', 'Use 09XX XXX XXXX or +639XX XXX XXXX.');
+					ok = false; firstBad ??= form.elements.namedItem('mobile') as HTMLElement;
+				}
+			}
+
+			firstBad?.focus();
+			return ok;
+		};
+
+		const render = () => {
+			fieldsets.forEach((fs) => { fs.hidden = Number(fs.dataset.step) !== step; });
+			backBtn.hidden = step === 1;
+			nextLabel.textContent = step === last ? (endpoint ? 'Send my request' : 'Send by email') : 'Continue';
+			stepTitle.textContent = META[step - 1].title;
+			stepHint.textContent = META[step - 1].hint;
+			stepNow.textContent = String(step);
+			root.querySelectorAll<HTMLElement>('[data-bar]').forEach((bar) => {
+				const n = Number(bar.dataset.bar);
+				bar.classList.toggle('bg-pine-600', n <= step);
+				bar.classList.toggle('bg-ink-200', n > step);
+			});
+			progress.setAttribute('aria-label', `Step ${step} of ${last}: ${META[step - 1].title}`);
+		};
+
+		const collect = () => {
+			const fd = new FormData(form);
+			const areas = fd.getAll('areas').map(String);
+			return {
+				school: String(fd.get('school') ?? '').trim(),
+				schoolType: String(fd.get('schoolType') ?? ''),
+				learners: String(fd.get('learners') ?? ''),
+				areas,
+				timeline: String(fd.get('timeline') ?? ''),
+				name: String(fd.get('name') ?? '').trim(),
+				role: String(fd.get('role') ?? ''),
+				email: String(fd.get('email') ?? '').trim(),
+				mobile: String(fd.get('mobile') ?? '').trim(),
+				notes: String(fd.get('notes') ?? '').trim(),
+				...scoreLead({ schoolType: String(fd.get('schoolType') ?? ''), learners: String(fd.get('learners') ?? ''), timeline: String(fd.get('timeline') ?? ''), role: String(fd.get('role') ?? '') }),
+				pageUrl: location.href,
+				referrer: document.referrer || null,
+				submittedAt: new Date().toISOString(),
+			};
+		};
+
+		const mailtoFor = (payload: ReturnType<typeof collect>) => {
+			const lines = [
+				`School: ${payload.school} (${payload.schoolType})`,
+				`Learners: ${payload.learners}`,
+				`Priority areas: ${payload.areas.join(', ') || '—'}`,
+				`Timeline: ${payload.timeline}`,
+				'',
+				`Name: ${payload.name}`,
+				`Role: ${payload.role}`,
+				`Email: ${payload.email}`,
+				`Mobile: ${payload.mobile || '—'}`,
+				'',
+				`Notes: ${payload.notes || '—'}`,
+			].join('\n');
+			return `mailto:${leadEmail}?subject=${encodeURIComponent(`Demo request — ${payload.school}`)}&body=${encodeURIComponent(lines)}`;
+		};
+
+		const fail = (message: string, payload?: ReturnType<typeof collect>) => {
+			formError.textContent = message;
+			if (leadEmail && payload) {
+				const a = document.createElement('a');
+				a.href = mailtoFor(payload);
+				a.className = 'ml-1 font-semibold underline';
+				a.textContent = 'Send it by email instead.';
+				formError.appendChild(a);
+			}
+			formError.classList.remove('hidden');
+			nextBtn.disabled = false;
+			track('funnel_error', { message });
+		};
+
+		backBtn.addEventListener('click', () => {
+			if (step === 1) return;
+			step -= 1; render();
+			track('funnel_step', { step, direction: 'back' });
+		});
+
+		form.addEventListener('submit', async (event) => {
+			event.preventDefault();
+			formError.classList.add('hidden');
+			if (!validate(step)) return;
+
+			if (step < last) {
+				step += 1; render();
+				track('funnel_step', { step, direction: 'forward' });
+				root.scrollIntoView({ block: 'nearest' });
+				return;
+			}
+
+			// Spam gates: the honeypot, and anything completed implausibly fast.
+			const trap = (form.elements.namedItem('company_website') as HTMLInputElement)?.value;
+			if (trap || Date.now() - openedAt < 3000) {
+				fail('That submission looked automated. Please try again.');
+				return;
+			}
+
+			const payload = collect();
+			track('funnel_submit', { areas: payload.areas.length });
+
+			if (!endpoint) {
+				if (!leadEmail) {
+					fail('This form is not connected yet. Please contact the school directly.');
+					return;
+				}
+				// No endpoint configured: hand off to the mail client. We cannot
+				// confirm it was actually sent, so the wording does not claim it was.
+				window.location.href = mailtoFor(payload);
+				successBody.textContent =
+					'Your email app should be open with the details filled in. Send that message and we will reply within one working day.';
+				form.hidden = true;
+				successPanel.classList.remove('hidden');
+				track('funnel_success', { via: 'mailto' });
+				return;
+			}
+
+			nextBtn.disabled = true;
+			nextLabel.textContent = 'Sending…';
+			try {
+				const res = await fetch(endpoint, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+					body: JSON.stringify(payload),
+				});
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				form.hidden = true;
+				successPanel.classList.remove('hidden');
+				successPanel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+				track('funnel_success', { via: 'endpoint' });
+			} catch (err) {
+				nextLabel.textContent = 'Send my request';
+				fail("That didn't go through.", payload);
+			}
+		});
+
+		// One view event the first time the form reaches the screen.
+		new IntersectionObserver((entries, obs) => {
+			for (const e of entries) {
+				if (!e.isIntersecting) continue;
+				track('funnel_view');
+				obs.disconnect();
+			}
+		}, { threshold: 0.3 }).observe(root);
+
+		render();
+	});
+</script>

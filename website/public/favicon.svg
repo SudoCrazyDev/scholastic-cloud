@@ -1,12 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-    <defs>
-        <linearGradient id="sc" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#474e94" />
-            <stop offset="0.55" stop-color="#333a78" />
-            <stop offset="1" stop-color="#d4a955" />
-        </linearGradient>
-    </defs>
-    <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#sc)" />
+    <!-- Solid pine, matching the navbar mark. The old gradient belonged to the
+         dark indigo/gold identity and read muddy at 16px. -->
+    <rect x="6" y="6" width="116" height="116" rx="28" fill="#235141" />
     <path fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"
         d="M64 44.6v46.8M64 44.6C59.8 41.8 54.1 40 47.8 40S36 41.8 31.8 44.6v46.8C36 88.6 41.7 86.8 47.8 86.8S59.8 88.6 64 91.4m0-46.8C68.2 41.8 73.9 40 80.2 40S92 41.8 96.2 44.6v46.8C92 88.6 86.3 86.8 80.2 86.8S68.2 88.6 64 91.4" />
 </svg>

@@ -1,7 +1,23 @@
 /** @type {import('tailwindcss').Config} */
+
+/*
+ * Palette: light, paper-grounded, academic.
+ *
+ * Three scales carry the whole site.
+ *
+ *   ink      — the neutral. Warm grey with a faint green cast so it sits with
+ *              pine instead of fighting it. Text, borders, hairlines.
+ *   pine     — the primary. A deep, desaturated academic green: chalkboards,
+ *              school trim, exercise-book covers. Structure, and anything the
+ *              reader should read as the brand speaking.
+ *   marigold — the accent. Warm and singular; spent only on calls to action,
+ *              eyebrows, and the one thing per screen that must be noticed.
+ *
+ * `ink-950` is a real near-black and exists for text, NOT as a page ground —
+ * this site is light throughout. Grounds come from `paper`.
+ */
 export default {
 	content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
-	darkMode: 'class',
 	theme: {
 		extend: {
 			fontFamily: {
@@ -9,103 +25,50 @@ export default {
 				display: ['"Syne"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
 			},
 			colors: {
-				// Academic-modern identity: deep indigo "ink" base + warm "gold" accent.
+				// Page grounds. Named rather than numbered because there are only
+				// three, and the name says which band of the page you are on.
+				paper: {
+					DEFAULT: '#FBFBF9',
+					alt: '#F4F6F2',
+					sunk: '#EDF0EA',
+				},
 				ink: {
-					50: '#f4f5fb',
-					100: '#e6e8f5',
-					200: '#c7cbe6',
-					300: '#9aa0cf',
-					400: '#6b73b3',
-					500: '#474e94',
-					600: '#333a78',
-					700: '#252a5c',
-					800: '#171b3d',
-					900: '#0e1230',
-					950: '#070a1c',
+					50: '#F8F9F7',
+					100: '#EFF1ED',
+					200: '#E1E5DC',
+					300: '#C7CCC3',
+					400: '#98A09A',
+					500: '#6F786F',
+					600: '#545C55',
+					700: '#3F463F',
+					800: '#2C322D',
+					900: '#1D221E',
+					950: '#121614',
 				},
-				gold: {
-					50: '#fdf9ef',
-					100: '#f9edcf',
-					200: '#f2d99c',
-					300: '#ebc169',
-					400: '#e3ac44',
-					500: '#d4a955',
-					600: '#b8863a',
-					700: '#93662d',
-					800: '#78522a',
-					900: '#664526',
+				pine: {
+					50: '#F0F6F3',
+					100: '#DCEBE4',
+					200: '#B9D7C9',
+					300: '#8CBCA7',
+					400: '#5B9B81',
+					500: '#3A7D63',
+					600: '#2A6450',
+					700: '#235141',
+					800: '#1E4235',
+					900: '#19362C',
+					950: '#0D1F19',
 				},
-				primary: {
-					50: '#eef2ff',
-					100: '#e0e7ff',
-					200: '#c7d2fe',
-					300: '#a5b4fc',
-					400: '#818cf8',
-					500: '#6366f1',
-					600: '#4f46e5', // Main primary color (indigo-600)
-					700: '#4338ca',
-					800: '#3730a3',
-					900: '#312e81',
-				},
-				secondary: {
-					50: '#f9fafb',
-					100: '#f3f4f6',
-					200: '#e5e7eb',
-					300: '#d1d5db',
-					400: '#9ca3af',
-					500: '#6b7280',
-					600: '#4b5563', // Main secondary color
-					700: '#374151',
-					800: '#1f2937',
-					900: '#111827',
-				},
-				success: {
-					50: '#f0fdf4',
-					100: '#dcfce7',
-					200: '#bbf7d0',
-					300: '#86efac',
-					400: '#4ade80',
-					500: '#22c55e',
-					600: '#16a34a', // Main success color
-					700: '#15803d',
-					800: '#166534',
-					900: '#14532d',
-				},
-				warning: {
-					50: '#fefce8',
-					100: '#fef9c3',
-					200: '#fef08a',
-					300: '#fde047',
-					400: '#facc15',
-					500: '#eab308', // Main warning color
-					600: '#ca8a04',
-					700: '#a16207',
-					800: '#854d0e',
-					900: '#713f12',
-				},
-				danger: {
-					50: '#fef2f2',
-					100: '#fee2e2',
-					200: '#fecaca',
-					300: '#fca5a5',
-					400: '#f87171',
-					500: '#ef4444',
-					600: '#dc2626', // Main danger color
-					700: '#b91c1c',
-					800: '#991b1b',
-					900: '#7f1d1d',
-				},
-				info: {
-					50: '#ecfeff',
-					100: '#cffafe',
-					200: '#a5f3fc',
-					300: '#67e8f9',
-					400: '#22d3ee',
-					500: '#06b6d4',
-					600: '#0891b2', // Main info color
-					700: '#0e7490',
-					800: '#155e75',
-					900: '#164e63',
+				marigold: {
+					50: '#FDF6EA',
+					100: '#FAE9CB',
+					200: '#F4D398',
+					300: '#EDB85F',
+					400: '#E7A23A',
+					500: '#D9871F',
+					600: '#B96B17',
+					700: '#955217',
+					800: '#7A4319',
+					900: '#653818',
 				},
 			},
 		},
