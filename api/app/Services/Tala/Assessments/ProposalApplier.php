@@ -74,10 +74,12 @@ class ProposalApplier
 
         $questions = is_array($payload['questions'] ?? null) ? $payload['questions'] : [];
 
-        $item = DB::transaction(function () use ($proposal, $payload, $componentId, $questions) {
+        $creatorId = $context->user->id;
+
+        $item = DB::transaction(function () use ($proposal, $payload, $componentId, $questions, $creatorId) {
             $this->claim($proposal);
 
-            $item = SubjectEcrItem::create([
+            $item = new SubjectEcrItem([
                 'subject_ecr_id' => $componentId,
                 'type' => $payload['type'] ?? null,
                 // Explicit, because the column defaults to 'published'.
@@ -89,6 +91,11 @@ class ProposalApplier
                 'quarter' => $payload['quarter'] ?? null,
                 'academic_year' => $payload['academic_year'] ?? null,
             ]);
+
+            // The teacher who approved the draft is its author. Tala only ever
+            // proposes; the writing is theirs, and so is the credit.
+            $item->created_by_user_id = $creatorId;
+            $item->save();
 
             // Writes the question rows and recomputes `score` from their points.
             $this->v2->syncQuestions($item, $questions);

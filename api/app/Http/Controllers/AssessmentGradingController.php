@@ -5,13 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\StudentAssessmentAnswer;
 use App\Models\StudentAssessmentAttempt;
 use App\Models\StudentEcrItemScore;
-use App\Models\StudentSection;
-use App\Models\StudentSubject;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentScoringService;
 use App\Services\AssessmentV2Service;
 use App\Services\RunningGradeRecalcService;
 use App\Support\MediaUrl;
+use App\Support\SubjectRoster;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -270,30 +269,16 @@ class AssessmentGradingController extends Controller
     }
 
     /**
-     * Number of students expected to take this assessment, mirroring the student-side
-     * eligibility rules (ResolvesStudentSubjects): explicit active subject assignments
-     * always count; non-limited subjects also include the section's active students.
+     * Number of students expected to take this assessment.
+     *
+     * The rule itself lives in SubjectRoster, because Teaching Activity
+     * reports the same figure across a whole school and two implementations of
+     * "who is expected here" would eventually disagree — at which point one of
+     * the two screens is quietly libelling a teacher.
      */
     private function expectedStudentCount(SubjectEcrItem $item): int
     {
-        $subject = $item->subjectEcr?->subject;
-        if (! $subject) {
-            return 0;
-        }
-
-        $studentIds = StudentSubject::where('subject_id', $subject->id)
-            ->where('is_active', true)
-            ->pluck('student_id');
-
-        if (! $subject->is_limited_student && $subject->class_section_id) {
-            $studentIds = $studentIds->merge(
-                StudentSection::where('section_id', $subject->class_section_id)
-                    ->where('is_active', true)
-                    ->pluck('student_id')
-            );
-        }
-
-        return $studentIds->unique()->count();
+        return SubjectRoster::countFor($item->subjectEcr?->subject);
     }
 
     /**

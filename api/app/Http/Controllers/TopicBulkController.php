@@ -55,7 +55,7 @@ class TopicBulkController extends Controller
 
             $created = [];
             foreach ($validated['topics'] as $i => $topicInput) {
-                $created[] = Topic::create([
+                $topic = new Topic([
                     'subject_id' => $validated['subject_id'],
                     'quarter' => $validated['quarter'] ?? ($topicInput['quarter'] ?? null),
                     'title' => $topicInput['title'],
@@ -63,6 +63,10 @@ class TopicBulkController extends Controller
                     'order' => $maxOrder + $i + 1,
                     'is_completed' => false,
                 ]);
+                $topic->created_by_user_id = $user->id;
+                $topic->save();
+
+                $created[] = $topic;
             }
 
             DB::commit();

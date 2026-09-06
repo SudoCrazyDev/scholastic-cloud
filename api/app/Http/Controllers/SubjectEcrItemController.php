@@ -203,8 +203,13 @@ class SubjectEcrItemController extends Controller
                 unset($validatedData['content']['questions']);
             }
 
-            $item = DB::transaction(function () use ($validatedData, $isV2, $questions) {
-                $item = SubjectEcrItem::create($validatedData);
+            $creatorId = $request->user()?->id;
+
+            $item = DB::transaction(function () use ($validatedData, $isV2, $questions, $creatorId) {
+                $item = new SubjectEcrItem($validatedData);
+                // Assigned, not mass-assigned — see Topic::createdBy().
+                $item->created_by_user_id = $creatorId;
+                $item->save();
                 if ($isV2) {
                     $this->v2->syncQuestions($item, $questions ?? []);
                     $item->refresh()->load('questions');
@@ -522,7 +527,9 @@ class SubjectEcrItemController extends Controller
                 continue;
             }
 
-            DB::transaction(function () use ($source, $targetEcr) {
+            $creatorId = $request->user()?->id;
+
+            DB::transaction(function () use ($source, $targetEcr, $creatorId) {
                 $copy = $source->replicate([
                     'created_at',
                     'updated_at',
@@ -534,6 +541,8 @@ class SubjectEcrItemController extends Controller
                 $copy->open_at = null;
                 $copy->close_at = null;
                 $copy->due_at = null;
+                // A copy is the copier's assessment in the copier's subject.
+                $copy->created_by_user_id = $creatorId;
                 $copy->save();
 
                 if ($source->isV2()) {

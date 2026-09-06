@@ -91,6 +91,16 @@ class SubjectEcrItem extends Model
     }
 
     /**
+     * Who made this assessment. Null on anything written before creators were
+     * recorded, in which case Teaching Activity credits the subject's adviser.
+     * Kept out of `$fillable` for the same reason as Topic's.
+     */
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    /**
      * Get the subject ECR that owns this item.
      */
     public function subjectEcr()

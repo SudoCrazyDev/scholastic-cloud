@@ -97,7 +97,12 @@ class TopicController extends Controller
                 $request->merge(['order' => $maxOrder + 1]);
             }
 
-            $topic = Topic::create($request->all());
+            // Assigned rather than mass-assigned: this is a request built
+            // from `$request->all()`, so a fillable creator column would let a
+            // caller credit the lesson to another teacher.
+            $topic = new Topic($request->all());
+            $topic->created_by_user_id = $request->user()?->id;
+            $topic->save();
 
             return response()->json([
                 'success' => true,
@@ -407,6 +412,9 @@ class TopicController extends Controller
             [$content, $dropped] = $this->duplicateContentFor($source->content);
             $droppedAssessmentBlocks += $dropped;
             $copy->content = $content;
+            // The copy is a new lesson in a new subject, made by whoever
+            // pressed Copy — not by whoever wrote the original.
+            $copy->created_by_user_id = $request->user()?->id;
             $copy->save();
 
             $copied++;

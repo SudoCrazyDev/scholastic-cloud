@@ -44,6 +44,19 @@ class Topic extends Model
     }
 
     /**
+     * Who made this lesson. Null on anything written before creators were
+     * recorded, in which case Teaching Activity credits the subject's adviser.
+     *
+     * `created_by_user_id` is deliberately absent from `$fillable`: the topic
+     * endpoints mass-assign the request, and a client that could name the
+     * creator could credit its work to somebody else.
+     */
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    /**
      * Per-student progress through this lesson.
      */
     public function progress(): HasMany

@@ -30,6 +30,7 @@ import UserProfile from './pages/Users/UserProfile';
 import ConsolidatedGrades from './pages/ConsolidatedGrades/ConsolidatedGrades';
 import SectionGrades from './pages/ConsolidatedGrades/SectionGrades';
 import Proficiency from './pages/Proficiency/Proficiency';
+import { TeachingActivity, TeacherActivityDetail } from './pages/TeachingActivity';
 import SF9 from './pages/SF9';
 import SetNewPassword from './pages/SetNewPassword';
 import CertificateBuilder from './pages/CertificateBuilder/CertificateBuilder';
@@ -212,6 +213,13 @@ function App() {
               <Route path="consolidated-grades" element={<RequireModule module="consolidated-grades"><ConsolidatedGrades /></RequireModule>} />
               <Route path="consolidated-grades/:sectionId/:quarter" element={<RequireModule module="consolidated-grades"><SectionGrades /></RequireModule>} />
               <Route path="proficiency" element={<RequireModule module="proficiency"><Proficiency /></RequireModule>} />
+              {/*
+                Teaching Activity. View-only both here and on the API: the
+                module declares no `manage`, so there is no second ability to
+                gate the detail route on.
+              */}
+              <Route path="teaching-activity" element={<RequireModule module="teaching-activity"><TeachingActivity /></RequireModule>} />
+              <Route path="teaching-activity/:userId" element={<RequireModule module="teaching-activity"><TeacherActivityDetail /></RequireModule>} />
               <Route path="sf9" element={<RequireModule module="consolidated-grades"><SF9 /></RequireModule>} />
               <Route path="certificate-builder/new" element={<RequireModule module="certificate-builder" ability="manage"><CertificateBuilder /></RequireModule>} />
               <Route path="certificate-builder" element={<RequireModule module="certificate-builder"><CertificateBuilderPage /></RequireModule>} />

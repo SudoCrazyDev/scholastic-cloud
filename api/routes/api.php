@@ -501,6 +501,21 @@ Route::middleware('auth.token')->group(function () {
     Route::get('assessment-methods/{itemId}/submissions', [\App\Http\Controllers\AssessmentGradingController::class, 'submissions'])->middleware('module:subjects,view');
     Route::post('assessment-methods/{itemId}/submissions/{attemptId}/grade', [\App\Http\Controllers\AssessmentGradingController::class, 'grade'])->middleware('module:subjects,manage');
     Route::post('assessment-methods/{itemId}/submissions/recheck', [\App\Http\Controllers\AssessmentGradingController::class, 'recheck'])->middleware('module:subjects,manage');
+
+    /*
+     * Teaching Activity — oversight of what teachers have put up and what
+     * students have submitted, for an institution administrator or principal.
+     *
+     * `view` on all three and nothing else: the module has no `manage`
+     * ability at all, so there is no verb here that could ask for one.
+     * Deliberately not gated on `subjects` — a principal watching their
+     * teachers' output is a different question from a teacher editing their
+     * own subject, and a school that wants one without the other has to be
+     * able to say so in the role builder.
+     */
+    Route::get('teaching-activity/overview', [\App\Http\Controllers\TeachingActivityController::class, 'overview'])->middleware('module:teaching-activity,view');
+    Route::get('teaching-activity/teachers/{userId}', [\App\Http\Controllers\TeachingActivityController::class, 'teacher'])->middleware('module:teaching-activity,view');
+    Route::get('teaching-activity/assessments/{itemId}/submissions', [\App\Http\Controllers\TeachingActivityController::class, 'assessmentSubmissions'])->middleware('module:teaching-activity,view');
     // StudentRunningGrade routes — students read their own grades from the
     // index here (My Subject), so the read side is shared.
     Route::post('student-running-grades/upsert-final-grade', [\App\Http\Controllers\StudentRunningGradeController::class, 'upsertFinalGrade'])->middleware('module:consolidated-grades,manage');

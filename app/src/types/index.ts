@@ -3704,3 +3704,192 @@ export interface InstitutionCleanupLogEntry {
   cleared_by_role: string | null;
   created_at: string;
 }
+
+// ── Teaching Activity (lesson & assessment oversight) ───────────────────────
+
+/**
+ * Whether a figure was read off a recorded creator or guessed from the
+ * subject's adviser. Anything written before 2026-09 has no creator stored,
+ * and the screen says so rather than presenting the guess as fact.
+ */
+export type TeachingAttribution = 'recorded' | 'adviser';
+
+export interface TeachingLessonCounts {
+  total: number;
+  published: number;
+  with_files: number;
+  files: number;
+}
+
+export interface TeachingAssessmentCounts {
+  total: number;
+  published: number;
+  with_questions: number;
+  with_files: number;
+  /** Published with nothing to answer — visible to students, unsubmittable. */
+  published_without_questions: number;
+  /** Published and carrying questions: the ones a submission is expected for. */
+  online: number;
+}
+
+export interface TeachingSubmissionCounts {
+  expected: number;
+  received: number;
+  /** Percentage, or null when nothing was expected — never render 0% for that. */
+  rate: number | null;
+}
+
+export interface TeachingActivityTeacherRow {
+  user_id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+  subjects_count: number;
+  students_count: number;
+  lessons: TeachingLessonCounts;
+  assessments: TeachingAssessmentCounts;
+  lesson_plans: number;
+  submissions: TeachingSubmissionCounts;
+  /** Their own subjects with nothing posted in them yet. */
+  empty_subjects: { lessons: number; assessments: number };
+  last_activity_at: string | null;
+  attribution: TeachingAttribution;
+}
+
+export interface TeachingActivityTotals {
+  teachers: number;
+  subjects: number;
+  lessons: number;
+  lessons_published: number;
+  lesson_files: number;
+  lesson_plans: number;
+  assessments: number;
+  assessments_published: number;
+  assessments_with_files: number;
+  assessments_published_without_questions: number;
+  teachers_with_nothing: number;
+  expected_submissions: number;
+  submissions_received: number;
+  submission_rate: number | null;
+}
+
+export interface TeachingActivityOverview {
+  academic_year: string;
+  quarter: string | null;
+  totals: TeachingActivityTotals;
+  teachers: TeachingActivityTeacherRow[];
+  available_academic_years: string[];
+}
+
+export interface TeachingActivitySubjectRow {
+  subject_id: string;
+  title: string;
+  variant: string | null;
+  section_title: string | null;
+  grade_level: string | null;
+  is_adviser: boolean;
+  students_count: number;
+  lessons: TeachingLessonCounts;
+  assessments: TeachingAssessmentCounts;
+  lesson_plans: number;
+  submissions: TeachingSubmissionCounts;
+  last_activity_at: string | null;
+}
+
+export interface TeachingActivityLessonFile {
+  name: string;
+  url: string | null;
+  mime: string | null;
+  size: number | null;
+}
+
+export interface TeachingActivityLesson {
+  id: string;
+  title: string;
+  quarter: string | null;
+  subject_id: string;
+  subject_title: string | null;
+  section_title: string | null;
+  is_published: boolean;
+  files: TeachingActivityLessonFile[];
+  progress: { expected: number; started: number; completed: number; rate: number | null };
+  attribution: TeachingAttribution;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface TeachingActivityAssessment {
+  id: string;
+  title: string;
+  type: string | null;
+  status: string | null;
+  quarter: string | null;
+  subject_id: string;
+  subject_title: string | null;
+  section_title: string | null;
+  component_title: string | null;
+  question_count: number;
+  max_score: number;
+  /** Exact count of uploaded images the assessment references. */
+  files: number;
+  is_online: boolean;
+  due_at: string | null;
+  submissions: TeachingSubmissionCounts & { pending_grading: number };
+  attribution: TeachingAttribution;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface TeachingActivityTeacherDetail {
+  academic_year: string;
+  quarter: string | null;
+  teacher: TeachingActivityTeacherRow;
+  subjects: TeachingActivitySubjectRow[];
+  lessons: TeachingActivityLesson[];
+  assessments: TeachingActivityAssessment[];
+  available_academic_years: string[];
+}
+
+export interface TeachingActivitySubmissionStudent {
+  student_id: string;
+  name: string;
+  lrn: string | null;
+  status: 'submitted' | 'in_progress' | 'not_started';
+  score: number | null;
+  max_score: number | null;
+  submitted_at: string | null;
+  is_late: boolean;
+  graded_at: string | null;
+  attempts: number;
+}
+
+export interface TeachingActivityAssessmentSubmissions {
+  assessment: {
+    id: string;
+    title: string;
+    type: string | null;
+    status: string | null;
+    quarter: string | null;
+    academic_year: string | null;
+    question_count: number;
+    max_score: number;
+    due_at: string | null;
+    close_at: string | null;
+    subject_title: string | null;
+    section_title: string | null;
+  };
+  submissions: TeachingSubmissionCounts & {
+    in_progress: number;
+    not_started: number;
+    late: number;
+  };
+  students: TeachingActivitySubmissionStudent[];
+}
+
+export interface TeachingActivityFilters {
+  academic_year?: string;
+  quarter?: string;
+  department_id?: string;
+  search?: string;
+  sort?: 'name' | 'lessons' | 'assessments' | 'submission_rate' | 'last_activity';
+}

@@ -25,6 +25,7 @@ import {
   BookOpen as AssignedSubjectsIcon,
   BarChart3,
   TrendingUp,
+  Eye,
   X,
   Calendar,
   Settings,
@@ -263,6 +264,18 @@ const menuGroups: MenuGroup[] = [
         icon: <TrendingUp className="w-5 h-5" />,
         path: '/proficiency',
         module: 'proficiency',
+      },
+      {
+        /*
+         * Oversight of other people's teaching, so it is gated on its own
+         * module rather than on Subjects — a teacher holds `subjects.manage`
+         * for their own work and has no business reading the whole school's.
+         */
+        id: 'teaching-activity',
+        label: 'Teaching Activity',
+        icon: <Eye className="w-5 h-5" />,
+        path: '/teaching-activity',
+        module: 'teaching-activity',
       },
       {
         id: 'school-days',

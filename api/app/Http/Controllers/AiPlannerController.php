@@ -393,7 +393,14 @@ class AiPlannerController extends Controller
 
             $created = [];
             foreach ($items as $item) {
-                $created[] = SubjectEcrItem::create($item);
+                // Generated for the teacher who asked, and credited to them:
+                // Teaching Activity reports who put an assessment up, and "the
+                // AI" is not a person a principal can talk to.
+                $record = new SubjectEcrItem($item);
+                $record->created_by_user_id = $request->user()?->id;
+                $record->save();
+
+                $created[] = $record;
             }
 
             DB::commit();

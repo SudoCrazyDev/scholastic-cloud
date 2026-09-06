@@ -41,6 +41,19 @@ modules should consume its data.
   missing tool has to be built rather than left for the model to fill in; and
   [the write path](Tala/TALA.md#the-write-path-nothing-the-model-says-changes-anything) is the pattern
   any future mutating tool must follow.
+- [Teaching Activity](TeachingActivity/TEACHING_ACTIVITY.md) — Academics, **view-only**. What each
+  teacher has put up for their subjects (lessons, the files uploaded to them, assessments) and how
+  many of their students have submitted, for an institution administrator or principal. Owns no
+  data: it reports on Subjects and the student portal, so the module has no `manage` and all three
+  routes are GETs. Added `created_by_user_id` to `topics` and `subject_ecr_items` — **not
+  backfilled**, so older rows fall back to the subject's adviser and say so
+  (`attribution: 'adviser'`). Two shared pieces came out of it: `App\Support\SubjectRoster`, now
+  the only staff-side answer to "who is expected in this subject" (`AssessmentGradingController`
+  delegates to it; keep it agreeing with `ResolvesStudentSubjects`), and
+  `App\Support\MediaInventory`. Read
+  [What the numbers mean](TeachingActivity/TEACHING_ACTIVITY.md#what-the-numbers-mean) before
+  changing a figure — the submission denominator counts only *published assessments with
+  questions*, and a rate of `null` means nothing was ever set, not zero.
 - [Staff Schedules](HRIS/StaffSchedules/STAFF_SCHEDULES.md) — HRIS. Reusable schedule templates
   (weekly hours + lunch + per-day grace period), assigned to staff (one per staff), plus an
   institution calendar of holidays & events. Consumed by Payroll for lateness/undertime/overtime.

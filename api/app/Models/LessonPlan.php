@@ -43,5 +43,15 @@ class LessonPlan extends Model
     {
         return $this->belongsTo(Topic::class);
     }
+
+    /**
+     * Who asked for this plan. Set by the generator from the requesting user;
+     * null on plans generated before it was passed through, which Teaching
+     * Activity credits to the subject's adviser.
+     */
+    public function generatedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'generated_by_user_id');
+    }
 }
 

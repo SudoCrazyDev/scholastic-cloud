@@ -122,8 +122,15 @@ class SystemRolePermissions
     public const VIEW = [
         // Grade Levels was a super-administrator screen, but every school-side
         // role needs to read the list to filter and label by grade.
-        'institution-administrator' => ['grade-levels'],
-        'principal' => ['grade-levels'],
+        //
+        // `teaching-activity` is the one entry here that is not a supporting
+        // lookup: it is a screen of its own, and it is view-only for everybody
+        // because the module offers no Manage at all. It goes to the two
+        // institution-wide roles and nobody else — a department head can be
+        // given it in the role builder, but it reports on the whole school, so
+        // it is not something to hand out by default.
+        'institution-administrator' => ['grade-levels', 'teaching-activity'],
+        'principal' => ['grade-levels', 'teaching-activity'],
         // Finance also had the two "My Work" items, which hang off Subjects.
         'finance' => ['students', 'class-sections', 'grade-levels', 'subjects'],
         'subject-teacher' => ['class-sections', 'students', 'school-days', 'grade-levels'],

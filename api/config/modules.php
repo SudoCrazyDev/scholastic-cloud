@@ -145,6 +145,22 @@ return [
                     'label' => 'Proficiency',
                     'description' => 'Core values and proficiency markings.',
                 ],
+                'teaching-activity' => [
+                    'label' => 'Teaching Activity',
+                    'description' => 'Oversight of what teachers have put up for their subjects — lessons, uploaded files and assessments — and how many of their students have submitted. Read-only: it reports on other modules and changes nothing, so it offers no Manage.',
+
+                    /*
+                     * View only, deliberately.
+                     *
+                     * Every number on this screen is owned by another module —
+                     * Subjects writes the lessons and assessments, the student
+                     * portal writes the submissions — so there is nothing here
+                     * for a Manage to permit. Offering the toggle would suggest
+                     * a principal could edit a teacher's lesson from the
+                     * monitor, which is not what this is for.
+                     */
+                    'base_abilities' => ['view'],
+                ],
                 'school-days' => [
                     'label' => 'School Days',
                     'description' => 'School calendar and counted attendance days.',
