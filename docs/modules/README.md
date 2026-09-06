@@ -75,6 +75,17 @@ modules should consume its data.
   [Running a gate kiosk](GATE_KIOSK/RUNNING_A_GATE_KIOSK.md) is the operator-facing companion:
   register → pair → seed, what the office watches, and what each warning means. Hand that one to a
   technician or a school; the design doc is for us.
+- [Institution Clean-up](InstitutionCleanup/INSTITUTION_CLEANUP.md) — Platform administration,
+  **super-administrator only**. Empties one institution back to its people: deletes that tenant's
+  academic, finance, HRIS, device and messaging records across **every academic year at once**,
+  keeping students and staff with their profiles, logins and roles. 12 opt-in groups over 98 tables;
+  three steps (choose → preview → type the school's name). **No undo.** Read it before adding a
+  table or an upload to any module — a new table absent from `InstitutionCleanupGroups` is data a
+  clean-up silently leaves behind, and a new upload column absent from
+  `InstitutionDataCleaner::FILE_COLUMNS` is an orphaned R2 object. Covers the recursive
+  institution-scoping that keeps a dual-enrolled student's other school intact, the delete order the
+  CASCADE/SET NULL schema will not enforce for you, and why the super-administrator slug is checked
+  in the controller on top of the `system_only` module.
 
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder

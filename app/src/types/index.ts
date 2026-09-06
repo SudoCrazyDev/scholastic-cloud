@@ -3599,3 +3599,108 @@ export interface FinanceDataClearLogEntry {
   cleared_by_role: string | null;
   created_at: string;
 }
+
+/* -------------------------------------------------------------------------
+ * Institution clean-up — platform administration, super-administrator only.
+ *
+ * The counterpart of the Finance clear one level up: it empties a whole tenant
+ * rather than one of its academic years, which is why nothing here carries an
+ * `academic_year`. There is no year to choose; a clean-up takes all of them.
+ * ---------------------------------------------------------------------- */
+
+export interface InstitutionCleanupGroup {
+  key: string;
+  label: string;
+  /** Coarse heading the screen groups by — Academics, Finance, People… */
+  area: string;
+  description: string;
+  tables: string[];
+  /** Tables whose soft-deleted rows go too, e.g. a waived late fee. */
+  includes_trashed: string[];
+}
+
+/** A promise about what survives, rather than a list of tables. */
+export interface InstitutionCleanupKept {
+  label: string;
+  detail: string;
+}
+
+export interface InstitutionCleanupTarget {
+  id: string;
+  title: string;
+  abbr?: string | null;
+}
+
+export interface InstitutionCleanupCatalog {
+  groups: InstitutionCleanupGroup[];
+  kept: InstitutionCleanupKept[];
+  institutions: InstitutionCleanupTarget[];
+}
+
+export interface InstitutionCleanupGroupPreview {
+  key: string;
+  label: string;
+  area: string;
+  description: string;
+  total: number;
+  tables: Record<string, number>;
+}
+
+/**
+ * A reason the run would leave a surviving row broken. In practice this fires
+ * on school-built roles that staff still hold: deleting one is SET NULL, so the
+ * database allows it and the people the clean-up exists to preserve come out
+ * the other side with a login and no permissions.
+ */
+export interface InstitutionCleanupBlocker {
+  group: string;
+  group_label: string;
+  table: string;
+  column: string;
+  blocking_table: string;
+  rule: 'set_null' | 'cascade';
+  count: number;
+  message: string;
+}
+
+/** The promise, as a number: who is still here when the run finishes. */
+export interface InstitutionCleanupRetained {
+  students: number;
+  staff: number;
+}
+
+export interface InstitutionCleanupPreview {
+  institution: { id: string; title: string };
+  groups: InstitutionCleanupGroupPreview[];
+  total: number;
+  /** Uploaded files that would be removed from object storage. */
+  files: number;
+  retained: InstitutionCleanupRetained;
+  blockers: InstitutionCleanupBlocker[];
+  clearable: boolean;
+}
+
+export interface InstitutionCleanupResult {
+  log_id: string | null;
+  groups: string[];
+  deleted_counts: Record<string, number>;
+  total_deleted: number;
+  files_deleted: number;
+  files_failed: number;
+  retained: InstitutionCleanupRetained;
+}
+
+export interface InstitutionCleanupLogEntry {
+  id: string;
+  institution_id: string;
+  institution_title: string;
+  groups: string[];
+  group_labels: string[];
+  deleted_counts: Record<string, number>;
+  total_deleted: number;
+  files_deleted: number;
+  files_failed: number;
+  cleared_by_name: string | null;
+  cleared_by_role: string | null;
+  created_at: string;
+}

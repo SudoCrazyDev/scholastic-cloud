@@ -15,6 +15,7 @@ import {
   CreditCard,
   ToggleRight,
   KeyRound,
+  Eraser,
   Wallet,
   Menu,
   GraduationCap,
@@ -452,6 +453,13 @@ const menuGroups: MenuGroup[] = [
         icon: <KeyRound className="w-5 h-5" />,
         path: '/payment-gateways',
         module: 'payment-gateways',
+      },
+      {
+        id: 'institution-cleanup',
+        label: 'Institution Clean-up',
+        icon: <Eraser className="w-5 h-5" />,
+        path: '/institution-cleanup',
+        module: 'institution-cleanup',
       },
       {
         id: 'subscriptions',

@@ -361,6 +361,11 @@ return [
                     'description' => 'Which merchant account each institution takes online payments through, and the keys it does so with. Platform-only: a school can neither set nor read its own keys, though the money lands in that school\'s own account.',
                     'system_only' => true,
                 ],
+                'institution-cleanup' => [
+                    'label' => 'Institution Clean-up',
+                    'description' => 'Empty a school back to its people. Platform-only and super-administrator-only: one run deletes the academic, finance, HRIS and messaging records of a tenant while keeping its students and staff. Nothing about it is offered to the school itself.',
+                    'system_only' => true,
+                ],
             ],
         ],
 

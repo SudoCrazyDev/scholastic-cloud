@@ -24,6 +24,7 @@ use App\Http\Controllers\GateUnresolvedScanController;
 use App\Http\Controllers\GradeLevelController;
 use App\Http\Controllers\GradeLevelDiscountController;
 use App\Http\Controllers\IdCardTemplateController;
+use App\Http\Controllers\InstitutionCleanupController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\InstitutionFeatureController;
 use App\Http\Controllers\InstitutionPaymentGatewayController;
@@ -827,6 +828,32 @@ Route::middleware('auth.token')->group(function () {
         ->middleware('module:payment-gateways,manage');
     Route::delete('institution-payment-gateways/{institutionId}/{provider}', [InstitutionPaymentGatewayController::class, 'destroy'])
         ->middleware('module:payment-gateways,manage');
+    /*
+     * Emptying one institution back to its students and staff. The most
+     * destructive operation on the platform: it deletes a tenant's academic,
+     * finance, HRIS, device and messaging records across every academic year at
+     * once, and there is no undo.
+     *
+     * `module:institution-cleanup,manage` plus a `system_only` module is the
+     * usual pair of platform gates, and the controller *additionally* checks the
+     * super-administrator slug on every endpoint. That belt-and-braces is
+     * deliberate and documented on InstitutionCleanupController: system_only
+     * governs what the role builder offers, not what a stray role_permissions
+     * row can grant, and the blast radius here does not tolerate the difference.
+     *
+     * The institution is a URL parameter rather than resolved from the operator
+     * — a super-administrator has no meaningful own institution, and defaulting
+     * the target is the worst available way to get this wrong. `preview` is a
+     * POST only because it takes an array of groups; it reads.
+     */
+    Route::get('institution-cleanup/groups', [InstitutionCleanupController::class, 'groups'])
+        ->middleware('module:institution-cleanup,manage');
+    Route::get('institution-cleanup/history', [InstitutionCleanupController::class, 'history'])
+        ->middleware('module:institution-cleanup,manage');
+    Route::post('institution-cleanup/{institutionId}/preview', [InstitutionCleanupController::class, 'preview'])
+        ->middleware('module:institution-cleanup,manage');
+    Route::post('institution-cleanup/{institutionId}', [InstitutionCleanupController::class, 'store'])
+        ->middleware('module:institution-cleanup,manage');
 
     /*
      * Chat is gated on the institution having the feature, not on a role — see

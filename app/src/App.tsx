@@ -14,6 +14,7 @@ import Institutions from './pages/Institutions';
 import Roles from './pages/Roles';
 import Subscriptions from './pages/Subscriptions';
 import FeatureAccess from './pages/FeatureAccess';
+import InstitutionCleanup from './pages/InstitutionCleanup'
 import PaymentGateways from './pages/PaymentGateways';
 import Staffs from './pages/Staffs';
 import ClassSections from './pages/ClassSections/ClassSections';
@@ -124,6 +125,15 @@ function App() {
                 — or sets — the keys its online payments run on.
               */}
               <Route path="payment-gateways" element={<RequireModule module="payment-gateways"><PaymentGateways /></RequireModule>} />
+              {/*
+                The most destructive screen on the platform: it empties one
+                institution back to its students and staff. `institution-cleanup`
+                is system_only like the two above, and the API additionally
+                requires the super-administrator role itself — RequireModule here
+                only decides whether the link renders, never whether the run is
+                allowed.
+              */}
+              <Route path="institution-cleanup" element={<RequireModule module="institution-cleanup"><InstitutionCleanup /></RequireModule>} />
               <Route path="staffs" element={<RequireModule module="staffs"><Staffs /></RequireModule>} />
               <Route path="students" element={<RequireModule module="students" ability="manage"><Students /></RequireModule>} />
               <Route path="admission-forms" element={<RequireModule module="admission-forms"><AdmissionForms /></RequireModule>} />
