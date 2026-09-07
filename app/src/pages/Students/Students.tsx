@@ -1,9 +1,28 @@
-import { StudentHeader, StudentGrid, StudentModal, StudentPasswordResetModal } from './components'
+import { useState } from 'react'
+import { ChartBarIcon, PrinterIcon, UserGroupIcon } from '@heroicons/react/24/outline'
+import {
+  StudentHeader,
+  StudentGrid,
+  StudentModal,
+  StudentPasswordResetModal,
+  StudentPrintingTab,
+  StudentStatisticsTab,
+} from './components'
 import { ConfirmationModal } from '../../components/ConfirmationModal'
 import { useStudents } from '../../hooks/useStudents'
 import { Toaster } from 'react-hot-toast'
 
+type StudentsTab = 'records' | 'printing' | 'statistics'
+
+const TABS: { id: StudentsTab; label: string; icon: typeof UserGroupIcon }[] = [
+  { id: 'records', label: 'Records', icon: UserGroupIcon },
+  { id: 'printing', label: 'Printing', icon: PrinterIcon },
+  { id: 'statistics', label: 'Statistics', icon: ChartBarIcon },
+]
+
 export default function Students() {
+  const [activeTab, setActiveTab] = useState<StudentsTab>('records')
+
   const {
     students,
     loading,
@@ -32,7 +51,7 @@ export default function Students() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -56,7 +75,7 @@ export default function Students() {
           },
         }}
       />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
         <div className="mb-8">
@@ -66,52 +85,82 @@ export default function Students() {
           </p>
         </div>
 
-        {/* Header with search and filters */}
-        <StudentHeader
-          search={search.value}
-          onSearchChange={search.onSearch}
-          selectedRows={selectedRows}
-          onCreate={handleCreate}
-          onBulkDelete={handleBulkDelete}
-        />
-
-        {/* Students Grid */}
-        <StudentGrid
-          students={students}
-          loading={loading}
-          error={error}
-          selectedRows={selectedRows}
-          onSelectionChange={setSelectedRows}
-          onView={handleView}
-          onEdit={handleEdit}
-          onPasswordReset={handlePasswordReset}
-          onDelete={handleDelete}
-        />
-
-        {/* Pagination */}
-        {pagination && pagination.totalItems > 0 && (
-          <div className="mt-6 flex justify-center">
-            <div className="flex items-center gap-2">
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 border-b border-gray-200">
+          {TABS.map((tab) => {
+            const Icon = tab.icon
+            return (
               <button
-                onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
-                disabled={pagination.currentPage <= 1}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
-                Previous
+                <Icon className="w-4 h-4" />
+                {tab.label}
               </button>
-              <span className="px-3 py-2 text-sm text-gray-700">
-                Page {pagination.currentPage} of {pagination.totalPages}
-              </span>
-              <button
-                onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
-                disabled={pagination.currentPage >= pagination.totalPages}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+            )
+          })}
+        </div>
+
+        {activeTab === 'records' && (
+          <>
+            {/* Header with search and filters */}
+            <StudentHeader
+              search={search.value}
+              onSearchChange={search.onSearch}
+              selectedRows={selectedRows}
+              onCreate={handleCreate}
+              onBulkDelete={handleBulkDelete}
+            />
+
+            {/* Students Grid */}
+            <StudentGrid
+              students={students}
+              loading={loading}
+              error={error}
+              selectedRows={selectedRows}
+              onSelectionChange={setSelectedRows}
+              onView={handleView}
+              onEdit={handleEdit}
+              onPasswordReset={handlePasswordReset}
+              onDelete={handleDelete}
+            />
+
+            {/* Pagination */}
+            {pagination && pagination.totalItems > 0 && (
+              <div className="mt-6 flex justify-center">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
+                    disabled={pagination.currentPage <= 1}
+                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="px-3 py-2 text-sm text-gray-700">
+                    Page {pagination.currentPage} of {pagination.totalPages}
+                  </span>
+                  <button
+                    onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
+                    disabled={pagination.currentPage >= pagination.totalPages}
+                    className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
+
+        {activeTab === 'printing' && <StudentPrintingTab />}
+
+        {activeTab === 'statistics' && <StudentStatisticsTab />}
 
         {/* Student Modal */}
         <StudentModal
@@ -145,4 +194,4 @@ export default function Students() {
       </div>
     </div>
   )
-} 
+}

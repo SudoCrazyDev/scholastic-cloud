@@ -62,6 +62,7 @@ use App\Http\Controllers\StudentOnlinePaymentController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\StudentPaymentPlanChangeController;
 use App\Http\Controllers\StudentPaymentPlanController;
+use App\Http\Controllers\StudentReportController;
 use App\Http\Controllers\StudentRfidTagController;
 use App\Http\Controllers\StudentSectionController;
 use App\Http\Controllers\SubjectController;
@@ -337,6 +338,10 @@ Route::middleware('auth.token')->group(function () {
     Route::get('payment-plan-changes', [StudentPaymentPlanChangeController::class, 'index'])->middleware('module:payment-plans,view');
     Route::apiResource('payment-plans', PaymentPlanController::class)->middleware('module:payment-plans,view,shared');
     Route::get('students/search-for-assignment', [StudentController::class, 'searchForAssignment'])->middleware('module:students,view');
+    // Printing and Statistics tabs on the Students screen. Both are staff-only —
+    // they read the whole school's roll, so no `shared` argument here.
+    Route::get('students/statistics', [StudentReportController::class, 'statistics'])->middleware('module:students,view');
+    Route::get('students/roster', [StudentReportController::class, 'roster'])->middleware('module:students,view');
     Route::post('students/{id}/update', [StudentController::class, 'updateWithFile'])->middleware('module:students,manage');
     Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord'])->middleware('module:students,manage');
     Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index'])->middleware('module:students,view,shared');

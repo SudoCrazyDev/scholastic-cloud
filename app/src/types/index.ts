@@ -2160,6 +2160,85 @@ export interface Student {
   health_record?: StudentHealthRecord | null;
 }
 
+/** Male/female/other headcounts, shared by every statistics and roster row. */
+export interface GenderTally {
+  male: number;
+  female: number;
+  other: number;
+  total: number;
+}
+
+/** One section's headcount — GET /students/statistics `by_section`. */
+export interface StudentStatisticsSectionRow extends GenderTally {
+  section_id: string;
+  section: string | null;
+  grade_level: string | null;
+  adviser: string | null;
+}
+
+/** One grade level's headcount — GET /students/statistics `by_grade_level`. */
+export interface StudentStatisticsGradeRow extends GenderTally {
+  grade_level: string;
+  /** How many sections make up the grade level. */
+  sections: number;
+}
+
+export interface StudentStatisticsResponse {
+  academic_year: string;
+  /** Years the school has sections or enrolments for, newest first. */
+  academic_years: string[];
+  institution: { title: string; abbr: string; address?: string | null } | null;
+  by_section: StudentStatisticsSectionRow[];
+  by_grade_level: StudentStatisticsGradeRow[];
+  /** On the roll but sitting in no section for the year. */
+  unassigned: GenderTally;
+  totals: GenderTally;
+}
+
+/** A student as printed on a class list. */
+export interface StudentRosterEntry {
+  id: string;
+  lrn?: string | null;
+  first_name: string;
+  middle_name?: string | null;
+  last_name?: string | null;
+  ext_name?: string | null;
+  full_name: string;
+  /** Surname first ("Dela Cruz, Juan Miguel") — how a class list reads. */
+  list_name: string;
+  gender?: string | null;
+  birthdate?: string | null;
+  age?: number | null;
+  religion?: string | null;
+  section?: string | null;
+  grade_level?: string | null;
+}
+
+/** One printed list — a section, or a whole grade level. */
+export interface StudentRosterGroup extends GenderTally {
+  key: string;
+  label: string;
+  section_id: string | null;
+  section: string | null;
+  grade_level: string;
+  adviser: string | null;
+  students: StudentRosterEntry[];
+}
+
+export interface StudentRosterResponse {
+  academic_year: string;
+  group_by: StudentRosterGroupBy;
+  sort: StudentRosterSort;
+  institution: { title: string; abbr: string; address?: string | null } | null;
+  groups: StudentRosterGroup[];
+  totals: GenderTally;
+}
+
+export type StudentRosterGroupBy = 'section' | 'grade_level';
+
+/** `gender` puts the boys before the girls, DepEd SF1 style. */
+export type StudentRosterSort = 'gender' | 'name';
+
 /** Extended personal information from the admission form (1:1 with student). */
 export interface StudentProfile {
   id?: string;
