@@ -1,13 +1,10 @@
 import type { StudentRosterGroup, StudentRosterResponse } from '../../../types'
-
-const escapeHtml = (value: unknown) =>
-  String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-
-const formatNumber = (n: number) => new Intl.NumberFormat('en-PH').format(n)
+import {
+  PRINT_BASE_CSS,
+  PRINT_ON_LOAD_SCRIPT,
+  escapeHtml,
+  formatNumber,
+} from './printSupport'
 
 /** Birthdates arrive as plain `YYYY-MM-DD`, so parse them as local dates. */
 const formatBirthdate = (iso?: string | null) => {
@@ -120,37 +117,21 @@ export function buildRosterPrintHtml(report: StudentRosterResponse): string {
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(scope)} — ${escapeHtml(report.academic_year)}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; color: #111827; margin: 24px; font-size: 12px; }
+  <style>${PRINT_BASE_CSS}
     .sheet { page-break-after: always; }
     .sheet:last-of-type { page-break-after: auto; }
-    header { text-align: center; border-bottom: 2px solid #111827; padding-bottom: 10px; margin-bottom: 12px; }
-    header .inst { font-size: 18px; font-weight: 700; }
-    header .addr { font-size: 11px; color: #4b5563; }
-    header .title { font-size: 14px; font-weight: 600; margin-top: 8px; text-transform: uppercase; letter-spacing: .06em; }
     .meta { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-bottom: 10px; }
     .meta-label { color: #6b7280; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
     /* Fixed widths so consecutive sheets in one run line up column for column,
        whatever the longest LRN or name on each happens to be. */
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border: 1px solid #d1d5db; padding: 4px 8px; text-align: left; word-wrap: break-word; }
-    th { background: #f3f4f6; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; }
+    table { table-layout: fixed; }
     .c-index { width: 5%; }
     .c-lrn { width: 16%; }
     .c-sex { width: 6%; }
     .c-section { width: 16%; }
     .c-birthdate { width: 18%; }
     .c-age { width: 6%; }
-    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-    td.center, th.center { text-align: center; }
-    td.empty { text-align: center; color: #6b7280; font-style: italic; }
     .tally { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 10px; font-weight: 700; }
-    footer { margin-top: 20px; font-size: 10px; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 8px; }
-    /* Repeat the column headings when one section's list runs past a page. */
-    thead { display: table-header-group; }
-    tr { page-break-inside: avoid; }
-    @media print { body { margin: 0; } footer { page-break-before: avoid; } }
   </style>
 </head>
 <body>
@@ -163,7 +144,7 @@ export function buildRosterPrintHtml(report: StudentRosterResponse): string {
     }, ${formatNumber(totals.total)} total ·
     Generated on ${escapeHtml(generatedAt)}
   </footer>
-  <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
+  ${PRINT_ON_LOAD_SCRIPT}
 </body>
 </html>`
 }
