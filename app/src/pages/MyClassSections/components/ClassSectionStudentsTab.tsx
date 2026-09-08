@@ -180,7 +180,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   const { user } = useAuth();
   const pdfBrandColor = brandPrimaryHex(user);
   const masterListFileName = section
-    ? `master-list-grade-${section.grade_level}-${section.title}${section.academic_year ? `-${section.academic_year}` : ''}.pdf`
+    ? `master-list-${section.grade_level}-${section.title}${section.academic_year ? `-${section.academic_year}` : ''}.pdf`
     : 'master-list.pdf';
   const goToStudentDetail = (studentId: string) => {
     navigate(`/students/${studentId}`, { state: { fromClassSectionId: classSectionId } })

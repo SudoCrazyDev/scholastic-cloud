@@ -221,7 +221,7 @@ export const ClassSectionMasterListPDF: React.FC<ClassSectionMasterListPDFProps>
 
         <Text style={[styles.docTitle, { color: brandColor }]}>MASTER LIST OF STUDENTS</Text>
         <Text style={styles.sectionInfo}>
-          Grade {section.grade_level} - {section.title}
+          {[section.grade_level, section.title].filter(Boolean).join(' - ')}
           {section.academic_year ? ` • A.Y. ${section.academic_year}` : ''}
         </Text>
 
