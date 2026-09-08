@@ -29,6 +29,7 @@ export default function Students() {
     error,
     pagination,
     search,
+    sectionFilter,
     selectedRows,
     isModalOpen,
     editingStudent,
@@ -48,6 +49,28 @@ export default function Students() {
     handleDeleteConfirmationClose,
     setSelectedRows,
   } = useStudents()
+
+  /**
+   * What the grid says when it comes back empty. A search or a filter is the
+   * usual reason, and each wants different words — only a genuinely empty
+   * school should be told to create its first student record.
+   */
+  const gridEmptyState = (() => {
+    if (search.value) {
+      return { title: undefined, message: 'No student matches your search.' }
+    }
+    if (sectionFilter.value === 'unassigned') {
+      return {
+        title: 'Everyone has a section',
+        message: 'No student is waiting to be assigned to a section.',
+      }
+    }
+    if (sectionFilter.value === 'assigned') {
+      return { title: undefined, message: 'No student has been assigned to a section yet.' }
+    }
+
+    return { title: undefined, message: undefined }
+  })()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,6 +136,9 @@ export default function Students() {
             <StudentHeader
               search={search.value}
               onSearchChange={search.onSearch}
+              sectionStatus={sectionFilter.value}
+              onSectionStatusChange={sectionFilter.onChange}
+              totalItems={pagination?.totalItems}
               selectedRows={selectedRows}
               onCreate={handleCreate}
               onBulkDelete={handleBulkDelete}
@@ -123,6 +149,8 @@ export default function Students() {
               students={students}
               loading={loading}
               error={error}
+              emptyTitle={gridEmptyState.title}
+              emptyMessage={gridEmptyState.message}
               selectedRows={selectedRows}
               onSelectionChange={setSelectedRows}
               onView={handleView}

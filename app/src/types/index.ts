@@ -2160,6 +2160,13 @@ export interface Student {
   health_record?: StudentHealthRecord | null;
 }
 
+/**
+ * The Records tab's section filter. `unassigned` is the newly enrolled who have
+ * not been put in a section yet — the ones whose Current Section column is
+ * empty.
+ */
+export type StudentSectionStatus = 'all' | 'assigned' | 'unassigned';
+
 /** Male/female/other headcounts, shared by every statistics and roster row. */
 export interface GenderTally {
   male: number;

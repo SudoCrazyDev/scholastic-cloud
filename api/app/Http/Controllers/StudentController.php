@@ -71,6 +71,24 @@ class StudentController extends Controller
             }
         }
 
+        // Whether the student sits in a section at all. "Without a section" is
+        // the newly enrolled who have not been assigned to one yet, and the
+        // registrar's way of finding them.
+        //
+        // Defined against the same active-pivot rows that fill `current_section`
+        // below, so the filter and the grid's Current Section column can never
+        // disagree: every student the filter calls unassigned is exactly one
+        // whose section column reads as empty.
+        if (in_array($request->get('section_status'), ['assigned', 'unassigned'], true)) {
+            $hasActiveSection = fn ($q) => $q->where('student_sections.is_active', true);
+
+            if ($request->get('section_status') === 'unassigned') {
+                $query->whereDoesntHave('sections', $hasActiveSection);
+            } else {
+                $query->whereHas('sections', $hasActiveSection);
+            }
+        }
+
         // Eager-load the student's active section so we can expose its title.
         $query->with(['sections' => function ($q) {
             $q->wherePivot('is_active', true);

@@ -38,6 +38,13 @@ interface StudentGridProps {
   students: Student[]
   loading: boolean
   error: string | null
+  /**
+   * What to say when nothing comes back. Defaults to the first-run copy; a
+   * caller narrowing the list passes its own, since "create your first student
+   * record" is the wrong advice when a filter is what emptied the table.
+   */
+  emptyTitle?: string
+  emptyMessage?: string
   selectedRows: Student[]
   onSelectionChange: (students: Student[]) => void
   onView: (student: Student) => void
@@ -50,6 +57,8 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
   students,
   loading,
   error,
+  emptyTitle = 'No Students Found',
+  emptyMessage = 'Get started by creating your first student record.',
   selectedRows,
   onSelectionChange,
   onView,
@@ -165,8 +174,8 @@ export const StudentGrid: React.FC<StudentGridProps> = ({
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <UserIcon className="w-8 h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Students Found</h3>
-          <p className="text-gray-500">Get started by creating your first student record.</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyTitle}</h3>
+          <p className="text-gray-500">{emptyMessage}</p>
         </div>
       </div>
     )

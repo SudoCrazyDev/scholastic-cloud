@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { studentService } from '../services/studentService'
-import type { Student, CreateStudentData, UpdateStudentData, PaginatedResponse } from '../types'
+import type { Student, CreateStudentData, UpdateStudentData, PaginatedResponse, StudentSectionStatus } from '../types'
 
 // Define response types for different query methods
 type StudentsQueryResponse = 
@@ -12,6 +12,7 @@ type StudentsQueryResponse =
 export function useStudents(options?: { class_section_id?: string }) {
   const queryClient = useQueryClient()
   const [searchValue, setSearchValue] = useState('')
+  const [sectionStatus, setSectionStatus] = useState<StudentSectionStatus>('all')
   const [page, setPage] = useState(1)
   const [selectedRows, setSelectedRows] = useState<Student[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -33,7 +34,7 @@ export function useStudents(options?: { class_section_id?: string }) {
     error,
     refetch,
   } = useQuery<StudentsQueryResponse>({
-    queryKey: ['students', { search: searchValue, page, ...options }],
+    queryKey: ['students', { search: searchValue, sectionStatus, page, ...options }],
     queryFn: async () => {
       // If class_section_id is provided, use getStudentsByClassSection
       if (options?.class_section_id) {
@@ -43,6 +44,7 @@ export function useStudents(options?: { class_section_id?: string }) {
       // Otherwise, use the general getStudents method
       const response = await studentService.getStudents({
         search: searchValue,
+        section_status: sectionStatus,
         page,
         per_page: 70,
       });
@@ -117,6 +119,17 @@ export function useStudents(options?: { class_section_id?: string }) {
       setSearchValue(value)
       setPage(1)
     }
+  }
+
+  // Any change of filter invalidates the page position — page 4 of everyone is
+  // rarely a page of the handful who have no section.
+  const sectionFilter = {
+    value: sectionStatus,
+    onChange: (value: StudentSectionStatus) => {
+      setSectionStatus(value)
+      setPage(1)
+      setSelectedRows([])
+    },
   }
 
   const handleCreate = useCallback(() => {
@@ -211,6 +224,7 @@ export function useStudents(options?: { class_section_id?: string }) {
     error: error?.message || null,
     pagination,
     search,
+    sectionFilter,
     selectedRows,
     isModalOpen,
     editingStudent,

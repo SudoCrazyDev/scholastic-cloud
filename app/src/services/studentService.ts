@@ -1,5 +1,5 @@
 import { api } from '../lib/api'
-import type { Student, CreateStudentData, UpdateStudentData, UpdateAdmissionRecordData, PaginatedResponse } from '../types'
+import type { Student, CreateStudentData, UpdateStudentData, UpdateAdmissionRecordData, PaginatedResponse, StudentSectionStatus } from '../types'
 
 class StudentService {
   private baseUrl = '/students'
@@ -14,6 +14,8 @@ class StudentService {
     /** Single search: matches first_name, middle_name, last_name, or lrn (backend OR) */
     search?: string
     class_section_id?: string
+    /** Narrow to students who do or do not sit in a section; omit for both. */
+    section_status?: StudentSectionStatus
   }) {
     const queryParams = new URLSearchParams()
     
@@ -25,6 +27,9 @@ class StudentService {
     if (params?.last_name) queryParams.append('last_name', params.last_name)
     if (params?.lrn) queryParams.append('lrn', params.lrn)
     if (params?.class_section_id) queryParams.append('class_section_id', params.class_section_id)
+    if (params?.section_status && params.section_status !== 'all') {
+      queryParams.append('section_status', params.section_status)
+    }
 
     const url = `${this.baseUrl}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     
