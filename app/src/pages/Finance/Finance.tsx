@@ -43,6 +43,7 @@ import DashboardStudentsView from './DashboardStudentsView'
 import CollectionsView from './CollectionsView'
 import ReceiptApprovalsView from './ReceiptApprovalsView'
 import { PAYMENT_METHOD_OPTIONS } from './paymentMethods'
+import { planGeneralSplit } from './generalPaymentSplit'
 import DiscountsView from './DiscountsView'
 import DefaultDiscountsView from './DefaultDiscountsView'
 import StudentFeesView from './StudentFeesView'
@@ -1161,6 +1162,20 @@ const Finance: React.FC = () => {
   const cashierGradeLevel = cashierLedgerQuery.data?.data?.grade_level
   const cashierSection = cashierLedgerQuery.data?.data?.section
 
+  /**
+   * Where a lump sum typed into the General / Other field goes.
+   *
+   * Spread across the fees that still owe, in whole pesos, on top of whatever the cashier
+   * typed against them by hand — so the collection posts and prints with fee names on it
+   * and nothing goes on the books as an anonymous "General / Other" line. See
+   * `generalPaymentSplit.ts` for the two rules and why.
+   */
+  const cashierGeneralPlan = useMemo(
+    () =>
+      planGeneralSplit(cashierFeeBreakdown, Number(cashierGeneralAmount) || 0, cashierLineAmounts),
+    [cashierFeeBreakdown, cashierGeneralAmount, cashierLineAmounts]
+  )
+
   // Build the list of fee lines the cashier has entered an amount for.
   const cashierLineItems = useMemo(() => {
     const items: {
@@ -1183,17 +1198,38 @@ const Finance: React.FC = () => {
         })
       }
     }
-    const generalAmount = Number(cashierGeneralAmount)
-    if (cashierGeneralAmount && generalAmount > 0) {
+    // A fee's share of the lump sum joins the amount typed against it rather than
+    // becoming a second line for the same fee: one receipt line per fee is what the
+    // school reconciles, and two lines naming Tuition read as two collections.
+    for (const share of cashierGeneralPlan.shares) {
+      const existing = items.find((item) =>
+        share.is_additional
+          ? item.additional_fee_id === share.fee_id
+          : item.school_fee_id === share.fee_id
+      )
+      if (existing) {
+        existing.amount = Math.round((existing.amount + share.amount) * 100) / 100
+        continue
+      }
+      items.push({
+        school_fee_id: share.is_additional ? null : share.fee_id,
+        additional_fee_id: share.is_additional ? share.fee_id : null,
+        fee_name: share.fee_name,
+        amount: share.amount,
+      })
+    }
+    // Only when there is no fee to name it to — nothing charged for the year yet, or the
+    // ledger did not load — does the money still post unnamed, exactly as it used to.
+    if (cashierGeneralPlan.unassigned > 0) {
       items.push({
         school_fee_id: null,
         additional_fee_id: null,
         fee_name: 'General / Other',
-        amount: generalAmount,
+        amount: cashierGeneralPlan.unassigned,
       })
     }
     return items
-  }, [cashierFeeBreakdown, cashierLineAmounts, cashierGeneralAmount])
+  }, [cashierFeeBreakdown, cashierLineAmounts, cashierGeneralPlan])
 
   const cashierTotal = useMemo(
     () => cashierLineItems.reduce((sum, item) => sum + item.amount, 0),
@@ -1318,6 +1354,16 @@ const Finance: React.FC = () => {
       toast(`Note: payment for ${overpaid.fee_name} exceeds its balance (advance payment).`, {
         icon: '⚠️',
       })
+    }
+
+    // The lump sum can do the same on its own: more came in than the fees still owe, so
+    // the remainder sits on one of them as an advance instead of as unnamed money.
+    const advanced = cashierGeneralPlan.shares.find((share) => share.advance > 0)
+    if (advanced) {
+      toast(
+        `Note: ${formatCurrency(advanced.advance)} of the general payment is an advance on ${advanced.fee_name} — more was paid than the fees still owe.`,
+        { icon: '⚠️', duration: 6000 }
+      )
     }
 
     const payload: CreatePaymentTransactionData = {
@@ -2123,9 +2169,49 @@ const Finance: React.FC = () => {
                         disabled={cashierBusy}
                       />
                     </div>
-                    <p className="mt-1 text-xs text-gray-400">
-                      Not tied to a specific fee — reduces the overall balance.
-                    </p>
+                    {cashierFeeBreakdown.length === 0 && !cashierLedgerQuery.isFetching ? (
+                      <p className="mt-1 text-xs text-gray-400">
+                        Nothing is charged for {cashierPaymentForm.academic_year} yet, so there
+                        are no fees to distribute this across — it posts as a General / Other
+                        payment.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-400">
+                        Spread across the balances above in whole pesos — the receipt names the
+                        fees, so nothing is recorded as a General / Other payment.
+                      </p>
+                    )}
+
+                    {/* Where the lump sum lands, before it is posted: the cashier is about
+                        to print these lines, so they see them first and can retype any of
+                        them on its own fee row. */}
+                    {cashierGeneralPlan.shares.length > 0 && (
+                      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50/70 px-3 py-2">
+                        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Distributed to
+                        </p>
+                        <ul className="divide-y divide-gray-200/70">
+                          {cashierGeneralPlan.shares.map((share) => (
+                            <li
+                              key={share.fee_id}
+                              className="flex items-center justify-between gap-3 py-1"
+                            >
+                              <span className="min-w-0 truncate text-xs text-gray-600">
+                                {share.fee_name}
+                                {share.advance > 0 && (
+                                  <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700">
+                                    {formatCurrency(share.advance)} advance
+                                  </span>
+                                )}
+                              </span>
+                              <span className="shrink-0 text-xs font-medium tabular-nums text-gray-900">
+                                {formatCurrency(share.amount)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

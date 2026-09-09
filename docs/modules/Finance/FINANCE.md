@@ -72,7 +72,10 @@ views' requests.
   **`student_payments` rows** linked by `student_payments.payment_transaction_id` — there is *no*
   separate transaction-items table. A line settles **either** a school fee (`school_fee_id`) or an
   additional fee (`student_additional_fee_id`) — never both; with neither set it is a
-  "General / Other" payment.
+  "General / Other" payment. **New collections no longer make one**: the till distributes a
+  lump sum across the fees before posting (see [Cashiering](#cashiering-financecashiering))
+  and an approval names its fees as it posts, so an unnamed line now means a historical row,
+  a student with nothing charged yet, or a reviewer who deliberately left money unallocated.
 - **Receipt identifiers — `or_number` and `reference_number`** — both **optional**, and
   **neither is unique**. A school writes one OR across several postings routinely: the tuition and
   the ₱60 that came with it go in as two entries, siblings pay on one receipt, an installment is
@@ -233,6 +236,9 @@ views' requests.
   `ReceiptPrintModal.tsx`, `DataClearingView.tsx`, `PaymentPlansView.tsx` (standalone page),
   `ReceiptApprovalsView.tsx` (takes `embedded` + `studentId` — also rendered inside Cashiering,
   scoped to the selected student).
+- Lump-sum distribution: `src/pages/Finance/generalPaymentSplit.ts` — `planGeneralSplit()` and
+  `takesGeneralShare()`, how a "General / Other" amount typed at the till is spread across the
+  fees before it posts (see [Cashiering](#cashiering-financecashiering)).
 - Shared constants: `src/pages/Finance/paymentMethods.ts` — the mode-of-payment list. Only the
   till offers this choice; a receipt approval does not, because the mode is already settled by the
   proof of payment the student uploaded.
@@ -369,12 +375,45 @@ charge / discount / paid / outstanding, read from that student's `GET /students/
 The POS. Debounced student search (min 2 chars) → select a student → their ledger
 `fee_breakdown` loads (reusing `GET /students/{id}/ledger`) showing each fee's outstanding
 balance. The cashier types amounts per fee line (a "Pay full" shortcut fills the outstanding
-amount), plus an optional "General / Other" free-form line, payment method, OR number,
+amount), plus an optional "General / Other" lump sum, payment method, OR number,
 reference number, amount tendered (change computed client-side). Overpaying a line only warns
 (advance payment is allowed). Submit → `POST /student-payments` with `items[]` → creates one
 `PaymentTransaction` + one `StudentPayment` per line, returns the transaction, and opens
 `ReceiptPrintModal` for printing. Invalidates `finance-dashboard`, `student-ledger`,
 `cashier-ledger` query keys.
+
+**The lump sum is distributed before it posts** (`generalPaymentSplit.ts`,
+`planGeneralSplit`), so the till no longer writes a "General / Other" line at all: the
+amount is spread across the fees that still owe and the receipt posts and prints with fee
+names on it. Two rules, both of them what a cashier would do by hand:
+
+- **In proportion to what each fee still owes** — the same share the ledger already applied
+  to a general collection (`FeeBreakdownBuilder`), so the balances the till was showing are
+  the balances it comes back with, and by the same rule late fees and cash-basis fees take
+  no share (they sit outside the schedule and are settled only by money named to them —
+  `takesGeneralShare`). What the cashier typed against a fee by hand comes off its room
+  first, so a lump sum on top of a fee already paid in full goes to the *other* fees, and a
+  fee's share joins the line the cashier typed rather than becoming a second line naming
+  the same fee.
+- **Whole pesos.** Each share is floored to a peso and the remainder handed out a peso at a
+  time by largest fractional share. Centavos appear only where they must: settling a fee
+  whose balance is not a round peso (a fee with less than a peso of room takes exactly its
+  room, so it reads settled rather than a centavo short), and the tail of a lump sum that
+  was not a round peso itself. Given round balances and a round payment, every share is
+  round.
+
+The shares total the amount typed, exactly — a split that lands a centavo short pays the
+bill a centavo short. Anything past what the fees owe stays named too: it lands on the fee
+with the most room as an **advance**, badged in the preview and toasted on submit, rather
+than going back on the books as money nobody can trace to a charge. The cashier sees the
+whole distribution under the input before posting and can retype any of it on the fee's own
+row. The one case that still posts unnamed is a student with **no fees charged for the
+year** (or a ledger that failed to load) — there is nothing to name it to, and the panel
+says so.
+
+Older General / Other collections keep floating as they always did, and the backlog is
+named by [Fee Naming](#setup--fee-naming-financefee-naming--feenamingviewtsx). The API still
+accepts an unnamed line; it is the till that no longer sends one.
 
 A reused OR or reference number does not stop the post: it comes back on the 201 as
 `warnings.or_number` / `warnings.reference_number` and is shown as a ⚠️ toast after the success one,
@@ -590,8 +629,9 @@ either — the till, a reprint and the queue's row expansion all fall back to
 that money across the fees that still owe every time a ledger is read (`general_applied`).
 What was missing was the money written down, so an individual collection could be
 reconciled fee by fee. Approvals made from Sep 2026 onward name their fees at approval
-time (see [Receipt Approvals](#receipt-approvals-financereceipt-approvals--receiptapprovalsviewtsx));
-this clears the backlog that predates that.
+time (see [Receipt Approvals](#receipt-approvals-financereceipt-approvals--receiptapprovalsviewtsx)),
+and the till distributes its lump sums before posting (see
+[Cashiering](#cashiering-financecashiering)); this clears the backlog that predates both.
 
 **The safety property, and it is the whole design.** Every figure a run writes is one the
 ledger is already reporting — the shares come from `FeeBreakdownBuilder::forStudent()` and
