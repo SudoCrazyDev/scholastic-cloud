@@ -162,7 +162,8 @@ class CurriculumTree
     }
 
     /**
-     * The domains that appear in one (area, term), in print order.
+     * The domains of an area, in print order — of one term, or of the whole
+     * year when no term is named.
      *
      * A domain is either year-spanning (`term = 0`) or owned by one term.
      * Mathematics prints two per term drawn from three across the year, so
@@ -170,14 +171,92 @@ class CurriculumTree
      *
      * @return array<int, array<string, mixed>>
      */
-    public function domainsFor(MatatagLearningArea $area, int $term): array
+    public function domainsFor(MatatagLearningArea $area, ?int $term = null): array
     {
         return MatatagDomain::where('learning_area_id', $area->id)
-            ->whereIn('term', [0, $term])
+            // No term named means the whole year, which is what a PACE form
+            // prints. The entry grid always names one.
+            ->when($term !== null, fn ($q) => $q->whereIn('term', [0, $term]))
             ->orderBy('term')->orderBy('sort_order')
             ->get()
             ->map(fn (MatatagDomain $d) => $this->domain($d))
             ->values()->all();
+    }
+
+    /**
+     * One learning area's rows as the PACE form prints them: every rateable
+     * competency of the whole year, each carrying all of its slots.
+     *
+     * This is `columnsFor()` turned ninety degrees. The entry grid is one term
+     * wide and slots are its columns; the PACE form is a year long, competencies
+     * are its rows, and a competency's slots are the boxes along the row — one
+     * per (term, macro skill) it is actually assessed in. So a Reading &
+     * Literacy competency taught in all three terms prints one row with up to
+     * twelve boxes, while a GMRC value prints one row with one.
+     *
+     * Only rateable competencies appear. A numbered parent holds no slots — its
+     * lettered children carry the marks — so it contributes its label and text
+     * to each child row via `parent_label` / `parent_text` rather than a row of
+     * its own with nothing to fill in.
+     *
+     * The ordering tuple is `columnsFor()`'s minus the slot, and for the same
+     * reason: `sort_order` counts within a parent, so sorting on it alone
+     * interleaves children with their parents' neighbours.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function paceRowsFor(MatatagLearningArea $area): array
+    {
+        $competencies = MatatagCompetency::where('learning_area_id', $area->id)->get();
+        $byId = $competencies->keyBy('id');
+
+        $slots = MatatagCompetencySlot::where('learning_area_id', $area->id)
+            ->orderBy('term')->orderBy('sort_order')
+            ->get()
+            ->groupBy('competency_id');
+
+        $rows = [];
+
+        foreach ($competencies as $competency) {
+            $own = $slots[$competency->id] ?? collect();
+
+            if ($own->isEmpty()) {
+                continue;
+            }
+
+            $parent = $competency->parent_id ? ($byId[$competency->parent_id] ?? null) : null;
+            $top = $parent ?? $competency;
+
+            $rows[] = [
+                'order' => [$top->term, $top->sort_order, $parent ? $competency->sort_order : 0],
+                'row' => [
+                    'competency_id' => $competency->id,
+                    'path' => $competency->path,
+                    'domain_id' => $competency->domain_id,
+                    'term' => $competency->term,
+                    'number' => $competency->number,
+                    'letter' => $competency->letter,
+                    'label' => $competency->label,
+                    'text' => $competency->text,
+                    // GMRC's `text` is the value cultivated and this is the
+                    // Filipino sentence printed beside it; null everywhere else.
+                    'performance_standard' => $competency->performance_standard,
+                    'extra' => $competency->extra,
+                    'parent_label' => $parent?->label,
+                    'parent_text' => $parent?->text,
+                    'slots' => $own->map(fn (MatatagCompetencySlot $s) => [
+                        'id' => $s->id,
+                        'term' => $s->term,
+                        'macro_skill' => $area->uses_macro_skills ? $s->macro_skill : null,
+                        'sort_order' => $s->sort_order,
+                    ])->values()->all(),
+                ],
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => $a['order'] <=> $b['order']);
+
+        return array_column($rows, 'row');
     }
 
     /**

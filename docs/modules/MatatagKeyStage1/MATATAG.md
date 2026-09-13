@@ -368,7 +368,8 @@ Rows marked *planned* do not exist yet. Everything else is built and tested.
 | `api/app/Http/Controllers/Concerns/ResolvesMatatagSection.php` | **the single place every cross-tenant guard lives** | |
 | `api/app/Http/Controllers/Matatag{Reference,Curriculum,Section,Grid,Narrative,Attendance}Controller.php` | the six controllers | |
 | `api/tests/Feature/Matatag/*` | opt-in, grid, narratives, attendance, access — sharing a two-school fixture | |
-| `api/app/Http/Controllers/MatatagProgressReportController.php` | the report-card + PACE payload | *planned* |
+| `api/app/Services/Matatag/ProgressReport.php` | composes the card and the forms; the one place the payload's shape is decided | |
+| `api/app/Http/Controllers/MatatagProgressReportController.php` | the report-card + PACE payload, section-wide or one learner | |
 
 Routes in `api/routes/api.php`, near the Proficiency / Core Value Marking block.
 **`feature:matatag-grading` wraps the whole group** rather than being repeated per route, so a route
@@ -390,7 +391,35 @@ reaches this at a school that has not been switched on.
 
 `set-up` is separate from `manage` on purpose: deciding how a whole year is reported is not the same
 act as recording one learner's descriptor, and a school must be able to grant the second without the
-first.
+first. Printing, by contrast, is `view` on both report routes: a curriculum head who may not mark a
+learner may still print the card.
+
+#### The progress-report payload
+
+The shape *is* the model. The body of the card is `narratives` + `attendance` + `legend`; the
+descriptor grid is **not on the card** — DepEd prints it on the attached PACE forms — so it lives
+under `pace` and nowhere else. There is no key anywhere in the response for an average, a final
+grade, a score, a weight or a transmutation, not even as null: a field that exists eventually gets
+filled in. `MatatagProgressReportTest` walks the whole nested response asserting that, rather than
+trusting the composer to have been written carefully.
+
+**The catalog is hoisted.** Competency text is the bulk of the payload and is identical for every
+learner, so it is emitted once under `pace.learning_areas` and each learner carries only a flat
+`slot_id => descriptor` map.
+
+**Three PACE scopes, and the caller is told which it got.** A whole section across all five areas is
+50 × 604 descriptors and ~600 printed pages, and it is the one combination nobody should reach by
+accident. Naming a learner gives `all_areas`; naming a learning area gives `one_area` for the whole
+class; naming neither gives `omitted` — the report cards without the forms, plus a `note` saying so.
+
+**Descriptors are scoped by institution and year, not by class section.** A child who moves between
+two Grade 1 sections in October must not have Term 1 missing from their own card — the marks are the
+learner's. But the `institution_id` filter stays, because a transferred-in child leaves a term of
+descriptors behind at the school they came from and those must not print on this one's form.
+
+**Ages are computed from the school year's own month rows**, never from `now()`. `config/app.php`
+hardcodes UTC while the schools are in Asia/Manila; a learner's printed age is not something to be
+eight hours wrong about.
 
 ### Frontend
 
@@ -458,8 +487,10 @@ instrument.
 
 ## Not yet wired
 
-- **The progress report card and the PACE forms.** The descriptors, narratives and attendance are
-  all recorded and readable; nothing prints them yet. That is the next piece of work.
+- **Rendering the progress report card and the PACE forms.** `GET matatag/progress-report` composes
+  and serves the whole payload; nothing draws it yet. The renderers are `@react-pdf/renderer`
+  documents — the only PDF precedent in the repo, there being no server-side PDF library and no
+  Blade layer — and are the next piece of work.
 - **Grades 2 and 3.** No catalog exists. Their workbooks have not been obtained, and their structure
   may differ from Grade 1's in which learning areas exist, whether an area has domains, and whether
   its list spans the year or restarts each term.
@@ -478,3 +509,12 @@ instrument.
 - **Mid-year migration of a live section between catalog versions** — deliberately unsupported.
 - **A narrative length cap.** Unbounded text in a fixed DepEd box has no correct rendering; a cap
   (~600 chars/field) needs sign-off from whoever owns the DepEd relationship.
+- **A learner enrolled at two schools at once cannot hold two MATATAG records.** Both
+  `matatag_competency_ratings` and `matatag_term_narratives` are unique on `(student_id,
+  academic_year, …)` with no institution in the key, so School B's save would overwrite School A's.
+  In practice this is unreachable today: `student_institutions` is
+  `UNIQUE (student_id, is_active)`, so a student has at most one *active* institution — and note that
+  MySQL silently drops that index's `->where('is_active', true)` clause, since it has no partial
+  indexes. Left alone deliberately: adding `institution_id` to two unique keys on tables that now
+  hold data is not worth doing for a case the enrolment schema already forbids. Worth knowing if
+  that enrolment constraint is ever relaxed. Reads are institution-scoped either way.

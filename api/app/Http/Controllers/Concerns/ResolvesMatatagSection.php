@@ -189,6 +189,7 @@ trait ResolvesMatatagSection
             ->orderBy('students.first_name')
             ->select([
                 'students.id',
+                'students.lrn',
                 'students.first_name',
                 'students.middle_name',
                 'students.last_name',

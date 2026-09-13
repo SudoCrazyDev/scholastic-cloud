@@ -68,10 +68,15 @@ class TermAttendance
         $learners = [];
 
         foreach ($roster as $student) {
+            $own = $attendance[$student->id] ?? [];
+
             $learners[] = [
                 'student_id' => $student->id,
-                'months' => $this->monthsFor($attendance[$student->id] ?? [], $rows, $classDays),
-                'terms' => $this->termTotals($attendance[$student->id] ?? [], $rows, $classDays),
+                'months' => $this->monthsFor($own, $rows, $classDays),
+                'terms' => $this->termTotals($own, $rows, $classDays),
+                // Summed here rather than by each caller, so the report card's
+                // annual total and a screen's running total cannot disagree.
+                'total' => $this->total($own, $rows, $classDays),
             ];
         }
 

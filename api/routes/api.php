@@ -32,6 +32,7 @@ use App\Http\Controllers\MatatagAttendanceController;
 use App\Http\Controllers\MatatagCurriculumController;
 use App\Http\Controllers\MatatagGridController;
 use App\Http\Controllers\MatatagNarrativeController;
+use App\Http\Controllers\MatatagProgressReportController;
 use App\Http\Controllers\MatatagReferenceController;
 use App\Http\Controllers\MatatagSectionController;
 use App\Http\Controllers\PaymentIdentifierController;
@@ -738,6 +739,14 @@ Route::middleware('auth.token')->group(function () {
             ->middleware('module:matatag-grading,manage');
 
         Route::get('matatag/attendance', [MatatagAttendanceController::class, 'index'])
+            ->middleware('module:matatag-grading,view');
+
+        // Printing a report card is reading, so both of these are `view`. The
+        // learner-scoped one is declared after the section one because
+        // '/progress-report' must not be captured as a {studentId}.
+        Route::get('matatag/progress-report', [MatatagProgressReportController::class, 'index'])
+            ->middleware('module:matatag-grading,view');
+        Route::get('matatag/progress-report/{studentId}', [MatatagProgressReportController::class, 'show'])
             ->middleware('module:matatag-grading,view');
     });
     // SF9 routes
