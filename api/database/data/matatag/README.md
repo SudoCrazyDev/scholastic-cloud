@@ -6,7 +6,7 @@ of DepEd's workbooks.
 | | |
 |---|---|
 | `extract.py` | reads a DepEd workbook, writes a catalog JSON, prints a report |
-| `grade-1.v1.json` | Grade 1, from `2026_v1.0` of the workbook — 199 competencies, 606 slots |
+| `grade-1.v1.json` | Grade 1, from `2026_v1.0` of the workbook — 199 competencies, 604 slots |
 
 Loaded by `App\Services\Matatag\CatalogLoader`, which a data migration calls so
 the catalog arrives everywhere a deploy does. `php artisan matatag:load-catalog`
@@ -29,9 +29,10 @@ Needs `openpyxl`. It only ever reads the workbook.
 ## Read the report
 
 The script prints per-area counts, slots per term, unknown fill colours and an
-**anomalies** list. A run with anomalies is normal — DepEd's own file has six
-defects — but each one is a judgement the script made on your behalf, and you
-should agree with it before loading. A silent run is not a successful run.
+**anomalies** list. A run with anomalies is normal — DepEd's own file has
+several defects — but each one is a judgement the script made on your behalf,
+and you should agree with it before loading. A silent run is not a successful
+run. Grade 1 currently reports six anomalies.
 
 Cross-check the counts by hand against the PACE sheets. The loader asserts the
 JSON's own `counts` against what it actually inserts and rolls back the whole
@@ -46,15 +47,37 @@ answer two different questions:
 - **`PACE - GRADE 1`** gives the competency tree: numbering, lettered children,
   domain bands, wording, and GMRC's performance standards.
 - **The class-summary sheets** (`TERM n READING & LITERACY` and friends) say
-  which slots exist in which term. **A slot exists in a term if and only if its
-  cell carries a macro-skill fill colour in that term's sheet.** Cells for a
-  competency not taught that term are filled black or with a theme colour.
+  which slots exist in which term, and whose they are. **A slot exists in a term
+  if and only if its cell carries a macro-skill fill colour in that term's
+  sheet.** Cells for a competency not taught that term are filled black or with
+  a theme colour. Rows 12 and 13 above the cell name the competency it belongs
+  to.
 
 The fills are authoritative. Both signals were compared across all three
 Reading & Literacy sheets and agree exactly (74 / 76 / 91), disagreeing only
 where DepEd's formulas are wrong. Reading existence from the fills keeps those
 defects out of the catalog for free, and every area and term now reconciles
 against the workbook exactly.
+
+### Never carry a column number between term sheets
+
+The three term sheets **do not share a column layout**. `TERM 3 LANGUAGE` is two
+columns wider than Terms 1 and 2, because DepEd inserted an extra child pair
+under competency 6, so every column after it is shifted by two.
+
+Looking a Term-1 column number up in the Term-3 sheet therefore reads a
+neighbour's cell — and nearly gets away with it, because where both children are
+assessed it lands on another filled cell and **the totals still come out right**.
+In Grade 1 it cost one pair: Language competency 8 is assessed on child `b` in
+Term 3, and the shifted read credited it to child `a`.
+
+Each sheet is read entirely on its own, so a layout that shifts cannot
+misattribute anything. Two quirks of DepEd's heading rows, both handled: row 13
+is written only on the first column of a child's pair, so a blank inherits the
+letter to its left; and a competency with no lettered children repeats its own
+number on row 13, which means "no child".
+
+**Assume the next grade level's workbook has the same class of defect.**
 
 ## The macro-skill palette
 
@@ -82,7 +105,8 @@ add them in both places and re-run.
 3. Read the report. Resolve every anomaly and every unknown fill.
 4. Commit the JSON here.
 5. Add a data migration calling
-   `CatalogLoader::load(database_path('data/matatag/grade-2.v1.json'), setDefault: true)`.
+   `(new CatalogLoader)->loadFile(database_path('data/matatag/grade-2.v1.json'), makeDefault: true, force: true)`,
+   modelled on `2026_09_14_000006_load_matatag_ks1_grade_1_catalog.php`.
 
 No code changes. Different learning areas, different domains, a different shape
 per area, different pacing and a new macro skill are all absorbed as data — see
@@ -97,13 +121,14 @@ recorded against it.
 
 ## Defects in DepEd's Grade 1 workbook
 
-All six are handled and reported. They are described in full in the module doc.
+All are handled and reported. They are described in full in the module doc.
 
 | Where | What the script does |
 |---|---|
 | `PACE!I109`, `I110` — a Language competency reads from a Reading & Literacy sheet | drops the formula; the fills supply the right slots |
 | `PACE!R112` reads Term 2, `PACE!R141` reads Term 1, where Term 3 is meant | harmless — the fills decide the term, not the formula |
 | Maths Term 2 numbers competency 3's children as top-level 3, 4 and 5 | keeps them as children `b` and `c`, drops the stray numbers |
-| Language 20e in Term 3 is filled but no PACE formula reads it | recovers the two slots from the class-summary header |
+| `TERM 3 LANGUAGE` is two columns wider than Terms 1 and 2 | reads every sheet on its own headings, so nothing is misattributed |
+| `TERM 3 LANGUAGE` `AS`/`AT` duplicate competency `6b`'s heading | reports the duplicate column and drops it — Term 3 Language has 95 slots, not the 97 cells that are filled |
 | `SF9!Q27` shows July's attendance figure for August | not used — attendance is derived from the platform's own records |
 | GMRC Term 3 competency 3 repeats competency 4's performance standard | carried through verbatim; DepEd's text, not ours to correct |

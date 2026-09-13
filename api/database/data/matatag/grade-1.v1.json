@@ -8,7 +8,7 @@
  },
  "counts": {
   "competencies": 199,
-  "slots": 606
+  "slots": 604
  },
  "learning_areas": [
   {
@@ -1830,7 +1830,7 @@
    "sort_order": 2,
    "counts": {
     "competencies": 64,
-    "slots": 275
+    "slots": 273
    },
    "domains": [
     {
@@ -2788,16 +2788,6 @@
          "term": 2,
          "macro_skill": "speaking",
          "sort_order": 4
-        },
-        {
-         "term": 3,
-         "macro_skill": "listening",
-         "sort_order": 5
-        },
-        {
-         "term": 3,
-         "macro_skill": "speaking",
-         "sort_order": 6
         }
        ]
       },
@@ -2809,9 +2799,20 @@
        "text": "b. school",
        "term": 0,
        "domain": "language-for-developing-and-expressing-ideas",
-       "is_rateable": false,
+       "is_rateable": true,
        "sort_order": 2,
-       "slots": []
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        }
+       ]
       },
       {
        "path": ".8.c",
@@ -3414,12 +3415,12 @@
       },
       {
        "term": 3,
-       "macro_skill": "speaking",
+       "macro_skill": "listening",
        "sort_order": 5
       },
       {
        "term": 3,
-       "macro_skill": "listening",
+       "macro_skill": "speaking",
        "sort_order": 6
       }
      ]
@@ -4063,16 +4064,6 @@
          "term": 3,
          "macro_skill": "speaking",
          "sort_order": 6
-        },
-        {
-         "term": 3,
-         "macro_skill": "listening",
-         "sort_order": 7
-        },
-        {
-         "term": 3,
-         "macro_skill": "speaking",
-         "sort_order": 8
         }
        ]
       }

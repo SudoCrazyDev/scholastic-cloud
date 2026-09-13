@@ -20,15 +20,27 @@ Two sheets, used for two different things:
   competency's marks live in, via its VLOOKUP formulas.
 
 * **The class-summary sheets** (`TERM n READING & LITERACY` and friends) say
-  which of those slots actually *exist* in a given term. A slot exists iff its
-  cell carries a macro-skill fill colour in that term's sheet; cells for a
-  competency not taught that term are filled black or with a theme colour.
+  which slots actually *exist* in a given term, and whose they are. A slot
+  exists iff its cell carries a macro-skill fill colour in that term's sheet
+  — cells for a competency not taught that term are filled black or with a
+  theme colour — and rows 12 and 13 above the cell name the competency it
+  belongs to.
 
-The fills are authoritative, not the formulas. Both signals were compared
-across all three Reading & Literacy sheets and agree exactly (74/76/91), except
-for two cells in Term 3 where the PACE formulas point at the wrong sheet — a
-bug in DepEd's file. Reading existence from the fills keeps those four known
-formula bugs out of the catalog for free.
+**Each class-summary sheet is read entirely on its own**, and nothing is
+carried between them. That is not fussiness. The three term sheets do not share
+a column layout: `TERM 3 LANGUAGE` is two columns wider than Terms 1 and 2,
+because an extra child pair was inserted under competency 6. Taking a
+competency's columns from the PACE formulas and looking those column numbers up
+in each term's sheet — the obvious approach, and the one this script used
+first — therefore reads a neighbour's cell from competency 6 onwards, and
+does it silently, because where both children are assessed it lands on another
+filled cell and the count still comes out right. It cost exactly one pair in
+Grade 1: Language competency 8 is assessed on child b in Term 3 and was
+credited to child a. Assume the next workbook has the same shape of defect.
+
+The fills and headings are therefore authoritative and the PACE formulas are
+used only for the competency tree and its wording. That also keeps DepEd's four
+known formula bugs out of the catalog for free.
 
 ## Output
 
@@ -381,40 +393,129 @@ class Extractor:
     # -- turning references into slots --------------------------------------
 
     def slots_for(self, area, refs):
-        """Which terms a competency is actually marked in, and under which skill.
+        """Slots for an area with no macro skills: one per PACE rating cell.
 
-        For Reading & Literacy and Language the answer is in the fills: one
-        class-summary sheet per term, and a column is live in that term only if
-        its cell is filled with a macro-skill colour. For the other three areas
-        there is one sheet and the term comes from the "Term N" band, so a
-        reference is the slot.
+        Mathematics, GMRC and Makabansa print a single rating column per
+        competency, and the term comes from the enclosing "Term N" band rather
+        than from the cell, so a reference simply *is* a slot. Areas that use
+        macro skills do not come through here at all — see
+        `assign_slots_from_headers`, which reads the class-summary sheet
+        instead.
         """
-        slots = []
+        return [
+            {"term": None,                    # filled in by the caller
+             "macro_skill": NO_MACRO_SKILL,
+             "column": ref["column"]}
+            for ref in refs
+        ]
 
-        if not area["uses_macro_skills"]:
-            for ref in refs:
-                slots.append({
-                    "term": None,                 # filled in by the caller
-                    "macro_skill": NO_MACRO_SKILL,
-                    "column": ref["column"],
-                })
-            return slots
+    def column_owner(self, sheet):
+        """Which competency each column of a class-summary sheet belongs to.
 
-        columns = sorted({ref["column"] for ref in refs})
-        for term in (1, 2, 3):
-            sheet = self.book[area["sheets"][term]]
-            for column in columns:
+        The sheet says so itself: row 12 carries the competency number and row
+        13 the lettered child. Two quirks of how DepEd fills those in:
+
+        * Row 13 is written only on the FIRST column of a child's pair — the
+          "Speaking" column beside it is left blank — so a blank inherits the
+          letter to its left.
+        * A competency with no lettered children repeats its own number on row
+          13 rather than leaving it empty, which means "no child", not "child
+          19".
+
+        Yields (column, number, letter).
+        """
+        number, letter = None, None
+
+        for column in range(11, sheet.max_column + 1):
+            heading = clean(merged_value(sheet, 12, column))
+            child = clean(merged_value(sheet, 13, column))
+
+            if heading is not None and heading != number:
+                number, letter = heading, None
+
+            if child is not None:
+                if child == number:
+                    letter = None
+                elif len(child) <= 2 and child.isalpha():
+                    letter = child
+
+            yield column, number, letter
+
+    def assign_slots_from_headers(self, area, items):
+        """Read a macro-skill area's slots straight off the class-summary sheets.
+
+        ## Why not from the PACE formulas
+
+        The obvious approach — take the columns a competency's PACE VLOOKUPs
+        point at, then look those column numbers up in each term's sheet — is
+        wrong, and wrong in a way that hides. It assumes the three term sheets
+        share one column layout. DepEd's Grade 1 file breaks that: `TERM 3
+        LANGUAGE` is two columns wider than its Term 1 and Term 2 siblings,
+        because an extra child pair was inserted under competency 6, and every
+        column after it is shifted by two. Reading Term 1's column numbers
+        against the Term 3 sheet therefore lands on a neighbour's cell.
+
+        It very nearly gets away with it, which is the dangerous part: where
+        both children of a competency are assessed in Term 3 the shifted read
+        lands on another filled cell and the *count* still comes out right.
+        Grade 1 lost exactly one pair this way — Language competency 8 is
+        assessed on child b in Term 3, and the shifted read credited it to
+        child a.
+
+        So each sheet is read entirely on its own terms: a cell's fill says
+        whether a slot exists and which macro skill it is, and rows 12/13 above
+        it say whose it is. Nothing is carried between sheets, so a layout that
+        shifts cannot misattribute anything.
+
+        ## Duplicates
+
+        The same insertion left `TERM 3 LANGUAGE` with two adjacent pairs both
+        labelled competency 6b. A second column for one (competency, term,
+        skill) is DepEd's copied label, not a second assessment, so it is
+        reported and dropped rather than counted.
+        """
+        seen = {}
+
+        for term, sheet_name in sorted(area["sheets"].items()):
+            sheet = self.book[sheet_name]
+
+            for column, number, child in self.column_owner(sheet):
                 argb = fill_of(sheet, area["learner_row"], column)
                 skill = MACRO_SKILL_FILLS.get(argb)
+                letter = get_column_letter(column)
+
                 if skill is None:
                     if argb and argb not in ("FF000000", "00000000"):
-                        letter = openpyxl.utils.get_column_letter(column)
-                        self.unknown_fills.setdefault(
-                            argb, "%s!%s" % (area["sheets"][term], letter))
+                        self.unknown_fills.setdefault(argb, "%s!%s" % (sheet_name, letter))
                     continue  # not taught this term
-                slots.append({"term": term, "macro_skill": skill, "column": column})
 
-        return slots
+                if number is None:
+                    self.note(area["key"], "%s!%s" % (sheet_name, letter),
+                              "column is filled for %s but rows 12/13 name no competency "
+                              "- SLOT LOST, fix before loading" % skill)
+                    continue
+
+                node = self.find_node(items, number, child)
+
+                if node is None:
+                    self.note(area["key"], "%s!%s" % (sheet_name, letter),
+                              "column is filled for %s but its heading (%s%s) matches no "
+                              "competency on the PACE form - SLOT LOST, fix before loading"
+                              % (skill, number, child or ""))
+                    continue
+
+                key = (id(node), term, skill)
+
+                if key in seen:
+                    self.note(area["key"], "%s!%s" % (sheet_name, letter),
+                              "second %s column for competency %s%s in term %d, duplicating "
+                              "%s - DepEd copied a heading when inserting a column; dropped"
+                              % (skill, number, child or "", term, seen[key]))
+                    continue
+
+                seen[key] = letter
+                node.setdefault("fill_slots", []).append(
+                    {"term": term, "macro_skill": skill, "column": column})
 
     def find_node(self, items, number, letter):
         """The competency a class-summary column header names."""
@@ -428,58 +529,6 @@ class Extractor:
                     return child
         return None
 
-    def recover_orphans(self, area, items):
-        """Attach slots the PACE form forgot to print a rating cell for.
-
-        The fills are authoritative: a column filled with a macro-skill colour
-        is a slot, whether or not any formula points at it. DepEd's Grade 1
-        file has two such columns - Language competency 20e in Term 3, on a
-        sheet three columns wider than its Term 1 and Term 2 siblings, with no
-        PACE formula anywhere for either.
-
-        Dropping them would lose two assessable slots. The class-summary sheet
-        names its own owner in the header rows (competency number on row 12,
-        child letter on row 13), so read the owner from there instead.
-        """
-        if not area["uses_macro_skills"]:
-            return
-
-        claimed = set()
-
-        def walk(nodes):
-            for node in nodes:
-                claimed.update(ref["column"] for ref in node["refs"])
-                walk(node["children"])
-
-        walk(items)
-
-        for term, sheet_name in sorted(area["sheets"].items()):
-            sheet = self.book[sheet_name]
-            for column in range(11, sheet.max_column + 1):
-                if column in claimed:
-                    continue
-                if MACRO_SKILL_FILLS.get(fill_of(sheet, area["learner_row"], column)) is None:
-                    continue
-
-                letter = get_column_letter(column)
-                number = clean(merged_value(sheet, 12, column))
-                child = clean(merged_value(sheet, 13, column))
-                node = self.find_node(items, number, child)
-                if node is None:
-                    self.note(area["key"], "%s!%s" % (sheet_name, letter),
-                              "column is filled for a macro skill but no PACE formula "
-                              "reads it, and its header (%s/%s) matches no competency - "
-                              "SLOT LOST, fix before loading" % (number, child))
-                    continue
-
-                node["refs"].append({"column": column, "term": term})
-                claimed.add(column)
-                self.note(area["key"], "%s!%s" % (sheet_name, letter),
-                          "column is filled for a macro skill but no PACE formula reads "
-                          "it; recovered onto competency %s%s from the sheet header "
-                          "(a known defect in DepEd's workbook)"
-                          % (number, child or ""))
-
     def build_area(self, area, sort_order):
         items, domains = [], []
         for block in area["blocks"]:
@@ -491,7 +540,8 @@ class Extractor:
                     domain = dict(domain, sort_order=len(domains) + 1)
                     domains.append(domain)
 
-        self.recover_orphans(area, items)
+        if area["uses_macro_skills"]:
+            self.assign_slots_from_headers(area, items)
 
         competencies = []
         counts = {"competencies": 0, "slots": 0}
@@ -506,10 +556,13 @@ class Extractor:
             else:
                 path = "%s.r%d" % (prefix, node["row"])
 
-            slots = self.slots_for(area, node["refs"])
-            for slot in slots:
-                if slot["term"] is None:
-                    slot["term"] = term or 1
+            if area["uses_macro_skills"]:
+                slots = list(node.get("fill_slots", []))
+            else:
+                slots = self.slots_for(area, node["refs"])
+                for slot in slots:
+                    if slot["term"] is None:
+                        slot["term"] = term or 1
             slots.sort(key=lambda s: (s["term"], s["column"]))
 
             out = OrderedDict()

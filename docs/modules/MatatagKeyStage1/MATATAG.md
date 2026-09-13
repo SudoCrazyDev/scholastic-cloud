@@ -98,7 +98,7 @@ fifteen-line migration**, never a schema change.
 | Different descriptor wording | `config/matatag.php` | config only |
 | A **new per-competency text field** | `matatag_competencies.extra` (json) | none |
 
-Nothing in code may hardcode Grade 1's shape. In particular **199 and 606 are not constants** — the
+Nothing in code may hardcode Grade 1's shape. In particular **199 and 604 are not constants** — the
 loader asserts each file's *own* per-area counts, so each grade level asserts its own totals. The
 entry grid renders whatever `columns` the API returns and branches only on the
 `uses_macro_skills` / `has_domains` / `carries_values` flags — never on an area key or a grade level.
@@ -147,10 +147,10 @@ reproducible. If a future workbook uses different shades, add them there.
 
 ### A slot is (competency × macro skill × term)
 
-This is the load-bearing definition, and it was **proven rather than inferred**. Each learning
-area's class-summary sheet is a fixed 101-column grid — the *union* of all slots across the three
-terms — and a slot exists in a term **iff its cell carries a macro-skill fill in that term's sheet**.
-Two independent signals were compared:
+This is the load-bearing definition, and it was **proven rather than inferred**. A slot exists in a
+term **iff its cell carries a macro-skill fill in that term's class-summary sheet**, and the
+competency it belongs to is named by rows 12 and 13 directly above the cell. Two independent signals
+were compared:
 
 | Sheet | Macro-skill-filled cells | Cells referenced by `PACE` formulas | Agreement |
 |---|---|---|---|
@@ -163,9 +163,38 @@ and `T` in T3 — which are the `PACE!I109`/`I110` cells listed below as a formu
 Two independent readings agree everywhere except on a known defect.
 
 **Consequence: "blocked" is not a slot property.** A slot simply has no row for a term it is not
-taught in. The workbook shows 101 columns because one sheet template is reused per term; our grid
-renders only the term's real slots. **Extract from the fills, not the formulas** — that alone keeps
-the four known formula bugs out of the catalog.
+taught in. Our grid renders only the term's real slots.
+
+### Read each term's sheet on its own. Never carry a column number between them.
+
+This is the single most important rule for extracting a MATATAG workbook, and getting it wrong is
+almost invisible.
+
+The tempting approach is to take the columns a competency's PACE formulas point at and look those
+column numbers up in each term's sheet. That assumes the three term sheets share one column layout.
+**They do not.** `TERM 3 LANGUAGE` is two columns wider than its Term 1 and Term 2 siblings, because
+DepEd inserted an extra child pair under competency 6; every column after it is shifted by two, so a
+Term-1 column number read against the Term-3 sheet lands on a neighbour's cell.
+
+What makes this dangerous is that it nearly works. Wherever both children of a competency are
+assessed in Term 3, the shifted read lands on another filled cell and the per-term **totals still
+come out right** — so a count-based check passes while the attribution is wrong. In Grade 1 it cost
+exactly one pair: Language competency 8 is assessed on child **b** in Term 3 and on child **a** in
+Terms 1 and 2, and the shifted read credited Term 3 to child a. A teacher would have been asked to
+mark the wrong competency, and the PACE form would have printed it under the wrong heading.
+
+So the extractor reads each sheet entirely on its own: the fill says whether a slot exists and which
+macro skill it is, and rows 12/13 say whose it is. Nothing is carried between sheets, so a layout
+that shifts cannot misattribute anything. The PACE form is used only for the competency tree and its
+wording. `MatatagCatalogLoadTest::test_the_term_3_language_column_shift_is_attributed_correctly`
+pins competency 8 by name. **Assume the next grade level's workbook has the same class of defect.**
+
+Two quirks of how DepEd fills those heading rows, both handled:
+
+- Row 13 is written only on the **first** column of a child's pair — the *Speaking* column beside it
+  is left blank — so a blank inherits the letter to its left.
+- A competency with no lettered children **repeats its own number** on row 13 rather than leaving it
+  empty. That means "no child", not "child 19".
 
 ### Two shapes, both required
 
@@ -183,11 +212,11 @@ which hold the slots, the parent then holding none.
 | Learning area | Source sheets | Domains | Competencies | Slots |
 |---|---|---|---|---|
 | Reading & Literacy | `TERM {1,2,3} READING & LITERACY` | 6, span the year | 42 | 241 |
-| Language | `TERM {1,2,3} LANGUAGE` | 4, span the year | 64 | 275 |
+| Language | `TERM {1,2,3} LANGUAGE` | 4, span the year | 64 | 273 |
 | Mathematics | `TERM 1-3 MATHEMATICS` | 3 distinct, **2 per term** | 54 | 52 |
 | GMRC | `TERM 1-3 GMRC` | none | 24 | 24 |
 | Makabansa | `G1 PACE FORM MAKABANSA` | none | 15 | 14 |
-| **Total** | | | **199** | **606** |
+| **Total** | | | **199** | **604** |
 
 Mathematics domains are two per term drawn from three across the year — T1 *Number and Algebra* +
 *Measurement and Geometry*; T2 *Number and Algebra* + *Data and Probability*; T3 *Number and Algebra*
@@ -226,7 +255,7 @@ clean-up:
 | `matatag_learning_areas` | the areas | `UNIQUE (version_id, key)` |
 | `matatag_domains` | domains; `term = 0` when year-spanning | `UNIQUE (area_id, term, code)` |
 | `matatag_competencies` | the competency rows, one level of `parent_id` | `UNIQUE (area_id, path)`, e.g. `T1.9.a` |
-| `matatag_competency_slots` | the rateable cells (606 for Grade 1) | `UNIQUE (competency_id, term, macro_skill)` |
+| `matatag_competency_slots` | the rateable cells (604 for Grade 1) | `UNIQUE (competency_id, term, macro_skill)` |
 
 **Per-tenant:**
 
@@ -302,38 +331,43 @@ Confirmed by reading the cells. Fix in our data; note the deviation.
 | `PACE!R141` | Reads `'TERM 1 LANGUAGE'` where Term 3 is meant. |
 | `TERM 1-3 MATHEMATICS` T2 | Numbers the children of competency `3` ("Determine:") as top-level `3`, `4`, `5` — inconsistent with every other nested competency in the file. |
 | `TERM 1-3 GMRC` T3 | Competency `3` (*Mapagmalasakit*) repeats competency `4`'s (*Mapagbigay*) performance standard verbatim. |
-| `TERM 3 LANGUAGE` `DH`/`DI` | Competency `20e` is fill-coloured and assessable, but **no PACE formula reads it** — the Term 3 sheet is three columns wider than its Term 1 and Term 2 siblings. Two slots would be lost; the extractor recovers them from the sheet's own header. |
+| `TERM 3 LANGUAGE` column layout | The sheet is **two columns wider** than its Term 1 and Term 2 siblings: an extra child pair was inserted under competency `6`, shifting every column after it. Any extraction that reuses one term's column numbers on another term's sheet misattributes slots from competency 6 onwards — see "Read each term's sheet on its own" above. |
+| `TERM 3 LANGUAGE` `AS`/`AT` | The inserted pair carries a **copied heading**: two adjacent pairs are both labelled competency `6b`. It is a duplicated column, not a second assessment; the extractor reports it and drops it. Dropping it is why Term 3 Language holds 95 slots and not the 97 cells that are filled. |
 
 Extracting from macro-skill fills rather than PACE formulas removes the four formula bugs
-automatically. The Math numbering and the GMRC duplicate need a judgement call recorded in the JSON.
+automatically, and reading each sheet's own headings removes the Term 3 Language shift. The Math
+numbering, the GMRC duplicate and the duplicated `6b` column need a judgement call, and each one is
+printed in the extractor's `anomalies` report. **A silent extraction run is not a successful one.**
 
 ---
 
 ## File map
 
-**Everything here is planned. None of it exists yet.**
+Rows marked *planned* do not exist yet. Everything else is built and tested.
 
 ### API
 
-| Path | Purpose |
-|---|---|
-| `api/config/matatag.php` | terms + months, the five descriptors, macro-skill labels **and their ARGB fills**, Key Stage 1 grade levels |
-| `api/app/Support/MatatagTerms.php` | the reader; shaped like `GradingPeriods`, deliberately never calling it |
-| `api/app/Support/AcademicYear.php` | **add** `forSection()` beside the existing `forSubject()` / `forInstitution()` |
-| `api/database/migrations/2026_09_08_00000{1..4}_*` | catalog tables, section curricula, ratings, narratives |
-| `api/database/migrations/..._000005_load_matatag_ks1_grade_1_catalog.php` | data migration invoking the loader; `down()` refuses while ratings exist |
-| `api/database/migrations/..._000006_grant_matatag_grading_permission.php` | permission backfill for existing tenants' roles |
-| `api/database/data/matatag/extract.py` | the workbook extractor, committed **beside the data** |
-| `api/database/data/matatag/README.md` | the ARGB table and the extraction runbook |
-| `api/database/data/matatag/grade-1.v1.json` | the catalog artifact |
-| `api/app/Services/Matatag/CatalogLoader.php` | idempotent loader; asserts the JSON's own counts |
-| `api/app/Services/Matatag/TermAttendance.php` | derivation; reads only |
-| `api/app/Console/Commands/LoadMatatagCatalog.php` | `matatag:load-catalog {file} {--default} {--force}` |
-| `api/app/Models/Matatag*.php` | nine models, `HasUuids`, no `SoftDeletes` |
-| `api/app/Http/Controllers/Matatag*Controller.php` | reference, section, rating, narrative, attendance, progress-report |
+| Path | Purpose | |
+|---|---|---|
+| `api/config/matatag.php` | terms + months, the five descriptors, macro-skill labels **and their ARGB fills**, Key Stage 1 grade levels | |
+| `api/app/Support/MatatagTerms.php` | the reader; shaped like `GradingPeriods`, deliberately never calling it | |
+| `api/app/Support/AcademicYear.php` | `forSection()` beside the existing `forSubject()` / `forInstitution()` | |
+| `api/database/migrations/2026_09_14_00000{1..4}_*` | catalog tables, section curricula, ratings, narratives | |
+| `api/database/migrations/..._000005_grant_matatag_grading_permission.php` | permission backfill for existing tenants' roles | |
+| `api/database/migrations/..._000006_load_matatag_ks1_grade_1_catalog.php` | data migration invoking the loader; `down()` refuses while ratings or pins exist | |
+| `api/database/data/matatag/extract.py` | the workbook extractor, committed **beside the data** | |
+| `api/database/data/matatag/README.md` | the ARGB table and the extraction runbook | |
+| `api/database/data/matatag/grade-1.v1.json` | the catalog artifact | |
+| `api/app/Services/Matatag/CatalogLoader.php` | idempotent loader; asserts the JSON's own counts | |
+| `api/app/Services/Matatag/CatalogLoadResult.php`, `CatalogLoadException.php` | what a load did; why one was refused | |
+| `api/app/Console/Commands/LoadMatatagCatalog.php` | `matatag:load-catalog {file} {--default} {--force} {--dry-run}` | |
+| `api/app/Models/Matatag*.php` | nine models, `HasUuids`, no `SoftDeletes` | |
+| `api/tests/Feature/MatatagCatalogLoadTest.php` | the real artifact's counts, idempotency, and the versioning promise | |
+| `api/app/Services/Matatag/TermAttendance.php` | derivation; reads only | *planned* |
+| `api/app/Http/Controllers/Matatag*Controller.php` | reference, section, rating, narrative, attendance, progress-report | *planned* |
 
-Routes in `api/routes/api.php`, near the Proficiency / Core Value Marking block. **Every route
-carries both gates** — `feature:matatag-grading` and `module:matatag-grading,<ability>`.
+Routes — *planned* — in `api/routes/api.php`, near the Proficiency / Core Value Marking block.
+**Every route carries both gates** — `feature:matatag-grading` and `module:matatag-grading,<ability>`.
 `EnsureFeatureEnabled` deliberately does not honour the super-administrator wildcard, so nobody
 reaches this at a school that has not been switched on.
 
@@ -353,7 +387,7 @@ reaches this at a school that has not been switched on.
 act as recording one learner's descriptor, and a school must be able to grant the second without the
 first.
 
-### Frontend
+### Frontend — *all planned*
 
 | Path | Purpose |
 |---|---|
@@ -402,7 +436,11 @@ instrument.
 
 ## Not yet wired
 
-- **Everything.** This is a design document ahead of implementation.
+- **Every HTTP route, and the whole frontend.** The catalog, its nine tables and the loader are
+  built and tested; nothing reads them over the wire yet. `docs/modules/README.md` conventions say
+  an Integration section lists live consumers — there are none.
+- **`TermAttendance`.** The derivation from `student_attendances` / `school_days` is designed above
+  and not written.
 - **Grades 2 and 3.** No catalog exists. Their workbooks have not been obtained, and their structure
   may differ from Grade 1's in which learning areas exist, whether an area has domains, and whether
   its list spans the year or restarts each term.
