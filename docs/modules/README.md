@@ -100,6 +100,21 @@ modules should consume its data.
   CASCADE/SET NULL schema will not enforce for you, and why the super-administrator slug is checked
   in the controller on top of the `system_only` module.
 
+- [MATATAG Key Stage 1](MatatagKeyStage1/MATATAG.md) — Academics. **Designed, not built.** DepEd's
+  competency progress report for **Grades 1–3**: a letter descriptor **A–E** against each learning
+  competency each term, the adviser's two narratives, and the PACE forms and progress report card
+  printed from them. **Three terms, and nothing numeric** — no scores, no averages, no
+  transmutation, no general average. Runs *alongside* the existing four-quarter numeric grading and
+  replaces none of it. Read it before touching anything grading-adjacent for a primary grade, and
+  **before assuming `App\Support\GradingPeriods` can carry this** — it resolves quarter-vs-term
+  school-wide per academic year, so switching a K-12 school to `'term'` for Grades 1–3 would strand
+  quarter 4 for Grades 4–12. Also covers **how to take a DepEd update**: the catalog is versioned
+  and version-pinned per section, a revision is a new version rather than an edit, and a new grade
+  level is a JSON file plus a fifteen-line migration — the extraction runbook and the ARGB
+  macro-skill palette are in the doc, because the workbook encodes each slot's language macro skill
+  *only* as a cell fill colour. Notes six defects in DepEd's own spreadsheet and one deliberate
+  deviation from the printed form (September attendance).
+
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder
   (`Announcements/`, `HRIS/<Module>/`); single-module areas can sit directly in `modules/`.
