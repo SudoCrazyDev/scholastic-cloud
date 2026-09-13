@@ -92,6 +92,14 @@ class MatatagGridController extends Controller
                 'academic_year' => $academicYear,
                 'term' => $term,
                 'curriculum_version' => $this->tree->version($pin->curriculumVersion),
+                // Every area of the pinned catalog, so the client can offer
+                // the area selector without fetching the whole competency
+                // tree. Five rows; the tree is a quarter of a megabyte.
+                'learning_areas' => MatatagLearningArea::where('curriculum_version_id', $pin->curriculum_version_id)
+                    ->orderBy('sort_order')
+                    ->get()
+                    ->map(fn (MatatagLearningArea $a) => $this->tree->area($a))
+                    ->all(),
                 'learning_area' => $this->tree->area($area),
                 'domains' => $this->tree->domainsFor($area, $term),
                 'slot_counts_by_term' => $this->tree->slotCountsByTerm($area),

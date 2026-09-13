@@ -3979,3 +3979,241 @@ export interface TeachingActivityFilters {
   search?: string;
   sort?: 'name' | 'lessons' | 'assessments' | 'submission_rate' | 'last_activity';
 }
+
+/* ------------------------------------------------------------------
+ * DepEd MATATAG Key Stage 1 (Grades 1-3)
+ *
+ * A competency-level, descriptor-only record that replaces numeric quarterly
+ * grading for Grades 1 to 3. Nothing here is a number: no score, no average,
+ * no transmutation, no general average. If a type below grows a numeric grade
+ * field, something has misunderstood the instrument.
+ *
+ * These live here rather than beside the service because the same shapes are
+ * needed by the PDF components under `components/`, and a presentation
+ * component importing from a service would be a back-edge in the mandated
+ * pages -> hooks -> services -> lib/api chain.
+ * ------------------------------------------------------------------ */
+
+/** A, B, C, D or E. Never a number. */
+export type MatatagDescriptor = 'A' | 'B' | 'C' | 'D' | 'E';
+
+export interface MatatagDescriptorDefinition {
+  letter: MatatagDescriptor;
+  label: string;
+  filipino: string;
+  description: string;
+}
+
+export interface MatatagTermDefinition {
+  /** 1, 2 or 3. Named `value` to match GradingPeriods' payload shape. */
+  value: number;
+  label: string;
+  filipino: string;
+  months: number[];
+}
+
+export interface MatatagMacroSkillDefinition {
+  key: string;
+  label: string | null;
+  abbr: string | null;
+  /** The workbook's own fill colours, as ARGB. Served, never hardcoded. */
+  fills: string[];
+}
+
+export interface MatatagReference {
+  terms: MatatagTermDefinition[];
+  descriptors: MatatagDescriptorDefinition[];
+  macro_skills: MatatagMacroSkillDefinition[];
+  grade_levels: string[];
+}
+
+export interface MatatagCurriculumVersionSummary {
+  id: string;
+  code: string;
+  title: string;
+  grade_level: string;
+  source: string | null;
+  published_on: string | null;
+  competency_count: number;
+  slot_count: number;
+  /** True once a descriptor has been recorded against it; it is history then. */
+  locked: boolean;
+}
+
+/**
+ * How an area is laid out. Branch on this and on the three flags below —
+ * never on `key`, and never on the grade level. Grade 2 may have entirely
+ * different areas.
+ */
+export type MatatagAreaShape = 'year_list' | 'per_term_list';
+
+export interface MatatagLearningAreaSummary {
+  id: string;
+  key: string;
+  title: string;
+  shape: MatatagAreaShape;
+  uses_macro_skills: boolean;
+  has_domains: boolean;
+  carries_values: boolean;
+  sort_order: number;
+}
+
+export interface MatatagDomainSummary {
+  id: string;
+  code: string;
+  title: string;
+  /** 0 when the domain spans the year, 1-3 when it belongs to one term. */
+  term: number;
+  sort_order: number;
+}
+
+/** One column of the entry grid: one rateable cell per learner. */
+export interface MatatagGridColumn {
+  slot_id: string;
+  competency_id: string;
+  domain_id: string | null;
+  term: number;
+  /** Null for an area that does not use macro skills. */
+  macro_skill: string | null;
+  number: string | null;
+  letter: string | null;
+  /** What prints in the form's No. column: '9', or 'a' for a lettered child. */
+  label: string;
+  text: string;
+  /** GMRC prints one beside each value it cultivates. */
+  performance_standard: string | null;
+  /** Room for a field a later grade level introduces, without a migration. */
+  extra?: Record<string, string> | null;
+  parent_label: string | null;
+  parent_text: string | null;
+  sort_order: number;
+}
+
+export interface MatatagLearner {
+  student_id: string;
+  name: string;
+  last_name?: string;
+  first_name?: string;
+  gender: string | null;
+}
+
+export interface MatatagGrid {
+  section: {
+    id: string;
+    title: string;
+    grade_level: string;
+    adviser_id: string | null;
+  };
+  academic_year: string;
+  term: number;
+  curriculum_version: MatatagCurriculumVersionSummary;
+  /** Every area of the pinned catalog, for the area selector. */
+  learning_areas: MatatagLearningAreaSummary[];
+  learning_area: MatatagLearningAreaSummary;
+  domains: MatatagDomainSummary[];
+  /** How many slots each term of this area holds — the curriculum's pacing. */
+  slot_counts_by_term: Record<string, number>;
+  columns: MatatagGridColumn[];
+  learners: MatatagLearner[];
+  /** Keyed `studentId:slotId`, so a keystroke patches in O(1). */
+  ratings: Record<string, MatatagDescriptor>;
+  can_manage: boolean;
+  counts: { columns: number; learners: number; recorded: number };
+}
+
+export interface MatatagRatingWrite {
+  student_id: string;
+  slot_id: string;
+  /** Null clears the cell, which deletes the row. */
+  descriptor: MatatagDescriptor | null;
+}
+
+export interface MatatagSectionStatus {
+  id: string;
+  title: string;
+  grade_level: string;
+  academic_year: string | null;
+  adviser_id: string | null;
+  opted_in: boolean;
+  has_ever_opted_in: boolean;
+  curriculum_version: MatatagCurriculumVersionSummary | null;
+  /**
+   * What this section could opt in to. Null means DepEd has published no
+   * catalog for this grade level yet — the honest answer for Grades 2 and 3
+   * until their workbooks arrive.
+   */
+  available_curriculum_version: MatatagCurriculumVersionSummary | null;
+}
+
+export interface MatatagNarrative {
+  can_do: string | null;
+  to_improve: string | null;
+  updated_at?: string | null;
+}
+
+export interface MatatagNarrativeWrite {
+  student_id: string;
+  term: number;
+  can_do: string | null;
+  to_improve: string | null;
+}
+
+export interface MatatagNarratives {
+  section: { id: string; title: string };
+  academic_year: string;
+  max_length: number;
+  terms: number[];
+  learners: MatatagLearner[];
+  /** Keyed `studentId:term`. */
+  narratives: Record<string, MatatagNarrative>;
+  can_manage: boolean;
+}
+
+export interface MatatagAttendanceMonth {
+  term: number;
+  month: number;
+  year: number;
+  label: string;
+  class_days: number;
+  days_present: number;
+  days_absent: number;
+}
+
+export interface MatatagAttendanceTotals {
+  class_days: number;
+  days_present: number;
+  days_absent: number;
+}
+
+/**
+ * `student_attendances` has no unique index, so two rows for one learner-month
+ * are possible. They are summed and warned about rather than silently doubled
+ * — surface these rather than swallowing them.
+ */
+export interface MatatagAttendanceWarning {
+  student_id: string;
+  month: number;
+  year: number;
+  rows: number;
+  message: string;
+}
+
+export interface MatatagSectionAttendance {
+  academic_year: string;
+  months: Array<{ term: number; month: number; year: number; label: string; class_days: number }>;
+  learners: Array<{
+    student_id: string;
+    months: MatatagAttendanceMonth[];
+    terms: Record<string, MatatagAttendanceTotals>;
+  }>;
+  warnings: MatatagAttendanceWarning[];
+}
+
+export interface MatatagStudentAttendance {
+  academic_year: string;
+  student_id: string;
+  months: MatatagAttendanceMonth[];
+  terms: Record<string, MatatagAttendanceTotals>;
+  total: MatatagAttendanceTotals;
+  warnings: MatatagAttendanceWarning[];
+}

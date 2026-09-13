@@ -363,11 +363,16 @@ Rows marked *planned* do not exist yet. Everything else is built and tested.
 | `api/app/Console/Commands/LoadMatatagCatalog.php` | `matatag:load-catalog {file} {--default} {--force} {--dry-run}` | |
 | `api/app/Models/Matatag*.php` | nine models, `HasUuids`, no `SoftDeletes` | |
 | `api/tests/Feature/MatatagCatalogLoadTest.php` | the real artifact's counts, idempotency, and the versioning promise | |
-| `api/app/Services/Matatag/TermAttendance.php` | derivation; reads only | *planned* |
-| `api/app/Http/Controllers/Matatag*Controller.php` | reference, section, rating, narrative, attendance, progress-report | *planned* |
+| `api/app/Services/Matatag/TermAttendance.php` | derivation from `student_attendances` / `school_days`; reads only | |
+| `api/app/Services/Matatag/CurriculumTree.php` | the tree, and one (area, term) block of grid columns | |
+| `api/app/Http/Controllers/Concerns/ResolvesMatatagSection.php` | **the single place every cross-tenant guard lives** | |
+| `api/app/Http/Controllers/Matatag{Reference,Curriculum,Section,Grid,Narrative,Attendance}Controller.php` | the six controllers | |
+| `api/tests/Feature/Matatag/*` | opt-in, grid, narratives, attendance, access — sharing a two-school fixture | |
+| `api/app/Http/Controllers/MatatagProgressReportController.php` | the report-card + PACE payload | *planned* |
 
-Routes — *planned* — in `api/routes/api.php`, near the Proficiency / Core Value Marking block.
-**Every route carries both gates** — `feature:matatag-grading` and `module:matatag-grading,<ability>`.
+Routes in `api/routes/api.php`, near the Proficiency / Core Value Marking block.
+**`feature:matatag-grading` wraps the whole group** rather than being repeated per route, so a route
+added later cannot quietly miss it. Each route then names its own ability. — `feature:matatag-grading` and `module:matatag-grading,<ability>`.
 `EnsureFeatureEnabled` deliberately does not honour the super-administrator wildcard, so nobody
 reaches this at a school that has not been switched on.
 
@@ -387,12 +392,29 @@ reaches this at a school that has not been switched on.
 act as recording one learner's descriptor, and a school must be able to grant the second without the
 first.
 
-### Frontend — *all planned*
+### Frontend
 
-| Path | Purpose |
-|---|---|
-| `app/src/pages/MyClassSections/components/Ks1*.tsx` | the entry grid, narratives, attendance, reports — a **tab in the adviser's class-section workspace** |
-| `app/src/hooks/useKs1*.ts`, `app/src/services/ks1*Service.ts` | per the mandated `pages → hooks → services → lib/api.ts` layering |
+| Path | Purpose | |
+|---|---|---|
+| `app/src/pages/MyClassSections/components/MatatagTab.tsx` | the workspace: opt-in, area/term selectors, the three panels | |
+| `app/src/pages/MyClassSections/components/MatatagGrid.tsx` | the entry grid — roving single editor, type-to-set, `Ctrl+D` | |
+| `app/src/pages/MyClassSections/components/MatatagNarrativesPanel.tsx` | the two paragraphs, capped with a live counter | |
+| `app/src/pages/MyClassSections/components/MatatagAttendancePanel.tsx` | the derived table, read-only | |
+| `app/src/hooks/useMatatag.ts`, `app/src/services/matatagService.ts` | per the mandated `pages → hooks → services → lib/api.ts` layering | |
+| `app/src/pages/MyClassSections/ClassSectionDetail.tsx` | a ninth tab, shown only on a Key Stage 1 section | |
+| PDF components and the `.xlsx` export | | *planned* |
+
+Two things about the grid are worth knowing before touching it.
+
+**Exactly one cell renders a `Select`.** The cell *count* is not the problem — 4,550 `<td>`s is about
+5,000 nodes, and `SectionGrades` already puts four nested divs in every cell. 4,550 Headless UI
+`Select`s would be. So the active cell is a real `Select` and the other 4,549 are text, which
+honours the repo's Select mandate for the editor itself. A windowed grid cannot work here: it
+cannot be a real `<table>`, and the three-tier header is built from `colSpan`.
+
+**`Ctrl+D` must be tested before the letter branch.** `D` is one of DepEd's five descriptors, so a
+handler that checks "is this a descriptor letter" first swallows `Ctrl+D` and marks one cell `D`
+instead of filling the column. This was a real bug, caught only in a browser.
 | `app/src/types/index.ts` | all types in the barrel — the `@react-pdf` components need them, and importing from a service would be a back-edge |
 | `app/src/components/ks1ProgressReportCard/`, `ks1PaceForm/` | `@react-pdf/renderer` documents |
 
@@ -436,11 +458,8 @@ instrument.
 
 ## Not yet wired
 
-- **Every HTTP route, and the whole frontend.** The catalog, its nine tables and the loader are
-  built and tested; nothing reads them over the wire yet. `docs/modules/README.md` conventions say
-  an Integration section lists live consumers — there are none.
-- **`TermAttendance`.** The derivation from `student_attendances` / `school_days` is designed above
-  and not written.
+- **The progress report card and the PACE forms.** The descriptors, narratives and attendance are
+  all recorded and readable; nothing prints them yet. That is the next piece of work.
 - **Grades 2 and 3.** No catalog exists. Their workbooks have not been obtained, and their structure
   may differ from Grade 1's in which learning areas exist, whether an area has domains, and whether
   its list spans the year or restarts each term.

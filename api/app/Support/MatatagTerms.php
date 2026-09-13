@@ -313,6 +313,11 @@ class MatatagTerms
                 'key' => $slug,
                 'label' => $definition['label'] ?? null,
                 'abbr' => $definition['abbr'] ?? null,
+                // The workbook's own fill colours, served rather than
+                // duplicated in the client. The grid paints the form teachers
+                // already know, and when DepEd reshades a skill this file is
+                // the only place that changes.
+                'fills' => $definition['fills'] ?? [],
             ];
         }
 

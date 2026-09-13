@@ -29,7 +29,8 @@ import {
   BarChart3,
   Award,
   Calendar,
-  ScrollText
+  ScrollText,
+  Sparkles
 } from 'lucide-react'
 import type { Student, Subject, StudentSubjectGrade } from '../../types'
 import ClassSectionHeader from './components/ClassSectionHeader'
@@ -41,6 +42,10 @@ import ClassSectionSubjectsTab from './components/ClassSectionSubjectsTab'
 import ClassSectionCoreValuesTab from './components/ClassSectionCoreValuesTab'
 import ClassSectionAttendanceTab from './components/ClassSectionAttendanceTab'
 import ClassSectionCertificatesTab from './components/ClassSectionCertificatesTab'
+import { MatatagTab } from './components/MatatagTab'
+import { useFeatures } from '../../hooks/useFeatures'
+import { usePermissions } from '../../hooks/usePermissions'
+import { useIsKeyStageOne } from '../../hooks/useMatatag'
 import { Select } from '../../components/select'
 import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils'
 import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods'
@@ -52,7 +57,7 @@ const ClassSectionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user, isImpersonating } = useAuth()
-  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values' | 'attendance' | 'certificates'>('students')
+  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values' | 'attendance' | 'certificates' | 'matatag'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
   const [showRemoveModal, setShowRemoveModal] = useState(false)
@@ -163,6 +168,21 @@ const ClassSectionDetail: React.FC = () => {
   // 4 quarters or 3 terms, per this section's academic year — a section from an
   // earlier year keeps reporting on the structure its grades were entered under.
   const gradingPeriods = useGradingPeriodsForYear(classSectionData?.academic_year)
+
+  /*
+   * MATATAG is additive and narrow: it shows only where the school has the
+   * feature, the person holds the module, and this particular section is a
+   * Key Stage 1 one. Every other section keeps the numeric record it has, and
+   * a Grade 4-12 adviser never sees this tab at all.
+   *
+   * All three are courtesies. The API refuses the calls regardless — the
+   * feature middleware does not even honour the super-administrator wildcard.
+   */
+  const { hasFeature } = useFeatures()
+  const { can } = usePermissions()
+  const isKeyStageOne = useIsKeyStageOne(classSectionData?.grade_level)
+  const showMatatag =
+    hasFeature('matatag-grading') && can('matatag-grading', 'view') && isKeyStageOne
 
   const quarterOptions = useMemo(
     () => [
@@ -555,6 +575,9 @@ const ClassSectionDetail: React.FC = () => {
               { key: 'core-values' as const, icon: Award, label: 'Core Values' },
               { key: 'attendance' as const, icon: Calendar, label: 'Attendance' },
               { key: 'certificates' as const, icon: ScrollText, label: 'Certificates' },
+              ...(showMatatag
+                ? [{ key: 'matatag' as const, icon: Sparkles, label: 'MATATAG Progress' }]
+                : []),
             ] as const).map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -739,6 +762,32 @@ const ClassSectionDetail: React.FC = () => {
                     academicYear={classSectionData?.academic_year || ''}
                     getFullName={getFullName}
                   />
+                </motion.div>
+              )}
+
+              {activeTab === 'matatag' && classSectionData && (
+                <motion.div
+                  key="matatag"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  /*
+                   * Breaks out of the tab panel's `p-4 sm:p-8`. The grid is up
+                   * to 91 columns wide and needs the full viewport to scroll
+                   * in; inside that padding it scrolls in a box narrower than
+                   * the screen for no reason.
+                   */
+                  className="-mx-4 sm:-mx-8"
+                >
+                  <div className="px-4 sm:px-8">
+                    <MatatagTab
+                      classSectionId={id!}
+                      gradeLevel={classSectionData.grade_level || ''}
+                      academicYear={classSectionData.academic_year || undefined}
+                      institutionId={effectiveInstitutionId}
+                    />
+                  </div>
                 </motion.div>
               )}
 
