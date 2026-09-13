@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\ClassSection;
 use App\Models\Institution;
 use App\Models\Subject;
 use Illuminate\Support\Carbon;
@@ -35,6 +36,25 @@ class AcademicYear
     }
 
     /**
+     * The year a class section's records belong to.
+     *
+     * The section-scoped mirror of {@see forSubject()}, for modules that hang
+     * records off a section rather than a subject — MATATAG Key Stage 1, where
+     * one adviser records every learning area for their section, is the first.
+     *
+     * A section carries the year itself, so this is mostly a null-safe read;
+     * the fallback matters for sections created before the column was filled.
+     */
+    public static function forSection(ClassSection|string|null $section): string
+    {
+        if (is_string($section)) {
+            $section = ClassSection::find($section);
+        }
+
+        return $section?->academic_year ?: self::forInstitution($section?->institution_id);
+    }
+
+    /**
      * The institution's current school year, or the calendar-derived one when a
      * school has never set it in Settings.
      */
@@ -56,6 +76,6 @@ class AcademicYear
         $today = Carbon::now();
         $startYear = $today->month >= 6 ? $today->year : $today->year - 1;
 
-        return $startYear . '-' . ($startYear + 1);
+        return $startYear.'-'.($startYear + 1);
     }
 }

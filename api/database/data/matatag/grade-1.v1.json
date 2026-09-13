@@ -1,0 +1,5859 @@
+{
+ "version": {
+  "code": "deped-matatag-ks1-grade-1-v1",
+  "title": "DepEd MATATAG Key Stage 1 - Grade 1",
+  "grade_level": "Grade 1",
+  "source": "KEY_STAGE_1_GRADE_1_3_TERM.xlsx",
+  "published_on": null
+ },
+ "counts": {
+  "competencies": 199,
+  "slots": 606
+ },
+ "learning_areas": [
+  {
+   "key": "reading-literacy",
+   "title": "Reading and Literacy",
+   "shape": "year_list",
+   "uses_macro_skills": true,
+   "has_domains": true,
+   "carries_values": false,
+   "sort_order": 1,
+   "counts": {
+    "competencies": 42,
+    "slots": 241
+   },
+   "domains": [
+    {
+     "code": "phonological-awareness-oracy-for-literacy",
+     "title": "Phonological Awareness (oracy for literacy)",
+     "term": 0,
+     "sort_order": 1
+    },
+    {
+     "code": "phonics-and-word-study-sounds-to-words",
+     "title": "Phonics and Word Study (sounds to words)",
+     "term": 0,
+     "sort_order": 2
+    },
+    {
+     "code": "vocabulary-and-word-knowledge-words",
+     "title": "Vocabulary and Word Knowledge (words)",
+     "term": 0,
+     "sort_order": 3
+    },
+    {
+     "code": "book-and-print-knowledge-words",
+     "title": "Book and Print Knowledge (words)",
+     "term": 0,
+     "sort_order": 4
+    },
+    {
+     "code": "comprehending-and-analyzing-texts-discourse",
+     "title": "Comprehending and Analyzing Texts (discourse)",
+     "term": 0,
+     "sort_order": 5
+    },
+    {
+     "code": "creating-and-composing-texts-discourse",
+     "title": "Creating and Composing Texts (discourse)",
+     "term": 0,
+     "sort_order": 6
+    }
+   ],
+   "competencies": [
+    {
+     "path": ".1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Chant rhymes and poems.",
+     "term": 0,
+     "domain": "phonological-awareness-oracy-for-literacy",
+     "is_rateable": true,
+     "sort_order": 1,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      }
+     ]
+    },
+    {
+     "path": ".2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Segment a two or three syllable word into its syllabic parts.",
+     "term": 0,
+     "domain": "phonological-awareness-oracy-for-literacy",
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      }
+     ]
+    },
+    {
+     "path": ".3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Identify rhyming words in nursery rhymes, poems, and chants.",
+     "term": 0,
+     "domain": "phonological-awareness-oracy-for-literacy",
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      }
+     ]
+    },
+    {
+     "path": ".4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Say two or three words that rhyme.",
+     "term": 0,
+     "domain": "phonological-awareness-oracy-for-literacy",
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      }
+     ]
+    },
+    {
+     "path": ".5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Identify initial sounds ((vowels, consonants, and semi-vowels, if any.)",
+     "term": 0,
+     "domain": "phonological-awareness-oracy-for-literacy",
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      }
+     ]
+    },
+    {
+     "path": ".6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Produce the sound of letters of L1.",
+     "term": 0,
+     "domain": "phonics-and-word-study-sounds-to-words",
+     "is_rateable": true,
+     "sort_order": 6,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Identify the letters in L1.",
+     "term": 0,
+     "domain": "phonics-and-word-study-sounds-to-words",
+     "is_rateable": true,
+     "sort_order": 7,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Isolate sounda (consonants and vowels) in a word (beginning and/or ending).",
+     "term": 0,
+     "domain": "phonics-and-word-study-sounds-to-words",
+     "is_rateable": true,
+     "sort_order": 8,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Substitute individual sounds in simple words to make new words.",
+     "term": 0,
+     "domain": "phonics-and-word-study-sounds-to-words",
+     "is_rateable": true,
+     "sort_order": 9,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".10",
+     "number": "10",
+     "letter": null,
+     "label": "10",
+     "text": "Sound out words accurately.",
+     "term": 0,
+     "domain": "phonics-and-word-study-sounds-to-words",
+     "is_rateable": true,
+     "sort_order": 10,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".11",
+     "number": "11",
+     "letter": null,
+     "label": "11",
+     "text": "Use vocabulary referring to self, family, school, community, and environment.",
+     "term": 0,
+     "domain": "vocabulary-and-word-knowledge-words",
+     "is_rateable": true,
+     "sort_order": 11,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".12",
+     "number": "12",
+     "letter": null,
+     "label": "12",
+     "text": "Identify words with different functions (naming and describing words).",
+     "term": 0,
+     "domain": "vocabulary-and-word-knowledge-words",
+     "is_rateable": false,
+     "sort_order": 12,
+     "slots": [],
+     "children": [
+      {
+       "path": ".12.a",
+       "number": "12",
+       "letter": "a",
+       "label": "a",
+       "text": "a. words that label persons, places, things, animals, actions, situations, ideas, and emotions",
+       "term": 0,
+       "domain": "vocabulary-and-word-knowledge-words",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 1,
+         "macro_skill": "reading",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 5
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 6
+        },
+        {
+         "term": 2,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 8
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 9
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 10
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 11
+        }
+       ]
+      },
+      {
+       "path": ".12.b",
+       "number": "12",
+       "letter": "b",
+       "label": "b",
+       "text": "b. words that describe persons, places, things, animals, actions, situations, ideas, and emotions",
+       "term": 0,
+       "domain": "vocabulary-and-word-knowledge-words",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 1,
+         "macro_skill": "reading",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 5
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 6
+        },
+        {
+         "term": 2,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 8
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 9
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 10
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 11
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".13",
+     "number": "13",
+     "letter": null,
+     "label": "13",
+     "text": "Read high-frequency words accurately for meaning.",
+     "term": 0,
+     "domain": "vocabulary-and-word-knowledge-words",
+     "is_rateable": true,
+     "sort_order": 13,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".14",
+     "number": "14",
+     "letter": null,
+     "label": "14",
+     "text": "Read content-specific words (Math, Makabansa, and GMRC) accurately for meaning.",
+     "term": 0,
+     "domain": "vocabulary-and-word-knowledge-words",
+     "is_rateable": true,
+     "sort_order": 14,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".15",
+     "number": "15",
+     "letter": null,
+     "label": "15",
+     "text": "Write words legibly and correctly.",
+     "term": 0,
+     "domain": "vocabulary-and-word-knowledge-words",
+     "is_rateable": true,
+     "sort_order": 15,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 1,
+       "macro_skill": "copying_guided_writing",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 6
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 7
+      },
+      {
+       "term": 2,
+       "macro_skill": "copying_guided_writing",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 9
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 10
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 11
+      },
+      {
+       "term": 3,
+       "macro_skill": "copying_guided_writing",
+       "sort_order": 12
+      }
+     ]
+    },
+    {
+     "path": ".16",
+     "number": "16",
+     "letter": null,
+     "label": "16",
+     "text": "Recognize environmental print (symbols).",
+     "term": 0,
+     "domain": "book-and-print-knowledge-words",
+     "is_rateable": true,
+     "sort_order": 16,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".17",
+     "number": "17",
+     "letter": null,
+     "label": "17",
+     "text": "Recognize the parts of the book (cover page, title page, etc.).",
+     "term": 0,
+     "domain": "book-and-print-knowledge-words",
+     "is_rateable": true,
+     "sort_order": 17,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".18",
+     "number": "18",
+     "letter": null,
+     "label": "18",
+     "text": "Recognize proper eye movement skills in reading: left to right, top to bottom, and return sweep.",
+     "term": 0,
+     "domain": "book-and-print-knowledge-words",
+     "is_rateable": true,
+     "sort_order": 18,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 1,
+       "macro_skill": "reading",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 4
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 2,
+       "macro_skill": "reading",
+       "sort_order": 6
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 7
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 8
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 9
+      }
+     ]
+    },
+    {
+     "path": ".19",
+     "number": "19",
+     "letter": null,
+     "label": "19",
+     "text": "Read sentences with appropriate speed, accuracy, and expression.",
+     "term": 0,
+     "domain": "comprehending-and-analyzing-texts-discourse",
+     "is_rateable": true,
+     "sort_order": 19,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 3,
+       "macro_skill": "reading",
+       "sort_order": 3
+      }
+     ]
+    },
+    {
+     "path": ".20",
+     "number": "20",
+     "letter": null,
+     "label": "20",
+     "text": "Comprehend stories.",
+     "term": 0,
+     "domain": "comprehending-and-analyzing-texts-discourse",
+     "is_rateable": false,
+     "sort_order": 20,
+     "slots": [],
+     "children": [
+      {
+       "path": ".20.a",
+       "number": "20",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Note important details in stories (character, setting, and events).",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 8
+        }
+       ]
+      },
+      {
+       "path": ".20.b",
+       "number": "20",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Sequence events in stories.",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 8
+        }
+       ]
+      },
+      {
+       "path": ".20.c",
+       "number": "20",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Infer the character's feelings and traits.",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 8
+        }
+       ]
+      },
+      {
+       "path": ".20.d",
+       "number": "20",
+       "letter": "d",
+       "label": "d",
+       "text": "d. Predict possible ending.",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 4,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 8
+        }
+       ]
+      },
+      {
+       "path": ".20.e",
+       "number": "20",
+       "letter": "e",
+       "label": "e",
+       "text": "e. Relate story events to one's experience.",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 5,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 8
+        }
+       ]
+      },
+      {
+       "path": ".20.f",
+       "number": "20",
+       "letter": "f",
+       "label": "f",
+       "text": "f. Identify cause and effects of events.",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 6,
+       "slots": [
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 3
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".20.g",
+       "number": "20",
+       "letter": "g",
+       "label": "g",
+       "text": "g. Identify problem and solution in stories.",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 7,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 3
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".21",
+     "number": "21",
+     "letter": null,
+     "label": "21",
+     "text": "Comprehend informational text.",
+     "term": 0,
+     "domain": "comprehending-and-analyzing-texts-discourse",
+     "is_rateable": false,
+     "sort_order": 21,
+     "slots": [],
+     "children": [
+      {
+       "path": ".21.a",
+       "number": "21",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Note significant details in informational texts (list and describe).",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 8
+        }
+       ]
+      },
+      {
+       "path": ".21.b",
+       "number": "21",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Identify problem and solution.",
+       "term": 0,
+       "domain": "comprehending-and-analyzing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 2,
+         "macro_skill": "reading",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "reading",
+         "sort_order": 8
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".22",
+     "number": "22",
+     "letter": null,
+     "label": "22",
+     "text": "Narrate one's personal experiences.",
+     "term": 0,
+     "domain": "creating-and-composing-texts-discourse",
+     "is_rateable": false,
+     "sort_order": 22,
+     "slots": [],
+     "children": [
+      {
+       "path": ".22.a",
+       "number": "22",
+       "letter": "a",
+       "label": "a",
+       "text": "a. oneself and family",
+       "term": 0,
+       "domain": "creating-and-composing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".22.b",
+       "number": "22",
+       "letter": "b",
+       "label": "b",
+       "text": "b. school",
+       "term": 0,
+       "domain": "creating-and-composing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 2
+        }
+       ]
+      },
+      {
+       "path": ".22.c",
+       "number": "22",
+       "letter": "c",
+       "label": "c",
+       "text": "c. community",
+       "term": 0,
+       "domain": "creating-and-composing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 2
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".23",
+     "number": "23",
+     "letter": null,
+     "label": "23",
+     "text": "Use own words in retelling myths, legends, fables, and narrative poems.",
+     "term": 0,
+     "domain": "creating-and-composing-texts-discourse",
+     "is_rateable": true,
+     "sort_order": 23,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 3
+      },
+      {
+       "term": 3,
+       "macro_skill": "copying_guided_writing",
+       "sort_order": 4
+      }
+     ]
+    },
+    {
+     "path": ".24",
+     "number": "24",
+     "letter": null,
+     "label": "24",
+     "text": "Narrate one's personal experiences.",
+     "term": 0,
+     "domain": "creating-and-composing-texts-discourse",
+     "is_rateable": false,
+     "sort_order": 24,
+     "slots": [],
+     "children": [
+      {
+       "path": ".24.a",
+       "number": "24",
+       "letter": "a",
+       "label": "a",
+       "text": "a. oneself and family",
+       "term": 0,
+       "domain": "creating-and-composing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".24.b",
+       "number": "24",
+       "letter": "b",
+       "label": "b",
+       "text": "b. school",
+       "term": 0,
+       "domain": "creating-and-composing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 2
+        }
+       ]
+      },
+      {
+       "path": ".24.c",
+       "number": "24",
+       "letter": "c",
+       "label": "c",
+       "text": "c. community",
+       "term": 0,
+       "domain": "creating-and-composing-texts-discourse",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "copying_guided_writing",
+         "sort_order": 2
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".25",
+     "number": "25",
+     "letter": null,
+     "label": "25",
+     "text": "Respond creatively to texts (myths, legends, fables, and narrative poems).",
+     "term": 0,
+     "domain": "creating-and-composing-texts-discourse",
+     "is_rateable": true,
+     "sort_order": 25,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "copying_guided_writing",
+       "sort_order": 2
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "copying_guided_writing",
+       "sort_order": 4
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 3,
+       "macro_skill": "copying_guided_writing",
+       "sort_order": 6
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "language",
+   "title": "Language",
+   "shape": "year_list",
+   "uses_macro_skills": true,
+   "has_domains": true,
+   "carries_values": false,
+   "sort_order": 2,
+   "counts": {
+    "competencies": 64,
+    "slots": 275
+   },
+   "domains": [
+    {
+     "code": "language-for-interacting-with-others",
+     "title": "Language for Interacting with Others",
+     "term": 0,
+     "sort_order": 1
+    },
+    {
+     "code": "language-for-developing-and-expressing-ideas",
+     "title": "Language for Developing and Expressing Ideas",
+     "term": 0,
+     "sort_order": 2
+    },
+    {
+     "code": "interacting-with-texts",
+     "title": "Interacting with Texts",
+     "term": 0,
+     "sort_order": 3
+    },
+    {
+     "code": "creating-texts",
+     "title": "Creating Texts",
+     "term": 0,
+     "sort_order": 4
+    }
+   ],
+   "competencies": [
+    {
+     "path": ".1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Talk about one's personal experiences.",
+     "term": 0,
+     "domain": "language-for-interacting-with-others",
+     "is_rateable": false,
+     "sort_order": 1,
+     "slots": [],
+     "children": [
+      {
+       "path": ".1.a",
+       "number": "1",
+       "letter": "a",
+       "label": "a",
+       "text": "a. oneself and family",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        }
+       ]
+      },
+      {
+       "path": ".1.b",
+       "number": "1",
+       "letter": "b",
+       "label": "b",
+       "text": "b. school",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        }
+       ]
+      },
+      {
+       "path": ".1.c",
+       "number": "1",
+       "letter": "c",
+       "label": "c",
+       "text": "c. community",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Participate in classroom interactions using verbal and non-verbal responses.",
+     "term": 0,
+     "domain": "language-for-interacting-with-others",
+     "is_rateable": false,
+     "sort_order": 2,
+     "slots": [],
+     "children": [
+      {
+       "path": ".2.a",
+       "number": "2",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Respond to teacher’s instructions.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".2.b",
+       "number": "2",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Ask and respond to questions.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Interact purposely and participate in conversations and discussions, in pairs, in groups, or in whole-class discussions.",
+     "term": 0,
+     "domain": "language-for-interacting-with-others",
+     "is_rateable": false,
+     "sort_order": 3,
+     "slots": [],
+     "children": [
+      {
+       "path": ".3.a",
+       "number": "3",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Make requests.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".3.b",
+       "number": "3",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Offer information.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".3.c",
+       "number": "3",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Communicate needs.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".3.d",
+       "number": "3",
+       "letter": "d",
+       "label": "d",
+       "text": "d. Clarify information.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 4,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".3.e",
+       "number": "3",
+       "letter": "e",
+       "label": "e",
+       "text": "e. Seek help.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 5,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".3.f",
+       "number": "3",
+       "letter": "f",
+       "label": "f",
+       "text": "f. Take part in or take turns in conversation or discussion.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 6,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Use common and socially acceptable expressions (e.g., greetings, leave-taking).",
+     "term": 0,
+     "domain": "language-for-interacting-with-others",
+     "is_rateable": false,
+     "sort_order": 4,
+     "slots": [],
+     "children": [
+      {
+       "path": ".4.a",
+       "number": "4",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Use simple and appropriate personal greetings.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".4.b",
+       "number": "4",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Use familiar terms of address.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".4.c",
+       "number": "4",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Greet and respond appropriately to greetings.",
+       "term": 0,
+       "domain": "language-for-interacting-with-others",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Share confidently thoughts, preferences, needs, feelings, and ideas with peers, teachers, and other adults.",
+     "term": 0,
+     "domain": "language-for-interacting-with-others",
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 4
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 5
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 6
+      }
+     ]
+    },
+    {
+     "path": ".6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Express ideas using a variety of symbols (e.g., drawings, emojis, scribbles).",
+     "term": 0,
+     "domain": "language-for-developing-and-expressing-ideas",
+     "is_rateable": false,
+     "sort_order": 6,
+     "slots": [],
+     "children": [
+      {
+       "path": ".6.a",
+       "number": "6",
+       "letter": "a",
+       "label": "a",
+       "text": "a. oneself and family",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        }
+       ]
+      },
+      {
+       "path": ".6.b",
+       "number": "6",
+       "letter": "b",
+       "label": "b",
+       "text": "b. school",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        }
+       ]
+      },
+      {
+       "path": ".6.c",
+       "number": "6",
+       "letter": "c",
+       "label": "c",
+       "text": "c. community",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Use words to represent ideas and events.",
+     "term": 0,
+     "domain": "language-for-developing-and-expressing-ideas",
+     "is_rateable": false,
+     "sort_order": 7,
+     "slots": [],
+     "children": [
+      {
+       "path": ".7.a",
+       "number": "7",
+       "letter": "a",
+       "label": "a",
+       "text": "a. words that represent people, animals and objects, locations (naming words).",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".7.b",
+       "number": "7",
+       "letter": "b",
+       "label": "b",
+       "text": "b. words that represent activities and situations (action words)",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".7.c",
+       "number": "7",
+       "letter": "c",
+       "label": "c",
+       "text": "c. words that represent qualities or attributes (describing words)",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Use high-frequency and content-specific words.",
+     "term": 0,
+     "domain": "language-for-developing-and-expressing-ideas",
+     "is_rateable": false,
+     "sort_order": 8,
+     "slots": [],
+     "children": [
+      {
+       "path": ".8.a",
+       "number": "8",
+       "letter": "a",
+       "label": "a",
+       "text": "a. oneself and family",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".8.b",
+       "number": "8",
+       "letter": "b",
+       "label": "b",
+       "text": "b. school",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": false,
+       "sort_order": 2,
+       "slots": []
+      },
+      {
+       "path": ".8.c",
+       "number": "8",
+       "letter": "c",
+       "label": "c",
+       "text": "c. community",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Use language to express connections between ideas.",
+     "term": 0,
+     "domain": "language-for-developing-and-expressing-ideas",
+     "is_rateable": false,
+     "sort_order": 9,
+     "slots": [],
+     "children": [
+      {
+       "path": ".9.a",
+       "number": "9",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Express compare and contrast.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".9.b",
+       "number": "9",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Express cause and effect.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".9.c",
+       "number": "9",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Use time words to relate ideas.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".10",
+     "number": "10",
+     "letter": null,
+     "label": "10",
+     "text": "Participate in and contribute to group oral language activities (e.g., singing, chanting, sabayang bigkas).",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 10,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 4
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 5
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 6
+      }
+     ]
+    },
+    {
+     "path": ".11",
+     "number": "11",
+     "letter": null,
+     "label": "11",
+     "text": "Notice the features (e.g., sounds, intonation, signs) of their first language and other languages in familiar contexts.",
+     "term": 0,
+     "domain": "language-for-developing-and-expressing-ideas",
+     "is_rateable": true,
+     "sort_order": 11,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 4
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 5
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 6
+      }
+     ]
+    },
+    {
+     "path": ".12",
+     "number": "12",
+     "letter": null,
+     "label": "12",
+     "text": "Recognize how a change in intonation (volume, pitch) and body language can change the meanings of utterances/expressions.",
+     "term": 0,
+     "domain": "language-for-developing-and-expressing-ideas",
+     "is_rateable": false,
+     "sort_order": 12,
+     "slots": [],
+     "children": [
+      {
+       "path": ".12.a",
+       "number": "12",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Recognize the difference between statements, questions, commands and exclamations.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".12.b",
+       "number": "12",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Respond to change of tones and cues through facial expressions, gestures and actions",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".13",
+     "number": "13",
+     "letter": null,
+     "label": "13",
+     "text": "Recognize how language reflects cultural practices and norms.",
+     "term": 0,
+     "domain": "language-for-developing-and-expressing-ideas",
+     "is_rateable": false,
+     "sort_order": 13,
+     "slots": [],
+     "children": [
+      {
+       "path": ".13.a",
+       "number": "13",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Share about the language(s) spoken at home.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".13.b",
+       "number": "13",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Share words and phrases in their language.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".13.c",
+       "number": "13",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Notice how local names of streets, places and landmarks have origins in their language.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".13.d",
+       "number": "13",
+       "letter": "d",
+       "label": "d",
+       "text": "d. Explore local terms for food and their origins.",
+       "term": 0,
+       "domain": "language-for-developing-and-expressing-ideas",
+       "is_rateable": true,
+       "sort_order": 4,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".14",
+     "number": "14",
+     "letter": null,
+     "label": "14",
+     "text": "View and listen to a range of texts for enjoyment and interest.",
+     "term": 0,
+     "domain": "interacting-with-texts",
+     "is_rateable": true,
+     "sort_order": 14,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 2
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 3
+      }
+     ]
+    },
+    {
+     "path": ".15",
+     "number": "15",
+     "letter": null,
+     "label": "15",
+     "text": "Recognize icons and symbols in various texts found in familiar contexts (e.g., printed and digital texts, books, magazines, environmental print).",
+     "term": 0,
+     "domain": "interacting-with-texts",
+     "is_rateable": true,
+     "sort_order": 15,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 4
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 5
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 6
+      }
+     ]
+    },
+    {
+     "path": ".16",
+     "number": "16",
+     "letter": null,
+     "label": "16",
+     "text": "Engage with or respond to a range of texts.",
+     "term": 0,
+     "domain": "interacting-with-texts",
+     "is_rateable": false,
+     "sort_order": 16,
+     "slots": [],
+     "children": [
+      {
+       "path": ".16.a",
+       "number": "16",
+       "letter": "a",
+       "label": "a",
+       "text": "a. View or listen to spoken texts.",
+       "term": 0,
+       "domain": "interacting-with-texts",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".16.b",
+       "number": "16",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Identify a variety of purposes for viewing and listening to texts.",
+       "term": 0,
+       "domain": "interacting-with-texts",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".16.c",
+       "number": "16",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Discuss what is interesting or entertaining in a text.",
+       "term": 0,
+       "domain": "interacting-with-texts",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".16.d",
+       "number": "16",
+       "letter": "d",
+       "label": "d",
+       "text": "d. Express personal preferences.",
+       "term": 0,
+       "domain": "interacting-with-texts",
+       "is_rateable": true,
+       "sort_order": 4,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".17",
+     "number": "17",
+     "letter": null,
+     "label": "17",
+     "text": "Give reason/s for choosing books/texts for enjoyment and interest.",
+     "term": 0,
+     "domain": "interacting-with-texts",
+     "is_rateable": true,
+     "sort_order": 17,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 4
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 5
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 6
+      }
+     ]
+    },
+    {
+     "path": ".18",
+     "number": "18",
+     "letter": null,
+     "label": "18",
+     "text": "Record and report ideas and events using some learnt vocabulary.",
+     "term": 0,
+     "domain": "creating-texts",
+     "is_rateable": false,
+     "sort_order": 18,
+     "slots": [],
+     "children": [
+      {
+       "path": ".18.a",
+       "number": "18",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Note and report main points.",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".18.b",
+       "number": "18",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Sequence up to key three (3) key events.",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".18.c",
+       "number": "18",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Relate ideas or events to one’s experience.",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": ".19",
+     "number": "19",
+     "letter": null,
+     "label": "19",
+     "text": "Use own words in retelling information from various texts (e.g., legends, fables, and jokes).",
+     "term": 0,
+     "domain": "creating-texts",
+     "is_rateable": true,
+     "sort_order": 19,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "listening",
+       "sort_order": 1
+      },
+      {
+       "term": 1,
+       "macro_skill": "speaking",
+       "sort_order": 2
+      },
+      {
+       "term": 2,
+       "macro_skill": "listening",
+       "sort_order": 3
+      },
+      {
+       "term": 2,
+       "macro_skill": "speaking",
+       "sort_order": 4
+      },
+      {
+       "term": 3,
+       "macro_skill": "listening",
+       "sort_order": 5
+      },
+      {
+       "term": 3,
+       "macro_skill": "speaking",
+       "sort_order": 6
+      }
+     ]
+    },
+    {
+     "path": ".20",
+     "number": "20",
+     "letter": null,
+     "label": "20",
+     "text": "Draw and discuss information or ideas from a range of texts (e.g.,stories, images).",
+     "term": 0,
+     "domain": "creating-texts",
+     "is_rateable": false,
+     "sort_order": 20,
+     "slots": [],
+     "children": [
+      {
+       "path": ".20.a",
+       "number": "20",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Note and describe main points (e.g., main characters and events).",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".20.b",
+       "number": "20",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Sequence up to key three (3) key events.",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".20.c",
+       "number": "20",
+       "letter": "c",
+       "label": "c",
+       "text": "c. Infer the character’s feelings and traits.",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".20.d",
+       "number": "20",
+       "letter": "d",
+       "label": "d",
+       "text": "d. Predict possible endings.",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 4,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        }
+       ]
+      },
+      {
+       "path": ".20.e",
+       "number": "20",
+       "letter": "e",
+       "label": "e",
+       "text": "e. Relate ideas or events to one’s experience.",
+       "term": 0,
+       "domain": "creating-texts",
+       "is_rateable": true,
+       "sort_order": 5,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "listening",
+         "sort_order": 1
+        },
+        {
+         "term": 1,
+         "macro_skill": "speaking",
+         "sort_order": 2
+        },
+        {
+         "term": 2,
+         "macro_skill": "listening",
+         "sort_order": 3
+        },
+        {
+         "term": 2,
+         "macro_skill": "speaking",
+         "sort_order": 4
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 5
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 6
+        },
+        {
+         "term": 3,
+         "macro_skill": "listening",
+         "sort_order": 7
+        },
+        {
+         "term": 3,
+         "macro_skill": "speaking",
+         "sort_order": 8
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "mathematics",
+   "title": "Mathematics",
+   "shape": "per_term_list",
+   "uses_macro_skills": false,
+   "has_domains": true,
+   "carries_values": false,
+   "sort_order": 3,
+   "counts": {
+    "competencies": 54,
+    "slots": 52
+   },
+   "domains": [
+    {
+     "code": "number-and-algebra",
+     "title": "Number and Algebra",
+     "term": 1,
+     "sort_order": 1
+    },
+    {
+     "code": "measurement-and-geometry",
+     "title": "Measurement and Geometry",
+     "term": 1,
+     "sort_order": 2
+    },
+    {
+     "code": "number-and-algebra",
+     "title": "Number and Algebra",
+     "term": 2,
+     "sort_order": 3
+    },
+    {
+     "code": "data-and-probability",
+     "title": "Data and Probability",
+     "term": 2,
+     "sort_order": 4
+    },
+    {
+     "code": "number-and-algebra",
+     "title": "Number and Algebra",
+     "term": 3,
+     "sort_order": 5
+    },
+    {
+     "code": "measurement-and-geometry",
+     "title": "Measurement and Geometry",
+     "term": 3,
+     "sort_order": 6
+    }
+   ],
+   "competencies": [
+    {
+     "path": "T1.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Count up to 100 (includes counting up or down from a given number and identifying a number that is 1 more or 1 less than a given number).",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 1,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Read and write numerals up to 100.",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Recognize and represent numbers up to 100 using a variety of concrete and pictorial models (e.g., number line, block or bar models, and numerals).",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Compare two numbers up to 20.",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Order numbers up to 20 from smallest to largest, and vice versa.",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Describe the position of objects using ordinal numbers: 1st, 2nd, 3rd, up to 10th.",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 6,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Compose and decompose numbers up to 10 using concrete materials.",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 7,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Illustrate addition of numbers with sums up to 20 using a variety of concrete and pictorial models and describes addition as “counting up,” and “putting together.”",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 8,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Illustrate by applying the following properties of addition, using sums up to 20:",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": false,
+     "sort_order": 9,
+     "slots": [],
+     "children": [
+      {
+       "path": "T1.9.a",
+       "number": "9",
+       "letter": "a",
+       "label": "a",
+       "text": "a. the sum of zero and any number is equal to the number",
+       "term": 1,
+       "domain": "number-and-algebra",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      },
+      {
+       "path": "T1.9.b",
+       "number": "9",
+       "letter": "b",
+       "label": "b",
+       "text": "b. changing the order of the addends does not change the sum",
+       "term": 1,
+       "domain": "number-and-algebra",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": "T1.10",
+     "number": "10",
+     "letter": null,
+     "label": "10",
+     "text": "Solve problems (given orally or in pictures) involving addition with sums up to 20.",
+     "term": 1,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 10,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.11",
+     "number": "11",
+     "letter": null,
+     "label": "11",
+     "text": "Identify simple 2-dimensional shapes (triangle, rectangle, square) of different size and in different orientation.",
+     "term": 1,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 11,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.12",
+     "number": "12",
+     "letter": null,
+     "label": "12",
+     "text": "Compare and distinguish 2-dimensional shapes according to features such as sides and corners.",
+     "term": 1,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 12,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.13",
+     "number": "13",
+     "letter": null,
+     "label": "13",
+     "text": "Compose and decompose triangles, squares, and rectangles.",
+     "term": 1,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 13,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.14",
+     "number": "14",
+     "letter": null,
+     "label": "14",
+     "text": "Measure the length of an object and the distance between two objects using non-standard units.",
+     "term": 1,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 14,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.15",
+     "number": "15",
+     "letter": null,
+     "label": "15",
+     "text": "Compare lengths and distances using non-standard units.",
+     "term": 1,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 15,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.16",
+     "number": "16",
+     "letter": null,
+     "label": "16",
+     "text": "Solve problems involving lengths and distances using non-standard units.",
+     "term": 1,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 16,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Order numbers up to 100 from smallest to largest, and vice versa.",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 17,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Counts by 2s, 5s and 10s up to 100.",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 18,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Determine:",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": false,
+     "sort_order": 19,
+     "slots": [],
+     "children": [
+      {
+       "path": "T2.3.a",
+       "number": "3",
+       "letter": "a",
+       "label": "a",
+       "text": "a. the place value of a digit in a 2-digit number",
+       "term": 2,
+       "domain": "number-and-algebra",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 2,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      },
+      {
+       "path": "T2.3.b",
+       "number": "3",
+       "letter": "b",
+       "label": "b",
+       "text": "b. the value of a digit",
+       "term": 2,
+       "domain": "number-and-algebra",
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 2,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      },
+      {
+       "path": "T2.3.c",
+       "number": "3",
+       "letter": "c",
+       "label": "c",
+       "text": "c. the digit of a number, given its place value",
+       "term": 2,
+       "domain": "number-and-algebra",
+       "is_rateable": true,
+       "sort_order": 3,
+       "slots": [
+        {
+         "term": 2,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": "T2.6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Decompose any 2-digit number into tens and ones.",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 20,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Add numbers by expressing addends as tens and ones (expanded form).",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 21,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Add numbers with sums up to 100 without regrouping, using a variety of concrete and pictorial models for: a. 2-digit and 1-digit numbers",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 22,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ],
+     "children": [
+      {
+       "path": "T2.8.b",
+       "number": "8",
+       "letter": "b",
+       "label": "b",
+       "text": "b. 2-digit and 2-digit numbers",
+       "term": 2,
+       "domain": "number-and-algebra",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 2,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": "T2.9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Solve problems (given orally or in pictures) involving addition with sums up to 100 without regrouping.",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 23,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.10",
+     "number": "10",
+     "letter": null,
+     "label": "10",
+     "text": "Illustrate subtraction involving numbers up to 20 using a variety of concrete and pictorial models and describes subtraction as “taking away.”",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 24,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.11",
+     "number": "11",
+     "letter": null,
+     "label": "11",
+     "text": "Find the missing number in addition or subtraction sentences involving numbers up to 20.",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 25,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.12",
+     "number": "12",
+     "letter": null,
+     "label": "12",
+     "text": "Write an equivalent expression to a given addition or subtraction expression (e.g., 2+3 = 1+4; 10-5 = 6-1).",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 26,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.13",
+     "number": "13",
+     "letter": null,
+     "label": "13",
+     "text": "Solve subtraction problems (given orally or in pictures) where both numbers are less than 20.",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 27,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.14",
+     "number": "14",
+     "letter": null,
+     "label": "14",
+     "text": "Subtract numbers where both numbers are less than 100 using concrete and pictorial models, without regrouping: a. 2-digit minus 1-digit numbers",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 28,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ],
+     "children": [
+      {
+       "path": "T2.14.b",
+       "number": "14",
+       "letter": "b",
+       "label": "b",
+       "text": "b. 2-digit minus 2-digit numbers",
+       "term": 2,
+       "domain": "number-and-algebra",
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 2,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": "T2.15",
+     "number": "15",
+     "letter": null,
+     "label": "15",
+     "text": "Subtract numbers by expressing minuends and subtrahends as tens and ones (expanded form), without regrouping.",
+     "term": 2,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 29,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.16",
+     "number": "16",
+     "letter": null,
+     "label": "16",
+     "text": "Collect data in one variable through a simple interview.",
+     "term": 2,
+     "domain": "data-and-probability",
+     "is_rateable": true,
+     "sort_order": 30,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.17",
+     "number": "17",
+     "letter": null,
+     "label": "17",
+     "text": "Present data in a pictograph without a scale.",
+     "term": 2,
+     "domain": "data-and-probability",
+     "is_rateable": true,
+     "sort_order": 31,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.18",
+     "number": "18",
+     "letter": null,
+     "label": "18",
+     "text": "Interpret a pictograph without a scale.",
+     "term": 2,
+     "domain": "data-and-probability",
+     "is_rateable": true,
+     "sort_order": 32,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.19",
+     "number": "19",
+     "letter": null,
+     "label": "19",
+     "text": "Organize data in a pictograph without a scale into a table.",
+     "term": 2,
+     "domain": "data-and-probability",
+     "is_rateable": true,
+     "sort_order": 33,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Determine the next term/s in a repeating pattern (patterns could use rhythmic properties, visual elements in the arts, ...)",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 34,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Create repeating patterns using objects, images, or numbers.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 35,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Illustrate 1/2 and 1/4 as parts of a whole.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 36,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Compare 1/2 and 1/4 using models.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 37,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Count halves and quarters.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 38,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Recognize coins (excluding centavo coins) and bills up to ₱100 and their notations.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 39,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Determine the value of a number of bills and/or a number of coins (excluding centavo coins) up to ₱100.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 40,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Compare different denominations of peso coins (excluding centavo coins) and bills up to ₱100.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 41,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Solve 1-step problems (given orally or in pictures) involving addition of money where the sum is up to ₱100, or subtraction of money where both amounts are less than ₱100.",
+     "term": 3,
+     "domain": "number-and-algebra",
+     "is_rateable": true,
+     "sort_order": 42,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.10",
+     "number": "10",
+     "letter": null,
+     "label": "10",
+     "text": "Identify the position of objects moved in half turn or in quarter turn, in clockwise or in counter-clockwise direction, given an initial facing direction.",
+     "term": 3,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 43,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.11",
+     "number": "11",
+     "letter": null,
+     "label": "11",
+     "text": "Read and write time by the hour, half hour, and quarter hour using an analog clock.",
+     "term": 3,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 44,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.12",
+     "number": "12",
+     "letter": null,
+     "label": "12",
+     "text": "Give the days of the week and months of the year in the correct order.",
+     "term": 3,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 45,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.13",
+     "number": "13",
+     "letter": null,
+     "label": "13",
+     "text": "Determine the day and month of the year using a calendar.",
+     "term": 3,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 46,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.14",
+     "number": "14",
+     "letter": null,
+     "label": "14",
+     "text": "Solve problems involving time (hour, half hour, quarter hour, days in a week, and months in a year).",
+     "term": 3,
+     "domain": "measurement-and-geometry",
+     "is_rateable": true,
+     "sort_order": 47,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "gmrc",
+   "title": "Good Manners and Right Conduct (GMRC)",
+   "shape": "per_term_list",
+   "uses_macro_skills": false,
+   "has_domains": false,
+   "carries_values": true,
+   "sort_order": 4,
+   "counts": {
+    "competencies": 24,
+    "slots": 24
+   },
+   "domains": [],
+   "competencies": [
+    {
+     "path": "T1.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Tiwala sa Sarili (Self-Confidence)",
+     "term": 1,
+     "domain": null,
+     "performance_standard": "Naipakikita ang tiwala sa sarili sa pamamagitan ng paggamit ng mga batayang impormasyon sa mga angkop na sitwasyon.",
+     "is_rateable": true,
+     "sort_order": 1,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Pagiging Totoo (Sincerity)",
+     "term": 1,
+     "domain": null,
+     "performance_standard": "Naipapakita ang pagiging totoo sa pamamagitan ng mabuting pakikipag-ugnayan sa kapwa.",
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Tiyaga (Perseverance)",
+     "term": 1,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging matiyaga sa pamamagitan ng palagiang pagtatabi ng mga naipong pera sa alkansiya o mga gamit sa lagayan",
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Madasalin (Prayerful)",
+     "term": 1,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging madasalin sa pamamagitan ng wastong kilos at salita sa pananalangin",
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Mapagpasalamat (Gratitude)",
+     "term": 1,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging mapagpasalamat sa pamamagitan ng pag-iingat ng mga yamang mula sa kapaligiran",
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Magalang (Respectful)",
+     "term": 1,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging magalang sa pamamagitan ng mga angkop na kilos na nagbibigay-halaga sa mga karapatang tinatamasa bilang bata",
+     "is_rateable": true,
+     "sort_order": 6,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Kalinisan (Cleanliness)",
+     "term": 1,
+     "domain": null,
+     "performance_standard": "Naipakikita ang kalinisan sa pamamagitan ng palagiang pagsunod sa mga alituntunin sa paglilinis ng katawan ayon sa gabay ng pamilya, tagapangalaga, o nakatatanda",
+     "is_rateable": true,
+     "sort_order": 7,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Magalang (Respectful)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging magalang sa pamamagitan ng wastong pagtugon sa mensahe ng kapwa",
+     "is_rateable": true,
+     "sort_order": 8,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Responsable (Responsible)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging responsable sa pamamagitan ng pakikiisa sa mga munting gawain sa pamayanan ayon sa sariling kakayahan",
+     "is_rateable": true,
+     "sort_order": 9,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Matulungin (Helpful)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging matulungin sa pamamagitan ng pagtulong sa mga gawain ng pamilya sa tahanan ayon sa kakayahan",
+     "is_rateable": true,
+     "sort_order": 10,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Matulungin (Helpful)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging matulungin sa nakatatanda sa pamamagitan ng mga gawaing makatutulong at makapagbibigay-ginhawa sa kanila nang may pagsasaalang-alang sa ligtas na paraan",
+     "is_rateable": true,
+     "sort_order": 11,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Madasalin (Prayerful)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Nakapagsasanay sa pagiging madasalin sa pamamagitan ng pakikilahok sa pananalangin ng pamilya",
+     "is_rateable": true,
+     "sort_order": 12,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Kalinisan (Cleanliness)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang kalinisan sa pamamamagitan ng pakikibahagi sa mga gawain ng pangangalaga sa kapaligiran",
+     "is_rateable": true,
+     "sort_order": 13,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Masunurin (Obedient)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging masunurin sa pamamagitan ng pagtalima sa mga mabuting gawi ng pamilyang Pilipino",
+     "is_rateable": true,
+     "sort_order": 14,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Tiwala sa Sarili (Self-Confidence)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang tiwala sa sarili sa pamamagitan ng pagsasagawa ng mga gawain na nakabubuti sa sarili at sa kapwa bilang bahagi ng tagubilin ng pamilya",
+     "is_rateable": true,
+     "sort_order": 15,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Mapagbigay (Generosity)",
+     "term": 2,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging mapagbigay sa pamamagitan ng kusang-loob na pagbabahagi ng anumang mayroon siya",
+     "is_rateable": true,
+     "sort_order": 16,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Magalang (Respectful)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging magalang sa pamamagitan ng pagtalima sa mga tagubilin at alituntunin ng pook- dalanginan",
+     "is_rateable": true,
+     "sort_order": 17,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Kalinisan (Cleanliness)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Naipakikita ang kalinisan sa pamamagitan ng palagiang pagpapaalala sa kapwa-bata ng wastong pagpapanatili ng kaayusan at kalinisan ng kapaligiran",
+     "is_rateable": true,
+     "sort_order": 18,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Mapagmalasakit (Compassion)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging mapagbigay sa pamamagitan ng kusang-loob na pagbabahagi ng anumang mayroon siya",
+     "is_rateable": true,
+     "sort_order": 19,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Mapagbigay (Generosity)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging mapagbigay sa pamamagitan ng kusang-loob na pagbabahagi ng anumang mayroon siya",
+     "is_rateable": true,
+     "sort_order": 20,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Mabuting Mamamayan (Good Citizenship)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Nakapagsasanay ng pagiging mabuting mamamayan sa pamamagitan ng kusang-loob na pagtulong sa pamilya sa mga gawaing pampamayanan",
+     "is_rateable": true,
+     "sort_order": 21,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Magalang (Respectful)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Nakapagsasanay sa pagiging magalang sa pamamagitan ng angkop na kilos sa iba’t ibang gawaing panrelihiyon o paniniwala sa pamayanan",
+     "is_rateable": true,
+     "sort_order": 22,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Mapagmalasakit (Compassion)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging mapagmalasakit sa pamamagitan ng panghihikayat sa kapwa na makiisa sa mga simpleng gawain ng pangangalaga ng kapaligiran",
+     "is_rateable": true,
+     "sort_order": 23,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Pagmamahal sa Bayan (Love of Country)",
+     "term": 3,
+     "domain": null,
+     "performance_standard": "Naipakikita ang pagiging makabansa sa pamamagitan ng palagiang pagsunod sa mga panuntunan para sa mga sagisag ng bayan",
+     "is_rateable": true,
+     "sort_order": 24,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "makabansa",
+   "title": "Makabansa",
+   "shape": "per_term_list",
+   "uses_macro_skills": false,
+   "has_domains": false,
+   "carries_values": false,
+   "sort_order": 5,
+   "counts": {
+    "competencies": 15,
+    "slots": 14
+   },
+   "domains": [],
+   "competencies": [
+    {
+     "path": "T1.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Nailalarawan na ang bawat tao ay may iba't-ibang:",
+     "term": 1,
+     "domain": null,
+     "is_rateable": false,
+     "sort_order": 1,
+     "slots": [],
+     "children": [
+      {
+       "path": "T1.1.a",
+       "number": "1",
+       "letter": "a",
+       "label": "a",
+       "text": "a. Katangiang Pisikal",
+       "term": 1,
+       "domain": null,
+       "is_rateable": true,
+       "sort_order": 1,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      },
+      {
+       "path": "T1.1.b",
+       "number": "1",
+       "letter": "b",
+       "label": "b",
+       "text": "b. Pangangailangan",
+       "term": 1,
+       "domain": null,
+       "is_rateable": true,
+       "sort_order": 2,
+       "slots": [
+        {
+         "term": 1,
+         "macro_skill": "none",
+         "sort_order": 1
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "path": "T1.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Naipaliliwanag ang karapatan at tungkulin ng bawat bata.",
+     "term": 1,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T1.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Napahahalagahan ang indibidwalidad ng bawat tao.",
+     "term": 1,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Naipaliwanag ang konsepto ng pamilya batay sa bumubuo nito tulad ng two-parent, solo parents, extended family, at iba pa.",
+     "term": 2,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Naipaliliwanag ang papel at tungkulin ng mga kasapi ng pamilya.",
+     "term": 2,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T2.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Napahahalagahan ang papel at tungkulin ng mga kasapi ng pamilya.",
+     "term": 2,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 6,
+     "slots": [
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Nailalahad ang mga batayang impormasyon tulad ng pangalan, pinagmulan, laki at lawak, kinaroroonan, at kwento ng sariling paaralan.",
+     "term": 3,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 7,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Naipaliliwanag ang tungkulin ng mga taong bumubuo sa paaralan tulad ng punong-guro, guro, doctor, nars, dyanitor, mag-aaral at iba pa.",
+     "term": 3,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 8,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Natutukoy ang kahalagahan ng mga palatandaan at estruktura mula sa tahanan patungo sa paaralan.",
+     "term": 3,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 9,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Napahahalagahan ang sariling paaralan bilang bahagi ng pamayanan.",
+     "term": 3,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 10,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Natutukoy ang iba pang kasapi ng pamayanan na umaagapay sa pamilya at paaralan.",
+     "term": 3,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 11,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Naipaliliwanag ang papel ng mga kasapi ng kinabibilangang pamayanan.",
+     "term": 3,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 12,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": "T3.7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Napahahalagahan ang papel ng mga kasapi ng kinabibilangang pamayanan.",
+     "term": 3,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 13,
+     "slots": [
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

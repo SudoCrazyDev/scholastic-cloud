@@ -98,7 +98,7 @@ fifteen-line migration**, never a schema change.
 | Different descriptor wording | `config/matatag.php` | config only |
 | A **new per-competency text field** | `matatag_competencies.extra` (json) | none |
 
-Nothing in code may hardcode Grade 1's shape. In particular **201 and 602 are not constants** — the
+Nothing in code may hardcode Grade 1's shape. In particular **199 and 606 are not constants** — the
 loader asserts each file's *own* per-area counts, so each grade level asserts its own totals. The
 entry grid renders whatever `columns` the API returns and branches only on the
 `uses_macro_skills` / `has_domains` / `carries_values` flags — never on an area key or a grade level.
@@ -182,19 +182,19 @@ which hold the slots, the parent then holding none.
 
 | Learning area | Source sheets | Domains | Competencies | Slots |
 |---|---|---|---|---|
-| Reading & Literacy | `TERM {1,2,3} READING & LITERACY` | 6, span the year | 43 | 241 |
-| Language | `TERM {1,2,3} LANGUAGE` | 5, span the year | 65 | 271 |
+| Reading & Literacy | `TERM {1,2,3} READING & LITERACY` | 6, span the year | 42 | 241 |
+| Language | `TERM {1,2,3} LANGUAGE` | 4, span the year | 64 | 275 |
 | Mathematics | `TERM 1-3 MATHEMATICS` | 3 distinct, **2 per term** | 54 | 52 |
 | GMRC | `TERM 1-3 GMRC` | none | 24 | 24 |
 | Makabansa | `G1 PACE FORM MAKABANSA` | none | 15 | 14 |
-| **Total** | | | **201** | **602** |
+| **Total** | | | **199** | **606** |
 
 Mathematics domains are two per term drawn from three across the year — T1 *Number and Algebra* +
 *Measurement and Geometry*; T2 *Number and Algebra* + *Data and Probability*; T3 *Number and Algebra*
 + *Measurement and Geometry*. Do not assume three per term.
 
-GMRC alone carries two extra text fields per competency: `Nililinang na Pagpapahalaga` (the value
-cultivated) and a Filipino `Performance Standard` sentence.
+GMRC alone carries an extra text field per competency: a Filipino `Performance Standard` sentence
+beside the value it cultivates, which is the competency's own wording.
 
 ### Descriptors
 
@@ -226,7 +226,7 @@ clean-up:
 | `matatag_learning_areas` | the areas | `UNIQUE (version_id, key)` |
 | `matatag_domains` | domains; `term = 0` when year-spanning | `UNIQUE (area_id, term, code)` |
 | `matatag_competencies` | the competency rows, one level of `parent_id` | `UNIQUE (area_id, path)`, e.g. `T1.9.a` |
-| `matatag_competency_slots` | the rateable cells | `UNIQUE (competency_id, term, macro_skill)` |
+| `matatag_competency_slots` | the rateable cells (606 for Grade 1) | `UNIQUE (competency_id, term, macro_skill)` |
 
 **Per-tenant:**
 
@@ -302,6 +302,7 @@ Confirmed by reading the cells. Fix in our data; note the deviation.
 | `PACE!R141` | Reads `'TERM 1 LANGUAGE'` where Term 3 is meant. |
 | `TERM 1-3 MATHEMATICS` T2 | Numbers the children of competency `3` ("Determine:") as top-level `3`, `4`, `5` — inconsistent with every other nested competency in the file. |
 | `TERM 1-3 GMRC` T3 | Competency `3` (*Mapagmalasakit*) repeats competency `4`'s (*Mapagbigay*) performance standard verbatim. |
+| `TERM 3 LANGUAGE` `DH`/`DI` | Competency `20e` is fill-coloured and assessable, but **no PACE formula reads it** — the Term 3 sheet is three columns wider than its Term 1 and Term 2 siblings. Two slots would be lost; the extractor recovers them from the sheet's own header. |
 
 Extracting from macro-skill fills rather than PACE formulas removes the four formula bugs
 automatically. The Math numbering and the GMRC duplicate need a judgement call recorded in the JSON.

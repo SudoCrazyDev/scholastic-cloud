@@ -145,6 +145,20 @@ return [
                     'label' => 'Proficiency',
                     'description' => 'Core values and proficiency markings.',
                 ],
+                'matatag-grading' => [
+                    'label' => 'MATATAG Progress (Key Stage 1)',
+                    'description' => "DepEd's MATATAG progress report for Grades 1 to 3: a letter descriptor A-E against each learning competency each term, the adviser's two narratives, and the PACE forms and progress report card printed from them. There are no numbers in it - no scores, no averages, no transmutation, no general average - and it changes nothing about the numeric grading the rest of the school runs on.",
+                    'special' => [
+                        'view-all' => [
+                            'label' => 'See every Key Stage 1 section in the school',
+                            'description' => "Open and print any Grade 1 to 3 section's competency grid, rather than only the sections this person advises. Tick it for a principal, curriculum head or registrar. An adviser holds Manage on their own section without it.",
+                        ],
+                        'set-up' => [
+                            'label' => 'Choose which sections report on MATATAG',
+                            'description' => 'Switch a Grade 1 to 3 section onto the competency grid and pin the DepEd catalog version its descriptors are recorded against. Kept apart from Manage because it decides how a whole year is reported, not what one learner was marked.',
+                        ],
+                    ],
+                ],
                 'teaching-activity' => [
                     'label' => 'Teaching Activity',
                     'description' => 'Oversight of what teachers have put up for their subjects — lessons, uploaded files and assessments — and how many of their students have submitted. Read-only: it reports on other modules and changes nothing, so it offers no Manage.',

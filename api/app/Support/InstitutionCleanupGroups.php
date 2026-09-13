@@ -126,6 +126,30 @@ class InstitutionCleanupGroups
                 'soft_deletes' => [],
             ],
 
+            // A separate group rather than extra rows on `assessments`: a school
+            // clearing its numeric grades has no reason to lose a year of MATATAG
+            // descriptors, and the reverse holds too. They are two different
+            // records of achievement that happen to cover the same learners.
+            //
+            // Every table here carries `institution_id` directly, so none of them
+            // needs a `scoping()` entry. That is deliberate, and it is the thing
+            // `core_value_markings` got wrong.
+            //
+            // `matatag_competency_ratings.slot_id` is RESTRICT, but it points at
+            // the platform-wide catalog, which a clean-up never deletes from - so
+            // it can never make a clean-up fail.
+            'matatag' => [
+                'label' => 'MATATAG Progress (Key Stage 1)',
+                'area' => 'Academics',
+                'description' => "Competency descriptors, the adviser's two narratives per term, and each section's opt-in to a DepEd catalog, for Grades 1 to 3. The catalog itself is platform-wide and is never touched.",
+                'tables' => [
+                    'matatag_competency_ratings',
+                    'matatag_term_narratives',
+                    'matatag_section_curricula',
+                ],
+                'soft_deletes' => [],
+            ],
+
             'assignments' => [
                 'label' => 'Section & Subject Assignments',
                 'area' => 'Academics',
@@ -517,7 +541,7 @@ class InstitutionCleanupGroups
             ],
             [
                 'label' => 'Platform-wide records',
-                'detail' => 'Grade levels and system roles are shared by every school on the platform and are never touched by a clean-up of one tenant.',
+                'detail' => 'Grade levels, system roles and the DepEd MATATAG competency catalog are shared by every school on the platform and are never touched by a clean-up of one tenant.',
             ],
             [
                 'label' => 'Audit trails',

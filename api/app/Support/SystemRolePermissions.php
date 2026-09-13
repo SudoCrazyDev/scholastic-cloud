@@ -43,7 +43,8 @@ class SystemRolePermissions
         // themselves on the same screen.
         'institution-administrator' => [
             'announcements', 'class-sections', 'subjects', 'timetable',
-            'grading-scales', 'consolidated-grades', 'proficiency', 'school-days',
+            'grading-scales', 'consolidated-grades', 'proficiency', 'matatag-grading',
+            'school-days',
             'tracks-strands', 'students', 'student-attendance', 'admission-forms',
             'gate-entries', 'finance', 'school-fees', 'payment-plans', 'discounts',
             'disbursements', 'finance-reports', 'staffs', 'staff-schedules',
@@ -55,7 +56,8 @@ class SystemRolePermissions
 
         'principal' => [
             'announcements', 'class-sections', 'subjects', 'timetable',
-            'grading-scales', 'consolidated-grades', 'proficiency', 'school-days',
+            'grading-scales', 'consolidated-grades', 'proficiency', 'matatag-grading',
+            'school-days',
             'tracks-strands', 'students', 'student-attendance', 'admission-forms',
             'gate-entries', 'finance', 'school-fees', 'payment-plans', 'discounts',
             'disbursements', 'finance-reports', 'staffs', 'staff-schedules',
@@ -80,7 +82,8 @@ class SystemRolePermissions
         // It is granted per teacher now, so it is not a role's to hand out.
         'subject-teacher' => [
             'announcements', 'subjects', 'consolidated-grades', 'proficiency',
-            'student-attendance', 'certificate-builder', 'form-builder', 'id-card-builder',
+            'matatag-grading', 'student-attendance', 'certificate-builder', 'form-builder',
+            'id-card-builder',
         ],
 
         // A department head works the same screens as a teacher. The difference
@@ -90,7 +93,8 @@ class SystemRolePermissions
         // should be a capability a department head has and a teacher does not.
         'department-head' => [
             'announcements', 'subjects', 'consolidated-grades', 'proficiency',
-            'student-attendance', 'certificate-builder', 'form-builder', 'id-card-builder',
+            'matatag-grading', 'student-attendance', 'certificate-builder', 'form-builder',
+            'id-card-builder',
         ],
 
         // Both only ever reached Consolidated Grades and Proficiency.
@@ -135,8 +139,8 @@ class SystemRolePermissions
         'finance' => ['students', 'class-sections', 'grade-levels', 'subjects'],
         'subject-teacher' => ['class-sections', 'students', 'school-days', 'grade-levels'],
         'department-head' => ['class-sections', 'students', 'school-days', 'grade-levels'],
-        'curriculum-head' => ['class-sections', 'students', 'subjects', 'grade-levels'],
-        'assistant-principal' => ['class-sections', 'students', 'subjects', 'grade-levels'],
+        'curriculum-head' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading'],
+        'assistant-principal' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading'],
         'registrar' => ['grade-levels', 'tracks-strands', 'class-sections'],
     ];
 
@@ -152,6 +156,7 @@ class SystemRolePermissions
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
+            'matatag-grading.view-all', 'matatag-grading.set-up',
             'tala.configure', 'students.reset-portal-password',
             'subjects.view-all',
         ],
@@ -161,6 +166,7 @@ class SystemRolePermissions
             'discounts.void',
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
+            'matatag-grading.view-all', 'matatag-grading.set-up',
             'tala.configure', 'students.reset-portal-password',
             'subjects.view-all',
         ],
@@ -192,10 +198,19 @@ class SystemRolePermissions
         // you would point a student's account at your own inbox.
         'subject-teacher' => ['students.reset-portal-password'],
 
-        // The one thing that separates a department head from a teacher. Their
-        // module sets are identical, so this — not `subjects.manage`, which a
-        // teacher also holds — is what My Assigned Subjects has to key off.
-        'department-head' => ['subjects.view-all'],
+        // What separates a department head from a teacher. Their module sets are
+        // identical, so these — not `subjects.manage`, which a teacher also holds —
+        // are what My Assigned Subjects and the MATATAG grid have to key off. Both
+        // are reach across other people's sections, not an extra ability.
+        'department-head' => ['subjects.view-all', 'matatag-grading.view-all'],
+
+        // Oversight roles: they read every Key Stage 1 section rather than only an
+        // advisory of their own. Deliberately without `matatag-grading.set-up` —
+        // deciding which sections report on MATATAG stays with the principal and the
+        // administrator, because it pins a catalog version for a whole school year.
+        'curriculum-head' => ['matatag-grading.view-all'],
+
+        'assistant-principal' => ['matatag-grading.view-all'],
     ];
 
     /**

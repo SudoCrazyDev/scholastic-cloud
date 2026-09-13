@@ -49,4 +49,25 @@ return [
         'notes' => 'Where a chat service is configured for the deployment, messages are served from Cloudflare rather than this server.',
     ],
 
+    'matatag-grading' => [
+        'label' => 'MATATAG Progress (Key Stage 1)',
+        'description' => "DepEd's MATATAG competency-based progress report for Grades 1 to 3 - letter descriptors against each learning competency each term, instead of numeric grades. It runs alongside the school's existing four-quarter numeric grading and replaces none of it.",
+
+        /*
+         * Off until a school is switched on, deliberately.
+         *
+         * Only Grade 1's DepEd catalog has been loaded so far, so a Grade 2 or
+         * Grade 3 section would open the screen and find nothing to mark. And a
+         * school still on the older report card should not discover a second,
+         * differently-shaped one in Academics without having asked for it.
+         *
+         * Turn this on school by school while Key Stage 1 rolls out, and change
+         * the default once Grades 2 and 3 have catalogs.
+         */
+        'default_enabled' => false,
+
+        // Shown on the Feature Access screen.
+        'notes' => 'Only grade levels a DepEd catalog has been loaded for can be used. Grade 1 ships with this release; Grades 2 and 3 arrive as data, with no deployment.',
+    ],
+
 ];
