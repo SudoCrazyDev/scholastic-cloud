@@ -327,4 +327,97 @@ class GradingPeriodStructureTest extends TestCase
             ])
             ->assertSuccessful();
     }
+
+    /**
+     * The premise the whole MATATAG module rests on, pinned here rather than
+     * in that module's own tests — because what has to keep working is *this*
+     * system, and this is the file that owns it.
+     *
+     * `GradingPeriods::forInstitution()` resolves quarter-versus-term per
+     * (institution, academic year), school-wide, and
+     * `institution_academic_years` is UNIQUE (institution_id, year) with no
+     * grade-level dimension to add one to. So a K-12 school cannot put Grades
+     * 1 to 3 on three MATATAG terms by flipping that flag: it would make
+     * `count()` return 3 for the whole school, and `assertValidPeriod()` would
+     * start throwing at every Grade 10 teacher entering Quarter 4.
+     *
+     * MATATAG therefore owns its own fixed three-term concept and never calls
+     * `GradingPeriods`. If someone later "simplifies" by wiring the two
+     * together, this test is what fails.
+     */
+    public function test_opting_a_grade_1_section_into_matatag_leaves_the_school_on_quarters(): void
+    {
+        $this->academicYear('2026-2027', 'quarter', true);
+        $user = $this->makeUserWithRole('subject-teacher', 'matatag-premise-token');
+
+        $grade1 = ClassSection::create([
+            'institution_id' => $this->institution->id,
+            'grade_level' => 'Grade 1',
+            'title' => 'Sampaguita',
+            'adviser' => $user->id,
+            'academic_year' => '2026-2027',
+        ]);
+
+        \App\Models\MatatagSectionCurriculum::create([
+            'institution_id' => $this->institution->id,
+            'class_section_id' => $grade1->id,
+            'academic_year' => '2026-2027',
+            'curriculum_version_id' => \App\Models\MatatagCurriculumVersion::where(
+                'code', 'deped-matatag-ks1-grade-1-v1'
+            )->value('id'),
+            'grade_level' => 'Grade 1',
+            'enabled' => true,
+        ]);
+
+        GradingPeriods::flushCache();
+
+        $this->assertSame(
+            'quarter',
+            GradingPeriods::forInstitution($this->institution->id, '2026-2027'),
+            'MATATAG must not touch how the rest of the school is graded.',
+        );
+        $this->assertSame(4, GradingPeriods::count($this->institution->id, '2026-2027'));
+
+        $this->assertSame(
+            'quarter',
+            InstitutionAcademicYear::where('institution_id', $this->institution->id)
+                ->where('year', '2026-2027')
+                ->value('grading_period_type'),
+            'the stored structure is untouched',
+        );
+
+        // And a Grade 10 teacher can still enter Quarter 4 in the same school
+        // and the same year.
+        $grade10 = ClassSection::create([
+            'institution_id' => $this->institution->id,
+            'grade_level' => 'Grade 10',
+            'title' => 'Einstein',
+            'academic_year' => '2026-2027',
+        ]);
+        $subject = Subject::create([
+            'institution_id' => $this->institution->id,
+            'class_section_id' => $grade10->id,
+            'adviser' => $user->id,
+            'subject_type' => 'parent',
+            'title' => 'Mathematics',
+            'order' => 1,
+        ]);
+        $student = \App\Models\Student::create([
+            'first_name' => 'Quarter',
+            'last_name' => 'Learner',
+            'gender' => 'male',
+            'birthdate' => '2010-05-05',
+            'is_active' => true,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer matatag-premise-token')
+            ->postJson('/api/student-running-grades/upsert-final-grade', [
+                'student_id' => $student->id,
+                'subject_id' => $subject->id,
+                'quarter' => 4,
+                'final_grade' => 88,
+                'academic_year' => '2026-2027',
+            ])
+            ->assertSuccessful();
+    }
 }

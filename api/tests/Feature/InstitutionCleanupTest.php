@@ -39,12 +39,14 @@ class InstitutionCleanupTest extends TestCase
     private const YEAR = '2026-2027';
 
     private Institution $target;
+
     private Institution $bystander;
 
     /** Enrolled at both schools — the cross-tenant canary. */
     private Student $sharedStudent;
 
     private Subject $targetSubject;
+
     private Subject $bystanderSubject;
 
     protected function setUp(): void
@@ -97,7 +99,7 @@ class InstitutionCleanupTest extends TestCase
         $section = ClassSection::create([
             'institution_id' => $institution->id,
             'grade_level' => 'Grade 7',
-            'title' => $title . ' Section',
+            'title' => $title.' Section',
             'academic_year' => self::YEAR,
             'status' => 'active',
         ]);
@@ -149,7 +151,7 @@ class InstitutionCleanupTest extends TestCase
             'token' => $token,
             // UserFactory hardcodes one address, so every user made here needs
             // its own or the second insert collides on users_email_unique.
-            'email' => $token . '@cleanup.test',
+            'email' => $token.'@cleanup.test',
             'token_expiry' => now()->addDay()->toDateTimeString(),
         ]);
 
@@ -171,8 +173,8 @@ class InstitutionCleanupTest extends TestCase
     {
         $institution ??= $this->target;
 
-        return $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->postJson('/api/institution-cleanup/' . $institution->id, [
+        return $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/institution-cleanup/'.$institution->id, [
                 'groups' => $groups,
                 'confirmation' => $confirmation ?? $institution->title,
             ]);
@@ -384,7 +386,7 @@ class InstitutionCleanupTest extends TestCase
         $this->makeGrade($this->targetSubject, $this->makeStudent('Second', 'Learner'), 80);
 
         $preview = $this->withHeader('Authorization', 'Bearer super-token')
-            ->postJson('/api/institution-cleanup/' . $this->target->id . '/preview', [
+            ->postJson('/api/institution-cleanup/'.$this->target->id.'/preview', [
                 'groups' => ['assessments'],
             ]);
 
@@ -397,5 +399,126 @@ class InstitutionCleanupTest extends TestCase
         $this->clear('super-token', ['assessments'])
             ->assertOk()
             ->assertJsonPath('data.total_deleted', 2);
+    }
+
+    /**
+     * MATATAG descriptors are their own cleanup group, not extra rows on
+     * `assessments`.
+     *
+     * A school clearing its numeric grades has no reason to lose a year of
+     * competency descriptors, and the reverse holds too — they are two
+     * different records of two different things, kept by the same school.
+     *
+     * The catalog itself is global reference data shared by every tenant, so a
+     * cleanup must not go near it: a competency is DepEd's, identical
+     * everywhere, and there is one copy.
+     */
+    public function test_the_matatag_group_clears_descriptors_and_leaves_the_catalog_alone(): void
+    {
+        $this->makeUser('super-token', 'super-administrator');
+
+        // The same dual-enrolled learner marked at both schools — the case
+        // `core_value_markings` gets wrong, because it carries no
+        // `institution_id` and has to be scoped through enrolment. Every
+        // MATATAG tenant table carries one directly, so this is the fixture
+        // that proves it.
+        //
+        // Different slots at each school: one learner cannot hold two
+        // descriptors for one slot in one year, and the unique index says so.
+        $this->makeMatatagMarks($this->target, $this->targetSubject->class_section_id, 0);
+        $this->makeMatatagMarks($this->bystander, $this->bystanderSubject->class_section_id, 1);
+
+        $competencies = DB::table('matatag_competencies')->count();
+        $slots = DB::table('matatag_competency_slots')->count();
+        $this->assertGreaterThan(0, $slots, 'the fixture must have a catalog loaded');
+
+        $this->clear('super-token', ['matatag'])->assertOk();
+
+        $this->assertSame(0, DB::table('matatag_competency_ratings')
+            ->where('institution_id', $this->target->id)->count());
+        $this->assertSame(0, DB::table('matatag_term_narratives')
+            ->where('institution_id', $this->target->id)->count());
+        $this->assertSame(0, DB::table('matatag_section_curricula')
+            ->where('institution_id', $this->target->id)->count());
+
+        $this->assertSame(1, DB::table('matatag_competency_ratings')
+            ->where('institution_id', $this->bystander->id)->count(),
+            "the other school's descriptors for the same learner are none of this cleanup's business");
+        $this->assertSame(1, DB::table('matatag_term_narratives')
+            ->where('institution_id', $this->bystander->id)->count());
+        $this->assertSame(1, DB::table('matatag_section_curricula')
+            ->where('institution_id', $this->bystander->id)->count());
+
+        $this->assertSame($competencies, DB::table('matatag_competencies')->count(),
+            'the DepEd catalog is global reference data and is never cleaned up');
+        $this->assertSame($slots, DB::table('matatag_competency_slots')->count());
+    }
+
+    /**
+     * Clearing numeric grades must not take the competency record with it, and
+     * vice versa.
+     */
+    public function test_clearing_assessments_leaves_matatag_descriptors_standing(): void
+    {
+        $this->makeUser('super-token', 'super-administrator');
+        $this->makeGrade($this->targetSubject, $this->sharedStudent, 90);
+        $this->makeMatatagMarks($this->target, $this->targetSubject->class_section_id, 0);
+
+        $this->clear('super-token', ['assessments'])->assertOk();
+
+        $this->assertDatabaseCount('student_running_grades', 0);
+        $this->assertSame(1, DB::table('matatag_competency_ratings')
+            ->where('institution_id', $this->target->id)->count());
+    }
+
+    /**
+     * A pin, a descriptor and a narrative for one institution.
+     */
+    private function makeMatatagMarks(Institution $institution, string $sectionId, int $slotOffset): void
+    {
+        $version = DB::table('matatag_curriculum_versions')
+            ->where('code', 'deped-matatag-ks1-grade-1-v1')->first();
+
+        $slot = DB::table('matatag_competency_slots')
+            ->where('term', 1)->orderBy('id')->skip($slotOffset)->first();
+
+        DB::table('matatag_section_curricula')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid7(),
+            'institution_id' => $institution->id,
+            'class_section_id' => $sectionId,
+            'academic_year' => self::YEAR,
+            'curriculum_version_id' => $version->id,
+            'grade_level' => 'Grade 1',
+            'enabled' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('matatag_competency_ratings')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid7(),
+            'institution_id' => $institution->id,
+            'class_section_id' => $sectionId,
+            'student_id' => $this->sharedStudent->id,
+            'academic_year' => self::YEAR,
+            'slot_id' => $slot->id,
+            'term' => 1,
+            'learning_area_id' => $slot->learning_area_id,
+            'curriculum_version_id' => $version->id,
+            'descriptor' => 'B',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('matatag_term_narratives')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid7(),
+            'institution_id' => $institution->id,
+            'class_section_id' => $sectionId,
+            'student_id' => $this->sharedStudent->id,
+            'academic_year' => self::YEAR,
+            'term' => 1 + $slotOffset,
+            'can_do' => 'Reads aloud with confidence.',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

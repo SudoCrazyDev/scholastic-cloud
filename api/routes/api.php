@@ -14,8 +14,8 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DisbursementComponentTypeController;
 use App\Http\Controllers\DisbursementController;
 use App\Http\Controllers\DisbursementTypeController;
-use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\FeeNamingController;
+use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\FinanceDataClearController;
 use App\Http\Controllers\GateDeviceController;
 use App\Http\Controllers\GateKioskController;
@@ -28,6 +28,12 @@ use App\Http\Controllers\InstitutionCleanupController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\InstitutionFeatureController;
 use App\Http\Controllers\InstitutionPaymentGatewayController;
+use App\Http\Controllers\MatatagAttendanceController;
+use App\Http\Controllers\MatatagCurriculumController;
+use App\Http\Controllers\MatatagGridController;
+use App\Http\Controllers\MatatagNarrativeController;
+use App\Http\Controllers\MatatagReferenceController;
+use App\Http\Controllers\MatatagSectionController;
 use App\Http\Controllers\PaymentIdentifierController;
 use App\Http\Controllers\PaymentPlanController;
 use App\Http\Controllers\PaymentReceiptSubmissionController;
@@ -689,6 +695,51 @@ Route::middleware('auth.token')->group(function () {
     Route::delete('gate/unresolved-scans/{id}', [GateUnresolvedScanController::class, 'destroy'])->middleware('module:gate-entries,manage');
     // Core Value Marking routes
     Route::apiResource('core-value-markings', CoreValueMarkingController::class)->middleware('module:proficiency,view');
+
+    /*
+     * DepEd MATATAG progress reporting for Key Stage 1 (Grades 1-3).
+     *
+     * Gated twice, and the two gates answer different questions.
+     * `feature:matatag-grading` wraps the whole group rather than being
+     * repeated per route, so a route added later cannot quietly miss it —
+     * and `EnsureFeatureEnabled` deliberately does not honour the
+     * super-administrator wildcard, so a school that has not been switched
+     * on is closed to everyone. `module:matatag-grading,*` is then the
+     * school's own decision about who among its staff may work here.
+     *
+     * `set-up` is separate from `manage` on purpose: deciding how a whole
+     * year is reported, and pinning the catalog version it is recorded
+     * against, is not the same act as marking one learner.
+     *
+     * Nothing in this group touches the numeric grading the rest of the
+     * school runs on. See docs/modules/MatatagKeyStage1/MATATAG.md.
+     */
+    Route::middleware('feature:matatag-grading')->group(function () {
+        Route::get('matatag/reference', [MatatagReferenceController::class, 'index'])
+            ->middleware('module:matatag-grading,view');
+        Route::get('matatag/curriculum', [MatatagCurriculumController::class, 'show'])
+            ->middleware('module:matatag-grading,view');
+
+        Route::get('matatag/sections', [MatatagSectionController::class, 'index'])
+            ->middleware('module:matatag-grading,view');
+        Route::post('matatag/sections/{sectionId}/opt-in', [MatatagSectionController::class, 'store'])
+            ->middleware('module:matatag-grading,set-up');
+        Route::delete('matatag/sections/{sectionId}/opt-in', [MatatagSectionController::class, 'destroy'])
+            ->middleware('module:matatag-grading,set-up');
+
+        Route::get('matatag/grid', [MatatagGridController::class, 'show'])
+            ->middleware('module:matatag-grading,view');
+        Route::post('matatag/grid/bulk-upsert', [MatatagGridController::class, 'bulkUpsert'])
+            ->middleware('module:matatag-grading,manage');
+
+        Route::get('matatag/narratives', [MatatagNarrativeController::class, 'index'])
+            ->middleware('module:matatag-grading,view');
+        Route::post('matatag/narratives/bulk-upsert', [MatatagNarrativeController::class, 'bulkUpsert'])
+            ->middleware('module:matatag-grading,manage');
+
+        Route::get('matatag/attendance', [MatatagAttendanceController::class, 'index'])
+            ->middleware('module:matatag-grading,view');
+    });
     // SF9 routes
     Route::post('sf9/generate', [SF9Controller::class, 'generate'])->middleware('module:consolidated-grades,view');
     Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears'])->middleware('module:consolidated-grades,view');
