@@ -4205,6 +4205,7 @@ export interface MatatagSectionAttendance {
     student_id: string;
     months: MatatagAttendanceMonth[];
     terms: Record<string, MatatagAttendanceTotals>;
+    total: MatatagAttendanceTotals;
   }>;
   warnings: MatatagAttendanceWarning[];
 }
@@ -4215,5 +4216,133 @@ export interface MatatagStudentAttendance {
   months: MatatagAttendanceMonth[];
   terms: Record<string, MatatagAttendanceTotals>;
   total: MatatagAttendanceTotals;
+  warnings: MatatagAttendanceWarning[];
+}
+
+/* ------------------------------------------------------------------
+ * MATATAG progress report — the card and the PACE forms
+ *
+ * The shape is the model. The card's body is narratives, attendance and the
+ * legend; the descriptor grid is not on the card — DepEd prints it on the
+ * attached PACE forms — so it lives under `pace` and nowhere else. There is no
+ * field here for an average, a final grade or a transmuted score, deliberately:
+ * a field that exists eventually gets filled in.
+ * ------------------------------------------------------------------ */
+
+export interface MatatagReportSchool {
+  id: string | null;
+  name: string | null;
+  address: string | null;
+  division: string | null;
+  region: string | null;
+  /** DepEd's School ID, stored on the institution as `gov_id`. */
+  school_id: string | null;
+  logo: string | null;
+}
+
+export interface MatatagReportSection {
+  id: string;
+  title: string;
+  grade_level: string;
+  adviser: { id: string; name: string } | null;
+}
+
+export interface MatatagReportNarrative {
+  term: number;
+  label: string;
+  filipino: string;
+  can_do: string | null;
+  to_improve: string | null;
+  updated_at: string | null;
+}
+
+export interface MatatagReportStudent {
+  id: string;
+  lrn: string | null;
+  name: string;
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  ext_name: string | null;
+  sex: string | null;
+  birthdate: string | null;
+  /** Whole years completed on the first and last printed day of the year. */
+  age_at_start_of_school_year: number | null;
+  age_at_end_of_school_year: number | null;
+}
+
+/** One box on a PACE row: the competency in one term, one macro skill. */
+export interface MatatagPaceSlot {
+  id: string;
+  term: number;
+  /** Null for an area that does not use macro skills. */
+  macro_skill: string | null;
+  sort_order: number;
+}
+
+/**
+ * One row of a PACE form: a competency across the whole year, carrying a box
+ * per (term, macro skill) it is actually assessed in. The entry grid is this
+ * same catalog turned ninety degrees.
+ */
+export interface MatatagPaceRow {
+  competency_id: string;
+  path: string;
+  domain_id: string | null;
+  term: number;
+  number: string | null;
+  letter: string | null;
+  label: string;
+  text: string;
+  /** GMRC prints this beside the value it cultivates; null elsewhere. */
+  performance_standard: string | null;
+  extra: Record<string, string> | null;
+  parent_label: string | null;
+  parent_text: string | null;
+  slots: MatatagPaceSlot[];
+}
+
+export interface MatatagPaceArea extends MatatagLearningAreaSummary {
+  domains: MatatagDomainSummary[];
+  rows: MatatagPaceRow[];
+}
+
+/**
+ * How much of the catalog came back. A whole section across every area is not
+ * served — it is ~600 printed pages — so the two real print jobs each narrow
+ * it, and `omitted` says so out loud rather than leaving forms silently absent.
+ */
+export type MatatagPaceScope = 'all_areas' | 'one_area' | 'omitted';
+
+export interface MatatagReportLearner {
+  student: MatatagReportStudent;
+  /** Always three, written or not: the card prints three blocks. */
+  narratives: MatatagReportNarrative[];
+  attendance: {
+    months: MatatagAttendanceMonth[];
+    terms: Record<string, MatatagAttendanceTotals>;
+    total: MatatagAttendanceTotals;
+  };
+  /** Descriptors keyed by slot id. The text they hang off is up in `pace`. */
+  pace: Record<string, MatatagDescriptor>;
+}
+
+export interface MatatagProgressReport {
+  academic_year: string;
+  school: MatatagReportSchool;
+  section: MatatagReportSection;
+  curriculum_version: MatatagCurriculumVersionSummary;
+  legend: {
+    descriptors: MatatagDescriptorDefinition[];
+    terms: MatatagTermDefinition[];
+    macro_skills: MatatagMacroSkillDefinition[];
+  };
+  pace: {
+    scope: MatatagPaceScope;
+    note: string | null;
+    /** Hoisted: emitted once for the section, never repeated per learner. */
+    learning_areas: MatatagPaceArea[];
+  };
+  learners: MatatagReportLearner[];
   warnings: MatatagAttendanceWarning[];
 }

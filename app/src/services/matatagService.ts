@@ -4,6 +4,7 @@ import type {
   MatatagGrid,
   MatatagNarrativeWrite,
   MatatagNarratives,
+  MatatagProgressReport,
   MatatagRatingWrite,
   MatatagReference,
   MatatagSectionAttendance,
@@ -132,6 +133,37 @@ class MatatagService {
   }) {
     const response = await api.get<ApiResponse<MatatagStudentAttendance>>(
       `/matatag/attendance${this.query(params)}`
+    )
+    return response.data.data
+  }
+
+  /**
+   * A section's report cards.
+   *
+   * Naming a `learning_area_id` also attaches that one PACE form for every
+   * learner — the "print the class's Reading & Literacy forms" job. Without
+   * one, the cards come back on their own: a whole section across all five
+   * areas is ~600 pages and is not served by accident. The response says which
+   * of the three it gave you in `pace.scope`.
+   */
+  async getSectionReport(params: {
+    class_section_id: string
+    learning_area_id?: string
+    academic_year?: string
+  }) {
+    const response = await api.get<ApiResponse<MatatagProgressReport>>(
+      `/matatag/progress-report${this.query(params)}`
+    )
+    return response.data.data
+  }
+
+  /** One learner's card and all of their PACE forms. */
+  async getLearnerReport(
+    studentId: string,
+    params: { class_section_id: string; learning_area_id?: string; academic_year?: string }
+  ) {
+    const response = await api.get<ApiResponse<MatatagProgressReport>>(
+      `/matatag/progress-report/${studentId}${this.query(params)}`
     )
     return response.data.data
   }

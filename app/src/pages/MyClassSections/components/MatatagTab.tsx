@@ -15,6 +15,7 @@ import type { MatatagGridColumn } from '../../../types'
 import { MatatagGrid } from './MatatagGrid'
 import { MatatagNarrativesPanel } from './MatatagNarrativesPanel'
 import { MatatagAttendancePanel } from './MatatagAttendancePanel'
+import { MatatagReportsPanel } from './MatatagReportsPanel'
 
 const HIGH_CONTRAST_KEY = 'matatag.highContrast'
 
@@ -25,7 +26,7 @@ interface Props {
   institutionId?: string
 }
 
-type Panel = 'grid' | 'narratives' | 'attendance'
+type Panel = 'grid' | 'narratives' | 'attendance' | 'reports'
 
 /**
  * The adviser's MATATAG workspace: one tab in the class-section screen they
@@ -62,7 +63,11 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
     learningAreaId: areaId,
     term,
     academicYear,
-    enabled: optedIn && panel === 'grid',
+    // Also loaded for the Reports panel, which needs the roster and the
+    // catalog's areas to fill its two selectors. In practice this is already
+    // cached — an adviser reaches Reports by way of the grid — and it is one
+    // request either way.
+    enabled: optedIn && (panel === 'grid' || panel === 'reports'),
   })
 
   const save = useMatatagGridSave({
@@ -137,7 +142,9 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
           <h3 className="text-base font-semibold text-gray-900">MATATAG Progress</h3>
           <p className="text-xs text-gray-500 mt-0.5">
             {status?.curriculum_version?.title}
-            {status?.curriculum_version ? ` · ${status.curriculum_version.slot_count} rateable competencies` : ''}
+            {status?.curriculum_version
+              ? ` · ${status.curriculum_version.competency_count} competencies, ${status.curriculum_version.slot_count} marks a year`
+              : ''}
           </p>
         </div>
 
@@ -161,6 +168,7 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
           ['grid', 'Competencies'],
           ['narratives', 'Narratives'],
           ['attendance', 'Attendance'],
+          ['reports', 'Report cards'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -303,6 +311,22 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
           learners={grid.data?.learners}
         />
       )}
+
+      {panel === 'reports' &&
+        (grid.isLoading || !data ? (
+          <div className="flex items-center gap-2 py-12 justify-center text-gray-500">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Loading the roster…</span>
+          </div>
+        ) : (
+          <MatatagReportsPanel
+            classSectionId={classSectionId}
+            sectionTitle={data.section.title}
+            academicYear={academicYear}
+            learners={data.learners}
+            learningAreas={data.learning_areas}
+          />
+        ))}
     </div>
   )
 }

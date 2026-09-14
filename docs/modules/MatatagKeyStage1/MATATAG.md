@@ -431,7 +431,13 @@ eight hours wrong about.
 | `app/src/pages/MyClassSections/components/MatatagAttendancePanel.tsx` | the derived table, read-only | |
 | `app/src/hooks/useMatatag.ts`, `app/src/services/matatagService.ts` | per the mandated `pages → hooks → services → lib/api.ts` layering | |
 | `app/src/pages/MyClassSections/ClassSectionDetail.tsx` | a ninth tab, shown only on a Key Stage 1 section | |
-| PDF components and the `.xlsx` export | | *planned* |
+| `app/src/pages/MyClassSections/components/MatatagReportsPanel.tsx` | the printing panel: preview one learner, download by learner or by area | |
+| `app/src/components/matatagReports/Ks1ProgressReportCard.tsx` | the card — A4 portrait, `@react-pdf/renderer` | |
+| `app/src/components/matatagReports/Ks1PaceForm.tsx` | the PACE forms — A4 landscape | |
+| `app/src/components/matatagReports/matatagPdfShared.ts` | page geometry and the helpers both documents share | |
+| `app/src/hooks/useMatatagReports.tsx` | the report query and the four download mutations | |
+| `app/src/utils/reportCardPdfUtils.ts` | gains `fitPdfBlockFontSizePx` / `estimatePdfBlockHeightPt` | |
+| The official `.xlsx` export | | *not decided — see below* |
 
 Two things about the grid are worth knowing before touching it.
 
@@ -444,6 +450,51 @@ cannot be a real `<table>`, and the three-tier header is built from `colSpan`.
 **`Ctrl+D` must be tested before the letter branch.** `D` is one of DepEd's five descriptors, so a
 handler that checks "is this a descriptor letter" first swallows `Ctrl+D` and marks one cell `D`
 instead of filling the column. This was a real bug, caught only in a browser.
+
+### The two printed documents
+
+**The card is portrait; the numeric SF9 is landscape.** What this card is made of is prose — two
+paragraphs per term, three terms — and landscape gives those a short wide box a teacher's sentence
+hits the bottom of. One learner is one A4 sheet: narratives down the left, attendance, the A-E
+legend and the two certificates down the right.
+
+**Narrative overflow has three defences, in order.** A cap at entry (600 characters, with a live
+counter); then `fitPdfBlockFontSizePx` shrinking the text to fit, down to a **6pt legibility floor**
+rather than to nothing; then a continuation page for whatever still will not fit. The floor is the
+point: shrinking a parent's report card to 4pt to avoid a page break is the wrong trade, so it is
+not made. The third defence exists because narratives written before the cap, or pasted past it, are
+real.
+
+**Do not reuse `ACADEMIC_YEAR_MONTHS` / `ATTENDANCE_MONTH_LABELS`** from
+`studentReportCard.tsx`. They are ten months keyed *by month number*, which cannot represent this
+table's eleven rows, and using them would quietly erase the one place this instrument differs from
+DepEd's printed form. The months, their order and their labels all come from the payload; so does
+the legend wording, so a DepEd rewording stays a config change.
+
+**PACE forms are landscape and one long column, not DepEd's two.** react-pdf cannot flow content
+between columns — there is no multi-column layout and no way to ask what is left on a page — so a
+two-column form has to be hand-paginated off a tuned rows-per-page constant, which is wrong the
+moment a competency's text runs one line longer than the constant assumed. More paper, every row
+correct.
+
+**A shaded cell is not a missing mark.** It means the competency is not assessed in that term at
+all, which is the curriculum's own pacing and is information a parent is entitled to. An empty box
+means assessed-but-not-yet-marked. DepEd's workbook fills the former black; these print light grey,
+because black on a handed-out form reads as a redaction.
+
+Three things in the form are load-bearing and easy to undo by accident:
+
+- **The column header is `fixed`.** Reading & Literacy runs to two or three pages, and without it
+  page two is twelve unlabelled boxes per row — a form nobody can read, and one somebody might read
+  wrongly.
+- **Per-term-list areas carry a Term column.** They restart their numbering at 1 each term, so a
+  continuation page that inherits only a band heading from the page before leaves "6. Magalang"
+  ambiguous between three different marks. The band still heads each term; the column is what
+  survives the page break.
+- **Domain bands are keyed by position, never by title.** A domain can band more than once —
+  Language has four domains but **six bands**, because its competency order leaves a domain and
+  returns to it — and a title-based key collides there. React warns that duplicate keys may
+  duplicate or omit children; dropping a row from a DepEd form is not a warning-level problem.
 | `app/src/types/index.ts` | all types in the barrel — the `@react-pdf` components need them, and importing from a service would be a back-edge |
 | `app/src/components/ks1ProgressReportCard/`, `ks1PaceForm/` | `@react-pdf/renderer` documents |
 
@@ -487,10 +538,9 @@ instrument.
 
 ## Not yet wired
 
-- **Rendering the progress report card and the PACE forms.** `GET matatag/progress-report` composes
-  and serves the whole payload; nothing draws it yet. The renderers are `@react-pdf/renderer`
-  documents — the only PDF precedent in the repo, there being no server-side PDF library and no
-  Blade layer — and are the next piece of work.
+- **Bulk printing beyond the four jobs offered.** Every PACE form for every learner is 50 × 5 areas
+  ≈ 600 pages from one click; neither the client nor the API will do it. `pace.scope` comes back
+  `omitted` with a note saying how to narrow it.
 - **Grades 2 and 3.** No catalog exists. Their workbooks have not been obtained, and their structure
   may differ from Grade 1's in which learning areas exist, whether an area has domains, and whether
   its list spans the year or restarts each term.
