@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Select } from '../../../components/select'
+import { parsePastedDescriptors } from './matatagPaste'
 import type {
   MatatagDescriptor,
   MatatagDescriptorDefinition,
@@ -22,6 +23,14 @@ interface Props {
   readOnly: boolean
   onSet: (studentId: string, slotId: string, descriptor: MatatagDescriptor | null) => void
   onActiveColumnChange: (column: MatatagGridColumn | null) => void
+  /**
+   * A paste is a deliberate, discrete action, so unlike a keystroke it does
+   * get a message. Reported rather than toasted here because this component
+   * stays presentational — the tab owns the side effect.
+   */
+  onPasteNotice: (
+    notice: { kind: 'applied'; count: number } | { kind: 'rejected'; reason: string }
+  ) => void
 }
 
 /**
@@ -65,6 +74,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
   readOnly,
   onSet,
   onActiveColumnChange,
+  onPasteNotice,
 }: Props) {
   const [active, setActive] = useState<ActiveCell | null>(null)
   const tableRef = useRef<HTMLTableElement>(null)
@@ -258,6 +268,79 @@ export const MatatagGrid = React.memo(function MatatagGrid({
     [active, readOnly, letters, onSet, move, focusCell, grid, learnerIndex]
   )
 
+  /**
+   * Paste a block of descriptors, anchored at the active cell.
+   *
+   * The teachers this is for are coming off DepEd's workbook, and copying a
+   * column out of it is the first thing they will try. It lands down and to
+   * the right of wherever they are, which is how every spreadsheet behaves.
+   *
+   * A block that does not fit is refused rather than clipped. Too many rows
+   * almost always means the copy started on a heading, or came from a class
+   * with a different roster — and silently dropping the overflow would leave
+   * the rows that *did* land shifted against the wrong learners, which is
+   * indistinguishable from a correct paste when every value is one letter.
+   */
+  const handlePaste = useCallback(
+    (event: React.ClipboardEvent<HTMLTableElement>) => {
+      if (readOnly || !active) return
+
+      const text = event.clipboardData.getData('text/plain')
+      if (text === '') return
+
+      event.preventDefault()
+
+      const parsed = parsePastedDescriptors(text, letters)
+
+      if (!parsed.ok) {
+        onPasteNotice({ kind: 'rejected', reason: parsed.reason })
+        return
+      }
+
+      const fromRow = learnerIndex.get(active.studentId) ?? 0
+      const fromColumn = columnIndex.get(active.slotId) ?? 0
+      const rowsLeft = grid.learners.length - fromRow
+      const columnsLeft = grid.columns.length - fromColumn
+
+      if (parsed.rows.length > rowsLeft) {
+        onPasteNotice({
+          kind: 'rejected',
+          reason:
+            `That is ${parsed.rows.length} rows of marks, and there ${rowsLeft === 1 ? 'is' : 'are'} ` +
+            `only ${rowsLeft} ${rowsLeft === 1 ? 'learner' : 'learners'} from here down. Nothing ` +
+            'was changed.',
+        })
+        return
+      }
+
+      if (parsed.rows[0].length > columnsLeft) {
+        onPasteNotice({
+          kind: 'rejected',
+          reason:
+            `That is ${parsed.rows[0].length} columns of marks, and there ${columnsLeft === 1 ? 'is' : 'are'} ` +
+            `only ${columnsLeft} from here across. Nothing was changed.`,
+        })
+        return
+      }
+
+      let count = 0
+
+      parsed.rows.forEach((row, rowOffset) => {
+        row.forEach((descriptor, columnOffset) => {
+          onSet(
+            grid.learners[fromRow + rowOffset].student_id,
+            grid.columns[fromColumn + columnOffset].slot_id,
+            descriptor
+          )
+          count++
+        })
+      })
+
+      onPasteNotice({ kind: 'applied', count })
+    },
+    [active, readOnly, letters, onSet, onPasteNotice, grid, learnerIndex, columnIndex]
+  )
+
   const fillFor = (column: MatatagGridColumn): string | undefined => {
     if (highContrast || !column.macro_skill) return undefined
 
@@ -296,6 +379,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
         ref={tableRef}
         role="grid"
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         className="border-collapse text-xs"
         aria-label={`${grid.learning_area.title}, Term ${grid.term}`}
       >

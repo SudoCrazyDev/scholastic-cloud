@@ -31,9 +31,13 @@ class MatatagNarrativeController extends Controller
      * spill onto a continuation page nobody expects. A cap at the point of
      * entry is the only one of the three a teacher can see happening.
      *
-     * The figure itself still wants sign-off from whoever owns the DepEd
-     * relationship; it is written here once so there is a single place to
-     * change it. See MATATAG.md, "Not yet wired".
+     * 600 is a decision, not a placeholder. DepEd's box on `SF9 - GRADE 1`
+     * fits roughly this much at a legible size, and the printed card degrades
+     * gracefully rather than suddenly: past the cap the renderer shrinks the
+     * block toward a 6pt floor and only then spills to a continuation page.
+     * Raising it is a one-line change here - the client reads the figure from
+     * this endpoint rather than carrying its own copy - so a school that finds
+     * it tight is not blocked by a deploy-shaped decision.
      */
     public const MAX_LENGTH = 600;
 

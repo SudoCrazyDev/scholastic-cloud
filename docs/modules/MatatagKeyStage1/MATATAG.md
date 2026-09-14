@@ -594,6 +594,45 @@ runner, and without `ext-zip` there `composer install` fails its platform check 
 reaches any target**. At runtime a server missing one answers this route with a 503 naming the
 extension, and the PDFs are unaffected.
 
+### Pasting a block of descriptors
+
+The teachers this module is for have been keeping these marks in DepEd's workbook, and the first
+thing they try is copying a column out of it. `Ctrl+V` anchors the block at the active cell and
+lands it down and to the right, the way every spreadsheet behaves. Parsing lives in
+`app/src/pages/MyClassSections/components/matatagPaste.ts`; the grid stays presentational and
+reports the outcome through `onPasteNotice`, which the tab turns into the one toast this screen
+raises.
+
+**It refuses rather than partly applying**, which is the whole design. These marks are single
+letters, so a paste that misaligns by one row produces a grid that looks entirely plausible and says
+the wrong thing about a class of six-year-olds. So:
+
+- an unrecognised value rejects the whole block, naming the row, the column and the value — the
+  usual cause is a heading row that came along with the copy;
+- ragged rows reject, because every spreadsheet pads a copied block to a rectangle, and padding the
+  short rows here would clear marks the teacher never touched;
+- a block taller or wider than the room left from the anchor rejects rather than clipping, because
+  dropping the overflow would leave the rows that *did* land shifted against the wrong learners.
+
+An **empty** cell is not unrecognised — it means "no mark" and clears the cell, which is what an
+empty cell means in the workbook too.
+
+Pasted cells go through `onSet`, the same path a keystroke takes, so they inherit the debounced
+batch write, the optimistic cache patch and the failed-cell marking without special handling.
+
+### The narrative cap is 600 characters, and that is a decision
+
+Unbounded prose in a fixed DepEd box has no correct rendering — the choices are shrink it until it
+is unreadable, clip it, or spill onto a continuation page nobody expects. A cap at the point of
+entry is the only one of the three a teacher can watch happening, so there is one, enforced by
+`MatatagNarrativeController::MAX_LENGTH` and mirrored by a live counter in the client.
+
+**The client does not carry its own copy of the figure** — `GET matatag/narratives` returns
+`max_length` and the textarea's `maxLength` is bound to it. So raising the cap is a one-line change
+in one file, and the screen follows on the next load. It degrades gracefully rather than suddenly
+either: past the cap the card's renderer shrinks the block toward a 6pt floor before spilling to a
+continuation page.
+
 ### Registration checklist for the new module
 
 `api/config/modules.php` (`academics` group) · `api/config/features.php`
@@ -644,8 +683,6 @@ instrument.
   scope; do not stretch this design to cover it on the assumption it looks similar.
 - **A mid-month term boundary for attendance** — see the deviation above.
 - **Mid-year migration of a live section between catalog versions** — deliberately unsupported.
-- **A narrative length cap.** Unbounded text in a fixed DepEd box has no correct rendering; a cap
-  (~600 chars/field) needs sign-off from whoever owns the DepEd relationship.
 - **A learner enrolled at two schools at once cannot hold two MATATAG records.** Both
   `matatag_competency_ratings` and `matatag_term_narratives` are unique on `(student_id,
   academic_year, …)` with no institution in the key, so School B's save would overwrite School A's.

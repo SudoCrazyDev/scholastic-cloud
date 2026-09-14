@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Check, CloudOff, Loader2, RefreshCw, Contrast } from 'lucide-react'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
@@ -10,6 +10,7 @@ import {
   useMatatagSectionMutations,
   useMatatagSections,
 } from '../../../hooks/useMatatag'
+import toast from 'react-hot-toast'
 import { usePermissions } from '../../../hooks/usePermissions'
 import type { MatatagGridColumn } from '../../../types'
 import { MatatagGrid } from './MatatagGrid'
@@ -43,6 +44,26 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
   const [term, setTerm] = useState(1)
   const [activeColumn, setActiveColumn] = useState<MatatagGridColumn | null>(null)
   const [highContrast, setHighContrast] = useState(false)
+
+  /**
+   * The one place in the grid that talks back.
+   *
+   * Marking is deliberately silent — a status chip, never a toast per
+   * keystroke — but a paste is a single deliberate act that either landed or
+   * did not, and a refused one has to say why or the teacher just tries it
+   * again.
+   */
+  const handlePasteNotice = useCallback(
+    (notice: { kind: 'applied'; count: number } | { kind: 'rejected'; reason: string }) => {
+      if (notice.kind === 'rejected') {
+        toast.error(notice.reason, { duration: 8000 })
+        return
+      }
+
+      toast.success(`Pasted ${notice.count} ${notice.count === 1 ? 'mark' : 'marks'}.`)
+    },
+    []
+  )
 
   const { data: reference } = useMatatagReference()
   const { data: sectionList, isLoading: sectionsLoading } = useMatatagSections({
@@ -281,6 +302,7 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
               readOnly={!data.can_manage}
               onSet={save.setDescriptor}
               onActiveColumnChange={setActiveColumn}
+              onPasteNotice={handlePasteNotice}
             />
           )}
 
@@ -290,7 +312,10 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
               <kbd className="px-1 border rounded">E</kbd> to mark and move down.{' '}
               <kbd className="px-1 border rounded">Space</kbd> clears.{' '}
               <kbd className="px-1 border rounded">Ctrl</kbd>+
-              <kbd className="px-1 border rounded">D</kbd> fills the rest of the column.
+              <kbd className="px-1 border rounded">D</kbd> fills the rest of the column.{' '}
+              <kbd className="px-1 border rounded">Ctrl</kbd>+
+              <kbd className="px-1 border rounded">V</kbd> pastes a block copied from the DepEd
+              workbook, starting at the cell you are on.
             </p>
           )}
         </>
