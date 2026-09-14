@@ -287,6 +287,57 @@ these tables needs a `scoping()` entry.
 
 ---
 
+## Switching a school on
+
+The feature ships `default_enabled => false` and is turned on **one school at a time** from the
+platform's Feature Access screen (`PUT institution-features/{institutionId}/matatag-grading`). It is
+not a deploy, and it is invisible to the school until it happens — `EnsureFeatureEnabled` does not
+honour the super-administrator wildcard, so until a school is switched on nobody reaches any of it.
+
+Leave the default off until Grades 2 and 3 have catalogs. Both reasons are recorded in
+`config/features.php` and both still hold.
+
+### Before switching a school on
+
+- **It must have Grade 1 sections.** Only Grade 1's catalog is loaded. A Grade 2 or Grade 3 section
+  is refused at opt-in with `no_catalog` — the guard working, not a fault, but it makes a school
+  whose Key Stage 1 is mostly Grades 2–3 a poor first pilot.
+- **The adviser needs the module.** `subject-teacher` carries `manage` in `SystemRolePermissions`,
+  and `..._grant_matatag_grading_permission.php` backfills roles that predate this, since
+  `SystemRolePermissions` only applies when a role is *created*. A school with hand-built custom
+  roles may still need the permission ticked.
+- **Attendance comes from the screens the school already uses.** The card's attendance block derives
+  from `student_attendances` and `school_days`; a school that has not entered `school_days` for the
+  year prints a table of zeros. Nothing warns about this — it is not wrong, just empty.
+- Opting a section in **does not** change how the rest of the school is graded, and there is a
+  regression test that says so (see `GradingPeriodStructureTest`).
+
+### What a first term should look like
+
+These are the figures a working Grade 1 section produces, confirmed end to end against a real
+section rather than from the catalog:
+
+| | |
+|---|---|
+| Reading & Literacy columns | 74 in Term 1, 76 in Term 2, 91 in Term 3 |
+| Domain bands, R&L Term 1 | 6 |
+| Macro-skill header fills | `#FDE49A` listening, `#C9A6E6` speaking, `#FFA766` reading, `#C4E0B3` writing |
+| A burst of typing | **one** `bulk-upsert`, not one per keystroke |
+| Attendance rows on the card | 11, September once, and the three columns must reconcile by hand |
+| The .xlsx export | ~8 s, and every macro-skill fill still present when reopened |
+
+Switching to Term 3 should *drop* the competencies taught only in Term 1 — R&L's numbering starts at
+6, not 1. If it still starts at 1, the term selector is not reaching the API.
+
+### If the API goes down mid-entry
+
+By design, nothing is lost and nothing rolls back: the marks stay on screen, the status chip reads
+"Could not save. Your marks are still on screen — press Retry," and Retry replays the batch. A
+teacher who reloads *before* retrying does lose that batch, which is the one thing worth telling a
+pilot's staff.
+
+---
+
 ## Attendance: a documented deviation from the DepEd form
 
 DepEd's attendance table prints **September twice** — once under Term 1, once under Term 2 — because
@@ -316,6 +367,25 @@ Consequences for anyone touching the derivation:
 
 If a school insists on the 13-row form, the honest fix is a per-learner September split entered once
 per section-year, validated to sum to the monthly figure. That is **not** built.
+
+### "Absent" is the school's recorded figure, not class days minus present
+
+Worth knowing before a pilot, because it is the one place our output and DepEd's can disagree.
+
+`student_attendances` stores `days_present` **and** `days_absent` as two separately entered columns,
+and the screen and the PDF card print the recorded `days_absent`. DepEd's form does not have that
+column: `SF9!R25:R36` is the formula `=O−Q`, class days minus days present. The .xlsx export writes
+only class days and days present, so the exported workbook computes its own absences.
+
+Where a school's records are internally consistent — present + absent = class days for the month —
+both agree and nothing surprising happens. Where they are not, the printed card and the submitted
+workbook will differ on absences for that month, and the card is the one showing what the school
+actually typed.
+
+Left as-is deliberately: the recorded figure is the school's own, a month can legitimately have a
+learner neither present nor marked absent, and silently replacing it with a derived number would
+overwrite a register the school maintains elsewhere in the platform. Flagged here rather than fixed
+because a pilot with untidy legacy attendance is exactly where it will show up.
 
 ---
 
