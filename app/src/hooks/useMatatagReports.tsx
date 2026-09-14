@@ -34,6 +34,14 @@ function messageFrom(error: unknown, fallback: string): string {
     if (typeof message === 'string' && message !== '') return message
   }
 
+  // A thrown Error carries a message written for this teacher — "this section
+  // has no learners on its roster", "DepEd's workbook holds 50 of each sex".
+  // Falling back past it would replace something specific with something
+  // generic.
+  if (error instanceof Error && error.message !== '') {
+    return error.message
+  }
+
   return fallback
 }
 
@@ -165,16 +173,41 @@ export function useMatatagReportDownloads({ sectionId, sectionTitle, academicYea
     onError: onError('Could not build the PACE forms for this class.'),
   })
 
+  /**
+   * DepEd's own workbook for the section.
+   *
+   * Built on the server rather than here: the macro-skill encoding on those
+   * sheets *is* fill colour, and `xlsx@0.18.5` — the build already in this
+   * repo — silently drops fills on write. So the API fills DepEd's committed
+   * template and we save what comes back.
+   *
+   * Slower than the PDFs by a wide margin (the server loads and rewrites a
+   * seventeen-sheet workbook), which is why the button says so.
+   */
+  const sectionWorkbook = useMutation({
+    mutationFn: async () => {
+      const blob = await matatagService.getWorkbook({
+        class_section_id: sectionId,
+        academic_year: academicYear,
+      })
+
+      saveBlob(blob, `MATATAG ECR - ${section} - ${year}.xlsx`)
+    },
+    onError: onError("Could not build DepEd's workbook for this section."),
+  })
+
   return {
     learnerCard,
     learnerPaceForms,
     classCards,
     classPaceForms,
+    sectionWorkbook,
     isBusy:
       learnerCard.isPending ||
       learnerPaceForms.isPending ||
       classCards.isPending ||
-      classPaceForms.isPending,
+      classPaceForms.isPending ||
+      sectionWorkbook.isPending,
   }
 }
 

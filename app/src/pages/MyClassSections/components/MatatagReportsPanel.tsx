@@ -1,6 +1,6 @@
 import { Component, useMemo, useState, type ReactNode } from 'react'
 import { PDFViewer } from '@react-pdf/renderer'
-import { AlertTriangle, Download, FileText, Loader2 } from 'lucide-react'
+import { AlertTriangle, Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
 import { Ks1PaceForm } from '../../../components/matatagReports/Ks1PaceForm'
@@ -185,6 +185,33 @@ export function MatatagReportsPanel({
           </div>
         </section>
       </div>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4">
+        <h4 className="text-sm font-semibold text-gray-900">DepEd's own workbook</h4>
+        <p className="mt-0.5 text-xs text-gray-500">
+          The whole section as the official <span className="font-medium">.xlsx</span> e-class
+          record — every descriptor, both narratives per term and the attendance, on DepEd's own
+          sheets. This is the file a division office asks for; the report cards above are what a
+          parent is handed.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={downloads.isBusy}
+            leftIcon={<FileSpreadsheet className="w-4 h-4" />}
+            onClick={() => downloads.sectionWorkbook.mutate()}
+          >
+            {downloads.sectionWorkbook.isPending ? 'Building…' : 'Download the workbook'}
+          </Button>
+
+          <span className="text-xs text-gray-400">
+            Built on the server; takes a few seconds.
+          </span>
+        </div>
+      </section>
 
       {report.data && report.data.warnings.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">

@@ -167,6 +167,58 @@ class MatatagService {
     )
     return response.data.data
   }
+
+  /**
+   * DepEd's own .xlsx for this section, filled in.
+   *
+   * The PDFs are what a parent is handed; this is what the division office
+   * asks for. It is built server-side by filling DepEd's committed workbook,
+   * so it carries their fills, formulas and print settings rather than our
+   * rendering of them.
+   *
+   * `responseType: 'blob'` means an *error* arrives as a Blob as well, so a 422
+   * saying the section is too big for DepEd's form, or a 503 naming a missing
+   * PHP extension, would otherwise reach the teacher as a generic failure. The
+   * body is decoded here, where its shape is known.
+   */
+  async getWorkbook(params: {
+    class_section_id: string
+    academic_year?: string
+  }): Promise<Blob> {
+    try {
+      const response = await api.get(`/matatag/workbook${this.query(params)}`, {
+        responseType: 'blob',
+        // The server loads and rewrites a seventeen-sheet workbook; the
+        // default timeout cuts it off part-way through a file that was
+        // going to arrive.
+        timeout: 120000,
+      })
+      return response.data as Blob
+    } catch (error) {
+      throw await this.decodeBlobError(error)
+    }
+  }
+
+  /** Turn an errored blob response back into the message the API sent. */
+  private async decodeBlobError(error: unknown): Promise<unknown> {
+    const data = (error as { response?: { data?: unknown } })?.response?.data
+
+    if (!(data instanceof Blob)) {
+      return error
+    }
+
+    try {
+      const parsed = JSON.parse(await data.text())
+      if (typeof parsed?.message === 'string' && parsed.message !== '') {
+        return new Error(parsed.message)
+      }
+    } catch {
+      // A blob that is not JSON tells us nothing useful; fall through to the
+      // original error so the caller's own fallback wording is used.
+    }
+
+    return error
+  }
 }
 
 export const matatagService = new MatatagService()

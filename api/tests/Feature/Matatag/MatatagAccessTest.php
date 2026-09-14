@@ -47,6 +47,7 @@ class MatatagAccessTest extends MatatagTestCase
             'narratives' => ['getJson', "/api/matatag/narratives?class_section_id={$section}", []],
             'progress report' => ['getJson', "/api/matatag/progress-report?class_section_id={$section}", []],
             'one card' => ['getJson', "/api/matatag/progress-report/{$student}?class_section_id={$section}", []],
+            'workbook' => ['getJson', "/api/matatag/workbook?class_section_id={$section}", []],
             'opt-in' => ['postJson', "/api/matatag/sections/{$section}/opt-in", []],
             'opt-out' => ['deleteJson', "/api/matatag/sections/{$section}/opt-in", []],
             'grid write' => ['postJson', '/api/matatag/grid/bulk-upsert', [

@@ -35,6 +35,7 @@ use App\Http\Controllers\MatatagNarrativeController;
 use App\Http\Controllers\MatatagProgressReportController;
 use App\Http\Controllers\MatatagReferenceController;
 use App\Http\Controllers\MatatagSectionController;
+use App\Http\Controllers\MatatagWorkbookController;
 use App\Http\Controllers\PaymentIdentifierController;
 use App\Http\Controllers\PaymentPlanController;
 use App\Http\Controllers\PaymentReceiptSubmissionController;
@@ -747,6 +748,11 @@ Route::middleware('auth.token')->group(function () {
         Route::get('matatag/progress-report', [MatatagProgressReportController::class, 'index'])
             ->middleware('module:matatag-grading,view');
         Route::get('matatag/progress-report/{studentId}', [MatatagProgressReportController::class, 'show'])
+            ->middleware('module:matatag-grading,view');
+
+        // DepEd's own .xlsx, filled in - the division office's copy, where the
+        // PDFs are the parent's. `view` for the same reason the cards are.
+        Route::get('matatag/workbook', [MatatagWorkbookController::class, 'show'])
             ->middleware('module:matatag-grading,view');
     });
     // SF9 routes

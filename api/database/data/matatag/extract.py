@@ -206,6 +206,7 @@ class Extractor:
         self.published_on = published_on
         self.anomalies = []
         self.unknown_fills = OrderedDict()
+        self.cells = OrderedDict()
 
     def note(self, area, where, message):
         self.anomalies.append({"area": area, "where": where, "message": message})
@@ -583,6 +584,8 @@ class Extractor:
                              ("sort_order", i + 1)])
                 for i, s in enumerate(slots)
             ]
+            for s in slots:
+                self.record_cell(area, path, s)
             counts["competencies"] += 1
             counts["slots"] += len(slots)
 
@@ -607,6 +610,32 @@ class Extractor:
             ("counts", counts),
             ("domains", domains),
             ("competencies", competencies),
+        ])
+
+    def record_cell(self, area, path, slot):
+        """Remember which workbook cell a slot was read out of.
+
+        The catalog itself deliberately does not carry this. A cell address is a
+        property of *the template*, not of the curriculum: DepEd can reissue the
+        same competencies on a sheet with two extra columns, and when they do,
+        only the template and this map change. Keeping it out of
+        `matatag_competency_slots` also means the .xlsx export never needed an
+        ALTER TABLE on a table that already holds real marks.
+        """
+        book = self.cells.setdefault(area["key"], OrderedDict([
+            ("learner_row", area["learner_row"]),
+            ("slots", OrderedDict()),
+        ]))
+        sheet = area["sheets"].get(slot["term"]) or area["sheets"][0]
+        key = "%s|%d|%s" % (path, slot["term"], slot["macro_skill"])
+        book["slots"][key] = [sheet, slot["column"]]
+
+    def cell_map(self):
+        """The template cell map, for the .xlsx export."""
+        return OrderedDict([
+            ("template", "KEY_STAGE_1_GRADE_1_3_TERM.xlsx"),
+            ("version_code", self.code),
+            ("areas", self.cells),
         ])
 
     def run(self):
@@ -647,7 +676,15 @@ def main():
         json.dump(catalog, handle, indent=1, ensure_ascii=False)
         handle.write("\n")
 
+    cells = extractor.cell_map()
+    cells_out = args.out.replace(".json", ".cells.json")
+    with open(cells_out, "w", encoding="utf-8") as handle:
+        json.dump(cells, handle, indent=1, ensure_ascii=False)
+        handle.write("\n")
+
     print("wrote %s" % args.out)
+    print("wrote %s (%d cells)" % (
+        cells_out, sum(len(a["slots"]) for a in cells["areas"].values())))
     print()
     print("%-26s %13s %7s %8s" % ("LEARNING AREA", "COMPETENCIES", "SLOTS", "DOMAINS"))
     for area in catalog["learning_areas"]:

@@ -25,7 +25,12 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, iconv, json, mbstring, pdo
+          # zip, fileinfo, simplexml, xmlreader, xmlwriter and zlib are hard
+          # requirements of phpoffice/phpspreadsheet (the MATATAG .xlsx export).
+          # Without ext-zip `composer install` fails its platform check here and
+          # NO api deploy reaches any target, so they are listed explicitly
+          # rather than relied on being compiled into the runner's PHP.
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, json, pdo, zip, fileinfo, simplexml, xmlreader, xmlwriter, zlib
 
       - name: Cache Composer dependencies
         uses: actions/cache@v3
