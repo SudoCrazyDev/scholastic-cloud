@@ -1,5 +1,4 @@
 import type {
-  MatatagDescriptorDefinition,
   MatatagMacroSkillDefinition,
   MatatagPaceArea,
   MatatagPaceRow,
@@ -17,9 +16,6 @@ import type {
 /** A4 portrait, in points, which is what react-pdf measures in. */
 export const A4_PORTRAIT = { width: 595.28, height: 841.89 }
 
-/** A4 landscape — the PACE forms need the width for their rating columns. */
-export const A4_LANDSCAPE = { width: 841.89, height: 595.28 }
-
 export const PAGE_PADDING = 22
 
 export const INK = '#000000'
@@ -27,14 +23,15 @@ export const RULE = '#4b5563'
 export const FAINT = '#9ca3af'
 
 /**
- * A cell for a competency not assessed in that term.
+ * A square for a competency not assessed in that term.
  *
- * DepEd's workbook fills these black. Black on a printed form wastes toner and
- * reads as a redaction, so this is the lightest grey that still reads as
- * "nothing goes here" next to an empty box — the meaning the workbook's fill
- * carries, without the ink.
+ * `FF3F3F3F`, read straight off `PACE - GRADE 1!H19`. It reads as black and
+ * costs toner, and a lighter grey would say the same thing for less — but on
+ * this form the fill of a square is the only thing that carries meaning, and a
+ * teacher comparing a printout against the workbook has to see the same sheet.
+ * Fidelity wins; the trade is recorded in MATATAG.md.
  */
-export const NOT_ASSESSED = '#d4d4d8'
+export const NOT_ASSESSED = '#3F3F3F'
 
 /** The workbook stores ARGB; PDF wants RGB, and the alpha is always opaque. */
 export function fillHex(argb: string | undefined): string | undefined {
@@ -69,31 +66,6 @@ export function gradeNumber(gradeLevel: string): string {
 export function schoolLines(school: MatatagReportSchool): string[] {
   return [school.region, school.division ? `Division of ${school.division}` : null]
     .filter((line): line is string => Boolean(line && line.trim()))
-}
-
-/**
- * The macro skills an area actually uses, in the order its own slots list them.
- *
- * Read off the data rather than off `MatatagReference`, because the reference
- * lists every macro skill DepEd defines and an area may use a subset — and
- * because a grade level that introduces a new one must reach the form without a
- * code change. Returns an empty list for an area that uses none, which is the
- * signal to print a single rating column per term instead of a band of them.
- */
-export function macroSkillsUsedBy(area: MatatagPaceArea): string[] {
-  if (!area.uses_macro_skills) return []
-
-  const firstSeenAt = new Map<string, number>()
-
-  area.rows.forEach(row =>
-    row.slots.forEach(slot => {
-      if (slot.macro_skill && !firstSeenAt.has(slot.macro_skill)) {
-        firstSeenAt.set(slot.macro_skill, slot.sort_order)
-      }
-    })
-  )
-
-  return [...firstSeenAt.entries()].sort((a, b) => a[1] - b[1]).map(([key]) => key)
 }
 
 /** The terms an area is actually assessed in, ascending. */
@@ -132,12 +104,6 @@ export function skillLookup(
   macroSkills: MatatagMacroSkillDefinition[]
 ): Map<string, MatatagMacroSkillDefinition> {
   return new Map(macroSkills.map(skill => [skill.key, skill]))
-}
-
-export function descriptorLookup(
-  descriptors: MatatagDescriptorDefinition[]
-): Map<string, MatatagDescriptorDefinition> {
-  return new Map(descriptors.map(descriptor => [descriptor.letter, descriptor]))
 }
 
 /**

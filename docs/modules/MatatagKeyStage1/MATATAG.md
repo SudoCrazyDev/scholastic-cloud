@@ -433,7 +433,7 @@ eight hours wrong about.
 | `app/src/pages/MyClassSections/ClassSectionDetail.tsx` | a ninth tab, shown only on a Key Stage 1 section | |
 | `app/src/pages/MyClassSections/components/MatatagReportsPanel.tsx` | the printing panel: preview one learner, download by learner or by area | |
 | `app/src/components/matatagReports/Ks1ProgressReportCard.tsx` | the card — A4 portrait, `@react-pdf/renderer` | |
-| `app/src/components/matatagReports/Ks1PaceForm.tsx` | the PACE forms — A4 landscape | |
+| `app/src/components/matatagReports/Ks1PaceForm.tsx` | the PACE forms — A4 portrait, two columns, hand-paginated | |
 | `app/src/components/matatagReports/matatagPdfShared.ts` | page geometry and the helpers both documents share | |
 | `app/src/hooks/useMatatagReports.tsx` | the report query and the four download mutations | |
 | `app/src/utils/reportCardPdfUtils.ts` | gains `fitPdfBlockFontSizePx` / `estimatePdfBlockHeightPt` | |
@@ -471,26 +471,51 @@ table's eleven rows, and using them would quietly erase the one place this instr
 DepEd's printed form. The months, their order and their labels all come from the payload; so does
 the legend wording, so a DepEd rewording stays a config change.
 
-**PACE forms are landscape and one long column, not DepEd's two.** react-pdf cannot flow content
-between columns — there is no multi-column layout and no way to ask what is left on a page — so a
-two-column form has to be hand-paginated off a tuned rows-per-page constant, which is wrong the
-moment a competency's text runs one line longer than the constant assumed. More paper, every row
-correct.
+#### The PACE form reproduces the sheet's own layout
 
-**A shaded cell is not a missing mark.** It means the competency is not assessed in that term at
-all, which is the curriculum's own pacing and is information a parent is entitled to. An empty box
-means assessed-but-not-yet-marked. DepEd's workbook fills the former black; these print light grey,
-because black on a handed-out form reads as a redaction.
+Read off `PACE - GRADE 1` rather than from a screenshot, because the structure is not obvious:
 
-Three things in the form are load-bearing and easy to undo by accident:
+- **Two columns on A4 portrait, reading down the left then down the right.** `C14:R14` bands the
+  learning area across both; each column then carries its own `No. | Learning Competencies | Rating
+  (T1 T2 T3)` heading and its own domain bands. `C18:I18` and `K18:R18` hold *different* domains on
+  the same sheet row — which is what proves the two columns are one continuous flow and not a list
+  split down the middle.
+- **A competency occupies one sub-row per macro skill.** Competency 1 merges `C19:C20` and `D19:F20`
+  across two rating rows: Listening on `G19`, Speaking on `G20`. Competency 20a merges across three.
+  So the sub-row count comes from *that competency's own slots*, never from the area's full set.
+- **The colour of the square is the label.** There is no L/S/R/W column anywhere on the form, which
+  is why the legend at `L74` is part of the instrument and not decoration, and why the note at `K71`
+  tells the teacher to write the rating on the coloured square itself.
+- **A square filled `FF3F3F3F` is a term the competency is not assessed in** — the curriculum's own
+  pacing, and something a parent is entitled to see. It reads as black and costs toner; a lighter
+  grey would say the same for less ink. DepEd's colour is used anyway, because on this form the fill
+  of a square is the *only* thing carrying meaning and a teacher comparing a printout against the
+  workbook has to be looking at the same sheet.
+- The title, the LRN/Name/Section strip and the General Instructions paragraph are transcribed
+  verbatim from `C4`, `C6` and `C8` (the workbook's apostrophes are mis-encoded; they are restored).
 
-- **The column header is `fixed`.** Reading & Literacy runs to two or three pages, and without it
-  page two is twelve unlabelled boxes per row — a form nobody can read, and one somebody might read
-  wrongly.
-- **Per-term-list areas carry a Term column.** They restart their numbering at 1 each term, so a
-  continuation page that inherits only a band heading from the page before leaves "6. Magalang"
-  ambiguous between three different marks. The band still heads each term; the column is what
-  survives the page break.
+**Pagination is computed, not delegated.** react-pdf cannot flow content between columns — no
+multi-column layout, no way to ask what is left on a page — so the only way to have DepEd's two
+columns is to measure each block and place it. Two rules keep that safe: heights are deliberately
+*over*-estimated, so the failure mode is white space at the foot of a column rather than a
+competency pushed off the form; and the pages stay wrappable, so an estimate that is ever wrong
+spills a row onto an extra page instead of clipping it away silently.
+
+**The colour key sits at the foot of the first page's right column.** That is the one deliberate
+departure from the sheet. DepEd's is a single scrolling worksheet that never paginates, so "at the
+end" and "where you can see it" are the same place there; on a printed multi-page form they are not,
+and a reader holding page one cannot decode a single square without it. For an area that fits on one
+page — which is most of them — this lands exactly where the workbook puts it.
+
+Do **not** reintroduce "reserve space on whichever page turns out to be last". It does not converge:
+reserving pushes a row onto a new page, which moves where "last" is, which removes the need for the
+reservation. It oscillates, and what it settles into is a page containing nothing but a colour key.
+
+Two more things are load-bearing and easy to undo by accident:
+
+- **Per-term-list areas band by term.** They restart their numbering at 1 each term, so "6. Magalang"
+  is ambiguous between three different marks without it. After the band, the position of the one
+  open square goes on saying which term it is.
 - **Domain bands are keyed by position, never by title.** A domain can band more than once —
   Language has four domains but **six bands**, because its competency order leaves a domain and
   returns to it — and a title-based key collides there. React warns that duplicate keys may
