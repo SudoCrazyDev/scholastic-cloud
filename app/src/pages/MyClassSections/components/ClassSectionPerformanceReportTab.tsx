@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Info } from 'lucide-react'
 
 import { Select } from '../../../components/select'
+import { Autocomplete } from '../../../components/autocomplete'
 import DepedPerformanceReportCard from '../../../components/depedPerformanceReport/DepedPerformanceReportCard'
 import { useGradingPeriodsForYear } from '../../../hooks/useGradingPeriods'
 import { staffService } from '../../../services/staffService'
@@ -110,6 +111,11 @@ export function ClassSectionPerformanceReportTab({
    * place — the same trick `StudentReportCardModal` and the MATATAG reports
    * panel use, for the same bug.
    */
+  const selectedLearnerOption = useMemo(() => {
+    const student = orderedStudents.find((candidate) => candidate.id === studentId)
+    return student ? { id: student.id, label: getFullName(student) } : null
+  }, [orderedStudents, studentId, getFullName])
+
   const viewerKey = useMemo(
     () => `${studentId}|${classSectionId}|${institutionId}|${academicYear}|${schoolHeadId}`,
     [studentId, classSectionId, institutionId, academicYear, schoolHeadId]
@@ -164,12 +170,23 @@ export function ClassSectionPerformanceReportTab({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-xs font-medium text-gray-600">
           <span className="block mb-1">Learner</span>
-          <Select
-            inputSize="sm"
-            value={studentId}
-            onChange={(event) => setStudentId(event.target.value)}
+          {/*
+            * Type-to-search rather than a dropdown: a section runs to fifty
+            * learners and scrolling to one by eye is the slow way to do it.
+            *
+            * `onChange` ignores a null, which is the one thing to keep. The
+            * shared Autocomplete clears its selection as soon as the typed text
+            * stops matching the chosen label, and taking that at face value
+            * would blank the preview on the first keystroke of a new search.
+            * The last real choice stands until another one is made.
+            */}
+          <Autocomplete
+            immediate
+            placeholder="Search a learner…"
+            value={selectedLearnerOption}
+            onChange={(option) => { if (option) setStudentId(option.id) }}
             options={orderedStudents.map((student) => ({
-              value: student.id,
+              id: student.id,
               label: getFullName(student),
             }))}
           />

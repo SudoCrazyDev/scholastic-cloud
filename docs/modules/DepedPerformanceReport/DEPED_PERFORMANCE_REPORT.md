@@ -8,8 +8,13 @@
 > 4 June 2026, effective **SY 2026–2027**. Every clause cited below is from the enclosure to that
 > Order; paragraph numbers are its own. It repeals **DO 8, s. 2015** and **DO 36, s. 2016**.
 
-DepEd re-issued the report card. This module prints the new one. It does **not** replace the old
-one, and the two are expected to run side by side for years.
+DepEd re-issued the report card. This module prints the new one.
+
+**For a Grade 2 to 10 section in a switched-on school, it *is* the Report Cards tab** — the older
+form is hidden there, not shown beside it. Two tabs printing two different cards from the same marks
+is how a parent ends up with the wrong one. Everywhere else the older card is untouched and still
+the only one: every other grade level, every school without the feature, and this section too the
+moment the feature is switched off. Nothing is deleted; one tab is swapped for another.
 
 | | Existing report card | This module |
 |---|---|---|
@@ -21,10 +26,11 @@ one, and the two are expected to run side by side for years.
 | Teacher's comments | none | **three boxes, one per term** |
 | Page | A5 landscape × 2 | **A4 landscape × 1** |
 | Grade levels | all | **Grades 2 to 10** |
+| Fill-ins | value underlined, no line when empty | **a ruled blank, always drawn** |
 
 ---
 
-## Read this first: three things that will bite you
+## Read this first: four things that will bite you
 
 ### 1. This card cannot render a four-quarter year, and must not pretend to
 
@@ -60,7 +66,25 @@ move onto the MATATAG competency grid (SY 2027–2028) and Grade 3 follows (SY 2
 grades stop wanting this form. It is not wired to the calendar — a school simply stops using the tab
 for those sections, or the rule narrows to Grades 4–10 then.
 
-### 3. Nothing here writes anything
+### 3. The older card is hidden, not removed
+
+`ClassSectionDetail` swaps the tab rather than adding one:
+
+```
+...(showPerformanceReport
+  ? [{ key: 'performance-report', ..., label: 'Report Cards' }]
+  : [{ key: 'report-cards',       ..., label: 'Report Cards' }]),
+```
+
+`showPerformanceReport` already carries the feature, the module and the grade range, so the fallback
+is the *only* branch a school without the feature can take. **Do not simplify this to an unconditional
+hide.** If the check ever widens past those three conditions, a school could lose its report cards
+altogether — the old tab is the default, and the new one has to earn its place each render.
+
+`studentReportCard.tsx`, `StudentReportCardModal` and `handleViewReportCard` are all still wired and
+still reachable from every other section.
+
+### 4. Nothing here writes anything
 
 Every figure on the form is owned by another module. Consolidated Grades writes the marks, Student
 Attendance writes the days, Class Sections owns the adviser. This module reads
@@ -95,8 +119,8 @@ it broadly is safe for the same reason the MATATAG grant is: the feature is off,
 
 This module adds **no endpoints**. It renders from `students`, `student-running-grades`,
 `student-attendances`, `school-days` and `institutions` — all of which the person opening this tab
-can already reach through the Report Cards tab beside it. So the module permission is enforced in
-the SPA only.
+could already reach through the older report card, and can still reach on any other section. So the
+module permission is enforced in the SPA only.
 
 That is honest here because **no new data is exposed** — this is a second layout of records the
 caller already has. If a future change gives this module an endpoint of its own (a server-rendered
@@ -166,6 +190,25 @@ disagree.
 DepEd leaves Annex G's month headings blank for the school to fill, so the two forms' month tables
 are free to diverge; a shared constant would tie a change in one to the other silently.
 
+### Every fill-in is a ruled blank, and every cell is a sibling
+
+Two layout rules that are easy to undo by accident, both learned the hard way:
+
+**`RuledBlank`, not underlined text.** Annex G draws a rule under every fill-in — Name, LRN, Age,
+Sex, Grade, Section, the signature lines, the transfer grades — and the rule is there whether or not
+anything is written on it. The older card underlines the *text*, which gives a line only as wide as
+the value and no line at all when there is nothing to print. That is a different document. The
+helper uses `flexGrow`/`flexBasis: 0` so a row of blanks divides the space it is given, rather than
+being a guessed number of underscores that a longer label pushes off the edge.
+
+**Table cells are flat siblings of the row, never nested in a column wrapper.** The term cells were
+first written as three cells inside one 27%-wide `View`. The wrapper stretched to the row height,
+but the inner row did not — it was only as tall as its own text — so on any row the Learning Areas
+cell made taller (a wrapped title, or a parent like MAPEH sitting above its children) the cells'
+right-hand rules stopped short and the column read as broken. Flex children stretch to the row by
+default; nesting is what takes that away. Body cells are therefore `width: 9%` of the whole row
+(`termCellWidth`), matching the header band's `33.33%` of its own 27% exactly.
+
 ### Teacher's comments print blank
 
 Three ruled boxes, labelled Term 1/2/3, empty. That is what DepEd's template is — the adviser writes
@@ -194,8 +237,8 @@ narratives are Key Stage 1 only and are not this.)
 |---|---|
 | `components/depedPerformanceReport/DepedPerformanceReportCard.tsx` | the `@react-pdf/renderer` document |
 | `components/depedPerformanceReport/depedPerformanceDescriptors.ts` | Table 11 bands, and the lookup |
-| `pages/MyClassSections/components/ClassSectionPerformanceReportTab.tsx` | the tab: learner picker, school-head picker, the four-quarter refusal |
-| `pages/MyClassSections/ClassSectionDetail.tsx` | `showPerformanceReport`, the tab button, the panel |
+| `pages/MyClassSections/components/ClassSectionPerformanceReportTab.tsx` | the tab: searchable learner picker, school-head picker, the four-quarter refusal |
+| `pages/MyClassSections/ClassSectionDetail.tsx` | `showPerformanceReport`, the tab swap, the panel, the redirect off a hidden tab |
 | `utils/gradeLevel.ts` | `parseGradeLevelNumber`, `isGradeTwoToTen` |
 
 The viewer is remounted on a key rather than updated in place — react-pdf v4 mis-renders on

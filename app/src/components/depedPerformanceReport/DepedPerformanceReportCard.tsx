@@ -105,6 +105,28 @@ const formatTeacherName = (teacher: User | null | undefined) => {
     return [first, middle ? `${middle.charAt(0)}.` : '', last].filter(Boolean).join(' ').trim();
 };
 
+/**
+ * A ruled blank: the line a DepEd form leaves for a value, with the value
+ * sitting on it.
+ *
+ * Annex G draws a rule under every fill-in — Name, LRN, Age, Sex, Grade,
+ * Section, the signature lines, the transfer grades — and the rule is there
+ * whether or not anything is written on it. Underlining the *text* instead, as
+ * the older card does, gives a line only as wide as the value and none at all
+ * when there is nothing to print, which is not the same document.
+ *
+ * `flexGrow` rather than a width so a row of these divides the space it is
+ * given; the line then stretches to the column instead of being a guessed
+ * number of underscores.
+ */
+const RuledBlank = ({ value = '', grow = 1, align = 'left' as 'left' | 'center' }) => (
+    <View style={{ flexGrow: grow, flexBasis: 0, borderBottom: '1px solid black', marginLeft: 3, justifyContent: 'flex-end' }}>
+        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica', textAlign: align, paddingBottom: 1 }}>
+            {value || ' '}
+        </Text>
+    </View>
+);
+
 const styles = StyleSheet.create({
     page: { display: 'flex', flexDirection: 'row', fontFamily: 'Helvetica', paddingVertical: 18 },
     column: { width: '50%', paddingHorizontal: 18, display: 'flex', flexDirection: 'column' },
@@ -166,7 +188,10 @@ export default function DepedPerformanceReportCard({
      */
     const gradingPeriods = useGradingPeriodsForYear(academicYear);
     const periodValues = gradingPeriods.values;
+    /** Of the *header band*, which is 27% of the row. */
     const periodColumnWidth = `${100 / gradingPeriods.count}%`;
+    /** Of the whole row — body cells are siblings of every other column. */
+    const termCellWidth = `${27 / gradingPeriods.count}%`;
 
     const attendanceByMonth = useMemo(() => {
         const map: Record<number, { classDays: number; present: number; absent: number }> = {};
@@ -344,31 +369,27 @@ export default function DepedPerformanceReportCard({
                         <Text style={{ fontSize: 7, textAlign: 'center' }}>School Year {academicYear}</Text>
 
                         <View style={{ marginTop: 6 }}>
-                            <View style={styles.row}>
-                                <Text style={[styles.body, { width: '52%' }]}>
-                                    Name: <Text style={{ textDecoration: 'underline' }}>{formatStudentNameReportCard(student).toUpperCase()}</Text>
-                                </Text>
-                                <Text style={[styles.body, { width: '24%' }]}>
-                                    Age: <Text style={{ textDecoration: 'underline' }}>{studentAge}</Text>
-                                </Text>
-                                <Text style={[styles.body, { width: '24%' }]}>
-                                    Sex: <Text style={{ textDecoration: 'underline' }}>
-                                        {student.gender === 'male' ? 'M' : student.gender === 'female' ? 'F' : 'O'}
-                                    </Text>
-                                </Text>
+                            <View style={[styles.row, { alignItems: 'flex-end' }]}>
+                                <Text style={styles.body}>Name:</Text>
+                                <RuledBlank grow={3} value={formatStudentNameReportCard(student).toUpperCase()} />
+                                <Text style={[styles.body, { marginLeft: 8 }]}>Age:</Text>
+                                <RuledBlank value={String(studentAge)} align="center" />
+                                <Text style={[styles.body, { marginLeft: 8 }]}>Sex:</Text>
+                                <RuledBlank
+                                    align="center"
+                                    value={student.gender === 'male' ? 'M' : student.gender === 'female' ? 'F' : 'O'}
+                                />
                             </View>
-                            <View style={[styles.row, { marginTop: 2 }]}>
-                                <Text style={[styles.body, { width: '52%' }]}>
-                                    LRN: <Text style={{ textDecoration: 'underline' }}>
-                                        {student?.lrn && String(student.lrn).trim() ? student.lrn : '—'}
-                                    </Text>
-                                </Text>
-                                <Text style={[styles.body, { width: '24%' }]}>
-                                    Grade: <Text style={{ textDecoration: 'underline' }}>{formatGradeLevel(classSection.grade_level) || '—'}</Text>
-                                </Text>
-                                <Text style={[styles.body, { width: '24%' }]}>
-                                    Section: <Text style={{ textDecoration: 'underline' }}>{classSection.title || '—'}</Text>
-                                </Text>
+                            <View style={[styles.row, { marginTop: 4, alignItems: 'flex-end' }]}>
+                                <Text style={styles.body}>LRN:</Text>
+                                <RuledBlank
+                                    grow={3}
+                                    value={student?.lrn && String(student.lrn).trim() ? String(student.lrn) : ''}
+                                />
+                                <Text style={[styles.body, { marginLeft: 8 }]}>Grade:</Text>
+                                <RuledBlank align="center" value={formatGradeLevel(classSection.grade_level)} />
+                                <Text style={[styles.body, { marginLeft: 8 }]}>Section:</Text>
+                                <RuledBlank align="center" value={classSection.title || ''} />
                             </View>
                         </View>
 
@@ -437,22 +458,31 @@ export default function DepedPerformanceReportCard({
                                                 {subject.variant ? `${subject.title} – ${subject.variant}` : subject.title}
                                             </Text>
                                         </View>
-                                        <View style={{ width: '27%', borderRight: '1px solid black', borderBottom: '1px solid black' }}>
-                                            <View style={styles.row}>
-                                                {termGrades.map((grade, index) => (
-                                                    <View
-                                                        key={`${subject.id}-${periodValues[index]}`}
-                                                        style={{
-                                                            width: periodColumnWidth,
-                                                            borderRight: index === termGrades.length - 1 ? undefined : '1px solid black',
-                                                            paddingVertical: 2,
-                                                        }}
-                                                    >
-                                                        <Text style={styles.cell}>{grade > 0 ? grade : ''}</Text>
-                                                    </View>
-                                                ))}
+                                        {/*
+                                          * Term cells are siblings of the other columns, not a
+                                          * nested row inside a 27% wrapper.
+                                          *
+                                          * Nested, the inner row is only as tall as its own text,
+                                          * so on any row the Learning Areas cell makes taller — a
+                                          * wrapped subject title, or a parent like MAPEH sitting
+                                          * above its children — the cells' right-hand rules stopped
+                                          * short and the column looked broken. Flat siblings all
+                                          * stretch to the row, so every rule runs its full height.
+                                          */}
+                                        {termGrades.map((grade, index) => (
+                                            <View
+                                                key={`${subject.id}-${periodValues[index]}`}
+                                                style={{
+                                                    width: termCellWidth,
+                                                    borderRight: '1px solid black',
+                                                    borderBottom: '1px solid black',
+                                                    paddingVertical: 2,
+                                                    justifyContent: 'center',
+                                                }}
+                                            >
+                                                <Text style={styles.cell}>{grade > 0 ? grade : ''}</Text>
                                             </View>
-                                        </View>
+                                        ))}
                                         <View style={{ width: '13%', borderRight: '1px solid black', borderBottom: '1px solid black', paddingVertical: 2, justifyContent: 'center' }}>
                                             <Text style={styles.cell}>{showFinal ? finalGrade : ''}</Text>
                                         </View>
@@ -546,9 +576,9 @@ export default function DepedPerformanceReportCard({
 
                         <Text style={[styles.sectionHeading, { marginTop: 10 }]}>PARENTS/GUARDIAN'S SIGNATURE</Text>
                         {gradingPeriods.periods.map((period) => (
-                            <View key={`sign-${period.value}`} style={[styles.row, { marginTop: 6, justifyContent: 'center' }]}>
-                                <Text style={[styles.label, { width: '25%' }]}>{period.numbered}</Text>
-                                <Text style={[styles.body, { width: '60%' }]}>_________________________________</Text>
+                            <View key={`sign-${period.value}`} style={[styles.row, { marginTop: 10, alignItems: 'flex-end' }]}>
+                                <Text style={[styles.label, { width: '22%' }]}>{period.numbered}</Text>
+                                <RuledBlank grow={1} />
                             </View>
                         ))}
 
@@ -557,41 +587,45 @@ export default function DepedPerformanceReportCard({
                             This is to certify that the above-named learner has satisfactorily completed the
                             requirements for the grade level indicated.
                         </Text>
-                        <Text style={[styles.body, { marginTop: 4 }]}>
-                            Admitted to Grade: <Text style={{ textDecoration: 'underline' }}>
-                                {formatGradeLevel(classSection.grade_level) || '__________'}
-                            </Text>
-                        </Text>
-                        <Text style={styles.body}>
-                            Eligible for Admission to Grade: <Text style={{ textDecoration: 'underline' }}>
-                                {incrementGradeLevelDisplay(classSection.grade_level) || '__________'}
-                            </Text>
-                        </Text>
-                        <Text style={styles.body}>Approved:</Text>
+                        <View style={[styles.row, { marginTop: 6, alignItems: 'flex-end' }]}>
+                            <Text style={styles.body}>Admitted to Grade:</Text>
+                            <RuledBlank value={formatGradeLevel(classSection.grade_level)} />
+                        </View>
+                        <View style={[styles.row, { marginTop: 4, alignItems: 'flex-end' }]}>
+                            <Text style={styles.body}>Eligible for Admission to Grade:</Text>
+                            <RuledBlank value={incrementGradeLevelDisplay(classSection.grade_level)} />
+                        </View>
+                        <Text style={[styles.body, { marginTop: 4 }]}>Approved:</Text>
 
-                        <View style={[styles.row, { marginTop: 10 }]}>
-                            <View style={{ width: '50%', alignItems: 'center' }}>
-                                <Text wrap={false} style={{ fontSize: principalNameFontPx, textTransform: 'uppercase', textDecoration: 'underline', width: '100%', textAlign: 'center' }}>
-                                    {principalDisplay}
-                                </Text>
-                                <Text style={[styles.body, { marginTop: 1 }]}>School Head</Text>
+                        <View style={[styles.row, { marginTop: 16 }]}>
+                            <View style={{ width: '50%', paddingRight: 8 }}>
+                                <View style={{ borderBottom: '1px solid black', justifyContent: 'flex-end' }}>
+                                    <Text wrap={false} style={{ fontSize: principalNameFontPx, fontFamily: 'Helvetica', textTransform: 'uppercase', textAlign: 'center', paddingBottom: 1 }}>
+                                        {principalDisplay}
+                                    </Text>
+                                </View>
+                                <Text style={[styles.body, { marginTop: 1, textAlign: 'center' }]}>School Head</Text>
                             </View>
-                            <View style={{ width: '50%', alignItems: 'center' }}>
-                                <Text wrap={false} style={{ fontSize: teacherNameFontPx, textDecoration: 'underline', width: '100%', textAlign: 'center' }}>
-                                    {teacherName || ' '}
-                                </Text>
-                                <Text style={[styles.body, { marginTop: 1 }]}>Adviser</Text>
+                            <View style={{ width: '50%', paddingLeft: 8 }}>
+                                <View style={{ borderBottom: '1px solid black', justifyContent: 'flex-end' }}>
+                                    <Text wrap={false} style={{ fontSize: teacherNameFontPx, fontFamily: 'Helvetica', textAlign: 'center', paddingBottom: 1 }}>
+                                        {teacherName || ' '}
+                                    </Text>
+                                </View>
+                                <Text style={[styles.body, { marginTop: 1, textAlign: 'center' }]}>Adviser</Text>
                             </View>
                         </View>
 
                         <Text style={[styles.sectionHeading, { marginTop: 10 }]}>CANCELLATION OF ELIGIBILITY TO TRANSFER</Text>
-                        <View style={styles.row}>
-                            <Text style={[styles.body, { width: '60%' }]}>Admitted in: ____________________</Text>
-                            <Text style={[styles.body, { width: '40%' }]}>Date: ______________</Text>
+                        <View style={[styles.row, { marginTop: 4, alignItems: 'flex-end' }]}>
+                            <Text style={styles.body}>Admitted in:</Text>
+                            <RuledBlank grow={2} />
+                            <Text style={[styles.body, { marginLeft: 8 }]}>Date:</Text>
+                            <RuledBlank />
                         </View>
-                        <View style={{ width: '50%', alignItems: 'center', marginTop: 12 }}>
-                            <Text style={styles.body}>_______________________</Text>
-                            <Text style={styles.body}>School Head</Text>
+                        <View style={{ width: '50%', marginTop: 16 }}>
+                            <View style={{ borderBottom: '1px solid black', height: 10 }} />
+                            <Text style={[styles.body, { marginTop: 1, textAlign: 'center' }]}>School Head</Text>
                         </View>
                     </View>
 

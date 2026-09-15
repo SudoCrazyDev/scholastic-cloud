@@ -214,6 +214,17 @@ const ClassSectionDetail: React.FC = () => {
     [gradingPeriods]
   )
 
+  /*
+   * The Report Cards tab is replaced rather than added to for a section on the
+   * DepEd Performance Report, so anyone sitting on it when the section loads is
+   * moved across instead of being left on a panel that no longer has a tab.
+   */
+  useEffect(() => {
+    if (showPerformanceReport && activeTab === 'report-cards') {
+      setActiveTab('performance-report')
+    }
+  }, [showPerformanceReport, activeTab])
+
   // A term-based year has no 4th period, so never leave the filter on one.
   useEffect(() => {
     if (selectedQuarter !== 'final' && !gradingPeriods.hasPeriod(selectedQuarter)) {
@@ -592,10 +603,19 @@ const ClassSectionDetail: React.FC = () => {
               { key: 'students' as const, icon: Users, label: `Students (${students.length})` },
               { key: 'subjects' as const, icon: BookOpen, label: `Subjects (${subjects.length})` },
               { key: 'ranking' as const, icon: Trophy, label: 'Student Ranking' },
-              { key: 'report-cards' as const, icon: FileText, label: 'Report Cards' },
+              /*
+               * One report card per section, not two.
+               *
+               * A Grade 2 to 10 section switched on for the DepEd Performance
+               * Report shows that and only that: handing an adviser two tabs
+               * that print different cards from the same marks is how a parent
+               * ends up with the wrong one. The older tab is still what every
+               * other section uses, and it comes straight back if the feature
+               * is switched off — this hides it, and removes nothing.
+               */
               ...(showPerformanceReport
-                ? [{ key: 'performance-report' as const, icon: ClipboardList, label: 'Performance Report' }]
-                : []),
+                ? [{ key: 'performance-report' as const, icon: ClipboardList, label: 'Report Cards' }]
+                : [{ key: 'report-cards' as const, icon: FileText, label: 'Report Cards' }]),
               { key: 'consolidated-grades' as const, icon: BarChart3, label: 'Consolidated Grades' },
               { key: 'core-values' as const, icon: Award, label: 'Core Values' },
               { key: 'attendance' as const, icon: Calendar, label: 'Attendance' },

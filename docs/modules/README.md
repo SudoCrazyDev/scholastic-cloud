@@ -120,8 +120,10 @@ modules should consume its data.
 
 - [DepEd Performance Report](DepedPerformanceReport/DEPED_PERFORMANCE_REPORT.md) — Academics.
   **Built.** The report card DepEd re-issued in **DO 15, s. 2026** (which repeals DO 8, s. 2015),
-  printed for **Grades 2 to 10** as a second card *beside* the existing one — a school hands out
-  both during the changeover and this replaces none of it. **Three term columns and no fourth**: a
+  printed for **Grades 2 to 10**. In a switched-on school it **becomes** the Report Cards tab for
+  those grade levels — the older form is hidden there, because two tabs printing two different cards
+  from the same marks is how a parent gets the wrong one — while every other grade level, and every
+  school without the feature, keeps the old card untouched. Nothing is deleted; one tab is swapped. **Three term columns and no fourth**: a
   section whose academic year is still four quarters gets an explanation instead of a form, because
   a silently dropped quarter on a card a parent keeps is worse than no card. New descriptors
   (**Advancing / Benchmarking / Connecting / Developing / Emerging**, Table 11), **no Observed Values

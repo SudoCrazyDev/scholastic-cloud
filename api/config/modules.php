@@ -161,7 +161,7 @@ return [
                 ],
                 'deped-performance-report' => [
                     'label' => 'DepEd Performance Report (Grades 2 to 10)',
-                    'description' => "The Learner's Performance Report from DepEd Order 15, s. 2026, printed for a Grade 2 to 10 section: three term grades, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and the adviser's remarks for each term. It reads the same numeric grades and attendance the existing report card reads and writes nothing of its own, so it offers no Manage - printing a card is not a second way to change a mark.",
+                    'description' => "The Learner's Performance Report from DepEd Order 15, s. 2026, printed for a Grade 2 to 10 section: three term grades, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and the adviser's remarks for each term. It replaces the older card on the Report Cards tab for those grade levels, rather than sitting beside it - an adviser with two tabs printing two different cards from the same marks is how a parent gets the wrong one. It reads the same numeric grades and attendance the older card reads and writes nothing of its own, so it offers no Manage - printing a card is not a second way to change a mark.",
 
                     /*
                      * View only, deliberately.
