@@ -149,13 +149,15 @@ const menuGroups: MenuGroup[] = [
         path: '/my-personal-info',
         allowedRoles: ['student'],
       },
-      {
-        id: 'my-subjects',
-        label: 'My Subject',
-        icon: <BookOpen className="w-5 h-5" />,
-        path: '/my-subjects',
-        allowedRoles: ['student'],
-      },
+      // Temporarily disabled. Restore this entry (and the route in App.tsx) to
+      // bring the student My Subject screen back.
+      // {
+      //   id: 'my-subjects',
+      //   label: 'My Subject',
+      //   icon: <BookOpen className="w-5 h-5" />,
+      //   path: '/my-subjects',
+      //   allowedRoles: ['student'],
+      // },
       {
         id: 'my-lessons',
         label: 'My Lessons',
