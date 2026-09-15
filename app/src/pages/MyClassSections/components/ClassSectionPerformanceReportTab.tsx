@@ -163,7 +163,10 @@ export function ClassSectionPerformanceReportTab({
         <p className="text-xs text-blue-900">
           The Learner's Performance Report from DepEd Order 15, s. 2026. It reads the same term
           grades and attendance as the Report Cards tab — nothing here changes a mark — and the
-          teacher's comment boxes print blank for the adviser to write in.
+          teacher's comment boxes print blank for the adviser to write in. A term column is
+          blank until the subject teacher has <strong>applied</strong> its grade in the class
+          record: a running average of the scores entered so far is not a grade, and this form
+          will not print one in a cell a parent will read as final.
         </p>
       </div>
 

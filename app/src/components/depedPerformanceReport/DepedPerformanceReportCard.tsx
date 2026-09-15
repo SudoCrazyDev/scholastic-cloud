@@ -4,9 +4,10 @@ import { Page, Text, View, Document, PDFViewer, StyleSheet, Image, Font } from '
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
 import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods';
-import { calculateFinalGrade, getPassFailRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
+import { getPassFailRemarks, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
 import { fitPdfSingleLineFontSizePx, formatStudentNameReportCard } from '../../utils/reportCardPdfUtils';
 import { PERFORMANCE_DESCRIPTOR_BANDS } from './depedPerformanceDescriptors';
+import { encodedFinalGrade, encodedTermGrade } from './depedPerformanceGrades';
 import type { SchoolDay, StudentAttendance, Subject, User } from '../../types';
 import type { StudentRunningGrade } from '../../services/studentRunningGradeService';
 
@@ -274,7 +275,7 @@ export default function DepedPerformanceReportCard({
                 ...(subjects || []).filter((s: Subject) => s.parent_subject_id === parent.id).map((s: Subject) => s.id),
             ];
             const areaGrades = idsInArea
-                .map((id: string) => calculateFinalGrade((grades || []).filter((g: StudentRunningGrade) => g.subject_id === id)))
+                .map((id: string) => encodedFinalGrade((grades || []).filter((g: StudentRunningGrade) => g.subject_id === id)))
                 .filter((grade: number) => grade > 0);
 
             if (areaGrades.length === 0) continue;
@@ -305,7 +306,7 @@ export default function DepedPerformanceReportCard({
 
             for (const id of idsWithGrades) {
                 const subjectGrades = (grades || []).filter((g: StudentRunningGrade) => g.subject_id === id);
-                if (!periodValues.every((period) => getQuarterGrade(subjectGrades, period) > 0)) return false;
+                if (!periodValues.every((period) => encodedTermGrade(subjectGrades, period) > 0)) return false;
             }
         }
 
@@ -439,8 +440,8 @@ export default function DepedPerformanceReportCard({
 
                             {orderedSubjects.map((subject: Subject) => {
                                 const subjectGrades = (grades || []).filter((g: StudentRunningGrade) => g.subject_id === subject.id);
-                                const termGrades = periodValues.map((period) => getQuarterGrade(subjectGrades, period));
-                                const finalGrade = calculateFinalGrade(subjectGrades);
+                                const termGrades = periodValues.map((period) => encodedTermGrade(subjectGrades, period));
+                                const finalGrade = encodedFinalGrade(subjectGrades);
                                 const isChild = subject.subject_type === 'child';
                                 const complete = termGrades.every((grade) => grade > 0);
                                 // A child row carries term marks only; its parent holds the area's

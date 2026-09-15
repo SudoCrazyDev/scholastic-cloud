@@ -30,7 +30,7 @@ moment the feature is switched off. Nothing is deleted; one tab is swapped for a
 
 ---
 
-## Read this first: four things that will bite you
+## Read this first: five things that will bite you
 
 ### 1. This card cannot render a four-quarter year, and must not pretend to
 
@@ -94,6 +94,35 @@ different sheet.
 That is why the module declares `base_abilities => ['view']` and offers no Manage. A Manage here
 would suggest the card is a second place to correct a grade, which it is not.
 
+### 5. Only an **applied** grade prints, and `gradeUtils` will not give you one
+
+`student_running_grades` carries two numbers that both look like grades and are not:
+
+| Column | Written by | What it is |
+|---|---|---|
+| `grade` | `RunningGradeRecalcService` | each ECR category's raw percentage times its weight, summed — recomputed on every score a teacher saves |
+| `final_grade` | `StudentRunningGradeController@...` (the class record's Apply) | the whole number the teacher deliberately applied |
+
+Only `final_grade` is a grade. `grade` is a progress figure: mid-term, with half the class record
+empty, it reads 17 or 30 or 47, because the scores that would lift it have not been entered yet.
+
+`gradeUtils.gradeValue` prefers `final_grade` and **falls back to `grade`**. On a teacher's preview
+screen that is defensible. On a form a parent keeps it is not — it prints a half-finished running
+percentage in the same cell, in the same type, as a real mark, with nothing to tell them apart.
+A parent reading 17 next to Mathematics has no way to know it means "not encoded yet."
+
+So this card does not use `gradeUtils` for marks at all. `depedPerformanceGrades.ts` reads
+`final_grade` and nothing else, and an un-applied term prints as an **empty cell**. Empty is honest.
+The tab says so above the preview, so a blank column reads as work outstanding rather than a bug.
+
+The tell that this was wrong, if it ever regresses: a parent area blank while its children show
+numbers. `ParentSubjectGradeService` only averages children `whereNotNull('final_grade')`, so a
+MAPEH row cannot be blank while Music and Arts shows a real mark.
+
+**The DO 8 card, SF9 and the consolidated-grades screens still take the fallback.** That is left
+alone deliberately — `gradeUtils` is shared, and changing it changes what every school's existing
+report card prints. It is worth fixing; it is not worth fixing by accident.
+
 ---
 
 ## The two gates
@@ -150,7 +179,7 @@ Filipino / English / Mathematics / Science / AP / GMRC-VE / EPP-TLE / MAPEH beca
 Grade 4–12 set, but a Grade 2 section under MATATAG carries Language, Reading & Literacy,
 Mathematics, GMRC and Makabansa instead. Both render correctly because neither is hardcoded.
 
-A **child row carries term marks and no final grade** — the parent row holds the area's final grade,
+Only an **applied** grade prints in a term column — see point 5 above. A **child row carries term marks and no final grade** — the parent row holds the area's final grade,
 which is what §52 averages. Final Grade and Remarks only appear once all three terms are marked.
 
 **General Average** (§53) is the mean of the areas' final grades, whole number, and prints only when
@@ -237,6 +266,7 @@ narratives are Key Stage 1 only and are not this.)
 |---|---|
 | `components/depedPerformanceReport/DepedPerformanceReportCard.tsx` | the `@react-pdf/renderer` document |
 | `components/depedPerformanceReport/depedPerformanceDescriptors.ts` | Table 11 bands, and the lookup |
+| `components/depedPerformanceReport/depedPerformanceGrades.ts` | reads `final_grade` only — why `gradeUtils` is not used for marks |
 | `pages/MyClassSections/components/ClassSectionPerformanceReportTab.tsx` | the tab: searchable learner picker, school-head picker, the four-quarter refusal |
 | `pages/MyClassSections/ClassSectionDetail.tsx` | `showPerformanceReport`, the tab swap, the panel, the redirect off a hidden tab |
 | `utils/gradeLevel.ts` | `parseGradeLevelNumber`, `isGradeTwoToTen` |
