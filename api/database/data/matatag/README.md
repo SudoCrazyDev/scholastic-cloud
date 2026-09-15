@@ -100,6 +100,12 @@ add them in both places and re-run.
 
 ## Adding Grade 2 or Grade 3
 
+**Neither is due yet.** DepEd Order 015, s. 2026 §55 phases descriptive grading in one grade level
+per year: Grade 1 from SY 2026–2027, Grade 2 from **SY 2027–2028**, Grade 3 from **SY 2028–2029**.
+Until each date those grades are graded numerically, so a missing catalog is a grade level DepEd has
+not moved yet rather than a gap in this directory. See the module doc's
+[transition table](../../../../docs/modules/MatatagKeyStage1/MATATAG.md#key-stage-1-is-phased-grade-2-and-grade-3-are-still-numeric).
+
 1. Get the official workbook. Ask early — without it there is no catalog.
 2. Run the script against it with a new `--grade` and `--code`.
 3. Read the report. Resolve every anomaly and every unknown fill.

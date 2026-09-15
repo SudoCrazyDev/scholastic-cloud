@@ -30,7 +30,8 @@ import {
   Award,
   Calendar,
   ScrollText,
-  Sparkles
+  Sparkles,
+  ClipboardList
 } from 'lucide-react'
 import type { Student, Subject, StudentSubjectGrade } from '../../types'
 import ClassSectionHeader from './components/ClassSectionHeader'
@@ -43,9 +44,11 @@ import ClassSectionCoreValuesTab from './components/ClassSectionCoreValuesTab'
 import ClassSectionAttendanceTab from './components/ClassSectionAttendanceTab'
 import ClassSectionCertificatesTab from './components/ClassSectionCertificatesTab'
 import { MatatagTab } from './components/MatatagTab'
+import { ClassSectionPerformanceReportTab } from './components/ClassSectionPerformanceReportTab'
 import { useFeatures } from '../../hooks/useFeatures'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useIsKeyStageOne } from '../../hooks/useMatatag'
+import { isGradeTwoToTen } from '../../utils/gradeLevel'
 import { Select } from '../../components/select'
 import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils'
 import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods'
@@ -57,7 +60,7 @@ const ClassSectionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user, isImpersonating } = useAuth()
-  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'consolidated-grades' | 'core-values' | 'attendance' | 'certificates' | 'matatag'>('students')
+  const [activeTab, setActiveTab] = useState<'students' | 'subjects' | 'ranking' | 'report-cards' | 'performance-report' | 'consolidated-grades' | 'core-values' | 'attendance' | 'certificates' | 'matatag'>('students')
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false)
   const [showRemoveModal, setShowRemoveModal] = useState(false)
@@ -183,6 +186,25 @@ const ClassSectionDetail: React.FC = () => {
   const isKeyStageOne = useIsKeyStageOne(classSectionData?.grade_level)
   const showMatatag =
     hasFeature('matatag-grading') && can('matatag-grading', 'view') && isKeyStageOne
+
+  /*
+   * The DepEd Performance Report is additive in exactly the same way, and gated
+   * the same three ways: the school has the feature, the person holds the
+   * module, and this section is one DO 15, s. 2026 puts on the form.
+   *
+   * Grades 2 to 10, so Grade 1 — already on the MATATAG competency grid, with
+   * its own progress report — never sees it, and Grades 11 and 12 wait for the
+   * Track and elective rows that form needs. Grades 2 and 3 are in because DepEd
+   * keeps them numeric until SY 2027-2028 and SY 2028-2029 respectively.
+   *
+   * The tab is shown even for a four-quarter year: it opens and explains that
+   * the form has three term columns, which is more use than a tab that silently
+   * is not there.
+   */
+  const showPerformanceReport =
+    hasFeature('deped-performance-report') &&
+    can('deped-performance-report', 'view') &&
+    isGradeTwoToTen(classSectionData?.grade_level)
 
   const quarterOptions = useMemo(
     () => [
@@ -571,6 +593,9 @@ const ClassSectionDetail: React.FC = () => {
               { key: 'subjects' as const, icon: BookOpen, label: `Subjects (${subjects.length})` },
               { key: 'ranking' as const, icon: Trophy, label: 'Student Ranking' },
               { key: 'report-cards' as const, icon: FileText, label: 'Report Cards' },
+              ...(showPerformanceReport
+                ? [{ key: 'performance-report' as const, icon: ClipboardList, label: 'Performance Report' }]
+                : []),
               { key: 'consolidated-grades' as const, icon: BarChart3, label: 'Consolidated Grades' },
               { key: 'core-values' as const, icon: Award, label: 'Core Values' },
               { key: 'attendance' as const, icon: Calendar, label: 'Attendance' },
@@ -714,6 +739,24 @@ const ClassSectionDetail: React.FC = () => {
                     isImpersonating={isImpersonating}
                     subjects={subjects}
                     academicYear={classSectionData?.academic_year ?? ''}
+                  />
+                </motion.div>
+              )}
+
+              {activeTab === 'performance-report' && classSectionData && (
+                <motion.div
+                  key="performance-report"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ClassSectionPerformanceReportTab
+                    classSectionId={id!}
+                    institutionId={effectiveInstitutionId || ''}
+                    academicYear={classSectionData.academic_year || ''}
+                    students={students}
+                    getFullName={getFullName}
                   />
                 </motion.div>
               )}

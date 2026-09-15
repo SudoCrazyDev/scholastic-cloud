@@ -159,6 +159,28 @@ return [
                         ],
                     ],
                 ],
+                'deped-performance-report' => [
+                    'label' => 'DepEd Performance Report (Grades 2 to 10)',
+                    'description' => "The Learner's Performance Report from DepEd Order 15, s. 2026, printed for a Grade 2 to 10 section: three term grades, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and the adviser's remarks for each term. It reads the same numeric grades and attendance the existing report card reads and writes nothing of its own, so it offers no Manage - printing a card is not a second way to change a mark.",
+
+                    /*
+                     * View only, deliberately.
+                     *
+                     * Every figure on this form is owned by another module -
+                     * Consolidated Grades writes the marks, Student Attendance
+                     * writes the days - and this only lays them out on DepEd's
+                     * newer sheet. A Manage here would suggest the card is a
+                     * place to correct a grade, which it is not.
+                     */
+                    'base_abilities' => ['view'],
+
+                    'special' => [
+                        'view-all' => [
+                            'label' => 'Print for every section in the school',
+                            'description' => "Open the form for any Grade 2 to 10 section, rather than only the sections this person advises. Tick it for a principal, registrar or curriculum head. An adviser prints their own section without it.",
+                        ],
+                    ],
+                ],
                 'teaching-activity' => [
                     'label' => 'Teaching Activity',
                     'description' => 'Oversight of what teachers have put up for their subjects — lessons, uploaded files and assessments — and how many of their students have submitted. Read-only: it reports on other modules and changes nothing, so it offers no Manage.',

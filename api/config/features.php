@@ -70,4 +70,25 @@ return [
         'notes' => 'Only grade levels a DepEd catalog has been loaded for can be used. Grade 1 ships with this release; Grades 2 and 3 arrive as data, with no deployment.',
     ],
 
+    'deped-performance-report' => [
+        'label' => "DepEd Performance Report (Grades 2 to 10)",
+        'description' => "The Learner's Performance Report prescribed by DepEd Order 15, s. 2026 - three term columns, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and the adviser's remarks per term. It prints alongside the school's existing report card and replaces none of it.",
+
+        /*
+         * Off until a school is switched on, deliberately.
+         *
+         * This is a second, differently-shaped report card for grade levels
+         * that already have one, and which of the two a school hands a parent
+         * is the school's decision to announce - not something to change under
+         * them on a deploy. DO 15 also only took effect for SY 2026-2027, so a
+         * school printing an earlier year has no use for it at all.
+         *
+         * Change the default once the older card is retired.
+         */
+        'default_enabled' => false,
+
+        // Shown on the Feature Access screen.
+        'notes' => 'Needs the section\'s academic year to be recorded as three terms; a four-quarter year has no fourth column on this form, so the tab says so rather than dropping a quarter.',
+    ],
+
 ];

@@ -133,15 +133,15 @@ class SystemRolePermissions
         // institution-wide roles and nobody else — a department head can be
         // given it in the role builder, but it reports on the whole school, so
         // it is not something to hand out by default.
-        'institution-administrator' => ['grade-levels', 'teaching-activity'],
-        'principal' => ['grade-levels', 'teaching-activity'],
+        'institution-administrator' => ['grade-levels', 'teaching-activity', 'deped-performance-report'],
+        'principal' => ['grade-levels', 'teaching-activity', 'deped-performance-report'],
         // Finance also had the two "My Work" items, which hang off Subjects.
         'finance' => ['students', 'class-sections', 'grade-levels', 'subjects'],
-        'subject-teacher' => ['class-sections', 'students', 'school-days', 'grade-levels'],
-        'department-head' => ['class-sections', 'students', 'school-days', 'grade-levels'],
-        'curriculum-head' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading'],
-        'assistant-principal' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading'],
-        'registrar' => ['grade-levels', 'tracks-strands', 'class-sections'],
+        'subject-teacher' => ['class-sections', 'students', 'school-days', 'grade-levels', 'deped-performance-report'],
+        'department-head' => ['class-sections', 'students', 'school-days', 'grade-levels', 'deped-performance-report'],
+        'curriculum-head' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading', 'deped-performance-report'],
+        'assistant-principal' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading', 'deped-performance-report'],
+        'registrar' => ['grade-levels', 'tracks-strands', 'class-sections', 'deped-performance-report'],
     ];
 
     /**
@@ -157,6 +157,7 @@ class SystemRolePermissions
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
             'matatag-grading.view-all', 'matatag-grading.set-up',
+            'deped-performance-report.view-all',
             'tala.configure', 'students.reset-portal-password',
             'subjects.view-all',
         ],
@@ -167,6 +168,7 @@ class SystemRolePermissions
             'attendance-requests.approve', 'student-attendance.approve',
             'consolidated-grades.approve', 'payroll.release', 'payroll.approve-loan',
             'matatag-grading.view-all', 'matatag-grading.set-up',
+            'deped-performance-report.view-all',
             'tala.configure', 'students.reset-portal-password',
             'subjects.view-all',
         ],
@@ -188,7 +190,7 @@ class SystemRolePermissions
         // which has always carried the power to reset a portal login; the
         // ability is listed for them so the role builder shows it ticked rather
         // than implying they lost something.
-        'registrar' => ['students.reset-portal-password'],
+        'registrar' => ['students.reset-portal-password', 'deped-performance-report.view-all'],
 
         // A subject teacher is the person a student actually tells when they
         // cannot sign in, so they may set a portal login up and issue new
@@ -202,15 +204,15 @@ class SystemRolePermissions
         // identical, so these — not `subjects.manage`, which a teacher also holds —
         // are what My Assigned Subjects and the MATATAG grid have to key off. Both
         // are reach across other people's sections, not an extra ability.
-        'department-head' => ['subjects.view-all', 'matatag-grading.view-all'],
+        'department-head' => ['subjects.view-all', 'matatag-grading.view-all', 'deped-performance-report.view-all'],
 
         // Oversight roles: they read every Key Stage 1 section rather than only an
         // advisory of their own. Deliberately without `matatag-grading.set-up` —
         // deciding which sections report on MATATAG stays with the principal and the
         // administrator, because it pins a catalog version for a whole school year.
-        'curriculum-head' => ['matatag-grading.view-all'],
+        'curriculum-head' => ['matatag-grading.view-all', 'deped-performance-report.view-all'],
 
-        'assistant-principal' => ['matatag-grading.view-all'],
+        'assistant-principal' => ['matatag-grading.view-all', 'deped-performance-report.view-all'],
     ];
 
     /**

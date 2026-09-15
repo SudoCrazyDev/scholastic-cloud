@@ -15,6 +15,10 @@ DepEd's MATATAG rollout replaces numeric quarterly grading for **Key Stage 1 (Gr
 term-based, competency-level, descriptor-only record. This module implements that **alongside** the
 existing numeric grading, which it must never alter: a K-12 school runs both at once.
 
+**Key Stage 1 arrives one grade at a time, and only Grade 1 is here yet** — see
+[the transition](#key-stage-1-is-phased-grade-2-and-grade-3-are-still-numeric) before concluding
+that a Grade 2 section is missing something.
+
 | | Existing numeric grading | This module |
 |---|---|---|
 | Periods | 4 quarters | **3 terms** |
@@ -23,6 +27,41 @@ existing numeric grading, which it must never alter: a K-12 school runs both at 
 | Aggregation | weighted, averaged, transmuted | **none at all** |
 | Report card | numeric SF9 | narrative progress report + attached PACE forms |
 | Record owner | the subject teacher | **the adviser**, for all learning areas |
+
+### Key Stage 1 is phased: Grade 2 and Grade 3 are still numeric
+
+The table above describes the **end state**. It is not what a Grade 2 or Grade 3 section does today,
+and reading it as though it were is the single easiest mistake to make about this module.
+
+**DepEd Order No. 015, s. 2026** §55, Table 12 — *KS1 Transition to Descriptive Grading and
+Transmutation* — phases the descriptive system in one grade level per year:
+
+| School Year | Grade 1 | Grade 2 | Grade 3 |
+|---|---|---|---|
+| **2026–2027** | **Descriptive** | Numerical (adjusted transmutation) | Numerical (adjusted transmutation) |
+| 2027–2028 | **Descriptive** | **Descriptive** | Numerical (zero-based) |
+| 2028–2029 | **Descriptive** | **Descriptive** | **Descriptive** |
+
+§56 and §57 say it in prose too: in SY 2026–2027 Grades 2 and 3 "shall continue to use the numerical
+grading system and the adjusted transmutation table", and in SY 2027–2028 Grade 3 continues on
+zero-based numerical grading. §58: only from SY 2028–2029 do all KS1 grade levels transition.
+
+Three consequences worth holding on to:
+
+- **A Grade 2 section with no competency catalog is not a gap to close in a hurry.** It is a grade
+  level DepEd has not moved yet. The catalog is wanted for **SY 2027–2028**, and Grade 3's for
+  **SY 2028–2029** — see [A new grade level](#a-new-grade-level-grade-2-grade-3).
+- **Grades 2 and 3 print a numeric report card in the meantime**, and DepEd supplies one: Annex G
+  of the same Order, which says in terms that it "may also be used for Grades 2 and 3 during the SYs
+  in which the numerical grading system is still being implemented". That form is a separate module —
+  [DepEd Performance Report](../DepedPerformanceReport/DEPED_PERFORMANCE_REPORT.md).
+- **The `matatag-grading` feature stays off for a school with no Grade 1 sections opted in.** Nothing
+  about this module is useful to a school whose youngest numeric-free grade has not arrived.
+
+DO 15 also repealed **DO 8, s. 2015** and **DO 36, s. 2016**, and **DO 9, s. 2026** replaced the
+four-quarter calendar with three terms for *every* grade level — not only Key Stage 1. The "4
+quarters" column in the table above is therefore a statement about what this codebase still supports,
+not about what DepEd now prescribes.
 
 ---
 
@@ -63,6 +102,12 @@ version whose `grade_level` does not match the section's, and every rating row c
 denormalised `curriculum_version_id` so a reprint years later resolves the exact catalog the mark
 was made against.
 
+That the workbook offers 1, 2 and 3 while containing only Grade 1 is not an oversight on DepEd's
+part, incidentally — it is the instrument arriving ahead of the rollout it serves. Grades 2 and 3
+are [still numerically graded](#key-stage-1-is-phased-grade-2-and-grade-3-are-still-numeric) until
+SY 2027–2028 and SY 2028–2029, so the sheets for them do not exist yet because the grades do not
+need them yet.
+
 ---
 
 ## Receiving a DepEd update
@@ -73,6 +118,13 @@ instrument still to come. The design's whole purpose is that a new catalog is **
 fifteen-line migration**, never a schema change.
 
 ### A new grade level (Grade 2, Grade 3)
+
+**When each one is actually needed**, from DO 15's phase-in
+([above](#key-stage-1-is-phased-grade-2-and-grade-3-are-still-numeric)): Grade 2's catalog has to be
+loaded before **SY 2027–2028**, Grade 3's before **SY 2028–2029**. Until then those grades are graded
+numerically and there is nothing for a catalog to do. "Ask early" below means early against *that*
+date — a year of lead time on a file DepEd has to publish first — not that the module is incomplete
+without them.
 
 1. Obtain the official workbook. **Ask early** — without it the catalog cannot be extracted.
 2. Run `api/database/data/matatag/extract.py` against it. Check its report: every slot must resolve

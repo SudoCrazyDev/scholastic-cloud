@@ -103,7 +103,10 @@ modules should consume its data.
 - [MATATAG Key Stage 1](MatatagKeyStage1/MATATAG.md) — Academics. **Designed, not built.** DepEd's
   competency progress report for **Grades 1–3**: a letter descriptor **A–E** against each learning
   competency each term, the adviser's two narratives, and the PACE forms and progress report card
-  printed from them. **Three terms, and nothing numeric** — no scores, no averages, no
+  printed from them. **Grades 1–3 is the end state, not today** — DO 15, s. 2026 Table 12 phases
+  descriptive grading in one grade a year (Grade 1 from SY 2026–2027, Grade 2 from SY 2027–2028,
+  Grade 3 from SY 2028–2029), so Grades 2 and 3 are still numeric and a missing catalog for them is
+  not a gap. **Three terms, and nothing numeric** — no scores, no averages, no
   transmutation, no general average. Runs *alongside* the existing four-quarter numeric grading and
   replaces none of it. Read it before touching anything grading-adjacent for a primary grade, and
   **before assuming `App\Support\GradingPeriods` can carry this** — it resolves quarter-vs-term
@@ -114,6 +117,21 @@ modules should consume its data.
   macro-skill palette are in the doc, because the workbook encodes each slot's language macro skill
   *only* as a cell fill colour. Notes six defects in DepEd's own spreadsheet and one deliberate
   deviation from the printed form (September attendance).
+
+- [DepEd Performance Report](DepedPerformanceReport/DEPED_PERFORMANCE_REPORT.md) — Academics.
+  **Built.** The report card DepEd re-issued in **DO 15, s. 2026** (which repeals DO 8, s. 2015),
+  printed for **Grades 2 to 10** as a second card *beside* the existing one — a school hands out
+  both during the changeover and this replaces none of it. **Three term columns and no fourth**: a
+  section whose academic year is still four quarters gets an explanation instead of a form, because
+  a silently dropped quarter on a card a parent keeps is worse than no card. New descriptors
+  (**Advancing / Benchmarking / Connecting / Developing / Emerging**, Table 11), **no Observed Values
+  grid** — GMRC/VE is a learning-area row now — and three blank per-term comment boxes. Read it
+  before assuming Grades 2 and 3 are descriptive: DO 15 Table 12 keeps them numeric until
+  **SY 2027–2028** and **SY 2028–2029**, so `isGradeTwoToTen` is a transitional rule with an expiry.
+  Adds **no API routes**, so its module permission is SPA-enforced — the doc says what to do the
+  moment that stops being true. Transmutation (§48/§50) and component weights (§44) are
+  grading-engine work and are **not** implemented; this card prints whatever Consolidated Grades
+  computed.
 
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder
