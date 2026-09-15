@@ -72,7 +72,7 @@ return [
 
     'deped-performance-report' => [
         'label' => "DepEd Performance Report (Grades 2 to 10)",
-        'description' => "The Learner's Performance Report prescribed by DepEd Order 15, s. 2026 - three term columns, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and the adviser's remarks per term. In a Grade 2 to 10 section it becomes the school's report card: the Report Cards tab prints this form instead of the DO 8, s. 2015 one. Every other grade level, and every school without this feature, is untouched - switch it off and the older card is back.",
+        'description' => "The Learner's Performance Report prescribed by DepEd Order 15, s. 2026 - three term columns, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and a teacher's comment the adviser types in once per term and the card prints in DepEd's box. In a Grade 2 to 10 section it becomes the school's report card: the Report Cards tab prints this form instead of the DO 8, s. 2015 one. Every other grade level, and every school without this feature, is untouched - switch it off and the older card is back.",
 
         /*
          * Off until a school is switched on, deliberately.

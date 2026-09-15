@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Info } from 'lucide-react'
+import { AlertTriangle, Info, MessageSquareText } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 import { Select } from '../../../components/select'
 import { Autocomplete } from '../../../components/autocomplete'
+import { Textarea } from '../../../components/textarea'
+import { Button } from '../../../components/button'
 import DepedPerformanceReportCard from '../../../components/depedPerformanceReport/DepedPerformanceReportCard'
 import { useGradingPeriodsForYear } from '../../../hooks/useGradingPeriods'
+import {
+  usePerformanceReportComments,
+  usePerformanceReportCommentMutations,
+} from '../../../hooks/usePerformanceReportComments'
 import { staffService } from '../../../services/staffService'
 import type { Student, User, UserInstitution } from '../../../types'
 
@@ -106,6 +113,83 @@ export function ClassSectionPerformanceReportTab({
   )
 
   /*
+   * The adviser's comment per term — DepEd's TEACHER'S COMMENTS/REMARKS boxes.
+   *
+   * The whole section loads at once rather than a learner at a time, so the
+   * counter below can answer the question an adviser actually has before a card
+   * run: how many are still to write.
+   */
+  const { data: commentsData } = usePerformanceReportComments({
+    sectionId: classSectionId,
+    academicYear,
+    enabled: isTermBased,
+  })
+
+  const saveComments = usePerformanceReportCommentMutations({
+    sectionId: classSectionId,
+    academicYear,
+  })
+
+  const canManageComments = commentsData?.can_manage ?? false
+  const maxCommentLength = commentsData?.max_length ?? 300
+
+  /** What is stored for the selected learner, keyed by period value. */
+  const savedComments = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const period of gradingPeriods.periods) {
+      map[period.value] = commentsData?.comments?.[`${studentId}:${period.value}`]?.comment ?? ''
+    }
+    return map
+  }, [commentsData, studentId, gradingPeriods.periods])
+
+  /*
+   * The editor's own copy, reseeded whenever the stored text changes — which is
+   * when the learner changes, and after a save.
+   *
+   * The card is deliberately fed `savedComments` rather than this: what prints
+   * is what is stored, so an adviser cannot hand a parent a card carrying a
+   * sentence they never saved. It also keeps the PDF from re-rendering on every
+   * keystroke, which react-pdf is in no state to do.
+   */
+  const [draftComments, setDraftComments] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setDraftComments(savedComments)
+  }, [savedComments])
+
+  const commentsDirty = useMemo(
+    () => gradingPeriods.periods.some((period) => (draftComments[period.value] ?? '') !== savedComments[period.value]),
+    [gradingPeriods.periods, draftComments, savedComments]
+  )
+
+  /** How many learners on the roster have at least one term written up. */
+  const learnersWithComments = useMemo(() => {
+    const stored = commentsData?.comments ?? {}
+    const seen = new Set<string>()
+    for (const key of Object.keys(stored)) {
+      if (stored[key]?.comment) seen.add(key.split(':')[0])
+    }
+    return seen.size
+  }, [commentsData])
+
+  const handleSaveComments = useCallback(() => {
+    if (!studentId) return
+
+    saveComments.mutate(
+      gradingPeriods.periods.map((period) => ({
+        student_id: studentId,
+        quarter: period.value,
+        comment: draftComments[period.value] ?? '',
+      })),
+      {
+        onSuccess: () => {
+          toast.success('Comments saved. The card below now prints them.')
+        },
+      }
+    )
+  }, [studentId, saveComments, gradingPeriods.periods, draftComments])
+
+  /*
    * react-pdf v4 mis-renders on incremental prop updates, so the viewer is
    * remounted on anything that changes the document rather than updated in
    * place — the same trick `StudentReportCardModal` and the MATATAG reports
@@ -117,8 +201,18 @@ export function ClassSectionPerformanceReportTab({
   }, [orderedStudents, studentId, getFullName])
 
   const viewerKey = useMemo(
-    () => `${studentId}|${classSectionId}|${institutionId}|${academicYear}|${schoolHeadId}`,
-    [studentId, classSectionId, institutionId, academicYear, schoolHeadId]
+    () =>
+      [
+        studentId,
+        classSectionId,
+        institutionId,
+        academicYear,
+        schoolHeadId,
+        // Stored comments are part of the document, so a save has to remount
+        // the viewer or the card keeps printing what it was handed first.
+        gradingPeriods.periods.map((period) => savedComments[period.value] ?? '').join('\u0001'),
+      ].join('|'),
+    [studentId, classSectionId, institutionId, academicYear, schoolHeadId, gradingPeriods.periods, savedComments]
   )
 
   if (!isTermBased) {
@@ -163,7 +257,7 @@ export function ClassSectionPerformanceReportTab({
         <p className="text-xs text-blue-900">
           The Learner's Performance Report from DepEd Order 15, s. 2026. It reads the same term
           grades and attendance as the Report Cards tab — nothing here changes a mark — and the
-          teacher's comment boxes print blank for the adviser to write in. A term column is
+          teacher's comments below are written here and print on the card. A term column is
           blank until the subject teacher has <strong>applied</strong> its grade in the class
           record: a running average of the scores entered so far is not a grade, and this form
           will not print one in a cell a parent will read as final.
@@ -209,6 +303,85 @@ export function ClassSectionPerformanceReportTab({
         </label>
       </div>
 
+      {/*
+        * DepEd's TEACHER'S COMMENTS/REMARKS boxes, filled in here rather than by
+        * hand after printing. Three of them, one per term, for the learner
+        * selected above.
+        */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <MessageSquareText className="w-4 h-4 text-gray-500" />
+            <h4 className="text-sm font-semibold text-gray-900">Teacher's comments / remarks</h4>
+          </div>
+          <p className="text-xs text-gray-500">
+            {learnersWithComments} of {orderedStudents.length} learners written up
+          </p>
+        </div>
+
+        {!canManageComments && (
+          <p className="text-xs text-gray-500">
+            You can read these but not change them. Writing the adviser's comment needs Manage on
+            the DepEd Performance Report module — a school grants it in the role builder.
+          </p>
+        )}
+
+        <div className="grid gap-3 lg:grid-cols-3">
+          {gradingPeriods.periods.map((period) => {
+            const value = draftComments[period.value] ?? ''
+
+            return (
+              <label key={`comment-${period.value}`} className="block">
+                <span className="flex items-baseline justify-between mb-1">
+                  <span className="text-xs font-medium text-gray-600">{period.numbered}</span>
+                  <span
+                    className={
+                      value.length > maxCommentLength * 0.9
+                        ? 'text-xs text-amber-600'
+                        : 'text-xs text-gray-400'
+                    }
+                  >
+                    {value.length}/{maxCommentLength}
+                  </span>
+                </span>
+                <Textarea
+                  rows={4}
+                  maxLength={maxCommentLength}
+                  disabled={!canManageComments || !studentId}
+                  placeholder={`What the parent should know about this term…`}
+                  value={value}
+                  onChange={(event) =>
+                    setDraftComments((current) => ({
+                      ...current,
+                      [period.value]: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            )
+          })}
+        </div>
+
+        {canManageComments && (
+          <div className="flex items-center justify-end gap-3">
+            {commentsDirty && (
+              <p className="text-xs text-amber-700">
+                Unsaved — the card below still prints what was last saved.
+              </p>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              disabled={!commentsDirty || saveComments.isPending || !studentId}
+              loading={saveComments.isPending}
+              onClick={handleSaveComments}
+            >
+              Save comments
+            </Button>
+          </div>
+        )}
+      </div>
+
       <div className="rounded-xl border border-gray-200 overflow-hidden bg-white" style={{ height: '75vh' }}>
         <DepedPerformanceReportCard
           key={viewerKey}
@@ -218,6 +391,7 @@ export function ClassSectionPerformanceReportTab({
           institutionId={institutionId}
           academicYear={academicYear}
           principalName={schoolHeadName}
+          comments={savedComments}
           viewerHeight="100%"
         />
       </div>

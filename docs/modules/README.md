@@ -127,13 +127,17 @@ modules should consume its data.
   section whose academic year is still four quarters gets an explanation instead of a form, because
   a silently dropped quarter on a card a parent keeps is worse than no card. New descriptors
   (**Advancing / Benchmarking / Connecting / Developing / Emerging**, Table 11), **no Observed Values
-  grid** — GMRC/VE is a learning-area row now — and three blank per-term comment boxes. Read it
+  grid** — GMRC/VE is a learning-area row now — and a per-term **teacher's comment** the adviser
+  types in the tab and the card prints. Read it
   before assuming Grades 2 and 3 are descriptive: DO 15 Table 12 keeps them numeric until
   **SY 2027–2028** and **SY 2028–2029**, so `isGradeTwoToTen` is a transitional rule with an expiry.
-  Adds **no API routes**, so its module permission is SPA-enforced — the doc says what to do the
-  moment that stops being true. Transmutation (§48/§50) and component weights (§44) are
-  grading-engine work and are **not** implemented; this card prints whatever Consolidated Grades
-  computed.
+  The comment is the module's only API surface (`performance-report/comments`, feature- and
+  module-gated); everything else the card draws is read through other modules' endpoints and is
+  SPA-enforced. `manage` here writes that comment and nothing else — it is never a second way to
+  change a mark. **Only an applied grade prints**: the card reads `final_grade`, never the running
+  average `gradeUtils` falls back to, so an un-encoded term is an empty cell rather than a raw 17.
+  Transmutation (§48/§50) and component weights (§44) are grading-engine work and are **not**
+  implemented; this card prints whatever Consolidated Grades computed.
 
 ## Conventions
 - One doc per module, named in `SCREAMING_SNAKE_CASE.md`. Group a suite's modules under a folder

@@ -28,6 +28,14 @@ use Illuminate\Support\Facades\DB;
  * sheet. Granting a `manage` that the module does not offer would put a dead
  * permission string in `role_permissions` for every tenant.
  *
+ * **This stopped being true on 2026-09-16.** The module gained the adviser's
+ * comment in DepEd's TEACHER'S COMMENTS/REMARKS box — data of its own, and so
+ * something to manage — and
+ * `2026_09_16_000002_grant_deped_performance_report_manage_permission.php`
+ * grants it. The paragraph above stands because it was true when this migration
+ * ran; rewriting a migration's reasoning after the fact makes the history lie
+ * about what was decided when.
+ *
  * `view-all` is reach across other people's sections, for the roles that oversee
  * rather than teach. An adviser prints their own section without it.
  *

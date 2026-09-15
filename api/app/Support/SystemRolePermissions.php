@@ -51,7 +51,7 @@ class SystemRolePermissions
             'attendance-logs', 'attendance-requests', 'payroll', 'biometric-devices',
             'zk-users', 'sms-gateways', 'sms-messages', 'sms-settings',
             'roles', 'departments', 'settings', 'certificate-builder', 'form-builder',
-            'id-card-builder', 'receipt-templates',
+            'id-card-builder', 'receipt-templates', 'deped-performance-report',
         ],
 
         'principal' => [
@@ -64,7 +64,7 @@ class SystemRolePermissions
             'attendance-logs', 'attendance-requests', 'payroll', 'biometric-devices',
             'zk-users', 'sms-gateways', 'sms-messages', 'sms-settings',
             'roles', 'departments', 'settings', 'certificate-builder', 'form-builder',
-            'id-card-builder', 'receipt-templates',
+            'id-card-builder', 'receipt-templates', 'deped-performance-report',
         ],
 
         // Finance ran the money screens, the announcement board and the three
@@ -83,7 +83,7 @@ class SystemRolePermissions
         'subject-teacher' => [
             'announcements', 'subjects', 'consolidated-grades', 'proficiency',
             'matatag-grading', 'student-attendance', 'certificate-builder', 'form-builder',
-            'id-card-builder',
+            'id-card-builder', 'deped-performance-report',
         ],
 
         // A department head works the same screens as a teacher. The difference
@@ -94,13 +94,13 @@ class SystemRolePermissions
         'department-head' => [
             'announcements', 'subjects', 'consolidated-grades', 'proficiency',
             'matatag-grading', 'student-attendance', 'certificate-builder', 'form-builder',
-            'id-card-builder',
+            'id-card-builder', 'deped-performance-report',
         ],
 
         // Both only ever reached Consolidated Grades and Proficiency.
-        'curriculum-head' => ['consolidated-grades', 'proficiency'],
+        'curriculum-head' => ['consolidated-grades', 'proficiency', 'deped-performance-report'],
 
-        'assistant-principal' => ['consolidated-grades', 'proficiency'],
+        'assistant-principal' => ['consolidated-grades', 'proficiency', 'deped-performance-report'],
 
         // Registrar ran Students and Admission Forms.
         'registrar' => ['students', 'admission-forms'],
@@ -133,14 +133,18 @@ class SystemRolePermissions
         // institution-wide roles and nobody else — a department head can be
         // given it in the role builder, but it reports on the whole school, so
         // it is not something to hand out by default.
-        'institution-administrator' => ['grade-levels', 'teaching-activity', 'deped-performance-report'],
-        'principal' => ['grade-levels', 'teaching-activity', 'deped-performance-report'],
+        'institution-administrator' => ['grade-levels', 'teaching-activity'],
+        'principal' => ['grade-levels', 'teaching-activity'],
         // Finance also had the two "My Work" items, which hang off Subjects.
         'finance' => ['students', 'class-sections', 'grade-levels', 'subjects'],
-        'subject-teacher' => ['class-sections', 'students', 'school-days', 'grade-levels', 'deped-performance-report'],
-        'department-head' => ['class-sections', 'students', 'school-days', 'grade-levels', 'deped-performance-report'],
-        'curriculum-head' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading', 'deped-performance-report'],
-        'assistant-principal' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading', 'deped-performance-report'],
+        'subject-teacher' => ['class-sections', 'students', 'school-days', 'grade-levels'],
+        'department-head' => ['class-sections', 'students', 'school-days', 'grade-levels'],
+        'curriculum-head' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading'],
+        'assistant-principal' => ['class-sections', 'students', 'subjects', 'grade-levels', 'matatag-grading'],
+        // The registrar keeps `deped-performance-report` view-only while every
+        // other role holding it has Manage: they hand out and re-issue cards,
+        // and the comment in DepEd's box is the adviser's to write. A school
+        // that disagrees ticks Manage in the role builder.
         'registrar' => ['grade-levels', 'tracks-strands', 'class-sections', 'deped-performance-report'],
     ];
 

@@ -161,18 +161,20 @@ return [
                 ],
                 'deped-performance-report' => [
                     'label' => 'DepEd Performance Report (Grades 2 to 10)',
-                    'description' => "The Learner's Performance Report from DepEd Order 15, s. 2026, printed for a Grade 2 to 10 section: three term grades, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and the adviser's remarks for each term. It replaces the older card on the Report Cards tab for those grade levels, rather than sitting beside it - an adviser with two tabs printing two different cards from the same marks is how a parent gets the wrong one. It reads the same numeric grades and attendance the older card reads and writes nothing of its own, so it offers no Manage - printing a card is not a second way to change a mark.",
+                    'description' => "The Learner's Performance Report from DepEd Order 15, s. 2026, printed for a Grade 2 to 10 section: three term grades, a final grade and a general average per learning area, the Advancing to Emerging descriptors, and the adviser's comment to the parent for each term. It replaces the older card on the Report Cards tab for those grade levels, rather than sitting beside it - an adviser with two tabs printing two different cards from the same marks is how a parent gets the wrong one. View prints the card. Manage writes the adviser's comment in DepEd's TEACHER'S COMMENTS/REMARKS box, and nothing else - the grades and attendance on this form stay owned by Consolidated Grades and Student Attendance, so Manage here is never a second way to change a mark.",
 
                     /*
-                     * View only, deliberately.
+                     * Manage covers exactly one thing: the adviser's comment.
                      *
-                     * Every figure on this form is owned by another module -
+                     * Every number on this form is owned by another module -
                      * Consolidated Grades writes the marks, Student Attendance
-                     * writes the days - and this only lays them out on DepEd's
-                     * newer sheet. A Manage here would suggest the card is a
-                     * place to correct a grade, which it is not.
+                     * writes the days - and the card only lays them out on
+                     * DepEd's newer sheet. The comment is the one piece of data
+                     * this module owns, so it is the one thing there is to
+                     * manage. Granting Manage must not be read as permission to
+                     * correct a grade; there is no code path here that can.
                      */
-                    'base_abilities' => ['view'],
+                    'base_abilities' => ['view', 'manage'],
 
                     'special' => [
                         'view-all' => [

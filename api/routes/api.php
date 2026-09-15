@@ -42,6 +42,7 @@ use App\Http\Controllers\PaymentReceiptSubmissionController;
 use App\Http\Controllers\PaymentTransactionController;
 use App\Http\Controllers\PaymentVoidRequestController;
 use App\Http\Controllers\PaymentWebhookController;
+use App\Http\Controllers\PerformanceReportCommentController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ReceiptTemplateController;
 use App\Http\Controllers\RfidScanLogController;
@@ -755,6 +756,31 @@ Route::middleware('auth.token')->group(function () {
         Route::get('matatag/workbook', [MatatagWorkbookController::class, 'show'])
             ->middleware('module:matatag-grading,view');
     });
+    /*
+     * The adviser's comment to a parent, per term, for DepEd's Annex G.
+     *
+     * The first and only API surface the DepEd Performance Report has. Every
+     * other figure on that form is read through endpoints owned by Consolidated
+     * Grades, Student Attendance and Class Sections, each carrying its own
+     * gate; the comment is the module's own data, so this is where the module's
+     * own gates finally get declared.
+     *
+     * `feature:deped-performance-report` wraps the group rather than being
+     * repeated per route, so a route added later cannot quietly miss it, and
+     * `EnsureFeatureEnabled` does not honour the super-administrator wildcard —
+     * a school that has not been switched on is closed to everyone.
+     *
+     * `manage` is the school's decision about who may write on a card a parent
+     * keeps. It is not permission to change a mark: nothing in this group
+     * touches a grade.
+     */
+    Route::middleware('feature:deped-performance-report')->group(function () {
+        Route::get('performance-report/comments', [PerformanceReportCommentController::class, 'index'])
+            ->middleware('module:deped-performance-report,view');
+        Route::post('performance-report/comments', [PerformanceReportCommentController::class, 'bulkUpsert'])
+            ->middleware('module:deped-performance-report,manage');
+    });
+
     // SF9 routes
     Route::post('sf9/generate', [SF9Controller::class, 'generate'])->middleware('module:consolidated-grades,view');
     Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears'])->middleware('module:consolidated-grades,view');

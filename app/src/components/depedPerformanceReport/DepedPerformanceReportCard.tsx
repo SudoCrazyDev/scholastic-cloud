@@ -42,10 +42,12 @@ Font.registerHyphenationCallback((word) => [word]);
  *   carried by the GMRC / Values Education row of the learning-area table
  *   instead. The data is still recorded — the Core Values tab and the older card
  *   both still use it — this form simply has nowhere to print it.
- * - **Teacher's comments are three empty ruled boxes.** DepEd's template leaves
- *   them blank for the adviser to write in, and the platform stores no per-term
- *   adviser remark for a numeric section, so they print blank. If a field for
- *   them is ever added, this is where it lands.
+ * - **Teacher's comments are the adviser's own, one per term.** DepEd's template
+ *   leaves the boxes blank for the adviser to fill in by hand; the tab lets them
+ *   type it once instead, and `comments` prints what they wrote. A term nobody
+ *   has written up still prints an empty ruled box, so a card is never worse off
+ *   than DepEd's own. See `student_adviser_comments` and
+ *   `PerformanceReportCommentController`.
  *
  * ## Page size
  *
@@ -142,7 +144,12 @@ const styles = StyleSheet.create({
     // so the label column is narrower than the older card's to fit eleven cells.
     attendanceCell: { width: '7.09%', borderRight: '1px solid black', borderBottom: '1px solid black', paddingVertical: 2, justifyContent: 'center' },
     attendanceLabel: { width: '22%', borderRight: '1px solid black', borderBottom: '1px solid black', padding: 2, justifyContent: 'center' },
-    commentBox: { borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black', height: 34, padding: 3 },
+    // `minHeight`, not `height`: an adviser's comment is capped at 300
+    // characters, which fits three lines here, but a run of long words wraps
+    // wider than the estimate and a fixed height would clip the last line off a
+    // card a parent keeps. An empty box still draws at its full size.
+    commentBox: { borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black', minHeight: 34, padding: 3 },
+    commentText: { fontSize: 7, fontFamily: 'Helvetica', marginTop: 1 },
 });
 
 interface DepedPerformanceReportCardProps {
@@ -155,6 +162,15 @@ interface DepedPerformanceReportCardProps {
     principalName?: string;
     /** When set, displayed instead of the age calculated as of 31 October. */
     overrideAge?: string;
+    /**
+     * The adviser's comment per term, keyed by period value ('1', '2', '3').
+     *
+     * Passed in rather than fetched here: the tab owns the editor, and a card
+     * that fetched its own copy would print the saved text while the adviser
+     * looked at their unsaved edit. A term with no comment prints an empty box,
+     * which is what DepEd's form does anyway.
+     */
+    comments?: Record<string, string>;
 }
 
 export default function DepedPerformanceReportCard({
@@ -166,6 +182,7 @@ export default function DepedPerformanceReportCard({
     viewerHeight = '100%',
     principalName = '',
     overrideAge,
+    comments = {},
 }: DepedPerformanceReportCardProps) {
     const {
         student,
@@ -571,6 +588,9 @@ export default function DepedPerformanceReportCard({
                             {gradingPeriods.periods.map((period) => (
                                 <View key={`comment-${period.value}`} style={styles.commentBox}>
                                     <Text style={styles.label}>{period.numbered}</Text>
+                                    {comments[period.value] ? (
+                                        <Text style={styles.commentText}>{comments[period.value]}</Text>
+                                    ) : null}
                                 </View>
                             ))}
                         </View>

@@ -132,8 +132,15 @@ Both, and in this order:
 - **Feature** `deped-performance-report` — `config/features.php`, `default_enabled => false`.
   The platform switches a school on. Off by default because which of two report cards a parent is
   handed is the school's announcement to make, not a deploy's.
-- **Module** `deped-performance-report` — `config/modules.php`, under **Academics**, `view` only,
-  plus a `view-all` special for reach across sections a person does not advise.
+- **Module** `deped-performance-report` — `config/modules.php`, under **Academics**. `view` prints
+  the card; `manage` writes the adviser's comment and nothing else; `view-all` is reach across
+  sections a person does not advise.
+
+**`manage` here is not permission to change a grade.** The only thing it opens is
+`POST /performance-report/comments`, which writes prose to `student_adviser_comments`. Every number
+on this form stays owned by Consolidated Grades and Student Attendance, gated separately. The module
+description in `config/modules.php` spells that out too, because the role builder is where a school
+reads it.
 
 Plus a third, narrower condition that is not a gate at all: the section has to be **Grades 2 to 10**
 (`isGradeTwoToTen`). Grade 1 is on the MATATAG grid with its own progress report; Grades 11 and 12
@@ -144,17 +151,30 @@ tenants' roles, because `SystemRolePermissions` only takes effect when a role is
 it broadly is safe for the same reason the MATATAG grant is: the feature is off, and
 `EnsureFeatureEnabled` does not honour the super-administrator wildcard.
 
-### There is no API route to gate, and that is the one weak spot
+### One API route, and everything else is still SPA-only
 
-This module adds **no endpoints**. It renders from `students`, `student-running-grades`,
-`student-attendances`, `school-days` and `institutions` — all of which the person opening this tab
-could already reach through the older report card, and can still reach on any other section. So the
-module permission is enforced in the SPA only.
+For its first weeks this module added **no endpoints at all**, and the module permission was
+enforced in the SPA only. That was honest as far as it went — the card renders from `students`,
+`student-running-grades`, `student-attendances`, `school-days` and `institutions`, all of which the
+person opening the tab could already reach through the older card — but it left the module's gates
+with nothing on the server to gate.
 
-That is honest here because **no new data is exposed** — this is a second layout of records the
-caller already has. If a future change gives this module an endpoint of its own (a server-rendered
-PDF, a bulk download, a stored adviser remark), that route **must** carry
-`feature:deped-performance-report` and `module:deped-performance-report,view` like every other.
+The adviser's comment changed that, because it is the module's **own** data. Its two routes are
+declared together in `routes/api.php`:
+
+```
+Route::middleware('feature:deped-performance-report')->group(function () {
+    GET  performance-report/comments   module:deped-performance-report,view
+    POST performance-report/comments   module:deped-performance-report,manage
+});
+```
+
+The feature wraps the group rather than being repeated per route, so a route added later cannot
+quietly miss it.
+
+Everything else the card reads is still SPA-gated, and that is still fine for the same reason: no
+new data is exposed. Any future endpoint of this module's own — a server-rendered PDF, a bulk
+download — belongs in that same group.
 
 ---
 
@@ -238,11 +258,32 @@ right-hand rules stopped short and the column read as broken. Flex children stre
 default; nesting is what takes that away. Body cells are therefore `width: 9%` of the whole row
 (`termCellWidth`), matching the header band's `33.33%` of its own 27% exactly.
 
-### Teacher's comments print blank
+### Teacher's comments are the adviser's own
 
-Three ruled boxes, labelled Term 1/2/3, empty. That is what DepEd's template is — the adviser writes
-in them — and the platform stores no per-term adviser remark for a numeric section. (MATATAG's term
-narratives are Key Stage 1 only and are not this.)
+Three ruled boxes, labelled Term 1/2/3. DepEd's template leaves them blank for the adviser to fill
+in by hand; the tab lets them type it once instead, and the card prints what they wrote. A term
+nobody has written up still prints an empty box, so a card is never worse off than DepEd's own.
+
+**Stored in `student_adviser_comments`**, keyed `(student_id, academic_year, quarter)` — see that
+migration for why the section is recorded but not part of the key. Capped at 300 characters
+(`PerformanceReportCommentController::MAX_LENGTH`), which is about what the box holds at a legible
+size; the client reads the figure from the endpoint rather than carrying its own copy, so raising it
+is a one-line change on the server. **An empty comment deletes the row** rather than storing a blank
+string, so "has this learner been written up yet" stays a question the database can answer.
+
+Three things in the wiring are load-bearing:
+
+- **The card is fed the *saved* comments, never the draft.** What prints is what is stored, so an
+  adviser cannot hand a parent a card carrying a sentence they never saved. It also keeps react-pdf
+  from re-rendering on every keystroke.
+- **The saved text is part of `viewerKey`.** react-pdf v4 mis-renders on incremental prop updates,
+  so a save has to remount the viewer or the card keeps printing what it was handed first.
+- **The roster is checked server-side.** A learner id in a request body is not proof the learner is
+  in the section; without that check an adviser could write on any card in the school by editing one
+  field. The scoping in this repo is per-controller and nothing else would have caught it.
+
+(MATATAG's term narratives are Key Stage 1 only and are not this. They are two paragraphs with
+prescribed headings on a descriptor-only card; this is one free-text box per term on a numeric one.)
 
 ---
 
@@ -253,12 +294,17 @@ narratives are Key Stage 1 only and are not this.)
 | Path | What it does |
 |---|---|
 | `config/features.php` | `deped-performance-report`, `default_enabled => false` |
-| `config/modules.php` | the module, under `academics`, `base_abilities => ['view']` + `view-all` |
-| `app/Support/SystemRolePermissions.php` | `VIEW` for the school-side roles, `SPECIAL` for `view-all` |
-| `database/migrations/2026_09_15_000001_grant_deped_performance_report_permission.php` | grants it to existing tenants' roles |
+| `config/modules.php` | the module, under `academics`, `base_abilities => ['view', 'manage']` + `view-all` |
+| `app/Support/SystemRolePermissions.php` | `MANAGE` for the roles that advise, `VIEW` for the registrar, `SPECIAL` for `view-all` |
+| `app/Http/Controllers/PerformanceReportCommentController.php` | the adviser's comment: read a section's, bulk-write one learner's |
+| `app/Models/StudentAdviserComment.php` | one comment, one learner, one term |
+| `database/migrations/2026_09_16_000001_create_student_adviser_comments_table.php` | the table, and why it is keyed the way it is |
+| `database/migrations/2026_09_15_000001_grant_deped_performance_report_permission.php` | grants `view` / `view-all` to existing tenants' roles |
+| `database/migrations/2026_09_16_000002_grant_deped_performance_report_manage_permission.php` | grants `manage` once there was something to manage |
+| `routes/api.php` | the `feature:deped-performance-report` group |
 
-**No controller, no route, no model, no migration of schema.** See
-[the weak spot](#there-is-no-api-route-to-gate-and-that-is-the-one-weak-spot).
+The card itself still has **no endpoint** — it renders in the browser from other modules' reads. See
+[one API route](#one-api-route-and-everything-else-is-still-spa-only).
 
 ### Frontend
 
@@ -267,6 +313,8 @@ narratives are Key Stage 1 only and are not this.)
 | `components/depedPerformanceReport/DepedPerformanceReportCard.tsx` | the `@react-pdf/renderer` document |
 | `components/depedPerformanceReport/depedPerformanceDescriptors.ts` | Table 11 bands, and the lookup |
 | `components/depedPerformanceReport/depedPerformanceGrades.ts` | reads `final_grade` only — why `gradeUtils` is not used for marks |
+| `services/performanceReportCommentService.ts` | the two comment endpoints |
+| `hooks/usePerformanceReportComments.ts` | the read (`staleTime: 0`) and the bulk write |
 | `pages/MyClassSections/components/ClassSectionPerformanceReportTab.tsx` | the tab: searchable learner picker, school-head picker, the four-quarter refusal |
 | `pages/MyClassSections/ClassSectionDetail.tsx` | `showPerformanceReport`, the tab swap, the panel, the redirect off a hidden tab |
 | `utils/gradeLevel.ts` | `parseGradeLevelNumber`, `isGradeTwoToTen` |
@@ -301,8 +349,6 @@ one is the one a school is still handing out.
 
 - **Bulk download.** One learner previews at a time. There is no "download the whole section"
   button — `MatatagReportsPanel` has the pattern to copy if one is wanted.
-- **Adviser remarks per term.** The three comment boxes print blank. Storing them needs a table and
-  an editor, and then this card reads them.
 - **Transmutation.** DO 15 §48 mandates an adjusted transmutation table for SY 2026–2027
   (raw 70.00 → 75, floor 60) and §50 a zero-based system with no transmutation from SY 2027–2028.
   The platform's existing grading scales are unchanged, so **what this card prints is whatever
