@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, CloudOff, Loader2, RefreshCw, Contrast } from 'lucide-react'
+import {
+  AlertTriangle,
+  Check,
+  CloudOff,
+  Contrast,
+  LayoutGrid,
+  Loader2,
+  Rows3,
+  RefreshCw,
+} from 'lucide-react'
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
 import {
@@ -14,11 +23,22 @@ import toast from 'react-hot-toast'
 import { usePermissions } from '../../../hooks/usePermissions'
 import type { MatatagGridColumn } from '../../../types'
 import { MatatagGrid } from './MatatagGrid'
+import { MatatagFocusList } from './MatatagFocusList'
 import { MatatagNarrativesPanel } from './MatatagNarrativesPanel'
 import { MatatagAttendancePanel } from './MatatagAttendancePanel'
 import { MatatagReportsPanel } from './MatatagReportsPanel'
 
 const HIGH_CONTRAST_KEY = 'matatag.highContrast'
+const VIEW_KEY = 'matatag.view'
+
+/**
+ * How the competencies are laid out for marking.
+ *
+ * `grid` is the class at a glance and the only view a block paste can land
+ * in. `focus` is one competency down the page, which is the view that does not
+ * scroll sideways — see `MatatagFocusList` for why both have to exist.
+ */
+type GridView = 'grid' | 'focus'
 
 interface Props {
   classSectionId: string
@@ -44,6 +64,10 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
   const [term, setTerm] = useState(1)
   const [activeColumn, setActiveColumn] = useState<MatatagGridColumn | null>(null)
   const [highContrast, setHighContrast] = useState(false)
+  const [view, setView] = useState<GridView>('grid')
+  const [domainId, setDomainId] = useState('all')
+  const [macroSkill, setMacroSkill] = useState('all')
+  const [focusIndex, setFocusIndex] = useState(0)
 
   /**
    * The one place in the grid that talks back.
@@ -104,13 +128,42 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
     enabled: optedIn && panel === 'attendance',
   })
 
+  /**
+   * Column scoping, done here rather than on the server.
+   *
+   * `GET matatag/grid` returns the whole (area, term) block on purpose and
+   * must never be paginated — fill-down and paste both need every column
+   * present — so narrowing what is *shown* is a view concern. Filtering here
+   * also means the counter and the grid cannot disagree about what is on
+   * screen, which is the failure the counter exists to prevent.
+   */
+  const allColumns = grid.data?.columns
+  const visibleColumns = useMemo(
+    () =>
+      (allColumns ?? []).filter(
+        column =>
+          (domainId === 'all' || column.domain_id === domainId) &&
+          (macroSkill === 'all' || column.macro_skill === macroSkill)
+      ),
+    [allColumns, domainId, macroSkill]
+  )
+
+  // A filter that survived an area or term change would silently hide most of
+  // the new block — Term 1's domains are not Term 3's.
+  useEffect(() => {
+    setDomainId('all')
+    setMacroSkill('all')
+    setFocusIndex(0)
+  }, [areaId, term])
+
   // A per-viewer convenience, so wrapped: some browsers throw on access
   // outright rather than returning null.
   useEffect(() => {
     try {
       setHighContrast(window.localStorage.getItem(HIGH_CONTRAST_KEY) === '1')
+      setView(window.localStorage.getItem(VIEW_KEY) === 'focus' ? 'focus' : 'grid')
     } catch {
-      /* storage unavailable; the default is fine */
+      /* storage unavailable; the defaults are fine */
     }
   }, [])
 
@@ -124,6 +177,15 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
       }
       return next
     })
+  }
+
+  const chooseView = (next: GridView) => {
+    setView(next)
+    try {
+      window.localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      /* nothing to do; the choice still holds for this session */
+    }
   }
 
   // Switching area or term changes which cells the pending batch belongs to,
@@ -240,16 +302,92 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
               </div>
             </label>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={toggleContrast}
-              className="mb-0.5"
-              leftIcon={<Contrast className="w-4 h-4" />}
-            >
-              {highContrast ? 'Show macro-skill colours' : 'High contrast'}
-            </Button>
+            {data && data.learning_area.has_domains && data.domains.length > 1 && (
+              <label className="text-xs font-medium text-gray-600">
+                <span className="block mb-1">Domain</span>
+                <div className="min-w-[230px]">
+                  <Select
+                    inputSize="sm"
+                    value={domainId}
+                    onChange={event => setDomainId(event.target.value)}
+                    options={[
+                      { value: 'all', label: `All domains (${data.counts.columns})` },
+                      ...data.domains.map(domain => ({
+                        value: domain.id,
+                        label: `${domain.title} (${
+                          data.columns.filter(column => column.domain_id === domain.id).length
+                        })`,
+                      })),
+                    ]}
+                  />
+                </div>
+              </label>
+            )}
+
+            {data && data.learning_area.uses_macro_skills && (
+              <label className="text-xs font-medium text-gray-600">
+                <span className="block mb-1">Macro skill</span>
+                <div className="min-w-[190px]">
+                  <Select
+                    inputSize="sm"
+                    value={macroSkill}
+                    onChange={event => setMacroSkill(event.target.value)}
+                    options={[
+                      { value: 'all', label: 'All macro skills' },
+                      ...(reference?.macro_skills ?? [])
+                        // Only the skills this term actually assesses — Term 1
+                        // Reading & Literacy has no Speaking column at all.
+                        .filter(skill => data.columns.some(c => c.macro_skill === skill.key))
+                        .map(skill => ({
+                          value: skill.key,
+                          label: `${skill.label} (${
+                            data.columns.filter(c => c.macro_skill === skill.key).length
+                          })`,
+                        })),
+                    ]}
+                  />
+                </div>
+              </label>
+            )}
+
+            {/* Grid or one-at-a-time. The choice is remembered, because it is
+                a working preference rather than a per-session decision. */}
+            <div className="mb-0.5 inline-flex overflow-hidden rounded-lg border border-gray-300">
+              {(
+                [
+                  ['grid', 'Grid', LayoutGrid],
+                  ['focus', 'One at a time', Rows3],
+                ] as const
+              ).map(([key, label, Icon]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => chooseView(key)}
+                  aria-pressed={view === key}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition ${
+                    view === key
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {view === 'grid' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={toggleContrast}
+                className="mb-0.5"
+                leftIcon={<Contrast className="w-4 h-4" />}
+              >
+                {highContrast ? 'Show macro-skill colours' : 'High contrast'}
+              </Button>
+            )}
 
             <div className="ml-auto mb-1">
               <SaveChip state={save.state} onRetry={save.retry} />
@@ -259,8 +397,12 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
           {data && (
             <>
               <p className="text-xs text-gray-500">
-                {data.counts.columns} competenc{data.counts.columns === 1 ? 'y' : 'ies'} ·{' '}
-                {data.counts.learners} learner{data.counts.learners === 1 ? '' : 's'} ·{' '}
+                {/* Never quietly show a subset: if a filter is narrowing the
+                    block, the count says so against the term's real total. */}
+                {visibleColumns.length === data.counts.columns
+                  ? `${data.counts.columns} competenc${data.counts.columns === 1 ? 'y' : 'ies'}`
+                  : `${visibleColumns.length} of ${data.counts.columns} competencies`}{' '}
+                · {data.counts.learners} learner{data.counts.learners === 1 ? '' : 's'} ·{' '}
                 {data.counts.recorded} recorded
                 {data.learning_area.uses_macro_skills && reference?.macro_skills ? (
                   <span className="ml-2">
@@ -272,7 +414,7 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
                 ) : null}
               </p>
 
-              <InspectorStrip column={activeColumn} />
+              {view === 'grid' && <InspectorStrip column={activeColumn} />}
             </>
           )}
 
@@ -292,9 +434,10 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
             </div>
           )}
 
-          {data && reference && (
+          {data && reference && view === 'grid' && (
             <MatatagGrid
               grid={data}
+              columns={visibleColumns}
               descriptors={reference.descriptors}
               macroSkills={reference.macro_skills}
               failedKeys={save.failedKeys}
@@ -306,7 +449,21 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
             />
           )}
 
-          {data?.can_manage && (
+          {data && reference && view === 'focus' && (
+            <MatatagFocusList
+              grid={data}
+              columns={visibleColumns}
+              descriptors={reference.descriptors}
+              macroSkills={reference.macro_skills}
+              failedKeys={save.failedKeys}
+              readOnly={!data.can_manage}
+              index={focusIndex}
+              onIndexChange={setFocusIndex}
+              onSet={save.setDescriptor}
+            />
+          )}
+
+          {data?.can_manage && view === 'grid' && (
             <p className="text-[11px] text-gray-500">
               Click a cell, then press <kbd className="px-1 border rounded">A</kbd>–
               <kbd className="px-1 border rounded">E</kbd> to mark and move down.{' '}
@@ -315,7 +472,17 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
               <kbd className="px-1 border rounded">D</kbd> fills the rest of the column.{' '}
               <kbd className="px-1 border rounded">Ctrl</kbd>+
               <kbd className="px-1 border rounded">V</kbd> pastes a block copied from the DepEd
-              workbook, starting at the cell you are on.
+              workbook, starting at the cell you are on. Narrow the table with the domain and
+              macro-skill filters, or switch to <strong>One at a time</strong> to stop scrolling
+              sideways.
+            </p>
+          )}
+
+          {data?.can_manage && view === 'focus' && (
+            <p className="text-[11px] text-gray-500">
+              One competency down the page, the whole class on it. Press a letter to mark a
+              learner, press it again to clear. <strong>Grid</strong> is still where you paste a
+              block copied from the DepEd workbook.
             </p>
           )}
         </>

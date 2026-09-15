@@ -4092,6 +4092,12 @@ export interface MatatagGridColumn {
 export interface MatatagLearner {
   student_id: string;
   name: string;
+  /**
+   * `DELA CRUZ JR., JUAN M.` — surname first, capitals, the way every DepEd
+   * form lists a class. Optional because the report endpoints send only the
+   * prose `name`; render `display_name || name`.
+   */
+  display_name?: string;
   last_name?: string;
   first_name?: string;
   gender: string | null;

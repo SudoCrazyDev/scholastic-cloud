@@ -232,4 +232,44 @@ trait ResolvesMatatagSection
             $student->ext_name,
         ])));
     }
+
+    /**
+     * The name as a class record writes it: `ESTRADA, DINO L. JR.`
+     *
+     * This is not decoration. A Grade 1 adviser reads down a column of fifty
+     * names looking for one learner, and every DepEd form they have ever used
+     * -- the SF1, the class record, the workbook this module exports to --
+     * lists surname first, in capitals. `learnerName()` above builds the
+     * natural order for prose (a report card addressed to a parent); this
+     * builds the sortable order for a list.
+     *
+     * The suffix trails the given names rather than joining the surname,
+     * because that is what the Students tab of this same class-section screen
+     * already does. Surname-first with the suffix moved (`ESTRADA JR., DINO
+     * L.`) is arguably the better reading of a Philippine name, but an adviser
+     * comparing two tabs of one screen would read the difference as a bug
+     * before they read it as a refinement.
+     *
+     * Returns an empty string when a record has neither name, so a caller can
+     * fall back rather than print a lone comma.
+     */
+    protected function learnerListName(object $student): string
+    {
+        $surname = trim((string) ($student->last_name ?? ''));
+
+        $middle = trim((string) ($student->middle_name ?? ''));
+        $initial = $middle === '' ? '' : mb_substr($middle, 0, 1).'.';
+
+        $given = trim(implode(' ', array_filter([
+            trim((string) ($student->first_name ?? '')),
+            $initial,
+            trim((string) ($student->ext_name ?? '')),
+        ])));
+
+        if ($surname === '' || $given === '') {
+            return mb_strtoupper($surname !== '' ? $surname : $given);
+        }
+
+        return mb_strtoupper($surname.', '.$given);
+    }
 }

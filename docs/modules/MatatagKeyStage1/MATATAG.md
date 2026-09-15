@@ -504,7 +504,9 @@ eight hours wrong about.
 |---|---|---|
 | `app/src/pages/MyClassSections/components/MatatagTab.tsx` | the workspace: opt-in, area/term selectors, the three panels | |
 | `app/src/pages/MyClassSections/components/MatatagGrid.tsx` | the entry grid — roving single editor, type-to-set, `Ctrl+D` | |
-| `app/src/pages/MyClassSections/components/MatatagNarrativesPanel.tsx` | the two paragraphs, capped with a live counter | |
+| `app/src/pages/MyClassSections/components/MatatagFocusList.tsx` | one competency, the whole class, no horizontal scrolling | |
+| `app/src/pages/MyClassSections/components/matatagRoster.ts` | how a class is listed: males first, `DELA CRUZ, JUAN M.`, and the search match | |
+| `app/src/pages/MyClassSections/components/MatatagNarrativesPanel.tsx` | the two paragraphs, capped with a live counter, searchable | |
 | `app/src/pages/MyClassSections/components/MatatagAttendancePanel.tsx` | the derived table, read-only | |
 | `app/src/hooks/useMatatag.ts`, `app/src/services/matatagService.ts` | per the mandated `pages → hooks → services → lib/api.ts` layering | |
 | `app/src/pages/MyClassSections/ClassSectionDetail.tsx` | a ninth tab, shown only on a Key Stage 1 section | |
@@ -663,6 +665,61 @@ composer — the deploy ships a prebuilt `vendor/` — so `deploy-api.yml` lists
 runner, and without `ext-zip` there `composer install` fails its platform check and **no API deploy
 reaches any target**. At runtime a server missing one answers this route with a 503 naming the
 extension, and the PDFs are unaffected.
+
+### How a class is listed, everywhere
+
+Males first, then females, alphabetical within each, each learner numbered from 1 inside their own
+group — DepEd's order, the order the SF1 and the class record use, and the order the exported
+workbook's two physically separate blocks of rows expect. Names read `ESTRADA, DINO L. JR.`:
+surname first, capitals, the middle name reduced to an initial.
+
+Both halves of that are built server-side by `ResolvesMatatagSection::learnerListName()` and travel
+as `display_name`, alongside the prose `name` that the report card — addressed to a parent — keeps
+using. The client re-derives the grouping anyway in `matatagRoster.ts`, because the row order the
+teacher *sees* is the order that fill-down, paste and the arrow keys have to follow; if a `gender`
+ever arrives spelled in a way the server's `ORDER BY` did not anticipate, the two must not drift
+apart.
+
+The suffix trails the given names rather than joining the surname. `ESTRADA JR., DINO L.` is
+arguably the better reading of a Philippine name, but the Students tab of this same class-section
+screen already prints `Estrada, Dino L. Jr.`, and an adviser comparing two tabs of one screen would
+read the difference as a bug before they read it as a refinement.
+
+### The grid scrolls sideways, so there is a second view
+
+Term 3 Reading & Literacy is 91 competencies wide. At the narrowest a one-letter cell can legibly
+be, that is roughly 3,000 pixels of table: a learners x competencies matrix on a 1366-pixel school
+laptop scrolls sideways or it does not fit, and no amount of tightening changes the arithmetic.
+
+Three things answer that, in increasing order of how much they change:
+
+1. **Domain and macro-skill filters** narrow the block — Term 1 Reading & Literacy's largest domain
+   is 19 of its 74 columns, which fits a laptop with room to spare. Filtering is done in the client
+   because `GET matatag/grid` returns the whole (area, term) block on purpose and must never be
+   paginated — fill-down and paste both need every column present. Doing it there also means the
+   counter and the grid cannot disagree about what is on screen.
+2. **The counter never lets a subset pass for the whole.** When a filter is active it reads
+   `15 of 74 competencies` against the term's real total, not a bare `15`.
+3. **`MatatagFocusList` transposes the problem away.** One competency down the page, the whole
+   class on it, five buttons a row — so the screen needs exactly one column of marks and fits
+   anywhere. This is also the shape of the work: an adviser spends the afternoon going through the
+   class one competency at a time, not reading a matrix. The competency text is readable in full
+   instead of hiding behind a 32-pixel cell, and pressing a learner's current mark again clears it.
+
+The grid stays the default and stays the only view a block paste can land in. The choice is
+remembered per viewer in `localStorage`, and both views write through the same `onSet`, so they
+inherit one debounced batch, one optimistic patch and one Retry.
+
+### Finding a learner in the narratives
+
+Fifty textareas is a long page, so the narratives panel has a search. It filters what is
+**rendered** only: drafts are held per learner in component state, so a paragraph typed and then
+filtered out of view is still in the unsaved count and still saves. Hiding a row must never quietly
+discard what was typed into it, and the panel says so on screen while a search is active.
+
+The row numbers come from the *unfiltered* roster. Numbering the rendered rows instead would print
+Cara as `1` the moment a search hid Ana — and that number exists precisely so it matches the printed
+class record, where she is `2`. A group heading narrowed by a search reads `Female 1 of 3`.
 
 ### Pasting a block of descriptors
 

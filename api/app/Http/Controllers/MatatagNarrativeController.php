@@ -89,6 +89,7 @@ class MatatagNarrativeController extends Controller
                 'learners' => $roster->map(fn ($student) => [
                     'student_id' => $student->id,
                     'name' => $this->learnerName($student),
+                    'display_name' => $this->learnerListName($student),
                     'gender' => $student->gender,
                 ])->values()->all(),
                 'narratives' => (object) $narratives,

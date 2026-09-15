@@ -1,4 +1,5 @@
 import { AlertTriangle, Loader2 } from 'lucide-react'
+import { learnerListName } from './matatagRoster'
 import type { MatatagLearner, MatatagSectionAttendance } from '../../../types'
 
 interface Props {
@@ -27,8 +28,11 @@ export function MatatagAttendancePanel({ data, isLoading, learners }: Props) {
 
   if (!data) return null
 
-  const nameFor = (studentId: string) =>
-    learners?.find(l => l.student_id === studentId)?.name ?? studentId
+  const nameFor = (studentId: string) => {
+    const learner = learners?.find(l => l.student_id === studentId)
+
+    return learner ? learnerListName(learner) : studentId
+  }
 
   return (
     <div className="space-y-4">

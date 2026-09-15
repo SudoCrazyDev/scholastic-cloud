@@ -116,6 +116,49 @@ class MatatagRatingGridTest extends MatatagTestCase
         $this->assertSame(['Ben Cruz', 'Ana Bautista', 'Cara Dizon'], $names);
     }
 
+    /**
+     * The screens list a class the way every DepEd form does: surname first,
+     * in capitals, with the middle name reduced to an initial.
+     *
+     * `name` keeps the prose order because the report card is addressed to a
+     * parent. Both travel, and the one a screen uses is the screen's choice.
+     */
+    public function test_each_learner_carries_the_name_as_a_class_record_writes_it(): void
+    {
+        $this->makeLearner($this->schoolA, $this->sectionA1, 'Juan', 'Santos', 'male', 'Pineda', 'Jr.');
+
+        $learners = collect($this->as($this->adviserA1)->getJson(
+            '/api/matatag/grid?class_section_id='.$this->sectionA1->id.'&term=1'
+        )->json('data.learners'));
+
+        $this->assertSame(
+            ['CRUZ, BEN', 'SANTOS, JUAN P. JR.', 'BAUTISTA, ANA', 'DIZON, CARA'],
+            $learners->pluck('display_name')->all(),
+        );
+
+        // The suffix trails the given names, matching what the Students tab of
+        // the same screen already prints. And the prose name is untouched,
+        // because the report card is addressed to a parent.
+        $this->assertSame(
+            'Juan Pineda Santos Jr.',
+            $learners->firstWhere('display_name', 'SANTOS, JUAN P. JR.')['name'],
+        );
+    }
+
+    /** A blank middle name must not leave a stray initial or a lone comma. */
+    public function test_a_learner_with_no_middle_name_gets_no_initial(): void
+    {
+        $narratives = $this->as($this->adviserA1)->getJson(
+            '/api/matatag/narratives?class_section_id='.$this->sectionA1->id
+        );
+
+        $this->assertSame(
+            ['CRUZ, BEN', 'BAUTISTA, ANA', 'DIZON, CARA'],
+            collect($narratives->json('data.learners'))->pluck('display_name')->all(),
+            'The narratives screen lists the same class in the same order and spelling.',
+        );
+    }
+
     // -----------------------------------------------------------------
     // Writing
     // -----------------------------------------------------------------

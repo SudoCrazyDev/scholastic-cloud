@@ -6,6 +6,7 @@ import { Select } from '../../../components/select'
 import { Ks1PaceForm } from '../../../components/matatagReports/Ks1PaceForm'
 import { Ks1ProgressReportCard } from '../../../components/matatagReports/Ks1ProgressReportCard'
 import { useMatatagReport, useMatatagReportDownloads } from '../../../hooks/useMatatagReports'
+import { learnerListName, orderedLearners } from './matatagRoster'
 import type { MatatagLearner, MatatagLearningAreaSummary } from '../../../types'
 
 interface Props {
@@ -96,7 +97,12 @@ export function MatatagReportsPanel({
                 inputSize="sm"
                 value={studentId}
                 onChange={event => setStudentId(event.target.value)}
-                options={learners.map(l => ({ value: l.student_id, label: l.name }))}
+                // Same order and spelling as the competency grid, so the
+                // learner an adviser just marked is where they expect.
+                options={orderedLearners(learners).map(l => ({
+                  value: l.student_id,
+                  label: learnerListName(l),
+                }))}
               />
             </label>
 
@@ -246,7 +252,9 @@ export function MatatagReportsPanel({
             </button>
           ))}
 
-          <span className="ml-auto text-xs text-gray-400">{learner?.name}</span>
+          <span className="ml-auto text-xs text-gray-400">
+            {learner ? learnerListName(learner) : ''}
+          </span>
         </div>
 
         <div className="h-[720px] w-full">

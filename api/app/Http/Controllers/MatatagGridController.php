@@ -107,6 +107,7 @@ class MatatagGridController extends Controller
                 'learners' => $roster->map(fn ($student) => [
                     'student_id' => $student->id,
                     'name' => $this->learnerName($student),
+                    'display_name' => $this->learnerListName($student),
                     'last_name' => $student->last_name,
                     'first_name' => $student->first_name,
                     'gender' => $student->gender,

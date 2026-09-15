@@ -144,10 +144,14 @@ abstract class MatatagTestCase extends TestCase
         string $first,
         string $last,
         string $gender,
+        ?string $middle = null,
+        ?string $ext = null,
     ): Student {
         $student = Student::create([
             'first_name' => $first,
+            'middle_name' => $middle,
             'last_name' => $last,
+            'ext_name' => $ext,
             'gender' => $gender,
             'birthdate' => '2020-06-15',
             'is_active' => true,

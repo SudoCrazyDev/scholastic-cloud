@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Select } from '../../../components/select'
 import { parsePastedDescriptors } from './matatagPaste'
+import { groupLearnersByGender, learnerListName } from './matatagRoster'
 import type {
   MatatagDescriptor,
   MatatagDescriptorDefinition,
@@ -16,6 +17,13 @@ interface ActiveCell {
 
 interface Props {
   grid: MatatagGridData
+  /**
+   * The columns to actually render — `columns` narrowed by whatever the
+   * toolbar is filtering on. Passed in rather than filtered here so that the
+   * counter above the grid and the grid itself cannot disagree about what is
+   * on screen.
+   */
+  columns: MatatagGridColumn[]
   descriptors: MatatagDescriptorDefinition[]
   macroSkills: MatatagMacroSkillDefinition[]
   failedKeys: Set<string>
@@ -67,6 +75,7 @@ interface Props {
  */
 export const MatatagGrid = React.memo(function MatatagGrid({
   grid,
+  columns,
   descriptors,
   macroSkills,
   failedKeys,
@@ -79,6 +88,14 @@ export const MatatagGrid = React.memo(function MatatagGrid({
   const [active, setActive] = useState<ActiveCell | null>(null)
   const tableRef = useRef<HTMLTableElement>(null)
 
+  // Males then females, alphabetical within each — DepEd's own order, and the
+  // order the exported workbook's two blocks of rows expect. `learners` is the
+  // flattened result, and it is what every index-based operation below runs
+  // off: arrow keys, fill-down and paste anchoring all have to agree with what
+  // is on screen, not with the order the payload happened to arrive in.
+  const groups = useMemo(() => groupLearnersByGender(grid.learners), [grid.learners])
+  const learners = useMemo(() => groups.flatMap(group => group.learners), [groups])
+
   const letters = useMemo(() => descriptors.map(d => d.letter), [descriptors])
 
   const skillsByKey = useMemo(() => {
@@ -89,15 +106,15 @@ export const MatatagGrid = React.memo(function MatatagGrid({
 
   const columnIndex = useMemo(() => {
     const map = new Map<string, number>()
-    grid.columns.forEach((column, index) => map.set(column.slot_id, index))
+    columns.forEach((column, index) => map.set(column.slot_id, index))
     return map
-  }, [grid.columns])
+  }, [columns])
 
   const learnerIndex = useMemo(() => {
     const map = new Map<string, number>()
-    grid.learners.forEach((learner, index) => map.set(learner.student_id, index))
+    learners.forEach((learner, index) => map.set(learner.student_id, index))
     return map
-  }, [grid.learners])
+  }, [learners])
 
   // The active cell is held as ids rather than as a DOM ref, so a re-render
   // cannot lose it — which is the other half of keeping focus still.
@@ -108,14 +125,14 @@ export const MatatagGrid = React.memo(function MatatagGrid({
     }
 
     const index = columnIndex.get(active.slotId)
-    onActiveColumnChange(index === undefined ? null : grid.columns[index])
-  }, [active, columnIndex, grid.columns, onActiveColumnChange])
+    onActiveColumnChange(index === undefined ? null : columns[index])
+  }, [active, columnIndex, columns, onActiveColumnChange])
 
   /** Domain bands, for the top tier of the header. */
   const domainGroups = useMemo(() => {
     const groups: Array<{ id: string | null; title: string; span: number }> = []
 
-    grid.columns.forEach(column => {
+    columns.forEach(column => {
       const domain = grid.domains.find(d => d.id === column.domain_id)
       const title = domain?.title ?? 'Competencies'
       const last = groups[groups.length - 1]
@@ -128,13 +145,13 @@ export const MatatagGrid = React.memo(function MatatagGrid({
     })
 
     return groups
-  }, [grid.columns, grid.domains])
+  }, [columns, grid.domains])
 
   /** Competency bands, for the middle tier: a number spanning its macro skills. */
   const competencyGroups = useMemo(() => {
     const groups: Array<{ key: string; label: string; span: number }> = []
 
-    grid.columns.forEach(column => {
+    columns.forEach(column => {
       const key = column.competency_id
       const last = groups[groups.length - 1]
 
@@ -150,7 +167,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
     })
 
     return groups
-  }, [grid.columns])
+  }, [columns])
 
   const focusCell = useCallback((studentId: string, slotId: string) => {
     setActive({ studentId, slotId })
@@ -173,12 +190,12 @@ export const MatatagGrid = React.memo(function MatatagGrid({
       const row = learnerIndex.get(active.studentId) ?? 0
       const col = columnIndex.get(active.slotId) ?? 0
 
-      const nextRow = Math.min(Math.max(row + rowDelta, 0), grid.learners.length - 1)
-      const nextCol = Math.min(Math.max(col + colDelta, 0), grid.columns.length - 1)
+      const nextRow = Math.min(Math.max(row + rowDelta, 0), learners.length - 1)
+      const nextCol = Math.min(Math.max(col + colDelta, 0), columns.length - 1)
 
-      focusCell(grid.learners[nextRow].student_id, grid.columns[nextCol].slot_id)
+      focusCell(learners[nextRow].student_id, columns[nextCol].slot_id)
     },
-    [active, learnerIndex, columnIndex, grid.learners, grid.columns, focusCell]
+    [active, learnerIndex, columnIndex, learners, columns, focusCell]
   )
 
   const handleKeyDown = useCallback(
@@ -200,7 +217,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
         const value = grid.ratings[`${active.studentId}:${active.slotId}`] ?? null
         const from = learnerIndex.get(active.studentId) ?? 0
 
-        grid.learners.slice(from + 1).forEach(learner => {
+        learners.slice(from + 1).forEach(learner => {
           onSet(learner.student_id, active.slotId, value)
         })
 
@@ -256,16 +273,16 @@ export const MatatagGrid = React.memo(function MatatagGrid({
 
         if (event.ctrlKey) {
           focusCell(
-            grid.learners[toEnd ? grid.learners.length - 1 : 0].student_id,
-            grid.columns[toEnd ? grid.columns.length - 1 : 0].slot_id
+            learners[toEnd ? learners.length - 1 : 0].student_id,
+            columns[toEnd ? columns.length - 1 : 0].slot_id
           )
         } else {
-          focusCell(active.studentId, grid.columns[toEnd ? grid.columns.length - 1 : 0].slot_id)
+          focusCell(active.studentId, columns[toEnd ? columns.length - 1 : 0].slot_id)
         }
       }
 
     },
-    [active, readOnly, letters, onSet, move, focusCell, grid, learnerIndex]
+    [active, readOnly, letters, onSet, move, focusCell, grid, learnerIndex, columns, learners]
   )
 
   /**
@@ -299,8 +316,8 @@ export const MatatagGrid = React.memo(function MatatagGrid({
 
       const fromRow = learnerIndex.get(active.studentId) ?? 0
       const fromColumn = columnIndex.get(active.slotId) ?? 0
-      const rowsLeft = grid.learners.length - fromRow
-      const columnsLeft = grid.columns.length - fromColumn
+      const rowsLeft = learners.length - fromRow
+      const columnsLeft = columns.length - fromColumn
 
       if (parsed.rows.length > rowsLeft) {
         onPasteNotice({
@@ -328,8 +345,8 @@ export const MatatagGrid = React.memo(function MatatagGrid({
       parsed.rows.forEach((row, rowOffset) => {
         row.forEach((descriptor, columnOffset) => {
           onSet(
-            grid.learners[fromRow + rowOffset].student_id,
-            grid.columns[fromColumn + columnOffset].slot_id,
+            learners[fromRow + rowOffset].student_id,
+            columns[fromColumn + columnOffset].slot_id,
             descriptor
           )
           count++
@@ -338,7 +355,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
 
       onPasteNotice({ kind: 'applied', count })
     },
-    [active, readOnly, letters, onSet, onPasteNotice, grid, learnerIndex, columnIndex]
+    [active, readOnly, letters, onSet, onPasteNotice, learnerIndex, columnIndex, columns, learners]
   )
 
   const fillFor = (column: MatatagGridColumn): string | undefined => {
@@ -351,7 +368,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
     return `#${argb.slice(2)}`
   }
 
-  if (grid.columns.length === 0) {
+  if (columns.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
         <p className="text-sm text-gray-600">
@@ -365,7 +382,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
     )
   }
 
-  if (grid.learners.length === 0) {
+  if (learners.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-600">
         No learners are enrolled in this section for {grid.academic_year}.
@@ -428,7 +445,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
               <th className="sticky left-0 z-30 bg-white border border-gray-200 px-3 py-2 text-left min-w-[200px]">
                 Learner
               </th>
-              {grid.columns.map(column => {
+              {columns.map(column => {
                 const skill = column.macro_skill ? skillsByKey.get(column.macro_skill) : undefined
 
                 return (
@@ -455,7 +472,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
               <th className="sticky left-0 z-30 bg-white border border-gray-200 px-3 py-2 text-left min-w-[200px]">
                 Learner
               </th>
-              {grid.columns.map(column => (
+              {columns.map(column => (
                 <th
                   key={column.slot_id}
                   className="border border-gray-200 px-1 py-1 text-[10px] text-center w-8 min-w-[32px] bg-white"
@@ -468,77 +485,112 @@ export const MatatagGrid = React.memo(function MatatagGrid({
         </thead>
 
         <tbody>
-          {grid.learners.map((learner, rowIndex) => (
-            <tr key={learner.student_id} className={rowIndex % 2 ? 'bg-gray-50/60' : 'bg-white'}>
-              <th
-                scope="row"
-                className={`sticky left-0 z-10 border border-gray-200 px-3 py-1.5 text-left font-medium text-gray-800 whitespace-nowrap ${
-                  rowIndex % 2 ? 'bg-gray-50' : 'bg-white'
-                }`}
-              >
-                {learner.name}
-              </th>
+          {groups.map(group => (
+            <React.Fragment key={group.key}>
+              {/* The band that makes the two DepEd blocks visible. It is a real
+                  row rather than a styled first learner, so a screen reader
+                  announces the group once instead of repeating it fifty
+                  times, and the label stays pinned while the marks scroll. */}
+              <tr>
+                <th
+                  scope="colgroup"
+                  className="sticky left-0 z-20 border border-gray-300 bg-gray-200 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-wider text-gray-600"
+                >
+                  {group.label}
+                  <span className="ml-1.5 font-semibold text-gray-500">{group.learners.length}</span>
+                </th>
+                <td colSpan={columns.length} className="border border-gray-300 bg-gray-200 p-0" />
+              </tr>
 
-              {grid.columns.map(column => {
-                const key = `${learner.student_id}:${column.slot_id}`
-                const value = grid.ratings[key] ?? ''
-                const isActive =
-                  active?.studentId === learner.student_id && active?.slotId === column.slot_id
-                const hasFailed = failedKeys.has(key)
-
-                if (isActive && !readOnly) {
-                  return (
-                    <td
-                      key={column.slot_id}
-                      data-cell={key}
-                      className="border border-primary-500 p-0 w-8 min-w-[32px] ring-2 ring-primary-400"
-                    >
-                      <Select
-                        autoFocus
-                        inputSize="sm"
-                        className="!w-full"
-                        value={value}
-                        onChange={event =>
-                          onSet(
-                            learner.student_id,
-                            column.slot_id,
-                            (event.target.value || null) as MatatagDescriptor | null
-                          )
-                        }
-                        options={[
-                          { value: '', label: '—' },
-                          ...descriptors.map(d => ({ value: d.letter, label: `${d.letter} · ${d.label}` })),
-                        ]}
-                      />
-                    </td>
-                  )
-                }
+              {group.learners.map((learner, indexInGroup) => {
+                // Numbered within the group, because that is how the class
+                // record and the exported workbook number them — males 1..n,
+                // then females 1..n again.
+                const rowName = learnerListName(learner)
+                const striped = indexInGroup % 2 === 1
 
                 return (
-                  <td
-                    key={column.slot_id}
-                    data-cell={key}
-                    tabIndex={isActive ? 0 : -1}
-                    role="gridcell"
-                    aria-label={`${learner.name}, ${column.label}${
-                      column.macro_skill ? `, ${column.macro_skill}` : ''
-                    }${value ? `, ${value}` : ', not marked'}`}
-                    onClick={() => focusCell(learner.student_id, column.slot_id)}
-                    onFocus={() => setActive({ studentId: learner.student_id, slotId: column.slot_id })}
-                    className={`border px-1 py-1.5 text-center font-semibold cursor-pointer select-none w-8 min-w-[32px] outline-none ${
-                      hasFailed
-                        ? 'border-amber-500 bg-amber-50 text-amber-900'
-                        : isActive
-                          ? 'border-primary-500 ring-2 ring-primary-400 text-gray-900'
-                          : 'border-gray-200 text-gray-800 hover:bg-primary-50'
-                    }`}
-                    title={hasFailed ? 'Not saved yet — press Retry' : undefined}
-                  >
-                    {value || <span className="text-gray-300">·</span>}
-                  </td>
+                  <tr key={learner.student_id} className={striped ? 'bg-gray-50/60' : 'bg-white'}>
+                    <th
+                      scope="row"
+                      className={`sticky left-0 z-10 border border-gray-200 px-3 py-1.5 text-left font-medium text-gray-800 whitespace-nowrap ${
+                        striped ? 'bg-gray-50' : 'bg-white'
+                      }`}
+                    >
+                      <span className="mr-2 inline-block w-5 text-right font-normal tabular-nums text-gray-400">
+                        {indexInGroup + 1}
+                      </span>
+                      {rowName}
+                    </th>
+
+                    {columns.map(column => {
+                      const key = `${learner.student_id}:${column.slot_id}`
+                      const value = grid.ratings[key] ?? ''
+                      const isActive =
+                        active?.studentId === learner.student_id && active?.slotId === column.slot_id
+                      const hasFailed = failedKeys.has(key)
+
+                      if (isActive && !readOnly) {
+                        return (
+                          <td
+                            key={column.slot_id}
+                            data-cell={key}
+                            className="border border-primary-500 p-0 w-8 min-w-[32px] ring-2 ring-primary-400"
+                          >
+                            <Select
+                              autoFocus
+                              inputSize="sm"
+                              className="!w-full"
+                              value={value}
+                              onChange={event =>
+                                onSet(
+                                  learner.student_id,
+                                  column.slot_id,
+                                  (event.target.value || null) as MatatagDescriptor | null
+                                )
+                              }
+                              options={[
+                                { value: '', label: '—' },
+                                ...descriptors.map(d => ({
+                                  value: d.letter,
+                                  label: `${d.letter} · ${d.label}`,
+                                })),
+                              ]}
+                            />
+                          </td>
+                        )
+                      }
+
+                      return (
+                        <td
+                          key={column.slot_id}
+                          data-cell={key}
+                          tabIndex={isActive ? 0 : -1}
+                          role="gridcell"
+                          aria-label={`${rowName}, ${column.label}${
+                            column.macro_skill ? `, ${column.macro_skill}` : ''
+                          }${value ? `, ${value}` : ', not marked'}`}
+                          onClick={() => focusCell(learner.student_id, column.slot_id)}
+                          onFocus={() =>
+                            setActive({ studentId: learner.student_id, slotId: column.slot_id })
+                          }
+                          className={`border px-1 py-1.5 text-center font-semibold cursor-pointer select-none w-8 min-w-[32px] outline-none ${
+                            hasFailed
+                              ? 'border-amber-500 bg-amber-50 text-amber-900'
+                              : isActive
+                                ? 'border-primary-500 ring-2 ring-primary-400 text-gray-900'
+                                : 'border-gray-200 text-gray-800 hover:bg-primary-50'
+                          }`}
+                          title={hasFailed ? 'Not saved yet — press Retry' : undefined}
+                        >
+                          {value || <span className="text-gray-300">·</span>}
+                        </td>
+                      )
+                    })}
+                  </tr>
                 )
               })}
-            </tr>
+            </React.Fragment>
           ))}
         </tbody>
       </table>
