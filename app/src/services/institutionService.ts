@@ -1,5 +1,6 @@
 import { api } from '../lib/api'
 import type {
+  GradeLevelGradingPeriod,
   Institution,
   InstitutionAcademicYear,
   GradingPeriodType,
@@ -144,6 +145,26 @@ class InstitutionService {
     const response = await api.put<{ data: InstitutionAcademicYear }>(
       `${this.baseUrl}/${institutionId}/academic-years/grading-periods`,
       { year, grading_period_type: gradingPeriodType }
+    )
+    return response.data
+  }
+
+  /**
+   * Replace the grade levels that depart from a year's structure.
+   *
+   * DepEd's 3-term structure does not reach Senior High, so a school on terms
+   * still grades Grades 11 and 12 over 4 quarters in the same year. The payload
+   * is the complete set of exceptions: a grade level left out goes back to
+   * following the year, and one matching the year is dropped server-side.
+   */
+  async updateAcademicYearGradeLevelGradingPeriods(
+    institutionId: string,
+    year: string,
+    gradeLevels: GradeLevelGradingPeriod[]
+  ) {
+    const response = await api.put<{ data: InstitutionAcademicYear }>(
+      `${this.baseUrl}/${institutionId}/academic-years/grade-level-grading-periods`,
+      { year, grade_levels: gradeLevels }
     )
     return response.data
   }

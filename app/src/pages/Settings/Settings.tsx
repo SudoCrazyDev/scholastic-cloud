@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
 import { institutionService } from '../../services/institutionService'
 import { departmentService } from '../../services/departmentService'
+import { gradeLevelService } from '../../services/gradeLevelService'
 import { Input } from '../../components/input'
 import { Button } from '../../components/button'
 import { Textarea } from '../../components/textarea'
@@ -14,12 +15,23 @@ import { Building2, CalendarDays } from 'lucide-react'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import AppearanceSettings from './components/AppearanceSettings'
 import StudentAccessSettings from './components/StudentAccessSettings'
-import type { GradingPeriodType, UpdateInstitutionData } from '../../types'
+import type {
+  GradeLevelGradingPeriod,
+  GradingPeriodType,
+  InstitutionAcademicYear,
+  UpdateInstitutionData,
+} from '../../types'
 
 const GRADING_PERIOD_OPTIONS: { value: GradingPeriodType; label: string }[] = [
   { value: 'quarter', label: '4 Quarters' },
   { value: 'term', label: '3 Terms' },
 ]
+
+/** Sentinel for "no exception" — this grade level follows the year. */
+const FOLLOWS_YEAR = ''
+
+const gradingPeriodLabel = (type: GradingPeriodType) =>
+  GRADING_PERIOD_OPTIONS.find((option) => option.value === type)?.label ?? type
 
 // Access is the `settings` module permission, checked by the route's
 // RequireModule guard and again by the API. This page holds no gate of its own:
@@ -130,6 +142,65 @@ const Settings: React.FC = () => {
       toast.error(msg)
     },
   })
+
+  // The platform's grade level list, for naming an exception. Read from the
+  // public endpoint because the `grade-levels` module is a separate permission
+  // a school need not have granted to whoever edits its settings.
+  const { data: gradeLevels = [] } = useQuery({
+    queryKey: ['public-grade-levels'],
+    queryFn: () => gradeLevelService.getPublicGradeLevels(),
+    staleTime: 60 * 60 * 1000,
+  })
+
+  // Which year's exceptions are open. Collapsed by default: most schools have
+  // none, and a row per grade level on every year would bury the year itself.
+  const [openExceptionsYear, setOpenExceptionsYear] = useState<string | null>(null)
+
+  // Replace the whole exception set for a year. The API takes the complete list,
+  // so removing a grade level here is what puts it back on the year default.
+  const gradeLevelPeriodMutation = useMutation({
+    mutationFn: ({
+      year,
+      gradeLevels: entries,
+    }: {
+      year: string
+      gradeLevels: GradeLevelGradingPeriod[]
+    }) =>
+      institutionService.updateAcademicYearGradeLevelGradingPeriods(
+        institutionId!,
+        year,
+        entries
+      ),
+    onSuccess: async () => {
+      await refreshProfile()
+      queryClient.invalidateQueries({ queryKey: ['institution', institutionId] })
+      queryClient.invalidateQueries({ queryKey: ['grading-periods'] })
+      refetchAcademicYears()
+      toast.success('Grade level grading periods updated successfully!')
+    },
+    onError: (error: any) => {
+      const msg =
+        error.response?.data?.message || 'Failed to update grade level grading periods'
+      toast.error(msg)
+    },
+  })
+
+  // Apply one grade level's change on top of the year's current exceptions and
+  // send the whole set back.
+  const setGradeLevelPeriod = (
+    academicYear: InstitutionAcademicYear,
+    gradeLevel: string,
+    type: GradingPeriodType | typeof FOLLOWS_YEAR
+  ) => {
+    const existing = academicYear.grade_level_grading_periods ?? []
+    const without = existing.filter((entry) => entry.grade_level !== gradeLevel)
+    const next =
+      type === FOLLOWS_YEAR
+        ? without
+        : [...without, { grade_level: gradeLevel, grading_period_type: type }]
+
+    gradeLevelPeriodMutation.mutate({ year: academicYear.year, gradeLevels: next })
+  }
 
   // Populate form when institution is loaded
   useEffect(() => {
@@ -387,6 +458,9 @@ const Settings: React.FC = () => {
                         Grading Periods
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Exceptions
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -395,8 +469,16 @@ const Settings: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {academicYears.map((ay) => (
-                      <tr key={ay.id} className={ay.is_current ? 'bg-primary-50' : ''}>
+                    {academicYears.map((ay) => {
+                      const exceptions = ay.grade_level_grading_periods ?? []
+                      const exceptionFor = (gradeLevel: string) =>
+                        exceptions.find((entry) => entry.grade_level === gradeLevel)
+                          ?.grading_period_type ?? FOLLOWS_YEAR
+                      const isOpen = openExceptionsYear === ay.year
+
+                      return (
+                      <React.Fragment key={ay.id}>
+                      <tr className={ay.is_current ? 'bg-primary-50' : ''}>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
                           {ay.year}
                         </td>
@@ -414,6 +496,20 @@ const Settings: React.FC = () => {
                               disabled={gradingPeriodMutation.isPending}
                             />
                           </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <button
+                            type="button"
+                            onClick={() => setOpenExceptionsYear(isOpen ? null : ay.year)}
+                            className="text-xs font-medium text-primary-600 hover:text-primary-800"
+                          >
+                            {exceptions.length === 0
+                              ? 'None'
+                              : `${exceptions.length} grade ${
+                                  exceptions.length === 1 ? 'level' : 'levels'
+                                }`}
+                            <span className="ml-1 text-gray-400">{isOpen ? '▲' : '▼'}</span>
+                          </button>
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {ay.is_current ? (
@@ -437,14 +533,67 @@ const Settings: React.FC = () => {
                           )}
                         </td>
                       </tr>
-                    ))}
+                      {isOpen && (
+                        <tr className={ay.is_current ? 'bg-primary-50' : 'bg-gray-50'}>
+                          <td colSpan={5} className="px-4 py-4">
+                            <p className="text-xs text-gray-600 mb-3">
+                              {ay.year} is graded on{' '}
+                              <span className="font-medium">
+                                {gradingPeriodLabel(ay.grading_period_type ?? 'quarter')}
+                              </span>
+                              . Set any grade level that differs. Senior High usually
+                              stays on 4 quarters — DepEd's 3-term structure does not
+                              cover Grades 11 and 12, which run two semesters of two
+                              quarters each.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {gradeLevels.map((gradeLevel) => (
+                                <div
+                                  key={gradeLevel.id}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <span className="text-sm text-gray-700 truncate">
+                                    {gradeLevel.title}
+                                  </span>
+                                  <div className="w-40 shrink-0">
+                                    <Select
+                                      value={exceptionFor(gradeLevel.title)}
+                                      onChange={(e) =>
+                                        setGradeLevelPeriod(
+                                          ay,
+                                          gradeLevel.title,
+                                          e.target.value as GradingPeriodType | typeof FOLLOWS_YEAR
+                                        )
+                                      }
+                                      options={[
+                                        // Just "Same as year" - the sentence above
+                                        // already names the year's structure, and
+                                        // repeating it here overflowed the control.
+                                        { value: FOLLOWS_YEAR, label: 'Same as year' },
+                                        ...GRADING_PERIOD_OPTIONS,
+                                      ]}
+                                      disabled={gradeLevelPeriodMutation.isPending}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
               <p className="mt-3 text-xs text-gray-500">
                 Grading periods are set per academic year: switching a year to 3 terms
                 changes how that year's grades are labelled and how its final grades are
-                averaged. Change it only for a year that has not been graded yet.
+                averaged. Change it only for a year that has not been graded yet. A grade
+                level listed under Exceptions keeps its own structure for that year —
+                that is how Grades 11 and 12 stay on 4 quarters while the rest of the
+                school moves to 3 terms.
               </p>
             </div>
           )}

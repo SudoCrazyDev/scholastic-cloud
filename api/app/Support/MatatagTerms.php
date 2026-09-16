@@ -9,17 +9,28 @@ namespace App\Support;
  * ## Why this is not App\Support\GradingPeriods
  *
  * `GradingPeriods` already knows the difference between four quarters and
- * three terms, and reusing it here is the obvious move. It is also wrong, and
- * the failure is not obvious until it reaches a teacher.
+ * three terms, and reusing it here is the obvious move. It is still wrong, but
+ * not for the reason this docblock used to give.
  *
- * `GradingPeriods::forInstitution($institutionId, $academicYear)` resolves the
- * structure per *(institution, academic year)* — school-wide for the year —
- * and `institution_academic_years` is `UNIQUE (institution_id, year)` with no
- * grade-level dimension to add one to. But MATATAG covers Grades 1-3 only, so
- * a K-12 school needs three terms for its primary grades **while Grades 4-12
- * stay on four numeric quarters in the same year**. Switch that flag and
- * `GradingPeriods::count()` returns 3 for the whole school, and
- * `assertValidPeriod()` starts refusing quarter 4 for every Grade 10 teacher.
+ * The old reason was mechanical: `GradingPeriods` resolved a structure per
+ * *(institution, academic year)*, school-wide, so putting Grades 1-3 on three
+ * terms would have made `count()` return 3 for the whole school and
+ * `assertValidPeriod()` refuse quarter 4 to every Grade 10 teacher.
+ *
+ * That is no longer true. `institution_grade_level_grading_periods` records
+ * per-grade-level exceptions, and `GradingPeriods::forInstitution()` takes an
+ * optional grade level. It was added so Senior High could stay on four
+ * quarters through a three-term year — DepEd's 3-term structure does not reach
+ * Grades 11 and 12, which run two semesters of two quarters each.
+ *
+ * The reasons that remain are the ones that always mattered:
+ *
+ * - `GradingPeriods` counts and labels *numeric* periods a school chooses
+ *   between. These terms are DepEd's, fixed, and carry A-E descriptors per
+ *   competency rather than a numeric grade. A school cannot opt out of them.
+ * - Opting a section into MATATAG must not restructure that grade level's
+ *   numeric grades. A Grade 1 section can report descriptors here and still
+ *   carry numeric running grades under the year's own structure.
  *
  * So this module carries its own terms. They are fixed at three and are not
  * configurable per school: they are DepEd's, not the school's.

@@ -220,6 +220,13 @@ const SubjectDetail: React.FC = () => {
 
         {/* Tab Content */}
         <div className="p-6">
+          {/*
+            `gradeLevel` decides whether this subject is graded over 4 quarters or
+            3 terms. It is not the school-wide setting: DepEd's 3-term structure
+            does not cover Grades 11 and 12, so a Senior High subject keeps 4
+            quarters through a year the rest of the school runs on terms. Every
+            tab that names or counts a grading period needs it.
+          */}
           {activeTab === 'class-record' && (
             <ClassRecordTab
               key={`${subject.id}-${subject.class_section_id}`}
@@ -229,6 +236,7 @@ const SubjectDetail: React.FC = () => {
               assignedStudentIds={assignedStudentIds}
               gradingBands={gradingBands}
               academicYear={subject.class_section?.academic_year}
+              gradeLevel={subject.class_section?.grade_level}
             />
           )}
           {activeTab === 'student-scores' && (
@@ -238,13 +246,28 @@ const SubjectDetail: React.FC = () => {
               classSectionId={subject.class_section_id}
               isLimited={!!subject.is_limited_student}
               assignedStudentIds={assignedStudentIds}
+              gradeLevel={subject.class_section?.grade_level}
             />
           )}
           {activeTab === 'summative-assessment' && <SummativeAssessmentTab subjectId={subject.id} />}
-          {activeTab === 'assessment-methods' && <AssessmentBuilderTab subjectId={subject.id} />}
-          {activeTab === 'topics' && <TopicsTab subjectId={subject.id} />}
-          {activeTab === 'ai-planner' && <AiPlannerTab subjectId={subject.id} />}
-          {activeTab === 'lesson-plan-calendar' && <LessonPlanCalendarTab subjectId={subject.id} />}
+          {activeTab === 'assessment-methods' && (
+            <AssessmentBuilderTab
+              subjectId={subject.id}
+              gradeLevel={subject.class_section?.grade_level}
+            />
+          )}
+          {activeTab === 'topics' && (
+            <TopicsTab subjectId={subject.id} gradeLevel={subject.class_section?.grade_level} />
+          )}
+          {activeTab === 'ai-planner' && (
+            <AiPlannerTab subjectId={subject.id} gradeLevel={subject.class_section?.grade_level} />
+          )}
+          {activeTab === 'lesson-plan-calendar' && (
+            <LessonPlanCalendarTab
+              subjectId={subject.id}
+              gradeLevel={subject.class_section?.grade_level}
+            />
+          )}
           {activeTab === 'calendar' && <CalendarTab subjectId={subject.id} />}
         </div>
       </div>

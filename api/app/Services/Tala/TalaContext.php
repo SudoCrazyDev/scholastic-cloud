@@ -88,6 +88,24 @@ class TalaContext
             GradingPeriods::count($periodType),
         );
 
+        // A school is not always uniform: DepEd's 3-term structure does not reach
+        // Senior High, so Grades 11 and 12 commonly stay on 4 quarters through the
+        // same year. Say so, or the model confidently tells a Grade 11 teacher
+        // their 4th quarter does not exist.
+        $exceptions = GradingPeriods::overridesForInstitution($institutionId, $academicYear?->year);
+        if ($exceptions !== []) {
+            $lines[] = 'Exceptions: '.implode('; ', array_map(
+                fn (string $gradeLevel, string $type) => sprintf(
+                    '%s is graded on %d %s',
+                    $gradeLevel,
+                    GradingPeriods::count($type),
+                    strtolower(GradingPeriods::pluralNoun($type))
+                ),
+                array_keys($exceptions),
+                $exceptions
+            )).'. Use the grading period structure of the class being discussed, not the school default.';
+        }
+
         $lines[] = "Today's date: ".$today->toFormattedDayDateString().' (Philippine time)';
 
         $load = $this->teachingLoad($user, $institutionId);

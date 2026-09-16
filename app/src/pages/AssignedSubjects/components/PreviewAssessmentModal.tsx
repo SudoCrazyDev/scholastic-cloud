@@ -17,6 +17,8 @@ import { QuestionPromptView } from './QuestionPromptView'
 interface PreviewAssessmentModalProps {
   method: AssessmentMethod
   onClose: () => void
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 /** Choice body for single/multiple choice: image (when set) with optional text caption. */
@@ -41,8 +43,8 @@ const ChoiceContent: React.FC<{ text: string; imageUrl?: string }> = ({ text, im
  * see it while taking it. All inputs are disabled and the submit button is
  * inert — this is purely a "view as student" preview for teachers/admins.
  */
-export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ method, onClose }) => {
-  const gradingPeriods = useGradingPeriods()
+export const PreviewAssessmentModal: React.FC<PreviewAssessmentModalProps> = ({ method, onClose, gradeLevel }) => {
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const questions = method.questions
   const maxScore = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0)
 

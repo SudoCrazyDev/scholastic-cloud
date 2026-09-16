@@ -136,10 +136,16 @@ class SF9Controller extends Controller
                     'gov_id' => $institution->gov_id,
                 ],
                 'current_academic_year' => $academicYear,
-                // Whether this year is reported as 4 quarters or 3 terms, so the SF9
-                // renders the right number of columns for the year it covers.
+                // Whether this learner is reported on 4 quarters or 3 terms, so the
+                // SF9 renders the right number of columns. Resolved from the grade
+                // level the learner is actually enrolled in rather than the school
+                // default: a 3-term school still prints 4 columns for Senior High.
                 'grading_periods' => GradingPeriods::config(
-                    GradingPeriods::forInstitution($institution->id, $academicYear)
+                    GradingPeriods::forInstitution(
+                        $institution->id,
+                        $academicYear,
+                        $studentSections->first()?->classSection?->grade_level
+                    )
                 ),
                 'current_sections' => $studentSections->map(function ($studentSection) {
                     return [

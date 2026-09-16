@@ -30,6 +30,16 @@ export interface User {
    */
   features?: string[];
   user_institutions?: UserInstitution[];
+  /** Set for student logins: the id of the learner's own student record. */
+  student_id?: string;
+  /**
+   * Set for student logins: the grade level of the learner's active section.
+   *
+   * Decides whether their portal counts 4 quarters or 3 terms. A Grade 11
+   * learner is graded over quarters even when their school runs on terms, so
+   * portal screens pass this to `useGradingPeriods`.
+   */
+  grade_level?: string | null;
 }
 
 export interface Role {
@@ -1578,6 +1588,23 @@ export interface GradingPeriodConfig {
   /** 'Quarters' | 'Terms' */
   noun_plural: string;
   periods: GradingPeriod[];
+  /**
+   * Grade levels that do not follow the year's structure, keyed by grade level
+   * exactly as the school spells it on its sections.
+   *
+   * DepEd's 3-term structure does not reach Senior High, so a school on terms
+   * still grades Grades 11 and 12 over 4 quarters in the same year. Only grade
+   * levels that actually differ appear here; anything absent follows the
+   * top-level config. Prefer `useGradingPeriods(gradeLevel)` over reading this
+   * directly.
+   */
+  by_grade_level?: Record<string, GradingPeriodConfig>;
+}
+
+/** One grade level's exception to its academic year's structure. */
+export interface GradeLevelGradingPeriod {
+  grade_level: string;
+  grading_period_type: GradingPeriodType;
 }
 
 export interface InstitutionAcademicYear {
@@ -1586,6 +1613,8 @@ export interface InstitutionAcademicYear {
   year: string;
   grading_period_type: GradingPeriodType;
   grading_periods?: GradingPeriodConfig;
+  /** Grade levels that depart from `grading_period_type` for this year. */
+  grade_level_grading_periods?: GradeLevelGradingPeriod[];
   is_current: boolean;
   created_at?: string;
   updated_at?: string;

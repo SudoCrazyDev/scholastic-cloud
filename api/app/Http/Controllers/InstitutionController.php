@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Institution;
 use App\Models\InstitutionAcademicYear;
+use App\Models\InstitutionGradeLevelGradingPeriod;
 use App\Models\Subscription;
 use App\Support\GradingPeriods;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -302,11 +304,28 @@ class InstitutionController extends Controller
     public function getAcademicYears(string $id): JsonResponse
     {
         $institution = Institution::findOrFail($id);
-        $years = $institution->academicYears()->get()->map(function (InstitutionAcademicYear $year) {
-            $year->grading_periods = GradingPeriods::config($year->grading_period_type);
+        $years = $institution->academicYears()
+            ->with('gradeLevelGradingPeriods')
+            ->get()
+            ->map(function (InstitutionAcademicYear $year) {
+                $year->grading_periods = GradingPeriods::config($year->grading_period_type);
 
-            return $year;
-        });
+                // The grade levels that depart from this year's default, so the
+                // settings screen can show the exceptions without a request per
+                // year. Only rows that actually differ are exceptions; one that
+                // restates the default is noise on the screen.
+                $year->grade_level_grading_periods = $year->gradeLevelGradingPeriods
+                    ->filter(fn ($row) => $row->grading_period_type !== $year->grading_period_type)
+                    ->map(fn ($row) => [
+                        'grade_level' => $row->grade_level,
+                        'grading_period_type' => $row->grading_period_type,
+                    ])
+                    ->values();
+
+                $year->unsetRelation('gradeLevelGradingPeriods');
+
+                return $year;
+            });
 
         return response()->json([
             'success' => true,
@@ -316,19 +335,27 @@ class InstitutionController extends Controller
 
     /**
      * Resolved grading period structure for the signed-in user's institution.
-     * Optionally scoped to a specific academic year via ?academic_year=.
+     * Optionally scoped to a specific academic year via ?academic_year= and to a
+     * grade level via ?grade_level=.
+     *
+     * The response always carries `by_grade_level` as well, so a screen that spans
+     * grade levels - a report covering a whole school - can label each row on its
+     * own structure instead of asking again per grade level.
      */
     public function gradingPeriods(Request $request): JsonResponse
     {
         $academicYear = $request->query('academic_year');
+        $gradeLevel = $request->query('grade_level');
         $institutionId = $request->query('institution_id')
             ?: GradingPeriods::institutionIdForUser($request->user());
 
-        $type = GradingPeriods::forInstitution($institutionId, $academicYear ?: null);
-
         return response()->json([
             'success' => true,
-            'data' => GradingPeriods::config($type),
+            'data' => GradingPeriods::configForInstitution(
+                $institutionId,
+                $academicYear ?: null,
+                $gradeLevel ?: null
+            ),
         ]);
     }
 
@@ -375,6 +402,99 @@ class InstitutionController extends Controller
             'success' => true,
             'message' => 'Grading period structure updated successfully',
             'data' => $academicYear,
+        ]);
+    }
+
+    /**
+     * Set which grade levels depart from an academic year's grading structure.
+     *
+     * DepEd's 3-term structure does not reach Senior High: Grades 11 and 12 run
+     * two semesters of two quarters each, so a school that moves to terms still
+     * grades Grades 11 and 12 over four periods in the same year. Without this,
+     * switching the year refused a 4th-quarter grade to every SHS teacher.
+     *
+     * The payload is the complete set of exceptions for the year - anything not
+     * listed follows the year default, and an entry matching the default is
+     * dropped rather than stored, so the table only ever holds real exceptions.
+     */
+    public function updateAcademicYearGradeLevelGradingPeriods(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $role = $user->getRole();
+
+        if (! $role || ! in_array($role->slug, ['principal', 'institution-administrator'])) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'year' => ['required', 'string', 'regex:/^\d{4}-\d{4}$/'],
+            'grade_levels' => ['present', 'array'],
+            'grade_levels.*.grade_level' => ['required', 'string', 'max:50'],
+            'grade_levels.*.grading_period_type' => ['required', 'string', Rule::in(GradingPeriods::TYPES)],
+        ]);
+
+        $institution = Institution::findOrFail($id);
+
+        $academicYear = InstitutionAcademicYear::where('institution_id', $institution->id)
+            ->where('year', $validated['year'])
+            ->first();
+
+        if (! $academicYear) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Academic year not found for this institution.',
+            ], 404);
+        }
+
+        $rows = [];
+        foreach ($validated['grade_levels'] as $entry) {
+            $gradeLevel = GradingPeriods::canonicalGradeLevel($entry['grade_level']);
+
+            if ($gradeLevel === null) {
+                continue;
+            }
+
+            // An exception that matches the year is not an exception. Storing it
+            // would survive a later change to the year default and silently pin
+            // the grade level to the old structure.
+            if ($entry['grading_period_type'] === $academicYear->grading_period_type) {
+                continue;
+            }
+
+            // Last write wins on a duplicated grade level rather than tripping the
+            // unique index, since the client sends a list and not a map.
+            $rows[mb_strtolower($gradeLevel)] = [
+                'grade_level' => $gradeLevel,
+                'grading_period_type' => $entry['grading_period_type'],
+            ];
+        }
+
+        DB::transaction(function () use ($academicYear, $institution, $rows) {
+            // Replace wholesale: the payload is the complete set, so a grade level
+            // the school removed has to stop overriding.
+            InstitutionGradeLevelGradingPeriod::where('institution_academic_year_id', $academicYear->id)
+                ->delete();
+
+            foreach ($rows as $row) {
+                InstitutionGradeLevelGradingPeriod::create([
+                    'institution_id' => $institution->id,
+                    'institution_academic_year_id' => $academicYear->id,
+                    'grade_level' => $row['grade_level'],
+                    'grading_period_type' => $row['grading_period_type'],
+                ]);
+            }
+        });
+
+        GradingPeriods::flushCache();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Grade level grading periods updated successfully',
+            'data' => [
+                'year' => $academicYear->year,
+                'grading_period_type' => $academicYear->grading_period_type,
+                'grade_level_grading_periods' => array_values($rows),
+            ],
         ]);
     }
 

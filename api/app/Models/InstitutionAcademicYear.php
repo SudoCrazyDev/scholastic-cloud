@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class InstitutionAcademicYear extends Model
@@ -36,5 +37,18 @@ class InstitutionAcademicYear extends Model
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
+    }
+
+    /**
+     * Grade levels that do not follow this year's structure — Senior High
+     * staying on four quarters through a three-term year, typically. Only
+     * exceptions are stored; everything else follows `grading_period_type`.
+     */
+    public function gradeLevelGradingPeriods(): HasMany
+    {
+        return $this->hasMany(
+            InstitutionGradeLevelGradingPeriod::class,
+            'institution_academic_year_id'
+        );
     }
 }

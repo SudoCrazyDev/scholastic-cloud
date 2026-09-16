@@ -21,6 +21,8 @@ import { PreviewAssessmentModal } from './PreviewAssessmentModal'
 interface PreviewLessonModalProps {
   topic: Topic
   onClose: () => void
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 /**
@@ -29,8 +31,8 @@ interface PreviewLessonModalProps {
  * is purely a "view as student" preview; linked assessments open their own
  * student preview instead of a real attempt.
  */
-export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, onClose }) => {
-  const gradingPeriods = useGradingPeriods()
+export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, onClose, gradeLevel }) => {
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const blocks = topic.content ?? []
   const [assessmentId, setAssessmentId] = React.useState<string | null>(null)
 
@@ -157,7 +159,11 @@ export const PreviewLessonModal: React.FC<PreviewLessonModalProps> = ({ topic, o
         </div>
       )}
       {assessmentId && previewMethod && (
-        <PreviewAssessmentModal method={previewMethod} onClose={() => setAssessmentId(null)} />
+        <PreviewAssessmentModal
+          method={previewMethod}
+          onClose={() => setAssessmentId(null)}
+          gradeLevel={gradeLevel}
+        />
       )}
     </div>
   )

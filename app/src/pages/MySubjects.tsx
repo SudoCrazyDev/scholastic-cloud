@@ -36,7 +36,9 @@ export default function MySubjects() {
 
   // 4 quarters or 3 terms, per the academic year the grades belong to.
   const academicYear = grades?.[0]?.academic_year
-  const gradingPeriods = useGradingPeriodsForYear(academicYear)
+  // Scoped to this learner's grade level: Senior High keeps 4 quarters through
+  // a year the school runs on 3 terms.
+  const gradingPeriods = useGradingPeriodsForYear(academicYear, user?.grade_level)
 
   const subjects = useMemo((): SubjectGradeRow[] => {
     if (!grades || !Array.isArray(grades)) return []

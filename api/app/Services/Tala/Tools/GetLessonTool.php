@@ -93,10 +93,16 @@ class GetLessonTool implements TalaTool
             return ToolOutcome::error('A lesson title is required. Use list_lessons to find one.');
         }
 
+        // The school default, used only where no single lesson is in hand. Each
+        // row below re-resolves from its own subject, because a teacher with a
+        // Grade 11 class grades it on quarters through a 3-term year.
         $periodType = GradingPeriods::forInstitution($context->institutionId);
 
         $query = AssignedLessonScope::query($context)
-            ->with(['subject:id,title,class_section_id', 'subject.classSection:id,title,grade_level'])
+            ->with([
+                'subject:id,title,class_section_id,institution_id',
+                'subject.classSection:id,title,grade_level,academic_year',
+            ])
             ->where('title', 'like', '%'.$title.'%');
 
         // The title is handled above; the rest are ordinary narrowing filters.
@@ -135,7 +141,8 @@ class GetLessonTool implements TalaTool
                         'subject' => $match->subject?->title,
                         'section' => $this->sectionName($match),
                         'grading_period' => $match->quarter
-                            ? GradingPeriods::noun($periodType).' '.$match->quarter
+                            ? GradingPeriods::noun(GradingPeriods::forSubject($match->subject))
+                                .' '.$match->quarter
                             : null,
                     ], fn ($value) => $value !== null))->values()->all(),
                     'note' => 'More than one lesson matches. Ask the teacher which one, or call '
@@ -152,7 +159,8 @@ class GetLessonTool implements TalaTool
                 'subject' => $lesson->subject?->title,
                 'section' => $this->sectionName($lesson),
                 'grading_period' => $lesson->quarter
-                    ? GradingPeriods::noun($periodType).' '.$lesson->quarter
+                    ? GradingPeriods::noun(GradingPeriods::forSubject($lesson->subject))
+                        .' '.$lesson->quarter
                     : null,
                 'description' => LessonText::plain($lesson->description, self::MAX_BODY_CHARS),
                 'learning_objectives' => $this->objectives($lesson),

@@ -27,10 +27,38 @@ export default function ConsolidatedGrades() {
     section.academic_year === selectedAcademicYear
   );
 
-  const quarters = gradingPeriods.periods.map((period) => ({
-    value: period.value,
-    label: period.label,
-  }));
+  // This page lists every section in the year at once, and they do not all share
+  // a structure - Senior High stays on 4 quarters through a year the rest of the
+  // school runs on 3 terms. So the filter offers the union of what the listed
+  // sections actually have. Offering only the year default made a Grade 11
+  // section's 4th quarter unreachable: there was no way to select it.
+  const quarters = React.useMemo(() => {
+    const byValue = new Map(
+      gradingPeriods.periods.map((period) => [period.value, period])
+    );
+
+    const overrides = gradingPeriods.by_grade_level ?? {};
+    const gradeLevelsInYear = new Set(
+      filteredSections.map((section) => section.grade_level).filter(Boolean)
+    );
+
+    Object.entries(overrides).forEach(([gradeLevel, config]) => {
+      const normalize = (value: string) =>
+        value.trim().replace(/\s+/g, ' ').toLowerCase();
+      const isPresent = [...gradeLevelsInYear].some(
+        (name) => normalize(String(name)) === normalize(gradeLevel)
+      );
+      if (!isPresent) return;
+
+      config.periods.forEach((period) => {
+        if (!byValue.has(period.value)) byValue.set(period.value, period);
+      });
+    });
+
+    return [...byValue.values()]
+      .sort((a, b) => Number(a.value) - Number(b.value))
+      .map((period) => ({ value: period.value, label: period.label }));
+  }, [gradingPeriods, filteredSections]);
 
   // Use available academic years from data, with fallback to default years
   const academicYears = availableAcademicYears.length > 0 ? availableAcademicYears : [
@@ -48,12 +76,14 @@ export default function ConsolidatedGrades() {
   }, [availableAcademicYears, selectedAcademicYear]);
 
   // Switching to a term-based year drops period 4, so never leave the filter
-  // pointing at a period that year does not have.
+  // pointing at a period no listed section has. Checked against `quarters` rather
+  // than the year default, so a 4th quarter stays selectable while a Senior High
+  // section is on screen.
   React.useEffect(() => {
-    if (!gradingPeriods.hasPeriod(selectedQuarter)) {
+    if (quarters.length > 0 && !quarters.some((q) => q.value === selectedQuarter)) {
       setSelectedQuarter('1');
     }
-  }, [gradingPeriods, selectedQuarter]);
+  }, [quarters, selectedQuarter]);
 
   const handleQuarterChange = (quarter: string) => {
     setSelectedQuarter(quarter);

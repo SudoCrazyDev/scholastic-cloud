@@ -74,19 +74,35 @@ The platform already models 3-terms-vs-4-quarters:
 term => 3]`, `GET /api/grading-periods`, 22 backend consumers and 26 frontend files. Switching a
 school to `'term'` looks like it hands you this module's period structure for free.
 
-It does not. `GradingPeriods::forInstitution($institutionId, $academicYear)` resolves the structure
-per **(institution, academic year)** — school-wide for the year — and `institution_academic_years`
-is `UNIQUE (institution_id, year)` with no grade-level dimension to add one to. But a K-12 school
-needs Grades 1–3 on 3 MATATAG terms **while Grades 4–12 stay on 4 numeric quarters in the same
-year**. Flip the flag and `count()` returns 3 school-wide, `assertValidPeriod()` starts throwing
-*"this academic year is divided into 3 terms, so term 4 does not exist"* at every Grade 10 teacher
-entering Q4, and on the frontend `ClassSectionCoreValuesTab.tsx` silently resets the period filter
-to `'1'` when `'4'` disappears.
+It does not — though the reason has changed, and the note below is worth reading before you decide
+this section is stale.
 
-**This module therefore owns its own fixed 3-term concept (`App\Support\MatatagTerms`) and never
-calls `GradingPeriods`.** A regression test pins the premise. Related: `student_running_grades.quarter`
-is a hard `enum('1','2','3','4')` with a `decimal(5,2)` value, so descriptors could not live there
-even if the period model matched.
+**Originally** the obstacle was mechanical: `GradingPeriods::forInstitution()` resolved the
+structure per **(institution, academic year)**, school-wide for the year, with no grade-level
+dimension to add one to. Flipping a K-12 school to `'term'` made `count()` return 3 school-wide and
+`assertValidPeriod()` throw *"this academic year is divided into 3 terms, so term 4 does not exist"*
+at every Grade 10 teacher entering Q4.
+
+**That obstacle is gone.** `institution_grade_level_grading_periods` now records per-grade-level
+exceptions to a year's structure, and `forInstitution()` takes an optional grade level
+(`forSection()` / `forSubject()` resolve it for you). It was added for Senior High — DepEd's 3-term
+structure does not reach Grades 11 and 12, which run two semesters of two quarters each, so a school
+on terms grades SHS over 4 periods in the same year.
+
+**The module still does not reuse it**, for reasons that were always the deeper ones:
+
+- `GradingPeriods` counts and labels *numeric* periods a school **chooses between**. MATATAG's three
+  terms are DepEd's, fixed, and carry A–E descriptors per competency rather than a numeric grade.
+  A school cannot opt out of them or set Grade 1 to "4 quarters" of MATATAG.
+- Opting a section into MATATAG must not change how that grade level's **numeric** grades are
+  structured. A Grade 1 section can report MATATAG descriptors and still have numeric running
+  grades under the year's own structure; the two coexist rather than replace each other.
+- `student_running_grades.quarter` is a hard `enum('1','2','3','4')` with a `decimal(5,2)` value, so
+  descriptors could not live there even if the period model matched.
+
+**So this module owns its own fixed 3-term concept (`App\Support\MatatagTerms`) and never calls
+`GradingPeriods`.** A regression test pins the premise, and its docblock now records the updated
+reasoning rather than the obsolete mechanical one.
 
 ### 2. The DepEd workbook is Grade 1 only — and it invites you to think otherwise
 

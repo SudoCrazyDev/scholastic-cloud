@@ -27,9 +27,10 @@ class SectionConsolidatedGradesController extends Controller
         // Get the section with its students and subjects (eager load childSubjects)
         $section = ClassSection::with(['students', 'subjects.childSubjects', 'subjects.gradingScale.bands'])->findOrFail($sectionId);
 
-        // Quarters vs terms is a property of the section's academic year, so a
-        // 3-term year averages over 3 periods and never looks for a 4th.
-        $periodType = GradingPeriods::forInstitution($section->institution_id, $section->academic_year);
+        // Quarters vs terms is a property of the section's academic year *and* its
+        // grade level, so a 3-term year averages over 3 periods and never looks for
+        // a 4th - except in Senior High, which stays on 4 through the same year.
+        $periodType = GradingPeriods::forSection($section);
         $periodValues = GradingPeriods::intValues($periodType);
 
         if (! $isFinal) {

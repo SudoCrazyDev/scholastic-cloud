@@ -18,9 +18,15 @@ import type { CreateTopicData, UpdateTopicData } from '../../../services/topicSe
 
 interface TopicsTabProps {
   subjectId: string
+  /**
+   * Grade level of the subject's class section, which decides whether it is
+   * graded over 4 quarters or 3 terms. Senior High stays on quarters even in a
+   * year the school runs on terms, so this is not the school-wide setting.
+   */
+  gradeLevel?: string | null
 }
 
-export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
+export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId, gradeLevel }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
   const [deletingTopicId, setDeletingTopicId] = useState<string | null>(null)
@@ -46,7 +52,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
   } = useTopics(subjectId)
 
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
 
   // Group topics by grading period
   const topicsByQuarter = useMemo(() => {
@@ -254,6 +260,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
           topic={editingTopic}
           subjectId={subjectId}
           isLoading={isCreating || isUpdating}
+          gradeLevel={gradeLevel}
         />
       </div>
     )
@@ -332,6 +339,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
                     isTogglingCompletion={isTogglingCompletion}
                     isReordering={isReordering}
                     isUpdating={isUpdating}
+                    gradeLevel={gradeLevel}
                   />
                 ))}
               </div>
@@ -352,6 +360,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ subjectId }) => {
         topic={editingTopic}
         subjectId={subjectId}
         isLoading={isCreating || isUpdating}
+        gradeLevel={gradeLevel}
       />
 
       {/* Copy this lesson into the teacher's other subjects */}

@@ -129,7 +129,9 @@ class TalaProposalController extends Controller
         }
 
         $item = $result['item'];
-        $periodType = GradingPeriods::forInstitution($proposal->institution_id);
+        // From the assessment's own subject, so a Senior High assessment is
+        // summarised as a quarter even in a year the school runs on terms.
+        $periodType = GradingPeriods::forSubject($item?->subject);
 
         return response()->json([
             'success' => true,

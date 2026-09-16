@@ -97,7 +97,7 @@ export default function TeacherActivityDetail() {
                 aria-label={periods.noun}
                 value={quarter}
                 onChange={(e) => setParam('quarter', e.target.value)}
-                options={[{ value: 'all', label: 'Whole year' }, ...periods.options]}
+                options={[{ value: 'all', label: 'Whole year' }, ...periods.allOptions]}
                 inputSize="sm"
               />
             </div>

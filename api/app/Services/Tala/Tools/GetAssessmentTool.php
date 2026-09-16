@@ -92,8 +92,9 @@ class GetAssessmentTool implements TalaTool
             );
         }
 
-        $periodType = GradingPeriods::forInstitution($context->institutionId);
         $item = static::pick($matches, $title);
+        // Per assessment, from its subject's grade level - not school-wide.
+        $periodType = GradingPeriods::forSubject($item?->subject);
 
         if ($item === null) {
             return ToolOutcome::ok(
@@ -102,7 +103,10 @@ class GetAssessmentTool implements TalaTool
                     'ambiguous' => true,
                     'searched_for' => $title,
                     'candidates' => $matches->take(self::MAX_CANDIDATES)
-                        ->map(fn (SubjectEcrItem $match) => AssessmentPresenter::summary($match, $periodType))
+                        ->map(fn (SubjectEcrItem $match) => AssessmentPresenter::summary(
+                            $match,
+                            GradingPeriods::forSubject($match->subject)
+                        ))
                         ->values()
                         ->all(),
                     'note' => 'More than one assessment matches. Ask the teacher which one, or call '

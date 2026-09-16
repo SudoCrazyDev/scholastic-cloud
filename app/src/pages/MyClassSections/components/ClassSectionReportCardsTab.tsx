@@ -31,16 +31,21 @@ interface DebugGradesModalProps {
   studentName: string;
   subjects: Subject[];
   academicYear: string;
+  /**
+   * Section's grade level. Senior High keeps 4 quarters through a year the
+   * school runs on 3 terms, so the structure is not the school-wide one.
+   */
+  gradeLevel?: string | null;
   onClose: () => void;
 }
 
 /** 'all' or a grading period ordinal ('1'..'4'). */
 type QuarterFilter = string;
 
-function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYear, onClose }: DebugGradesModalProps) {
+function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYear, gradeLevel, onClose }: DebugGradesModalProps) {
   const queryClient = useQueryClient();
   // 4 quarters or 3 terms, per this section's academic year.
-  const gradingPeriods = useGradingPeriodsForYear(academicYear);
+  const gradingPeriods = useGradingPeriodsForYear(academicYear, gradeLevel);
   const quarterFilters = useMemo(
     () => [
       { value: 'all', label: 'All' },
@@ -380,6 +385,11 @@ interface ClassSectionReportCardsTabProps {
   isImpersonating?: boolean;
   subjects?: Subject[];
   academicYear?: string;
+  /**
+   * Section's grade level. Senior High keeps 4 quarters through a year the
+   * school runs on 3 terms, so the structure is not the school-wide one.
+   */
+  gradeLevel?: string | null;
 }
 
 const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
@@ -390,6 +400,7 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
   handleViewTempReportCard,
   handleViewReportCard,
   isImpersonating = false,
+  gradeLevel,
   subjects = [],
   academicYear = '',
 }) => {
@@ -535,6 +546,7 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
           studentName={debugStudent?.name ?? ''}
           subjects={subjects}
           academicYear={academicYear}
+          gradeLevel={gradeLevel}
           onClose={() => setDebugStudent(null)}
         />
       )}

@@ -34,9 +34,11 @@ export default function MyGrades() {
 
   const grades = gradesResponse?.data as StudentRunningGrade[] | undefined
 
-  // 4 quarters or 3 terms, per the academic year the grades belong to.
+  // 4 quarters or 3 terms, per the academic year the grades belong to and the
+  // grade level this learner is in - Senior High is graded over 4 quarters even
+  // in a year their school runs on 3 terms.
   const academicYear = grades?.[0]?.academic_year
-  const gradingPeriods = useGradingPeriodsForYear(academicYear)
+  const gradingPeriods = useGradingPeriodsForYear(academicYear, user?.grade_level)
 
   const rows = useMemo((): SubjectGradeRow[] => {
     if (!grades || !Array.isArray(grades)) return []

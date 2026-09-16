@@ -81,8 +81,12 @@ const CORE_VALUE_CODE: Record<string, string> = {
 const ClassSectionCoreValuesTab: React.FC<ClassSectionCoreValuesTabProps> = ({ classSectionId, classSectionData }) => {
   const queryClient = useQueryClient();
   const academicYear = classSectionData?.academic_year || '';
-  // 4 quarters or 3 terms, per this section's academic year.
-  const gradingPeriods = useGradingPeriodsForYear(academicYear);
+  // 4 quarters or 3 terms, per this section's academic year *and* grade level:
+  // Senior High stays on quarters through a year the school runs on terms.
+  const gradingPeriods = useGradingPeriodsForYear(
+    academicYear,
+    classSectionData?.grade_level
+  );
   const [selectedQuarter, setSelectedQuarter] = React.useState<string>('1');
   const [studentFilter, setStudentFilter] = React.useState('');
 

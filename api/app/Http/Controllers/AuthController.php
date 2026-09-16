@@ -8,6 +8,7 @@ use App\Auth\StudentPortalUser;
 use App\Models\User;
 use App\Models\Student;
 use App\Models\StudentAuth;
+use App\Models\StudentSection;
 use App\Support\GradingPeriods;
 use App\Support\StudentPortalAccess;
 use Illuminate\Http\Request;
@@ -214,12 +215,22 @@ class AuthController extends Controller
                         'name' => $inst->title ?? ($inst->name ?? null),
                         'current_academic_year' => $inst->current_academic_year,
                         'theme' => $inst->theme,
-                        'grading_periods' => GradingPeriods::config(
-                            GradingPeriods::forInstitution($si->institution_id)
+                        'grading_periods' => GradingPeriods::configForInstitution(
+                            $si->institution_id
                         ),
                     ] : null,
                 ];
             })->filter(fn ($i) => $i['institution'] !== null)->values()->all();
+
+            // The learner's own grade level, so their portal screens label and count
+            // grading periods on the structure *they* are graded under. A Grade 11
+            // learner sees 4 quarters even when their school runs on 3 terms, and
+            // without this the portal would quietly hide their 4th quarter.
+            $currentSection = StudentSection::where('student_id', $student->id)
+                ->where('is_active', true)
+                ->with('classSection:id,grade_level,academic_year')
+                ->latest('academic_year')
+                ->first();
 
             $data = [
                 'id' => $student->id,
@@ -228,6 +239,7 @@ class AuthController extends Controller
                 'last_name' => $student->last_name,
                 'ext_name' => $student->ext_name,
                 'email' => $auth->email,
+                'grade_level' => $currentSection?->classSection?->grade_level,
                 'gender' => $student->gender,
                 'birthdate' => $student->birthdate,
                 'is_new' => $auth->is_new,
@@ -298,8 +310,14 @@ class AuthController extends Controller
                         // Quarters vs terms for the institution's current academic year,
                         // so the client can label and count grading periods without an
                         // extra request on every grade screen.
-                        'grading_periods' => GradingPeriods::config(
-                            GradingPeriods::forInstitution($userInstitution->institution_id)
+                        //
+                        // Carries `by_grade_level` alongside the school-wide default,
+                        // because the two are not the same question: a school on 3
+                        // terms still runs Grades 11 and 12 on 4 quarters, and a
+                        // teacher's class record has to know which of the two it is
+                        // without another round trip per section.
+                        'grading_periods' => GradingPeriods::configForInstitution(
+                            $userInstitution->institution_id
                         ),
                     ] : null,
                 ];
@@ -397,8 +415,14 @@ class AuthController extends Controller
                         // Quarters vs terms for the institution's current academic year,
                         // so the client can label and count grading periods without an
                         // extra request on every grade screen.
-                        'grading_periods' => GradingPeriods::config(
-                            GradingPeriods::forInstitution($userInstitution->institution_id)
+                        //
+                        // Carries `by_grade_level` alongside the school-wide default,
+                        // because the two are not the same question: a school on 3
+                        // terms still runs Grades 11 and 12 on 4 quarters, and a
+                        // teacher's class record has to know which of the two it is
+                        // without another round trip per section.
+                        'grading_periods' => GradingPeriods::configForInstitution(
+                            $userInstitution->institution_id
                         ),
                     ] : null,
                 ];

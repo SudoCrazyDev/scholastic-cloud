@@ -170,7 +170,12 @@ const ClassSectionDetail: React.FC = () => {
 
   // 4 quarters or 3 terms, per this section's academic year — a section from an
   // earlier year keeps reporting on the structure its grades were entered under.
-  const gradingPeriods = useGradingPeriodsForYear(classSectionData?.academic_year)
+  // Scoped to this section's grade level, not the school: a Grade 11 section
+  // is graded over 4 quarters even in a year the school runs on 3 terms.
+  const gradingPeriods = useGradingPeriodsForYear(
+    classSectionData?.academic_year,
+    classSectionData?.grade_level
+  )
 
   /*
    * MATATAG is additive and narrow: it shows only where the school has the
@@ -759,6 +764,7 @@ const ClassSectionDetail: React.FC = () => {
                     isImpersonating={isImpersonating}
                     subjects={subjects}
                     academicYear={classSectionData?.academic_year ?? ''}
+                    gradeLevel={classSectionData?.grade_level}
                   />
                 </motion.div>
               )}

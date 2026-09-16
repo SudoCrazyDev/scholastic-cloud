@@ -31,7 +31,13 @@ export default function Proficiency() {
 
   // 4 quarters or 3 terms, resolved for the *selected* year — a school that moved
   // to terms this year still reports last year's grades as 4 quarters.
-  const gradingPeriods = useGradingPeriodsForYear(selectedAcademicYear);
+  // Narrowed to the selected grade level when there is one. With 'All' the
+  // report spans grade levels that may not share a structure, so it falls back
+  // to the year default and each row still names its own grade level.
+  const gradingPeriods = useGradingPeriodsForYear(
+    selectedAcademicYear,
+    selectedGradeLevel || undefined
+  );
 
   const availableAcademicYears = [
     ...new Set(

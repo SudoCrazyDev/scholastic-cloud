@@ -16,17 +16,20 @@ interface AddGradeItemModalProps {
   onClose: () => void
   subjectId: string
   onSuccess: () => void
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
   isOpen,
   onClose,
   subjectId,
-  onSuccess
+  onSuccess,
+  gradeLevel
 }) => {
   const createMutation = useCreateSubjectEcrItem()
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   const subjectEcrs = subjectEcrsData?.data || []
   const hasComponents = subjectEcrs.length > 0

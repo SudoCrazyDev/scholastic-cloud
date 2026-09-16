@@ -96,7 +96,10 @@ class ListLessonsTool implements TalaTool
 
         // Starts from the scope, always. The filters can only narrow it.
         $query = AssignedLessonScope::query($context)
-            ->with(['subject:id,title,class_section_id', 'subject.classSection:id,title,grade_level']);
+            ->with([
+                'subject:id,title,class_section_id,institution_id',
+                'subject.classSection:id,title,grade_level,academic_year',
+            ]);
 
         AssignedLessonScope::applyFilters($query, $input);
 
@@ -124,7 +127,8 @@ class ListLessonsTool implements TalaTool
             'subject' => $lesson->subject?->title,
             'section' => $this->sectionName($lesson),
             'grading_period' => $lesson->quarter
-                ? GradingPeriods::noun($periodType).' '.$lesson->quarter
+                ? GradingPeriods::noun(GradingPeriods::forSubject($lesson->subject))
+                    .' '.$lesson->quarter
                 : null,
             'summary' => LessonText::plain($lesson->description, self::MAX_DESCRIPTION_CHARS),
             'learning_objectives' => $this->objectives($lesson),

@@ -75,6 +75,12 @@ import { useLocalDraft } from '@/hooks/useLocalDraft'
 
 interface AssessmentBuilderTabProps {
   subjectId: string
+  /**
+   * Grade level of the subject's class section, which decides whether it is
+   * graded over 4 quarters or 3 terms. Senior High stays on quarters even in a
+   * year the school runs on terms, so this is not the school-wide setting.
+   */
+  gradeLevel?: string | null
 }
 
 interface BuilderDraft {
@@ -989,12 +995,12 @@ const DragPictureEditor: React.FC<{
   )
 }
 
-export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subjectId }) => {
+export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subjectId, gradeLevel }) => {
   const queryClient = useQueryClient()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const quarterSelectOptions = useMemo(
     () => gradingPeriods.periods.map((period) => ({ value: period.value, label: period.short })),
     [gradingPeriods]
@@ -1926,7 +1932,11 @@ export const AssessmentBuilderTab: React.FC<AssessmentBuilderTabProps> = ({ subj
       )}
 
       {previewMethod && (
-        <PreviewAssessmentModal method={previewMethod} onClose={() => setPreviewMethod(null)} />
+        <PreviewAssessmentModal
+          method={previewMethod}
+          onClose={() => setPreviewMethod(null)}
+          gradeLevel={gradeLevel}
+        />
       )}
 
       <CopyToSubjectsModal

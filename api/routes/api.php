@@ -260,6 +260,9 @@ Route::middleware('auth.token')->group(function () {
     Route::put('student-portal-access', [\App\Http\Controllers\StudentPortalAccessController::class, 'update'])->middleware('module:settings,manage');
     Route::get('institutions/{id}/academic-years', [InstitutionController::class, 'getAcademicYears']);
     Route::put('institutions/{id}/academic-years/grading-periods', [InstitutionController::class, 'updateAcademicYearGradingPeriods'])->middleware('module:settings,manage');
+    // Grade levels that depart from a year's structure - Senior High staying on
+    // 4 quarters through a 3-term year. Declared alongside the year it qualifies.
+    Route::put('institutions/{id}/academic-years/grade-level-grading-periods', [InstitutionController::class, 'updateAcademicYearGradeLevelGradingPeriods'])->middleware('module:settings,manage');
     // Resolved quarter-vs-term structure for the signed-in user's institution.
     // Every grade screen needs it to label periods — ungated reference data.
     Route::get('grading-periods', [InstitutionController::class, 'gradingPeriods']);

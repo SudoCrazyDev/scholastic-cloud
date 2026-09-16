@@ -109,9 +109,11 @@ modules should consume its data.
   not a gap. **Three terms, and nothing numeric** — no scores, no averages, no
   transmutation, no general average. Runs *alongside* the existing four-quarter numeric grading and
   replaces none of it. Read it before touching anything grading-adjacent for a primary grade, and
-  **before assuming `App\Support\GradingPeriods` can carry this** — it resolves quarter-vs-term
-  school-wide per academic year, so switching a K-12 school to `'term'` for Grades 1–3 would strand
-  quarter 4 for Grades 4–12. Also covers **how to take a DepEd update**: the catalog is versioned
+  **before assuming `App\Support\GradingPeriods` can carry this**. `GradingPeriods` *does* now take
+  a grade level (`institution_grade_level_grading_periods`, added so Senior High keeps 4 quarters
+  through a 3-term year), so the old mechanical objection is gone — but MATATAG's terms are DepEd's
+  fixed A–E descriptor terms, not a numeric structure a school picks, and the two still coexist
+  rather than merge. The doc records the current reasoning. Also covers **how to take a DepEd update**: the catalog is versioned
   and version-pinned per section, a revision is a new version rather than an edit, and a new grade
   level is a JSON file plus a fifteen-line migration — the extraction runbook and the ARGB
   macro-skill palette are in the doc, because the workbook encodes each slot's language macro skill

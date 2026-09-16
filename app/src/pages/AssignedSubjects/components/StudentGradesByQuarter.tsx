@@ -12,6 +12,8 @@ interface StudentGradesByQuarterProps {
   runningGrades: StudentRunningGrade[];
   /** Always passed explicitly: a defaulted school year files grades under the wrong one. */
   academicYear: string;
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null;
   selectedQuarter?: string;
   // Batch submission props
   isBatchMode?: boolean;
@@ -38,8 +40,9 @@ export const StudentGradesByQuarter: React.FC<StudentGradesByQuarterProps> = ({
   onGradeChange,
   isDisabled = false,
   gradingBands = null,
+  gradeLevel,
 }) => {
-  const gradingPeriods = useGradingPeriods();
+  const gradingPeriods = useGradingPeriods(gradeLevel);
 
   // Group grades by grading period
   const gradesByQuarter = runningGrades.reduce((acc, grade) => {

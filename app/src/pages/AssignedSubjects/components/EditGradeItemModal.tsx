@@ -25,6 +25,8 @@ interface EditGradeItemModalProps {
     quarter?: string
     type?: string
   } | null
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
@@ -32,11 +34,12 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
   onClose,
   subjectId,
   onSuccess,
-  gradeItem
+  gradeItem,
+  gradeLevel
 }) => {
   const updateMutation = useUpdateSubjectEcrItem()
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   const subjectEcrs = subjectEcrsData?.data || []
 

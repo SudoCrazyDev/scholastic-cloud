@@ -49,9 +49,12 @@ export default function TeachingActivity() {
   // A school that moved to 3 terms still has to read last year as 4 quarters,
   // so the period options follow the selected year, not today's.
   const periods = useGradingPeriodsForYear(academicYear)
+  // This page spans every class a teacher carries, which need not share a
+  // structure, so the filter offers the union. Narrowing to the school default
+  // would leave a Senior High teacher unable to select their 4th quarter.
   const quarterOptions = [
     { value: 'all', label: `Whole year` },
-    ...periods.options,
+    ...periods.allOptions,
   ]
 
   return (

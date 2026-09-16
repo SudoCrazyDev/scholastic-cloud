@@ -153,9 +153,13 @@ export default function PrintReportCard({
 
     const { schoolLogoUrl } = useInstitutionLogo(institutionId || undefined);
 
-    // 4 quarters or 3 terms, per the academic year this card covers. Historical
-    // cards keep the structure their grades were entered under.
-    const gradingPeriods = useGradingPeriodsForYear(academicYear);
+    // 4 quarters or 3 terms, per the academic year this card covers *and* the
+    // grade level it is for. Historical cards keep the structure their grades were
+    // entered under, and a Senior High card prints 4 columns even in a term year.
+    const gradingPeriods = useGradingPeriodsForYear(
+        academicYear,
+        classSection?.grade_level
+    );
     const periodValues = gradingPeriods.values;
     /** Grade columns split the fixed-width period block evenly (25% for 4, 33.33% for 3). */
     const periodColumnWidth = `${100 / gradingPeriods.count}%`;

@@ -18,6 +18,7 @@ import {
 import { Badge } from '@/components/badge';
 import { Select } from '@/components/select';
 import { SearchInput } from '@/components/search-input';
+import { useAuth } from '@/hooks/useAuth';
 import { useGradingPeriods } from '@/hooks/useGradingPeriods';
 import { stripHtml } from '@/pages/AssignedSubjects/components/LessonContentViewer';
 
@@ -51,8 +52,11 @@ export const MyLessons: React.FC = () => {
   const subjects = (data?.subjects ?? []) as StudentLessonSubject[];
   const forbidden = error && (error as any)?.response?.status === 403;
 
+  const { user } = useAuth();
   // 4 quarters or 3 terms, per the institution's current academic year.
-  const gradingPeriods = useGradingPeriods();
+  // This learner's own grade level: Senior High keeps 4 quarters through a year
+  // their school runs on 3 terms.
+  const gradingPeriods = useGradingPeriods(user?.grade_level);
   const quarterOptions = useMemo(
     () => [
       { value: '', label: `All ${gradingPeriods.noun_plural.toLowerCase()}` },

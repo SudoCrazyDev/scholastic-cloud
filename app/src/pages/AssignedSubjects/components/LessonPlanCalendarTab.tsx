@@ -12,6 +12,12 @@ import { QuizQuestionsViewer } from './QuizQuestionsViewer'
 
 interface LessonPlanCalendarTabProps {
   subjectId: string
+  /**
+   * Grade level of the subject's class section, which decides whether it is
+   * graded over 4 quarters or 3 terms. Senior High stays on quarters even in a
+   * year the school runs on terms, so this is not the school-wide setting.
+   */
+  gradeLevel?: string | null
 }
 
 function toYmd(d: Date): string {
@@ -99,9 +105,9 @@ const TypeBadge: React.FC<{ type?: string }> = ({ type }) => {
   )
 }
 
-export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ subjectId }) => {
+export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ subjectId, gradeLevel }) => {
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const [quarter, setQuarter] = useState<'1' | '2' | '3' | '4'>('1')
   const [cursorMonth, setCursorMonth] = useState<Date>(() => startOfMonth(new Date()))
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -548,6 +554,7 @@ export const LessonPlanCalendarTab: React.FC<LessonPlanCalendarTabProps> = ({ su
                     title={selectedLessonPlan?.title ?? undefined}
                     date={selectedYmd || undefined}
                     content={selectedLessonPlan?.content as any}
+                    gradeLevel={gradeLevel ?? undefined}
                   />
                 </div>
 

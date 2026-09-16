@@ -49,7 +49,7 @@ export const LessonPlanViewer: React.FC<LessonPlanViewerProps> = ({
   onPrint,
 }) => {
   // Called before the early return so the hook order stays stable.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
 
   if (!content) {
     return (

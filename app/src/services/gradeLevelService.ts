@@ -20,6 +20,17 @@ class GradeLevelService {
     return response.data.data
   }
 
+  /**
+   * The platform's grade level list, without the `grade-levels` module
+   * permission. `getGradeLevels()` is gated on a module a school may not have
+   * granted to the person editing its settings, and the list itself is the same
+   * public Kinder-to-Grade-12 sequence either way.
+   */
+  async getPublicGradeLevels(): Promise<GradeLevel[]> {
+    const response = await api.get<GradeLevelListResponse>('/public/grade-levels')
+    return response.data.data
+  }
+
   async createGradeLevel(data: CreateGradeLevelData): Promise<GradeLevel> {
     const response = await api.post<GradeLevelResponse>(this.baseUrl, data)
     return response.data.data

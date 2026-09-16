@@ -88,14 +88,13 @@ class ListAssessmentsTool implements TalaTool
 
     public function run(array $input, ToolContext $context): ToolOutcome
     {
-        $periodType = GradingPeriods::forInstitution($context->institutionId);
 
         // Starts from the scope, always.
         $query = AssignedAssessmentScope::query($context)
             ->with([
                 'subjectEcr:id,subject_id,title,percentage',
-                'subjectEcr.subject:id,title,class_section_id',
-                'subjectEcr.subject.classSection:id,title,grade_level',
+                'subjectEcr.subject:id,title,class_section_id,institution_id',
+                'subjectEcr.subject.classSection:id,title,grade_level,academic_year',
                 'questions',
             ]);
 
@@ -125,9 +124,13 @@ class ListAssessmentsTool implements TalaTool
 
         $attempts = $this->attemptCounts($items);
 
+        // Resolved per assessment rather than once for the school: a teacher
+        // carrying both a Grade 10 and a Grade 11 class has each labelled the
+        // way its own grade level is graded, terms for one and quarters for
+        // the other, in the same list.
         $rows = $items->map(fn (SubjectEcrItem $item) => AssessmentPresenter::summary(
             $item,
-            $periodType,
+            GradingPeriods::forSubject($item->subjectEcr?->subject),
             $attempts[$item->id] ?? 0,
         ))->values()->all();
 

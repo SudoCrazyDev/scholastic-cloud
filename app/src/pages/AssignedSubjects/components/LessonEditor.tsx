@@ -55,6 +55,8 @@ interface LessonEditorProps {
   topic?: Topic | null
   subjectId: string
   isLoading?: boolean
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 interface LessonDraft {
@@ -152,10 +154,11 @@ export const LessonEditor: React.FC<LessonEditorProps> = ({
   topic,
   subjectId,
   isLoading = false,
+  gradeLevel,
 }) => {
   const isEditing = !!topic
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const [draft, setDraft] = useState<LessonDraft>(emptyDraft())
   const [savedTopicId, setSavedTopicId] = useState<string | null>(topic?.id ?? null)
   const [uploadingBlockId, setUploadingBlockId] = useState<string | null>(null)

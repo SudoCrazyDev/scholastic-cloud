@@ -35,6 +35,8 @@ interface TopicItemProps {
   isTogglingCompletion?: boolean
   isReordering?: boolean
   isUpdating?: boolean
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 export const TopicItem: React.FC<TopicItemProps> = ({
@@ -46,6 +48,7 @@ export const TopicItem: React.FC<TopicItemProps> = ({
   onTogglePublish,
   onMoveUp,
   onMoveDown,
+  gradeLevel,
   canMoveUp = false,
   canMoveDown = false,
   isDeleting = false,
@@ -243,7 +246,13 @@ export const TopicItem: React.FC<TopicItemProps> = ({
       </div>
     </motion.div>
 
-    {showPreview && <PreviewLessonModal topic={topic} onClose={() => setShowPreview(false)} />}
+    {showPreview && (
+      <PreviewLessonModal
+        topic={topic}
+        onClose={() => setShowPreview(false)}
+        gradeLevel={gradeLevel}
+      />
+    )}
     </>
   )
 }

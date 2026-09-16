@@ -30,6 +30,12 @@ interface ClassRecordTabProps {
   gradingBands?: GradeBandLike[] | null
   /** School year of the subject's class section; final grades are saved under it. */
   academicYear?: string
+  /**
+   * Grade level of the subject's class section, which decides whether it is
+   * graded over 4 quarters or 3 terms. Senior High stays on quarters even in a
+   * year the school runs on terms, so this is not the school-wide setting.
+   */
+  gradeLevel?: string | null
 }
 
 // Type for batch grade changes
@@ -46,7 +52,7 @@ interface BatchGradeChange {
 // Type for submission strategy
 type SubmissionStrategy = 'bulk' | 'individual' | 'hybrid';
 
-export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [], gradingBands = null, academicYear }) => {
+export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [], gradingBands = null, academicYear, gradeLevel }) => {
   // The section's own year is the one the subject's grade items are filed under;
   // the institution setting only covers sections saved before it was recorded.
   const { currentAcademicYear } = useAuth();
@@ -67,7 +73,7 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // 4 quarters or 3 terms, depending on the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods();
+  const gradingPeriods = useGradingPeriods(gradeLevel);
 
   // Grading period filter state for mobile/tablet
   const [selectedQuarter, setSelectedQuarter] = useState<string>('1');
@@ -749,6 +755,7 @@ export const ClassRecordTab: React.FC<ClassRecordTabProps> = ({ subjectId, class
                           onGradeChange={handleGradeChange}
                           isDisabled={isSubmitting}
                           gradingBands={gradingBands}
+                          gradeLevel={gradeLevel}
                         />
                       ))}
                     </div>

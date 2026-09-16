@@ -23,6 +23,7 @@ import { Button } from '@/components/button';
 import { MatchingQuestion } from './MatchingQuestion';
 import { DragPictureQuestion } from './DragPictureQuestion';
 import { QuestionPromptView } from '../AssignedSubjects/components/QuestionPromptView';
+import { useAuth } from '@/hooks/useAuth';
 import { useGradingPeriods } from '@/hooks/useGradingPeriods';
 
 const isUploadAnswer = (value: unknown): value is UploadAnswer =>
@@ -55,7 +56,10 @@ export const TakeAssessment: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const gradingPeriods = useGradingPeriods();
+  const { user } = useAuth();
+  // This learner's own grade level: Senior High is graded over 4 quarters even in
+  // a year their school runs on 3 terms.
+  const gradingPeriods = useGradingPeriods(user?.grade_level);
   const [answers, setAnswers] = useState<AssessmentAnswers>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);

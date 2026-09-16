@@ -238,7 +238,11 @@ class ProposeAssessmentTool implements TalaTool
         }
 
         $period = ToolInput::period($input, 'grading_period');
-        $periodType = GradingPeriods::forInstitution($context->institutionId);
+        // Resolved from the subject, not the school: the subject's section carries
+        // the grade level, and a Senior High subject keeps 4 quarters through a
+        // year the rest of the school runs on 3 terms. Resolving school-wide here
+        // refused a Grade 11 teacher a 4th-quarter assessment.
+        $periodType = GradingPeriods::forSubject($subject);
 
         if ($period === null) {
             return ToolOutcome::error(
@@ -410,7 +414,7 @@ class ProposeAssessmentTool implements TalaTool
             );
         }
 
-        $periodType = GradingPeriods::forInstitution($context->institutionId);
+        $periodType = GradingPeriods::forSubject($item->subject);
         $attempts = StudentAssessmentAttempt::where('subject_ecr_item_id', $item->id)->count();
         $current = AssessmentPresenter::questions($item);
 

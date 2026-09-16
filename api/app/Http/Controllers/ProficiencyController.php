@@ -42,8 +42,15 @@ class ProficiencyController extends Controller
             return $deny;
         }
 
-        $gradingPeriods = GradingPeriods::config(
-            GradingPeriods::forInstitution($institutionId, $academicYear)
+        // Scoped to the grade level when the caller filtered by one. Unfiltered,
+        // this report spans grade levels that may not share a structure, so the
+        // payload also carries `by_grade_level` and each row names its grade
+        // level - that is what lets the client show 4 columns for Senior High and
+        // 3 for everyone else in the same table.
+        $gradingPeriods = GradingPeriods::configForInstitution(
+            $institutionId,
+            $academicYear,
+            $gradeLevelFilter
         );
 
         $sectionsQuery = ClassSection::where('institution_id', $institutionId)
@@ -239,8 +246,15 @@ class ProficiencyController extends Controller
             return $deny;
         }
 
-        $gradingPeriods = GradingPeriods::config(
-            GradingPeriods::forInstitution($institutionId, $academicYear)
+        // Scoped to the grade level when the caller filtered by one. Unfiltered,
+        // this report spans grade levels that may not share a structure, so the
+        // payload also carries `by_grade_level` and each row names its grade
+        // level - that is what lets the client show 4 columns for Senior High and
+        // 3 for everyone else in the same table.
+        $gradingPeriods = GradingPeriods::configForInstitution(
+            $institutionId,
+            $academicYear,
+            $gradeLevelFilter
         );
 
         $sectionsQuery = ClassSection::where('institution_id', $institutionId)

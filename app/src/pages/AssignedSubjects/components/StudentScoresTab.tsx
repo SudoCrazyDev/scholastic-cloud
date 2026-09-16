@@ -30,6 +30,12 @@ interface StudentScoresTabProps {
   classSectionId: string
   isLimited?: boolean
   assignedStudentIds?: string[]
+  /**
+   * Grade level of the subject's class section, which decides whether it is
+   * graded over 4 quarters or 3 terms. Senior High stays on quarters even in a
+   * year the school runs on terms, so this is not the school-wide setting.
+   */
+  gradeLevel?: string | null
 }
 
 // Type badge component
@@ -228,6 +234,8 @@ interface GradeItemSectionProps {
   students: Student[]
   scores: StudentScore[]
   onEditItem: (item: any) => void
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 const GradeItemSection: React.FC<GradeItemSectionProps> = ({
@@ -235,9 +243,10 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   students,
   scores,
   onEditItem,
+  gradeLevel,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
 
   // Group students by gender and sort alphabetically
   const groupedStudents = students.reduce((groups, student) => {
@@ -389,7 +398,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   )
 }
 
-export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [] }) => {
+export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, classSectionId, isLimited = false, assignedStudentIds = [], gradeLevel }) => {
   // Fetch students
   const { students, loading: studentsLoading, error: studentsError } = useStudents({ class_section_id: classSectionId })
   // Filter students if limited
@@ -418,7 +427,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   }, [subjectId, classSectionId, refetchGradeItems, refetchScores])
 
   const [activeQuarter, setActiveQuarter] = useState<string>('All')
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedGradeItem, setSelectedGradeItem] = useState<any>(null)
@@ -673,6 +682,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
               students={filteredStudents}
               scores={studentScoresData?.data || []}
               onEditItem={handleEditGradeItem}
+              gradeLevel={gradeLevel}
             />
           ))
         )}
@@ -684,6 +694,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         onClose={() => setShowAddModal(false)}
         subjectId={subjectId}
         onSuccess={handleGradeItemSuccess}
+        gradeLevel={gradeLevel}
       />
 
       {/* Edit Grade Item Modal */}
@@ -696,6 +707,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         subjectId={subjectId}
         onSuccess={handleEditGradeItemSuccess}
         gradeItem={selectedGradeItem}
+        gradeLevel={gradeLevel}
       />
     </div>
   )

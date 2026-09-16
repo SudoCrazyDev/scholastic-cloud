@@ -15,6 +15,8 @@ interface TopicModalProps {
   topic?: Topic | null
   subjectId: string
   isLoading?: boolean
+  /** Grade level of the subject's section; decides quarters vs terms. */
+  gradeLevel?: string | null
 }
 
 export const TopicModal: React.FC<TopicModalProps> = ({
@@ -23,7 +25,8 @@ export const TopicModal: React.FC<TopicModalProps> = ({
   onSubmit,
   topic,
   subjectId,
-  isLoading = false
+  isLoading = false,
+  gradeLevel
 }) => {
   const [formData, setFormData] = useState<CreateTopicData>({
     subject_id: subjectId,
@@ -34,7 +37,7 @@ export const TopicModal: React.FC<TopicModalProps> = ({
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
 
   const isEditing = !!topic
 

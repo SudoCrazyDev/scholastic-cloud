@@ -23,6 +23,12 @@ import {
 
 interface AiPlannerTabProps {
   subjectId: string
+  /**
+   * Grade level of the subject's class section, which decides whether it is
+   * graded over 4 quarters or 3 terms. Senior High stays on quarters even in a
+   * year the school runs on terms, so this is not the school-wide setting.
+   */
+  gradeLevel?: string | null
 }
 
 const WEEKDAYS = [
@@ -35,9 +41,9 @@ const WEEKDAYS = [
   { key: 'sunday', label: 'Sun' },
 ] as const
 
-export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId }) => {
+export const AiPlannerTab: React.FC<AiPlannerTabProps> = ({ subjectId, gradeLevel }) => {
   // 4 quarters or 3 terms, per the academic year's configured structure.
-  const gradingPeriods = useGradingPeriods()
+  const gradingPeriods = useGradingPeriods(gradeLevel)
   const [quarter, setQuarter] = useState<'1' | '2' | '3' | '4'>('1')
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     topics: true,
