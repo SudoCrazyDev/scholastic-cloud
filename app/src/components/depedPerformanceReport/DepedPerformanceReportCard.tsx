@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Page, Text, View, Document, PDFViewer, StyleSheet, Image, Font } from '@react-pdf/renderer';
+import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
 
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
@@ -11,9 +11,9 @@ import { encodedFinalGrade, encodedTermGrade } from './depedPerformanceGrades';
 import type { SchoolDay, StudentAttendance, Subject, User } from '../../types';
 import type { StudentRunningGrade } from '../../services/studentRunningGradeService';
 
-// Prevent mid-word hyphenation so long learning-area names wrap at word
-// boundaries, as in the existing card.
-Font.registerHyphenationCallback((word) => [word]);
+// How words break is registered once in reportCardPdfUtils — the callback is
+// global to @react-pdf/renderer, so a copy here would silently fight the one in
+// every other card depending on which module loaded last.
 
 /**
  * DepEd's Learner's Performance Report — Annex G of DepEd Order 15, s. 2026.

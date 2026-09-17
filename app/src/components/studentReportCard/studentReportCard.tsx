@@ -1,14 +1,15 @@
 
 import { useMemo } from 'react';
-import { Page, Text, View, Document, PDFViewer, StyleSheet, Image, Font } from '@react-pdf/renderer';
+import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
 
-// Prevent mid-word hyphenation so long subject names wrap at word boundaries (e.g. "TVE - Computer\nSystem Servicing" instead of "TVE - Computer Sys-\ntem Servicing").
-Font.registerHyphenationCallback((word) => [word]);
+// How words break is registered once in reportCardPdfUtils — the callback is
+// global to @react-pdf/renderer, so a copy here would silently fight the one in
+// every other card depending on which module loaded last.
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
 import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods';
 import { calculateFinalGrade, getPassFailRemarks, getGeneralAverageRemarks, getQuarterGrade, calculateAgeAsOfOctober31 } from '../../utils/gradeUtils';
-import { fitPdfSingleLineFontSizePx, REPORT_CARD_SIGNATURE_HALF_MAX_PT, formatStudentNameReportCard } from '../../utils/reportCardPdfUtils';
+import { fitLearningAreaFontSizePx, fitPdfSingleLineFontSizePx, LEARNING_AREA_CHILD_INDENT_PT, REPORT_CARD_SIGNATURE_HALF_MAX_PT, formatStudentNameReportCard } from '../../utils/reportCardPdfUtils';
 
 const CORE_VALUE_BEHAVIORS: Record<string, string[]> = {
     'Maka-Diyos': [
@@ -618,11 +619,24 @@ export default function PrintReportCard({
                             const isChild = subject.subject_type === 'child';
                             const allQuartersHaveValues = periodGrades.every(grade => grade > 0);
                             const showFinalAndRemarks = !isChild && subjectFinalGrade > 0 && allQuartersHaveValues;
+
+                            // Full size unless a single unbreakable word cannot fit the cell.
+                            const titleFontPx = fitLearningAreaFontSizePx(displayTitle, 7, isChild);
                             
                             return (
                                 <View key={subject.id} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
                                     <View style={{width: '30%', display: 'flex', flexDirection:'row', alignContent: 'center', justifyContent: 'flex-start', borderRight: '1px solid black', padding: '2px'}}>
-                                        <Text style={{fontSize: '7px', fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'center', marginLeft: isChild ? '10px' : '0px'}}>{displayTitle}</Text>
+                                        {/*
+                                          * Left-aligned, like every other cell of learning-area
+                                          * names we print (the temp card, the SF9, and the DO 15
+                                          * performance report). Centred, a title short enough to
+                                          * fit one line sat left while a wrapped one — "Effective
+                                          * Communication/Mabisang Komunikasyon", most of a Senior
+                                          * High load — centred each of its lines, so the column
+                                          * read as a ragged mix down the page. Left also makes the
+                                          * child indent below do something visible.
+                                          */}
+                                        <Text style={{fontSize: `${titleFontPx}px`, fontFamily: 'Helvetica', alignSelf: 'center', textAlign: 'left', marginLeft: isChild ? `${LEARNING_AREA_CHILD_INDENT_PT}px` : '0px'}}>{displayTitle}</Text>
                                     </View>
                                     <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black'}}>
                                         {periodGrades.map((periodGrade, index) => (

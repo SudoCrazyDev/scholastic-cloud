@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Page, Text, View, Document, PDFViewer, Image } from '@react-pdf/renderer';
 import type { SectionSubject, StudentSubjectGrade, Institution, ClassSection, Student } from '../../types';
 import { roundGrade, getPassFailRemarks, calculateAgeAsOfOctober31 } from '@/utils/gradeUtils';
-import { fitPdfSingleLineFontSizePx, formatStudentNameReportCard } from '@/utils/reportCardPdfUtils';
+import { fitLearningAreaFontSizePx, fitPdfSingleLineFontSizePx, formatStudentNameReportCard } from '@/utils/reportCardPdfUtils';
 import { useCoreValueMarkings } from '@/hooks/useCoreValueMarkings';
 import { useInstitutionLogo } from '@/hooks/useInstitutionLogo';
 import { useGradingPeriodsForYear } from '@/hooks/useGradingPeriods';
@@ -271,11 +271,19 @@ export default function PrintTempReportCard({
                             const remarks = finalGradeNum > 0 ? getPassFailRemarks(finalGradeNum) : '';
                             const isChild = subject.subject_type === 'child';
                             const showFinalAndRemarks = SHOW_FINAL_GRADE_AND_REMARKS_VALUES && !isChild;
+                            const tempDisplayTitle = `${subject.title || 'Subject'}${subject.variant ? ` - ${subject.variant}` : ''}`;
 
                             return (
                               <View key={index} style={{display: 'flex', flexDirection: 'row', borderLeft: '1px solid black', borderRight: '1px solid black', borderBottom: '1px solid black'}}>
                                 <View style={{paddingLeft: '2px', paddingVertical: '2px', width: '30%', display: 'flex', flexDirection:'row', alignItems: 'center', justifyContent: 'flex-start', borderRight: '1px solid black'}}>
-                                  <Text style={{fontSize: '8px', fontFamily: 'Helvetica', marginLeft: `${subject.subject_type === 'parent' ? '0px' : '10px'}`}}>{subject.title ||  'Subject'}{subject.variant ? ` - ${subject.variant}` : ''}</Text>
+                                  {/*
+                                    * Same fit as the final card, at this card's own 8pt base: a
+                                    * Senior High name like "Effective Communication/Mabisang
+                                    * Komunikasyon" carries a word too wide for the column, and
+                                    * printed across the quarter mark beside it. Only a row that
+                                    * cannot fit shrinks.
+                                    */}
+                                  <Text style={{fontSize: `${fitLearningAreaFontSizePx(tempDisplayTitle, 8, isChild)}px`, fontFamily: 'Helvetica', marginLeft: `${isChild ? '10px' : '0px'}`}}>{tempDisplayTitle}</Text>
                                 </View>
                                 <View style={{width: '40%', display: 'flex', flexDirection: 'row', borderRight: '1px solid black', alignItems: 'center', justifyContent: 'center'}}>
                                   {periodGrades.map((periodGrade, periodIndex) => (
