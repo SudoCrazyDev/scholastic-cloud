@@ -120,6 +120,20 @@ modules should consume its data.
   *only* as a cell fill colour. Notes six defects in DepEd's own spreadsheet and one deliberate
   deviation from the printed form (September attendance).
 
+- [Grade 1: the existing numeric scores](MatatagKeyStage1/NUMERIC_TO_DESCRIPTOR.md) — Academics.
+  **Analysis, decision pending.** What happens to a Grade 1 section's numeric quiz records when the
+  school switches to MATATAG mid-year, measured against Maranatha's live data (2026-09-17). Read it
+  before anyone proposes transmuting scores into descriptors, or tagging ECR items to competencies —
+  both were considered here and both are argued down with figures. The short answer is that the
+  scores **cannot be converted but can be read from**, and the reason is not arithmetic: **76% of
+  Term 1's slots are Listening and Speaking**, which no written quiz ever measured, so for three
+  quarters of the term there is nothing to convert. Records why restructuring `subjects_ecr`
+  components into MATATAG domains is a trap (`percentage` is a weight, and an ECR item has one score
+  where a slot needs one per macro skill). Recommends pacing the marking through `MatatagFocusList`
+  and building a **coverage indicator**, which does not exist. Also records a live bug in
+  `extract.py` — a workbook storing its numbers as floats silently extracts 178/90 instead of
+  199/604, and the loader would accept it.
+
 - [DepEd Performance Report](DepedPerformanceReport/DEPED_PERFORMANCE_REPORT.md) — Academics.
   **Built.** The report card DepEd re-issued in **DO 15, s. 2026** (which repeals DO 8, s. 2015),
   printed for **Grades 2 to 10**. In a switched-on school it **becomes** the Report Cards tab for

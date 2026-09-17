@@ -19,6 +19,12 @@ existing numeric grading, which it must never alter: a K-12 school runs both at 
 [the transition](#key-stage-1-is-phased-grade-2-and-grade-3-are-still-numeric) before concluding
 that a Grade 2 section is missing something.
 
+**A school switching on mid-year already has numeric scores for the term**, and the first question
+anyone asks is whether they can become descriptors. They cannot, and the reason is not the one you
+would expect — see
+[Grade 1: the existing numeric scores](NUMERIC_TO_DESCRIPTOR.md), which measures the question
+against a live tenant and argues down both transmutation and ECR-to-competency tagging.
+
 | | Existing numeric grading | This module |
 |---|---|---|
 | Periods | 4 quarters | **3 terms** |
