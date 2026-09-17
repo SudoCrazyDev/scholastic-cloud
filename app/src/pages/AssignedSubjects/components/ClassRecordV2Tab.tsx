@@ -139,6 +139,88 @@ const GENDER_GROUPS: { key: string; label: string }[] = [
   { key: 'other', label: 'OTHER' },
 ]
 
+/**
+ * A colour identity per component, cycled in the order the components run.
+ *
+ * Positional rather than keyed on a name: components are named by each school,
+ * so there is no "Written Works" to match on, and a fourth or fifth component
+ * would fall back to grey. Every class is written out in full because Tailwind
+ * only keeps the ones it can see in the source.
+ */
+const GROUP_PALETTES = [
+  {
+    band: 'bg-sky-700 text-white',
+    sub: 'bg-sky-50 text-sky-900',
+    hps: 'bg-sky-50/70 text-sky-700',
+    roll: 'bg-sky-50/70',
+    edge: 'border-l-2 border-l-sky-300',
+    dot: 'bg-sky-600',
+  },
+  {
+    band: 'bg-emerald-700 text-white',
+    sub: 'bg-emerald-50 text-emerald-900',
+    hps: 'bg-emerald-50/70 text-emerald-700',
+    roll: 'bg-emerald-50/70',
+    edge: 'border-l-2 border-l-emerald-300',
+    dot: 'bg-emerald-600',
+  },
+  {
+    band: 'bg-violet-700 text-white',
+    sub: 'bg-violet-50 text-violet-900',
+    hps: 'bg-violet-50/70 text-violet-700',
+    roll: 'bg-violet-50/70',
+    edge: 'border-l-2 border-l-violet-300',
+    dot: 'bg-violet-600',
+  },
+  {
+    band: 'bg-amber-700 text-white',
+    sub: 'bg-amber-50 text-amber-900',
+    hps: 'bg-amber-50/70 text-amber-700',
+    roll: 'bg-amber-50/70',
+    edge: 'border-l-2 border-l-amber-300',
+    dot: 'bg-amber-600',
+  },
+  {
+    band: 'bg-rose-700 text-white',
+    sub: 'bg-rose-50 text-rose-900',
+    hps: 'bg-rose-50/70 text-rose-700',
+    roll: 'bg-rose-50/70',
+    edge: 'border-l-2 border-l-rose-300',
+    dot: 'bg-rose-600',
+  },
+  {
+    band: 'bg-teal-700 text-white',
+    sub: 'bg-teal-50 text-teal-900',
+    hps: 'bg-teal-50/70 text-teal-700',
+    roll: 'bg-teal-50/70',
+    edge: 'border-l-2 border-l-teal-300',
+    dot: 'bg-teal-600',
+  },
+]
+
+const paletteFor = (index: number) => GROUP_PALETTES[index % GROUP_PALETTES.length]
+
+/**
+ * How a grade reads at a glance. The 75 line is the one that matters — it is
+ * the passing mark on both the DO 8 and the DO 15 card — so it is the only
+ * place the colour crosses from warm to cool.
+ */
+const gradeTone = (grade: number | null): string => {
+  if (grade === null || grade <= 0) return 'text-gray-300'
+  if (grade >= 90) return 'text-emerald-700'
+  if (grade >= 85) return 'text-sky-700'
+  if (grade >= 75) return 'text-amber-700'
+  return 'text-rose-700'
+}
+
+const descriptorTone = (grade: number | null): string => {
+  if (grade === null || grade <= 0) return 'bg-gray-100 text-gray-400'
+  if (grade >= 90) return 'bg-emerald-100 text-emerald-800'
+  if (grade >= 85) return 'bg-sky-100 text-sky-800'
+  if (grade >= 75) return 'bg-amber-100 text-amber-800'
+  return 'bg-rose-100 text-rose-800'
+}
+
 const formatName = (student: Student): string => {
   const middle = student.middle_name ? ` ${student.middle_name.charAt(0)}.` : ''
   const ext = student.ext_name ? ` ${student.ext_name}` : ''
@@ -219,11 +301,11 @@ const ScoreCell = React.memo<{
 
   const ring =
     state === 'saving'
-      ? 'ring-1 ring-amber-400'
+      ? 'ring-2 ring-inset ring-amber-400 bg-amber-50'
       : state === 'error'
-        ? 'ring-1 ring-red-500 bg-red-50'
+        ? 'ring-2 ring-inset ring-rose-500 bg-rose-50'
         : state === 'saved'
-          ? 'ring-1 ring-green-400'
+          ? 'ring-2 ring-inset ring-emerald-400 bg-emerald-50/70'
           : ''
 
   return (
@@ -252,7 +334,8 @@ const ScoreCell = React.memo<{
           next?.focus()
         })
       }}
-      className={`h-7 w-full rounded-none border-0 bg-transparent px-1 text-center text-xs tabular-nums text-gray-900 focus:z-10 focus:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:text-gray-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${ring}`}
+      placeholder="·"
+      className={`h-8 w-full rounded-none border-0 bg-transparent px-1 text-center text-xs font-medium tabular-nums text-gray-900 transition-colors placeholder:font-normal placeholder:text-gray-300 hover:bg-white hover:ring-1 hover:ring-inset hover:ring-primary-300 focus:z-10 focus:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 disabled:text-gray-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${ring}`}
     />
   )
 })
@@ -593,23 +676,41 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
   const totalColumns =
     2 + columnGroups.reduce((total, group) => total + Math.max(group.items.length, 0) + 3, 0) + 3
 
-  /** Column cells shared by the header rows and the body, so the ruling lines up. */
-  const cellBorder = 'border border-gray-300'
-  const headerCell = `${cellBorder} bg-gray-50 px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-700`
-  const stickyIndex = 'sticky left-0 w-10 min-w-10'
-  const stickyName = 'sticky left-10 w-64 min-w-64'
+  const itemCount = columnGroups.reduce((total, group) => total + group.items.length, 0)
 
   // Every score input in the sheet, in visual order, so Enter can walk down a column.
   const cellIdFor = (studentId: string, itemId: string) => `crv2-${studentId}-${itemId}`
   const orderedStudentIds = roster.flatMap((group) => group.students.map((student) => student.id))
 
+  /** The class's average Initial Grade. Null until somebody has one. */
+  const classAverage = (() => {
+    const grades = orderedStudentIds
+      .map((studentId) => computed[studentId]?.initial ?? null)
+      .filter((grade): grade is number => grade !== null && grade > 0)
+    if (grades.length === 0) return null
+    return grades.reduce((total, grade) => total + grade, 0) / grades.length
+  })()
+
+  /** Column cells shared by the header rows and the body, so the ruling lines up. */
+  const cellBorder = 'border border-slate-200'
+  const headerCell = `${cellBorder} px-1 text-center text-[10px] font-semibold uppercase tracking-wider`
+  const frozenHeader = `${headerCell} border-slate-600 bg-slate-700 text-white`
+  const stickyIndex = 'sticky left-0 w-10 min-w-10'
+  const stickyName = 'sticky left-10 w-64 min-w-64'
+  /** The frozen names end here; a heavier rule stops the sheet bleeding into them. */
+  const nameEdge = 'border-r-2 border-r-slate-300'
+  const resultsEdge = 'border-l-2 border-l-slate-400'
+
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex items-end gap-3">
-          <div className="w-48">
-            <label className="mb-1 block text-xs font-medium text-gray-500" htmlFor="crv2-period">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-wrap items-end gap-x-7 gap-y-3">
+          <div className="w-44">
+            <label
+              className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500"
+              htmlFor="crv2-period"
+            >
               Grading period
             </label>
             <Select
@@ -620,14 +721,38 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
               options={gradingPeriods.options}
             />
           </div>
-          <p className="pb-2 text-xs text-gray-500">
-            {orderedStudentIds.length} learner{orderedStudentIds.length === 1 ? '' : 's'} ·{' '}
-            {columnGroups.reduce((total, group) => total + group.items.length, 0)} grade item
-            {columnGroups.reduce((total, group) => total + group.items.length, 0) === 1 ? '' : 's'}
-          </p>
+
+          <dl className="flex items-end gap-7 pb-1">
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Learners
+              </dt>
+              <dd className="text-lg font-semibold leading-tight text-slate-900 tabular-nums">
+                {orderedStudentIds.length}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Grade items
+              </dt>
+              <dd className="text-lg font-semibold leading-tight text-slate-900 tabular-nums">
+                {itemCount}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Class average
+              </dt>
+              <dd
+                className={`text-lg font-semibold leading-tight tabular-nums ${gradeTone(classAverage)}`}
+              >
+                {classAverage === null ? '—' : classAverage.toFixed(2)}
+              </dd>
+            </div>
+          </dl>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={fillTermGradesFromInitial}>
             <ArrowDownTrayIcon className="h-4 w-4" />
             Fill from Initial Grade
@@ -646,13 +771,26 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
         </div>
       </div>
 
-      <p className="text-xs text-gray-500">
-        Scores save as you leave a cell; press Enter to drop to the next learner. The Term Grade
-        column is a draft until you save it.
-      </p>
+      {/* Which colour is which component, and what the sheet expects of you */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
+        {columnGroups.map(({ component, percentage }, groupIndex) => (
+          <span key={component.id} className="inline-flex items-center gap-1.5">
+            <span className={`h-2.5 w-2.5 rounded-sm ${paletteFor(groupIndex).dot}`} />
+            <span className="font-medium text-slate-700">{component.title}</span>
+            <span className="tabular-nums">{percentage}%</span>
+          </span>
+        ))}
+        <span className="text-slate-400">
+          Scores save as you leave a cell · Enter drops to the next learner · Term Grade is a draft
+          until saved
+        </span>
+      </div>
 
       {/* The sheet */}
-      <div className="overflow-auto rounded-lg border border-gray-300" style={{ maxHeight: '70vh' }}>
+      <div
+        className="overflow-auto rounded-xl border border-slate-300 shadow-sm"
+        style={{ maxHeight: '70vh' }}
+      >
         <table
           className="min-w-full text-xs"
           style={{ borderCollapse: 'separate', borderSpacing: 0 }}
@@ -662,45 +800,49 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
             <tr ref={groupRowRef}>
               <th
                 rowSpan={2}
-                className={`${headerCell} ${stickyIndex} z-40`}
+                className={`${frozenHeader} ${stickyIndex} z-40`}
                 style={{ top: 0, position: 'sticky' }}
               >
                 #
               </th>
               <th
                 rowSpan={2}
-                className={`${headerCell} ${stickyName} z-40 text-left`}
+                className={`${frozenHeader} ${stickyName} ${nameEdge} z-40 px-2 text-left`}
                 style={{ top: 0, position: 'sticky' }}
               >
                 Learners&apos; Names
               </th>
-              {columnGroups.map(({ component, items, percentage }) => (
+              {columnGroups.map(({ component, items, percentage }, groupIndex) => (
                 <th
                   key={component.id}
                   colSpan={items.length + 3}
-                  className={`${headerCell} z-30 bg-blue-50 text-blue-900`}
+                  className={`${headerCell} ${paletteFor(groupIndex).band} ${paletteFor(groupIndex).edge} z-30 py-1.5`}
                   style={{ top: 0, position: 'sticky' }}
                 >
-                  {component.title} ({percentage}%)
+                  {component.title} <span className="font-normal opacity-80">({percentage}%)</span>
                 </th>
               ))}
               <th
                 rowSpan={2}
-                className={`${headerCell} z-30 w-16 min-w-16`}
+                className={`${frozenHeader} ${resultsEdge} z-30 w-16 min-w-16 leading-tight`}
                 style={{ top: 0, position: 'sticky' }}
               >
-                Initial Grade
+                Initial
+                <br />
+                Grade
               </th>
               <th
                 rowSpan={2}
-                className={`${headerCell} z-30 w-20 min-w-20`}
+                className={`${frozenHeader} z-30 w-20 min-w-20 leading-tight`}
                 style={{ top: 0, position: 'sticky' }}
               >
-                Term Grade
+                Term
+                <br />
+                Grade
               </th>
               <th
                 rowSpan={2}
-                className={`${headerCell} z-30 w-32 min-w-32`}
+                className={`${frozenHeader} z-30 w-44 min-w-44`}
                 style={{ top: 0, position: 'sticky' }}
               >
                 Descriptor
@@ -709,83 +851,89 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
 
             {/* Item numbers and each component's roll-up */}
             <tr ref={columnRowRef}>
-              {columnGroups.map(({ component, items }) => (
-                <React.Fragment key={component.id}>
-                  {items.map((item, index) => (
+              {columnGroups.map(({ component, items }, groupIndex) => {
+                const palette = paletteFor(groupIndex)
+                return (
+                  <React.Fragment key={component.id}>
+                    {items.map((item, index) => (
+                      <th
+                        key={item.id}
+                        title={`${item.title} — highest possible ${toNumber(item.score)}`}
+                        className={`${headerCell} ${palette.sub} ${index === 0 ? palette.edge : ''} z-30 w-10 min-w-10 cursor-help`}
+                        style={{ top: headerOffsets[0], position: 'sticky' }}
+                      >
+                        {index + 1}
+                      </th>
+                    ))}
                     <th
-                      key={item.id}
-                      title={`${item.title} — highest possible ${toNumber(item.score)}`}
-                      className={`${headerCell} z-30 w-10 min-w-10`}
+                      className={`${headerCell} ${palette.sub} ${items.length === 0 ? palette.edge : ''} z-30 w-12 min-w-12`}
                       style={{ top: headerOffsets[0], position: 'sticky' }}
                     >
-                      {index + 1}
+                      Total
                     </th>
-                  ))}
-                  <th
-                    className={`${headerCell} z-30 w-12 min-w-12`}
-                    style={{ top: headerOffsets[0], position: 'sticky' }}
-                  >
-                    Total
-                  </th>
-                  <th
-                    className={`${headerCell} z-30 w-12 min-w-12`}
-                    style={{ top: headerOffsets[0], position: 'sticky' }}
-                  >
-                    PS
-                  </th>
-                  <th
-                    className={`${headerCell} z-30 w-12 min-w-12`}
-                    style={{ top: headerOffsets[0], position: 'sticky' }}
-                  >
-                    WS
-                  </th>
-                </React.Fragment>
-              ))}
+                    <th
+                      className={`${headerCell} ${palette.sub} z-30 w-12 min-w-12`}
+                      style={{ top: headerOffsets[0], position: 'sticky' }}
+                    >
+                      PS
+                    </th>
+                    <th
+                      className={`${headerCell} ${palette.sub} z-30 w-12 min-w-12`}
+                      style={{ top: headerOffsets[0], position: 'sticky' }}
+                    >
+                      WS
+                    </th>
+                  </React.Fragment>
+                )
+              })}
             </tr>
 
             {/* Highest possible score */}
             <tr>
               <th
                 colSpan={2}
-                className={`${headerCell} ${stickyIndex} z-40 pr-2 text-right italic`}
+                className={`${headerCell} ${stickyIndex} ${nameEdge} z-40 bg-slate-100 pr-2 text-right font-medium normal-case tracking-normal text-slate-500`}
                 style={{ top: headerOffsets[1], position: 'sticky', width: 296, minWidth: 296 }}
               >
                 Highest possible score
               </th>
-              {columnGroups.map(({ component, items, percentage, highestPossible }) => (
-                <React.Fragment key={component.id}>
-                  {items.map((item) => (
+              {columnGroups.map(({ component, items, percentage, highestPossible }, groupIndex) => {
+                const palette = paletteFor(groupIndex)
+                return (
+                  <React.Fragment key={component.id}>
+                    {items.map((item, index) => (
+                      <th
+                        key={item.id}
+                        className={`${headerCell} ${palette.hps} ${index === 0 ? palette.edge : ''} z-30 font-normal tabular-nums`}
+                        style={{ top: headerOffsets[1], position: 'sticky' }}
+                      >
+                        {toNumber(item.score)}
+                      </th>
+                    ))}
                     <th
-                      key={item.id}
-                      className={`${headerCell} z-30 font-normal tabular-nums`}
+                      className={`${headerCell} ${palette.hps} ${items.length === 0 ? palette.edge : ''} z-30 tabular-nums`}
                       style={{ top: headerOffsets[1], position: 'sticky' }}
                     >
-                      {toNumber(item.score)}
+                      {highestPossible}
                     </th>
-                  ))}
-                  <th
-                    className={`${headerCell} z-30 tabular-nums`}
-                    style={{ top: headerOffsets[1], position: 'sticky' }}
-                  >
-                    {highestPossible}
-                  </th>
-                  <th
-                    className={`${headerCell} z-30 tabular-nums`}
-                    style={{ top: headerOffsets[1], position: 'sticky' }}
-                  >
-                    100
-                  </th>
-                  <th
-                    className={`${headerCell} z-30 tabular-nums`}
-                    style={{ top: headerOffsets[1], position: 'sticky' }}
-                  >
-                    {percentage}%
-                  </th>
-                </React.Fragment>
-              ))}
+                    <th
+                      className={`${headerCell} ${palette.hps} z-30 tabular-nums`}
+                      style={{ top: headerOffsets[1], position: 'sticky' }}
+                    >
+                      100
+                    </th>
+                    <th
+                      className={`${headerCell} ${palette.hps} z-30 tabular-nums`}
+                      style={{ top: headerOffsets[1], position: 'sticky' }}
+                    >
+                      {percentage}%
+                    </th>
+                  </React.Fragment>
+                )
+              })}
               <th
                 colSpan={3}
-                className={`${headerCell} z-30`}
+                className={`${headerCell} ${resultsEdge} z-30 bg-slate-100`}
                 style={{ top: headerOffsets[1], position: 'sticky' }}
               />
             </tr>
@@ -794,7 +942,7 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
           <tbody>
             {roster.length === 0 && (
               <tr>
-                <td colSpan={totalColumns} className={`${cellBorder} p-8 text-center text-gray-500`}>
+                <td colSpan={totalColumns} className={`${cellBorder} p-8 text-center text-slate-500`}>
                   No learners in this section yet.
                 </td>
               </tr>
@@ -810,11 +958,14 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                   */}
                   <td
                     colSpan={2}
-                    className={`${cellBorder} sticky left-0 z-20 bg-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-700`}
+                    className={`${cellBorder} ${nameEdge} sticky left-0 z-20 bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-600`}
                   >
                     {group.label}
+                    <span className="ml-1.5 font-medium text-slate-400 tabular-nums">
+                      {group.students.length}
+                    </span>
                   </td>
-                  <td colSpan={totalColumns - 2} className={`${cellBorder} bg-gray-200`} />
+                  <td colSpan={totalColumns - 2} className={`${cellBorder} bg-slate-100`} />
                 </tr>
 
                 {group.students.map((student, rowIndex) => {
@@ -825,17 +976,20 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                   const letter = mapScoreToLabel(termNumber, gradingBands)
                   // The two frozen columns need a solid colour of their own:
                   // inheriting the row's would let the scores show through them.
-                  const zebra = rowIndex % 2 === 1 ? 'bg-gray-50' : 'bg-white'
+                  const zebra = rowIndex % 2 === 1 ? 'bg-slate-50' : 'bg-white'
+                  // Every cell that paints its own background has to answer the
+                  // row hover too, or the highlight stops at the first tinted one.
+                  const hover = 'group-hover/row:bg-primary-50'
 
                   return (
-                    <tr key={student.id} className={zebra}>
+                    <tr key={student.id} className={`group/row ${zebra} hover:bg-primary-50`}>
                       <td
-                        className={`${cellBorder} ${stickyIndex} ${zebra} z-20 px-1 text-center text-gray-500 tabular-nums`}
+                        className={`${cellBorder} ${stickyIndex} ${zebra} ${hover} z-20 px-1 text-center text-slate-400 tabular-nums`}
                       >
                         {rowIndex + 1}
                       </td>
                       <td
-                        className={`${cellBorder} ${stickyName} ${zebra} z-20 max-w-64 truncate px-2 py-1 font-medium uppercase text-gray-900`}
+                        className={`${cellBorder} ${stickyName} ${nameEdge} ${zebra} ${hover} z-20 max-w-64 truncate px-2 py-1 font-medium uppercase tracking-tight text-slate-900`}
                         title={formatName(student)}
                       >
                         {formatName(student)}
@@ -843,9 +997,10 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
 
                       {columnGroups.map(({ component, items }, groupIndex) => {
                         const totals = row?.groups[groupIndex]
+                        const palette = paletteFor(groupIndex)
                         return (
                           <React.Fragment key={component.id}>
-                            {items.map((item) => {
+                            {items.map((item, index) => {
                               // Enter walks down the same column to the next learner,
                               // across the male/female break as the eye does.
                               const position = orderedStudentIds.indexOf(student.id)
@@ -854,7 +1009,10 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                                   ? orderedStudentIds[position + 1]
                                   : null
                               return (
-                                <td key={item.id} className={`${cellBorder} p-0`}>
+                                <td
+                                  key={item.id}
+                                  className={`${cellBorder} ${index === 0 ? palette.edge : ''} p-0`}
+                                >
                                   <ScoreCell
                                     cellId={cellIdFor(student.id, item.id)}
                                     nextCellId={
@@ -869,21 +1027,29 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                                 </td>
                               )
                             })}
-                            <td className={`${cellBorder} px-1 text-center font-medium tabular-nums`}>
+                            <td
+                              className={`${cellBorder} ${palette.roll} ${hover} ${items.length === 0 ? palette.edge : ''} px-1 text-center font-semibold text-slate-800 tabular-nums`}
+                            >
                               {/* A 0 would read as a zero score; this component has no items yet. */}
                               {totals && items.length > 0 ? totals.earned : '—'}
                             </td>
-                            <td className={`${cellBorder} px-1 text-center tabular-nums text-gray-600`}>
+                            <td
+                              className={`${cellBorder} ${palette.roll} ${hover} px-1 text-center text-slate-500 tabular-nums`}
+                            >
                               {decimals(totals?.ps ?? null)}
                             </td>
-                            <td className={`${cellBorder} px-1 text-center tabular-nums text-gray-900`}>
+                            <td
+                              className={`${cellBorder} ${palette.roll} ${hover} px-1 text-center font-medium text-slate-800 tabular-nums`}
+                            >
                               {decimals(totals?.ws ?? null)}
                             </td>
                           </React.Fragment>
                         )
                       })}
 
-                      <td className={`${cellBorder} px-1 text-center font-semibold tabular-nums`}>
+                      <td
+                        className={`${cellBorder} ${resultsEdge} ${hover} px-1 text-center text-sm font-semibold tabular-nums ${gradeTone(row?.initial ?? null)}`}
+                      >
                         {decimals(row?.initial ?? null)}
                       </td>
                       <td className={`${cellBorder} p-0`}>
@@ -893,6 +1059,7 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                           min={0}
                           max={100}
                           value={termValue}
+                          placeholder="·"
                           onChange={(event) =>
                             setTermDrafts((previous) => ({
                               ...previous,
@@ -900,14 +1067,20 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                             }))
                           }
                           onFocus={(event) => event.currentTarget.select()}
-                          className={`h-7 w-full rounded-none border-0 bg-transparent px-1 text-center text-xs font-semibold tabular-nums focus:z-10 focus:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                            draftDirty ? 'bg-amber-50 ring-1 ring-amber-400' : ''
+                          className={`h-8 w-full rounded-none border-0 bg-transparent px-1 text-center text-sm font-bold tabular-nums transition-colors placeholder:text-base placeholder:font-normal placeholder:text-gray-300 hover:bg-white hover:ring-1 hover:ring-inset hover:ring-primary-300 focus:z-10 focus:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                            draftDirty
+                              ? 'bg-amber-50 text-amber-900 ring-2 ring-inset ring-amber-400'
+                              : gradeTone(termNumber)
                           }`}
                         />
                       </td>
-                      <td className={`${cellBorder} px-2 text-center text-[11px] text-gray-700`}>
-                        {letter ? `${letter} · ` : ''}
-                        {describe(termNumber)}
+                      <td className={`${cellBorder} ${hover} px-2 py-1 text-center`}>
+                        <span
+                          className={`inline-block max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold ${descriptorTone(termNumber)}`}
+                        >
+                          {letter ? `${letter} · ` : ''}
+                          {describe(termNumber)}
+                        </span>
                       </td>
                     </tr>
                   )
@@ -918,13 +1091,14 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
         </table>
       </div>
 
-      <p className="text-[11px] leading-relaxed text-gray-500">
-        <span className="font-medium">PS</span> is the percentage score for a component —
-        what the learner earned over the highest possible.{' '}
-        <span className="font-medium">WS</span> is that percentage carrying the component&apos;s
-        weight. The <span className="font-medium">Initial Grade</span> is the sum of the weighted
-        scores; the <span className="font-medium">Term Grade</span> is the grade you apply, and it
-        is what the report card prints.
+      <p className="text-[11px] leading-relaxed text-slate-500">
+        <span className="font-semibold text-slate-700">PS</span> is the percentage score for a
+        component — what the learner earned over the highest possible.{' '}
+        <span className="font-semibold text-slate-700">WS</span> is that percentage carrying the
+        component&apos;s weight. The{' '}
+        <span className="font-semibold text-slate-700">Initial Grade</span> is the sum of the
+        weighted scores; the <span className="font-semibold text-slate-700">Term Grade</span> is the
+        grade you apply, and it is what the report card prints.
       </p>
     </div>
   )
