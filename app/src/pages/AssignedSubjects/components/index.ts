@@ -1,6 +1,7 @@
 export { AssignedSubjectsHeader } from './AssignedSubjectsHeader'
 export { AssignedSubjectsGrid } from './AssignedSubjectsGrid'
 export { ClassRecordTab } from './ClassRecordTab'
+export { ClassRecordV2Tab } from './ClassRecordV2Tab'
 export { TopicsTab } from './TopicsTab'
 export { CalendarTab } from './CalendarTab'
 export { StudentScoresTab } from './StudentScoresTab'

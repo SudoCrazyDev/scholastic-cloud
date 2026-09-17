@@ -9,12 +9,14 @@ import {
   AcademicCapIcon,
   BuildingOfficeIcon,
   ListBulletIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  TableCellsIcon
 } from '@heroicons/react/24/outline'
 import { useSubjectDetail } from '@hooks'
 import { useQuery } from '@tanstack/react-query'
 import { studentSubjectService } from '../../services/studentSubjectService'
 import { ClassRecordTab } from './components/ClassRecordTab'
+import { ClassRecordV2Tab } from './components/ClassRecordV2Tab'
 import { TopicsTab } from './components/TopicsTab'
 import { CalendarTab } from './components/CalendarTab'
 import { StudentScoresTab } from './components/StudentScoresTab'
@@ -25,7 +27,7 @@ import { AssessmentBuilderTab } from './components/AssessmentBuilderTab'
 import { GradingTypeControl } from './components/GradingTypeControl'
 import type { Subject, Student, ClassSection } from '../../types'
 
-type TabType = 'class-record' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'assessment-methods' | 'ai-planner' | 'lesson-plan-calendar'
+type TabType = 'class-record' | 'class-record-v2' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'assessment-methods' | 'ai-planner' | 'lesson-plan-calendar'
 
 // Extend types locally to allow students array on class_section
 interface ClassSectionWithStudents extends ClassSection {
@@ -91,6 +93,11 @@ const SubjectDetail: React.FC = () => {
       id: 'class-record' as TabType,
       label: 'Class Record',
       icon: DocumentTextIcon,
+    },
+    {
+      id: 'class-record-v2' as TabType,
+      label: 'Class Record V2',
+      icon: TableCellsIcon,
     },
     {
       id: 'student-scores' as TabType,
@@ -197,14 +204,14 @@ const SubjectDetail: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {/* Tab Navigation */}
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6" aria-label="Tabs">
+          <nav className="flex space-x-8 overflow-x-auto px-6" aria-label="Tabs">
             {tabs.map((tab) => {
               const Icon = tab.icon
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors ${
+                  className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 whitespace-nowrap transition-colors ${
                     activeTab === tab.id
                       ? 'border-primary-500 text-primary-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -229,6 +236,18 @@ const SubjectDetail: React.FC = () => {
           */}
           {activeTab === 'class-record' && (
             <ClassRecordTab
+              key={`${subject.id}-${subject.class_section_id}`}
+              subjectId={subject.id}
+              classSectionId={subject.class_section_id}
+              isLimited={!!subject.is_limited_student}
+              assignedStudentIds={assignedStudentIds}
+              gradingBands={gradingBands}
+              academicYear={subject.class_section?.academic_year}
+              gradeLevel={subject.class_section?.grade_level}
+            />
+          )}
+          {activeTab === 'class-record-v2' && (
+            <ClassRecordV2Tab
               key={`${subject.id}-${subject.class_section_id}`}
               subjectId={subject.id}
               classSectionId={subject.class_section_id}
