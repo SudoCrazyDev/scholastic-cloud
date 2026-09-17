@@ -33,9 +33,19 @@ class ChatMembershipObserver
         $this->queue->section($section->id);
     }
 
+    /**
+     * Read the subjects before they go. The section's delete cascades to them in
+     * the database, which Eloquent never sees — see ChatSyncQueue.
+     */
+    public function deletingClassSection(ClassSection $section): void
+    {
+        $this->queue->noteCascadingSubjects($section->id);
+    }
+
     public function deletedClassSection(ClassSection $section): void
     {
         $this->queue->closeScope(ChatConversation::SCOPE_CLASS_SECTION, $section->id);
+        $this->queue->closeCascadedSubjects();
     }
 
     public function savedSubject(Subject $subject): void

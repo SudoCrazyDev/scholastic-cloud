@@ -499,6 +499,37 @@ class ChatGroupsTest extends TestCase
             ->assertJsonPath('data.messages.0.body', 'See you next year.');
     }
 
+    public function test_deleting_a_section_outright_closes_the_subjects_taught_in_it(): void
+    {
+        // A dissolve sets deleted_at and every observer sees it. A hard delete
+        // does not: subjects.class_section_id is ON DELETE CASCADE, so MySQL
+        // removes the subject rows itself and Eloquent never fires a `deleted`
+        // event for one of them. Without the section on its way out telling the
+        // sync which subjects are going, those groups stay open around a section
+        // that no longer exists — still listed, and still accepting messages.
+        $this->sectionA->delete();
+        $this->syncChat();
+
+        // Reyes taught Science into 7-A. His own advisory is untouched.
+        $groups = collect($this->asTeacher($this->reyes)->getJson('/api/chat/conversations')->json('data'));
+
+        $science = $groups->firstWhere('title', 'Science');
+        $this->assertNotNull($science, 'the transcript is kept');
+        $this->assertTrue($science['archived']);
+        $this->assertFalse($science['can_post']);
+
+        $this->asTeacher($this->reyes)
+            ->postJson("/api/chat/conversations/{$science['id']}/messages", ['body' => 'Anyone still here?'])
+            ->assertForbidden();
+
+        $this->assertTrue($groups->firstWhere('title', '7-B')['can_post']);
+
+        // And the same for the student who was in it.
+        $ana = collect($this->asStudent($this->ana)->getJson('/api/chat/conversations')->json('data'));
+        $this->assertFalse($ana->firstWhere('title', 'Science')['can_post']);
+        $this->assertFalse($ana->firstWhere('title', 'Mathematics')['can_post']);
+    }
+
     public function test_renaming_a_section_renames_its_group(): void
     {
         $this->sectionA->update(['title' => '7-Sampaguita']);

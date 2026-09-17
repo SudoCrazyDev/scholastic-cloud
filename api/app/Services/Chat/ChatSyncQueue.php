@@ -2,6 +2,7 @@
 
 namespace App\Services\Chat;
 
+use App\Models\ChatConversation;
 use App\Models\ClassSection;
 use App\Models\Student;
 use App\Models\Subject;
@@ -30,6 +31,13 @@ class ChatSyncQueue
 
     /** @var array<string,true> */
     private array $students = [];
+
+    /**
+     * Subjects that are about to disappear along with their section.
+     *
+     * @var array<string,true>
+     */
+    private array $cascading = [];
 
     private bool $registered = false;
 
@@ -60,6 +68,39 @@ class ChatSyncQueue
     public function closeScope(string $scopeType, string $scopeId): void
     {
         $this->guard(fn () => $this->sync->closeScope($scopeType, $scopeId));
+    }
+
+    /**
+     * Note the subjects that a section is about to take down with it.
+     *
+     * A dissolve sets deleted_at and every observer sees it. A hard delete does
+     * not: subjects.class_section_id is ON DELETE CASCADE, so MySQL removes the
+     * subject rows itself and Eloquent never hears about them — no `deleted`
+     * event, no closeScope, and a group left open around a section that no
+     * longer exists, still accepting messages from everyone who was in it.
+     *
+     * So the ids are read here, on the way out, while the rows are still there
+     * to be read. Closing them has to wait for the delete to actually land, or a
+     * rolled-back transaction would leave a live section full of closed groups.
+     */
+    public function noteCascadingSubjects(string $sectionId): void
+    {
+        $this->guard(function () use ($sectionId) {
+            foreach (Subject::where('class_section_id', $sectionId)->pluck('id') as $id) {
+                $this->cascading[(string) $id] = true;
+            }
+        });
+    }
+
+    /** Close what noteCascadingSubjects saw, now that the section has gone. */
+    public function closeCascadedSubjects(): void
+    {
+        $subjects = array_keys($this->cascading);
+        $this->cascading = [];
+
+        foreach ($subjects as $subjectId) {
+            $this->closeScope(ChatConversation::SCOPE_SUBJECT, $subjectId);
+        }
     }
 
     public function flush(): void

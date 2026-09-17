@@ -51,6 +51,10 @@ class AppServiceProvider extends ServiceProvider
             ->{$method}($model);
 
         ClassSection::saved($on('savedClassSection'));
+        // `deleting` as well as `deleted`: the subjects taught in a section are
+        // removed by a database cascade, so this is the last moment they can be
+        // read at all.
+        ClassSection::deleting($on('deletingClassSection'));
         ClassSection::deleted($on('deletedClassSection'));
 
         Subject::saved($on('savedSubject'));
