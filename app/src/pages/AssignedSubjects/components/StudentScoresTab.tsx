@@ -21,6 +21,7 @@ import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
 import { toast } from 'react-hot-toast'
 import { ErrorHandler } from '../../../utils/errorHandler'
 import { Alert } from '../../../components/alert'
+import { Select } from '../../../components/select'
 import { StudentScoreInput } from './StudentScoreInput'
 import type { Student } from '../../../types'
 
@@ -419,6 +420,7 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   // Reset filters and refetch data when subject changes
   useEffect(() => {
     setActiveQuarter('All')
+    setActiveComponent('All')
     // Force refetch when subject changes
     if (subjectId && classSectionId) {
       refetchGradeItems()
@@ -427,6 +429,8 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   }, [subjectId, classSectionId, refetchGradeItems, refetchScores])
 
   const [activeQuarter, setActiveQuarter] = useState<string>('All')
+  /** Component of summative assessment to show ('All', or a subject_ecr id). */
+  const [activeComponent, setActiveComponent] = useState<string>('All')
   const gradingPeriods = useGradingPeriods(gradeLevel)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -469,6 +473,13 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   // Filtered items — 4 quarters or 3 terms, per the academic year's structure
   const quarters = gradingPeriods.values
 
+  // Components of summative assessment (Written Works, Performance Task, …) for this subject
+  const components = subjectEcrsData?.data || []
+  const componentOptions = [
+    { value: 'All', label: 'All components' },
+    ...components.map((component: any) => ({ value: component.id, label: component.title })),
+  ]
+
   // Only process grade items if we have valid subject ECR IDs for this subject
   // This ensures we don't show items from other subjects
   const gradeItems = (subjectEcrIds.length > 0 && gradeItemsData?.data) ? gradeItemsData.data : []
@@ -487,6 +498,11 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
       return false
     }
     
+    // Apply component filter
+    if (activeComponent !== 'All' && itemEcrId !== activeComponent) {
+      return false
+    }
+
     // Apply quarter filter
     const quarterMatch = activeQuarter === 'All' || item.quarter === activeQuarter
     return quarterMatch
@@ -619,10 +635,10 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         </div>
       </div>
 
-      {/* Grading period tabs */}
+      {/* Grading period tabs and component filter */}
       <div className="bg-white rounded-lg border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-4" aria-label={gradingPeriods.noun_plural}>
+        <div className="flex flex-col gap-3 border-b border-gray-200 px-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <nav className="flex space-x-8 overflow-x-auto" aria-label={gradingPeriods.noun_plural}>
             {['All', ...quarters].map((quarter) => {
               const quarterLabel = quarter === 'All'
                 ? `All ${gradingPeriods.noun_plural}`
@@ -642,6 +658,23 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
               )
             })}
           </nav>
+          <div className="flex items-center gap-2 pb-3 sm:pb-0">
+            <label
+              htmlFor="student-scores-component"
+              className="whitespace-nowrap text-xs font-medium text-gray-500"
+            >
+              Component
+            </label>
+            <div className="w-full sm:w-48">
+              <Select
+                id="student-scores-component"
+                inputSize="sm"
+                value={activeComponent}
+                onChange={(event) => setActiveComponent(event.target.value)}
+                options={componentOptions}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
