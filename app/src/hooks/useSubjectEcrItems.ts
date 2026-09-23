@@ -13,6 +13,19 @@ export function useSubjectEcrItems(params?: { subject_ecr_id?: string | string[]
   });
 }
 
+/**
+ * Every grade item of a subject, including the ones filed under no component —
+ * those have no `subject_ecr_id` to look them up by.
+ */
+export function useSubjectEcrItemsBySubject(subjectId?: string) {
+  return useQuery({
+    queryKey: ['subjectEcrItems', 'by-subject', subjectId],
+    queryFn: () => subjectEcrItemService.listBySubject({ subject_id: subjectId! }),
+    enabled: !!subjectId,
+    staleTime: 0, // Always consider data stale to ensure fresh data on subject change
+  });
+}
+
 export function useSubjectEcrItem(id: string) {
   return useQuery({
     queryKey: ['subjectEcrItem', id],

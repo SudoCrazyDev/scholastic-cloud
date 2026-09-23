@@ -408,7 +408,9 @@ class InstitutionCleanupGroups
             'student_assessment_attempts' => ['via' => 'parent', 'parent' => 'subject_ecr_items', 'foreign_key' => 'subject_ecr_item_id'],
             'assessment_questions' => ['via' => 'parent', 'parent' => 'subject_ecr_items', 'foreign_key' => 'subject_ecr_item_id'],
             'student_ecr_item_scores' => ['via' => 'parent', 'parent' => 'subject_ecr_items', 'foreign_key' => 'subject_ecr_item_id'],
-            'subject_ecr_items' => ['via' => 'parent', 'parent' => 'subjects_ecr', 'foreign_key' => 'subject_ecr_id'],
+            // Reached through the subject rather than the component: an item filed
+            // under no component has no component to be reached through.
+            'subject_ecr_items' => ['via' => 'parent', 'parent' => 'subjects', 'foreign_key' => 'subject_id'],
             'subjects_ecr' => ['via' => 'parent', 'parent' => 'subjects', 'foreign_key' => 'subject_id'],
             'subject_summative_assessments' => ['via' => 'parent', 'parent' => 'subjects', 'foreign_key' => 'subject_id'],
             'student_running_grades' => ['via' => 'parent', 'parent' => 'subjects', 'foreign_key' => 'subject_id'],

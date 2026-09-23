@@ -20,6 +20,13 @@ interface AddGradeItemModalProps {
   gradeLevel?: string | null
 }
 
+/**
+ * Component value for a grade item the teacher wants recorded but kept out of the
+ * class record. It is saved with no component at all, which is what keeps it out
+ * of the running grade and of both class records.
+ */
+const NO_COMPONENT = 'none'
+
 export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
   isOpen,
   onClose,
@@ -33,6 +40,10 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   const subjectEcrs = subjectEcrsData?.data || []
   const hasComponents = subjectEcrs.length > 0
+  const componentOptions = [
+    ...subjectEcrs.map((ecr: any) => ({ value: ecr.id, label: `${ecr.title} (${ecr.percentage}%)` })),
+    { value: NO_COMPONENT, label: 'No component' },
+  ]
 
   const formik = useFormik({
     initialValues: {
@@ -54,17 +65,21 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
       type: Yup.string(),
     }),
     onSubmit: async (values, { resetForm, setSubmitting, setErrors }) => {
-      // Check if components are available first
-      if (!hasComponents) {
+      const noComponent = values.subject_ecr_id === NO_COMPONENT
+
+      // Every other item needs a component to be weighted under.
+      if (!noComponent && !hasComponents) {
         setErrors({ title: 'No Components, Please Create First' })
         setSubmitting(false)
         return
       }
-      
+
       try {
         await createMutation.mutateAsync({
           ...values,
-          subject_ecr_id: values.subject_ecr_id,
+          subject_ecr_id: noComponent ? null : values.subject_ecr_id,
+          // With no component there is nothing else tying the item to its subject.
+          subject_id: subjectId,
           ...(values.type ? { type: values.type } : {}),
           title: values.title,
           description: values.description,
@@ -205,21 +220,19 @@ export const AddGradeItemModal: React.FC<AddGradeItemModalProps> = ({
                       <div className="text-gray-500 text-sm">Loading components...</div>
                     ) : subjectEcrsError ? (
                       <div className="text-red-600 text-sm">Failed to load components.</div>
-                    ) : !hasComponents ? (
-                      <div className="w-full px-3 py-2 border border-yellow-300 bg-yellow-50 rounded-md text-sm text-yellow-800">
-                        No components available
-                      </div>
                     ) : (
-                      <select
+                      <Select
                         id="subject_ecr_id"
                         {...formik.getFieldProps('subject_ecr_id')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value="">Select a component</option>
-                        {subjectEcrs.map((ecr: any) => (
-                          <option key={ecr.id} value={ecr.id}>{ecr.title} ({ecr.percentage}%)</option>
-                        ))}
-                      </select>
+                        placeholder="Select a component"
+                        options={componentOptions}
+                        className="w-full"
+                      />
+                    )}
+                    {formik.values.subject_ecr_id === NO_COMPONENT && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Scores are recorded but left out of the class record and the {gradingPeriods.noun.toLowerCase()} grade.
+                      </p>
                     )}
                     {formik.touched.subject_ecr_id && formik.errors.subject_ecr_id && (
                       <div className="text-xs text-red-600 mt-1">{formik.errors.subject_ecr_id}</div>

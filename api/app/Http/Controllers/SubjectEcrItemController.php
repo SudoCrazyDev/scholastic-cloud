@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssessmentQuestion;
+use App\Models\StudentEcrItemScore;
 use App\Models\Subject;
 use App\Models\SubjectEcr;
 use App\Models\SubjectEcrItem;
 use App\Services\AssessmentV2Service;
+use App\Services\RunningGradeRecalcService;
 use App\Support\AcademicYear;
 use App\Support\GradingPeriods;
 use App\Support\MediaUrl;
@@ -21,7 +23,10 @@ use Illuminate\Validation\ValidationException;
 
 class SubjectEcrItemController extends Controller
 {
-    public function __construct(protected AssessmentV2Service $v2) {}
+    public function __construct(
+        protected AssessmentV2Service $v2,
+        protected RunningGradeRecalcService $runningGrades
+    ) {}
 
     /**
      * Response shape for a single item. For v2, resolved question rows (with stable ids) are
@@ -37,6 +42,30 @@ class SubjectEcrItemController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Whether the caller's institution owns this subject. Only the no-component
+     * path needs it: every other write reaches the subject through a component
+     * the caller already had to know the id of.
+     */
+    private function subjectIsVisibleTo(Request $request, ?string $subjectId): bool
+    {
+        if (! $subjectId) {
+            return false;
+        }
+
+        $institutionId = $request->user()?->userInstitutions()
+            ->where('is_default', true)
+            ->value('institution_id');
+
+        if (! $institutionId) {
+            return false;
+        }
+
+        return Subject::where('id', $subjectId)
+            ->where('institution_id', $institutionId)
+            ->exists();
     }
 
     /**
@@ -85,9 +114,7 @@ class SubjectEcrItemController extends Controller
         $query = SubjectEcrItem::query()->with('subjectEcr');
 
         if (! empty($validated['subject_id'])) {
-            $query->whereHas('subjectEcr', function ($q) use ($validated) {
-                $q->where('subject_id', $validated['subject_id']);
-            });
+            $query->forSubject($validated['subject_id']);
         }
 
         if (! empty($validated['subject_ecr_id'])) {
@@ -139,7 +166,8 @@ class SubjectEcrItemController extends Controller
     {
         try {
             $validatedData = $request->validate([
-                'subject_ecr_id' => 'required|uuid',
+                'subject_ecr_id' => 'nullable|uuid',
+                'subject_id' => 'required_without:subject_ecr_id|nullable|uuid|exists:subjects,id',
                 'type' => 'nullable|string|max:255',
                 'status' => ['nullable', 'string', Rule::in(['draft', 'published'])],
                 'title' => 'required|string|max:255',
@@ -188,12 +216,23 @@ class SubjectEcrItemController extends Controller
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 
+            // The component decides the subject whenever there is one; only an item
+            // filed under no component at all relies on the subject the client named,
+            // and that one is checked against the caller's institution here because
+            // nothing else on this path would.
+            if (! empty($validatedData['subject_ecr_id'])) {
+                $validatedData['subject_id'] = SubjectEcr::whereKey($validatedData['subject_ecr_id'])->value('subject_id');
+            } elseif (! $this->subjectIsVisibleTo($request, $validatedData['subject_id'] ?? null)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Subject not found or access denied',
+                ], 404);
+            }
+
             // An item with no academic year is skipped by every year-scoped query,
             // including the running-grade calculation, so never store one without it.
             if (empty($validatedData['academic_year'])) {
-                $validatedData['academic_year'] = AcademicYear::forSubject(
-                    SubjectEcr::whereKey($validatedData['subject_ecr_id'])->value('subject_id')
-                );
+                $validatedData['academic_year'] = AcademicYear::forSubject($validatedData['subject_id'] ?? null);
             }
 
             $isV2 = (int) ($validatedData['content_version'] ?? 1) === 2;
@@ -270,7 +309,7 @@ class SubjectEcrItemController extends Controller
             $item = SubjectEcrItem::findOrFail($id);
 
             $validatedData = $request->validate([
-                'subject_ecr_id' => 'sometimes|required|uuid',
+                'subject_ecr_id' => 'sometimes|nullable|uuid',
                 'type' => 'nullable|string|max:255',
                 'status' => ['nullable', 'string', Rule::in(['draft', 'published'])],
                 'title' => 'sometimes|required|string|max:255',
@@ -317,6 +356,14 @@ class SubjectEcrItemController extends Controller
                 'score' => 'nullable|numeric|min:0|max:999999.99',
             ]);
 
+            // Clearing the component must not strand the item: the subject it was under
+            // is recorded before the last thing pointing at it goes. `SubjectEcrItem`
+            // keeps the two in step from here on, but rows written before this column
+            // existed elsewhere in the app may still be carrying nothing.
+            if (array_key_exists('subject_ecr_id', $validatedData) && empty($validatedData['subject_ecr_id']) && empty($item->subject_id)) {
+                $item->subject_id = $item->subjectEcr?->subject_id;
+            }
+
             // v2 is sticky: an item already on v2 stays v2 even if the client omits the flag.
             $isV2 = $item->isV2() || (int) ($validatedData['content_version'] ?? 0) === 2;
             $questionsProvided = array_key_exists('questions', $validatedData['content'] ?? []);
@@ -361,10 +408,17 @@ class SubjectEcrItemController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         try {
-            $item = SubjectEcrItem::findOrFail($id);
+            $item = SubjectEcrItem::with('subjectEcr')->findOrFail($id);
+
+            if (! $this->subjectIsVisibleTo($request, $item->subjectEcr?->subject_id ?: $item->subject_id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Subject ECR item not found or access denied',
+                ], 404);
+            }
 
             // v2 answers reference questions with a restrict FK; block deleting an assessment
             // that already has submissions rather than hitting a raw DB error (and to avoid
@@ -376,7 +430,30 @@ class SubjectEcrItemController extends Controller
                 ], 422);
             }
 
+            // The item's points count towards the grade denominator, and its scores go
+            // with it on the cascade, so every student who had one needs their running
+            // grade redone from what the components hold afterwards. An item under no
+            // component never reached a running grade, so there is nothing to redo.
+            $subjectId = $item->subjectEcr?->subject_id;
+            $quarter = $item->quarter;
+            $academicYear = $item->academic_year ?: AcademicYear::forSubject($subjectId);
+            $affectedStudentIds = StudentEcrItemScore::where('subject_ecr_item_id', $item->id)
+                ->distinct()
+                ->pluck('student_id');
+
             $item->delete();
+
+            if ($subjectId && $quarter) {
+                foreach ($affectedStudentIds as $studentId) {
+                    $this->runningGrades->recalculateForSubject(
+                        $studentId,
+                        $subjectId,
+                        $quarter,
+                        $academicYear,
+                        empty($item->academic_year)
+                    );
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -535,6 +612,7 @@ class SubjectEcrItemController extends Controller
                     'updated_at',
                 ]);
                 $copy->subject_ecr_id = $targetEcr->id;
+                $copy->subject_id = $targetEcr->subject_id;
                 // Dates belong to the section the assessment was built for.
                 $copy->status = 'draft';
                 $copy->scheduled_date = null;

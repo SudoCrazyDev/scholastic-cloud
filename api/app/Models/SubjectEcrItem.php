@@ -17,6 +17,7 @@ class SubjectEcrItem extends Model
      * Note: 'type' is nullable in the database.
      */
     protected $fillable = [
+        'subject_id',
         'subject_ecr_id',
         'type',
         'status',
@@ -46,6 +47,32 @@ class SubjectEcrItem extends Model
         'due_at' => 'datetime',
         'allow_late_submission' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $item) {
+            // Keep the subject in step with the component. It is the item's only route
+            // back to its subject once the teacher files it under no component, and by
+            // then the component that would have told us is gone.
+            if ($item->subject_ecr_id && ($item->isDirty('subject_ecr_id') || empty($item->subject_id))) {
+                $item->subject_id = SubjectEcr::whereKey($item->subject_ecr_id)->value('subject_id');
+            }
+        });
+    }
+
+    /**
+     * Every item of a subject, whether or not it sits under a component.
+     *
+     * An item with no component is deliberately outside the class record, but it
+     * is still the subject's, and `subject_id` is the only thing left saying so.
+     */
+    public function scopeForSubject($query, string $subjectId)
+    {
+        return $query->where(function ($q) use ($subjectId) {
+            $q->whereHas('subjectEcr', fn ($ecr) => $ecr->where('subject_id', $subjectId))
+                ->orWhere(fn ($item) => $item->whereNull('subject_ecr_id')->where('subject_id', $subjectId));
+        });
+    }
 
     /**
      * Get the student scores for this ECR item.

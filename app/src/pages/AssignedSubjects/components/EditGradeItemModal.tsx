@@ -21,13 +21,22 @@ interface EditGradeItemModalProps {
     title: string
     description?: string
     score?: number
-    subject_ecr_id: string
+    /** Null on an item the teacher filed under no component. */
+    subject_ecr_id?: string | null
+    subject_ecr?: { id: string } | null
     quarter?: string
     type?: string
   } | null
   /** Grade level of the subject's section; decides quarters vs terms. */
   gradeLevel?: string | null
 }
+
+/**
+ * Component value for a grade item the teacher wants recorded but kept out of the
+ * class record. It is saved with no component at all, which is what keeps it out
+ * of the running grade and of both class records.
+ */
+const NO_COMPONENT = 'none'
 
 export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
   isOpen,
@@ -42,13 +51,21 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
   const gradingPeriods = useGradingPeriods(gradeLevel)
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   const subjectEcrs = subjectEcrsData?.data || []
+  const componentOptions = [
+    ...subjectEcrs.map((ecr: any) => ({ value: ecr.id, label: `${ecr.title} (${ecr.percentage}%)` })),
+    { value: NO_COMPONENT, label: 'No component' },
+  ]
+
+  // An item already saved with no component opens showing that, not an empty box.
+  const componentValueOf = (item: EditGradeItemModalProps['gradeItem']) =>
+    item?.subject_ecr?.id || item?.subject_ecr_id || NO_COMPONENT
 
   const formik = useFormik({
     initialValues: {
       title: gradeItem?.title || '',
       description: gradeItem?.description || '',
       total_score: gradeItem?.score || 10,
-      subject_ecr_id: gradeItem?.subject_ecr_id || '',
+      subject_ecr_id: componentValueOf(gradeItem),
       quarter: gradeItem?.quarter || '1',
       type: gradeItem?.type || '',
     },
@@ -71,7 +88,9 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
           id: gradeItem.id,
           data: {
             ...values,
-            subject_ecr_id: values.subject_ecr_id,
+            // Which subject the item belongs to is the server's to keep: it records it
+            // from the component before clearing it, so the item is never stranded.
+            subject_ecr_id: values.subject_ecr_id === NO_COMPONENT ? null : values.subject_ecr_id,
             ...(values.type ? { type: values.type } : {}),
             title: values.title,
             description: values.description,
@@ -96,7 +115,7 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
         title: gradeItem.title || '',
         description: gradeItem.description || '',
         total_score: gradeItem.score || 10,
-        subject_ecr_id: gradeItem.subject_ecr_id || '',
+        subject_ecr_id: componentValueOf(gradeItem),
         quarter: gradeItem.quarter || '1',
         type: gradeItem.type || '',
       })
@@ -207,16 +226,18 @@ export const EditGradeItemModal: React.FC<EditGradeItemModalProps> = ({
                     ) : subjectEcrsError ? (
                       <div className="text-red-600 text-sm">Failed to load components.</div>
                     ) : (
-                      <select
+                      <Select
                         id="subject_ecr_id"
                         {...formik.getFieldProps('subject_ecr_id')}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      >
-                        <option value="">Select a component</option>
-                        {subjectEcrs.map((ecr: any) => (
-                          <option key={ecr.id} value={ecr.id}>{ecr.title} ({ecr.percentage}%)</option>
-                        ))}
-                      </select>
+                        placeholder="Select a component"
+                        options={componentOptions}
+                        className="w-full"
+                      />
+                    )}
+                    {formik.values.subject_ecr_id === NO_COMPONENT && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Scores are recorded but left out of the class record and the {gradingPeriods.noun.toLowerCase()} grade.
+                      </p>
                     )}
                     {formik.touched.subject_ecr_id && formik.errors.subject_ecr_id && (
                       <div className="text-xs text-red-600 mt-1">{formik.errors.subject_ecr_id}</div>

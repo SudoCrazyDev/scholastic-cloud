@@ -268,7 +268,7 @@ const fromSubjectEcrItem = (item: SubjectEcrItem): AssessmentMethod => {
   const questions = (item.content?.questions ?? []).map(mapQuestionFromItem)
   return {
     id: item.id,
-    subjectEcrId: item.subject_ecr_id,
+    subjectEcrId: item.subject_ecr_id ?? '',
     type,
     status: (item.status ?? 'published') as AssessmentPublishStatus,
     title: item.title ?? '',

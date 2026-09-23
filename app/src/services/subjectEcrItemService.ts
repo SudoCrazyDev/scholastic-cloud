@@ -2,7 +2,10 @@ import { api } from '@/lib/api';
 
 export interface SubjectEcrItem {
   id?: string;
-  subject_ecr_id: string;
+  /** The subject this item belongs to. The only link to it when there is no component. */
+  subject_id?: string;
+  /** Null when the teacher filed the item under no component, keeping it out of the class record. */
+  subject_ecr_id: string | null;
   type?: string;
   status?: 'draft' | 'published';
   title: string;
@@ -56,6 +59,24 @@ export interface SubjectEcrItem {
   close_at?: string | null;
   due_at?: string | null;
   allow_late_submission?: boolean;
+}
+
+/**
+ * Whether this row was built in the Assessment Builder rather than typed in as a
+ * plain grade item. Only the builder stores questions or rule settings, and
+ * everything it saves is content_version 2. Such an item belongs to the builder,
+ * which owns deleting it — student attempts and answers hang off it.
+ */
+export function isAssessmentMethodItem(item: {
+  content_version?: number | string | null;
+  content?: { questions?: unknown[] } | null;
+  settings?: unknown;
+}): boolean {
+  return (
+    Number(item.content_version ?? 1) >= 2 ||
+    (Array.isArray(item.content?.questions) && item.content.questions.length > 0) ||
+    !!item.settings
+  );
 }
 
 class SubjectEcrItemService {

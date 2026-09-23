@@ -22,6 +22,14 @@ class RunningGradeRecalcService
     {
         $ecrItem = SubjectEcrItem::with('subjectEcr')->findOrFail($subjectEcrItemId);
         $subjectEcr = $ecrItem->subjectEcr;
+
+        // An item filed under no component is deliberately kept out of the quarter
+        // grade: there is no weight to apply it at. Its score stays on file and the
+        // running grade is left exactly as the components computed it.
+        if (! $subjectEcr) {
+            return;
+        }
+
         $subjectId = $subjectEcr->subject_id;
         $quarter = $ecrItem->quarter;
 
@@ -31,6 +39,23 @@ class RunningGradeRecalcService
         $academicYear = $ecrItem->academic_year ?: AcademicYear::forSubject($subjectId);
         $includeUnstampedItems = empty($ecrItem->academic_year);
 
+        $this->recalculateForSubject($studentId, $subjectId, $quarter, $academicYear, $includeUnstampedItems);
+    }
+
+    /**
+     * Recalculate one student's running grade for a subject and grading period from
+     * whatever items the components hold right now.
+     *
+     * Deleting an item goes through here rather than through `recalculate()`: the item
+     * whose removal changed the grade is gone by the time the grade has to be redone.
+     */
+    public function recalculateForSubject(
+        string $studentId,
+        string $subjectId,
+        string $quarter,
+        string $academicYear,
+        bool $includeUnstampedItems = false
+    ): void {
         $subjectEcrs = SubjectEcr::where('subject_id', $subjectId)->get();
         $totalGrade = 0;
 

@@ -354,9 +354,7 @@ class StudentEcrItemScoreController extends Controller
         }
 
         // Get all subject ECR items for the subject
-        $subjectEcrItems = \App\Models\SubjectEcrItem::whereHas('subjectEcr', function ($q) use ($request) {
-            $q->where('subject_id', $request->subject_id);
-        })->get();
+        $subjectEcrItems = \App\Models\SubjectEcrItem::forSubject($request->subject_id)->get();
 
         $subjectEcrItemIds = $subjectEcrItems->pluck('id');
 
@@ -429,9 +427,7 @@ class StudentEcrItemScoreController extends Controller
             }
 
             // Get all subject ECR items for the subject
-            $subjectEcrItems = \App\Models\SubjectEcrItem::whereHas('subjectEcr', function ($q) use ($validated) {
-                $q->where('subject_id', $validated['subject_id']);
-            })->get();
+            $subjectEcrItems = \App\Models\SubjectEcrItem::forSubject($validated['subject_id'])->get();
 
             $subjectEcrItemIds = $subjectEcrItems->pluck('id');
 

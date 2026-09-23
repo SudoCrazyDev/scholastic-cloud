@@ -10,17 +10,20 @@ import {
   UserIcon,
   UsersIcon,
   PencilIcon,
+  TrashIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import { AddGradeItemModal } from './AddGradeItemModal'
 import { EditGradeItemModal } from './EditGradeItemModal'
-import { useSubjectEcrItems, useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
+import { useDeleteSubjectEcrItem, useSubjectEcrItemsBySubject, useSubjectEcrs } from '../../../hooks/useSubjectEcrItems'
+import { isAssessmentMethodItem } from '../../../services/subjectEcrItemService'
 import { useStudents } from '../../../hooks/useStudents'
 import { useStudentScores } from '../../../hooks/useStudentScores'
 import { useGradingPeriods } from '../../../hooks/useGradingPeriods'
 import { toast } from 'react-hot-toast'
 import { ErrorHandler } from '../../../utils/errorHandler'
 import { Alert } from '../../../components/alert'
+import { ConfirmationModal } from '../../../components/ConfirmationModal'
 import { Select } from '../../../components/select'
 import { StudentScoreInput } from './StudentScoreInput'
 import type { Student } from '../../../types'
@@ -112,11 +115,19 @@ interface GradeItem {
   category: 'Written Works' | 'Performance Tasks' | 'Quarterly Assessment' | string
   /** Stored grading period ordinal ('1'..'4'); label comes from useGradingPeriods. */
   quarter: string
-  subject_ecr: {
+  /** Absent when the teacher filed the item under no component. */
+  subject_ecr?: {
     id: string
     title: string
-  }
+  } | null
+  subject_ecr_id?: string | null
+  content_version?: number
+  content?: { questions?: unknown[] } | null
+  settings?: unknown
 }
+
+/** Value of the component filter that picks out the items under no component. */
+const NO_COMPONENT = 'none'
 
 
 
@@ -235,6 +246,11 @@ interface GradeItemSectionProps {
   students: Student[]
   scores: StudentScore[]
   onEditItem: (item: any) => void
+  /**
+   * Absent for an item built in the Assessment Builder: that is where it is
+   * deleted, together with the questions and attempts hanging off it.
+   */
+  onDeleteItem?: (item: GradeItem) => void
   /** Grade level of the subject's section; decides quarters vs terms. */
   gradeLevel?: string | null
 }
@@ -244,6 +260,7 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
   students,
   scores,
   onEditItem,
+  onDeleteItem,
   gradeLevel,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -307,13 +324,21 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-medium text-gray-900">{item.title}</h3>
                 <TypeBadge type={item.type} />
+                {!item.subject_ecr && (
+                  <span
+                    className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700"
+                    title="Not under any component, so it stays out of the class record"
+                  >
+                    No component
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500">{item.description}</p>
               <div className="flex items-center space-x-2 mt-1">
                 <CalendarIcon className="w-3 h-3 text-gray-400" />
                 <span className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()}</span>
                 <span className="text-xs text-gray-400">•</span>
-                <span className="text-xs text-gray-500">{item.subject_ecr?.title || item.category}</span>
+                <span className="text-xs text-gray-500">{item.subject_ecr?.title || 'Not counted in the class record'}</span>
                 <span className="text-xs text-gray-400">•</span>
                 <span className="text-xs text-gray-500">{gradingPeriods.labelFor(item.quarter)}</span>
               </div>
@@ -339,6 +364,18 @@ const GradeItemSection: React.FC<GradeItemSectionProps> = ({
             >
               <PencilIcon className="w-4 h-4" />
             </button>
+            {onDeleteItem && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDeleteItem(item)
+                }}
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                title="Delete grade item"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -410,10 +447,9 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   const { data: subjectEcrsData, isLoading: subjectEcrsLoading, error: subjectEcrsError } = useSubjectEcrs(subjectId)
   // Extract all subject_ecr_id
   const subjectEcrIds = subjectEcrsData?.data?.map((ecr: any) => ecr.id) || []
-  // Fetch grade items for all subject_ecr_id
-  const { data: gradeItemsData, isLoading: gradeItemsLoading, error: gradeItemsError, refetch: refetchGradeItems } = useSubjectEcrItems(
-    subjectEcrIds.length > 0 ? { subject_ecr_id: subjectEcrIds } : undefined
-  )
+  // Fetch grade items by subject rather than by component, so the ones filed under
+  // no component — which have no component to look them up by — show here too.
+  const { data: gradeItemsData, isLoading: gradeItemsLoading, error: gradeItemsError, refetch: refetchGradeItems } = useSubjectEcrItemsBySubject(subjectId)
   // Fetch scores for all students and items
   const { data: studentScoresData, isLoading: scoresLoading, error: scoresError, refetch: refetchScores } = useStudentScores({ subjectId, classSectionId })
 
@@ -435,7 +471,9 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedGradeItem, setSelectedGradeItem] = useState<any>(null)
+  const [itemPendingDelete, setItemPendingDelete] = useState<GradeItem | null>(null)
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const deleteGradeItem = useDeleteSubjectEcrItem()
 
   // Handle errors
   useEffect(() => {
@@ -470,6 +508,21 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
     refetchGradeItems()
   }
 
+  // Deleting takes every score recorded against the item with it, so it is confirmed first.
+  const handleConfirmDeleteGradeItem = async () => {
+    if (!itemPendingDelete) return
+
+    try {
+      await deleteGradeItem.mutateAsync(itemPendingDelete.id)
+      toast.success('Grade item deleted.')
+      setItemPendingDelete(null)
+      refetchGradeItems()
+      refetchScores()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || ErrorHandler.handle(err).message)
+    }
+  }
+
   // Filtered items — 4 quarters or 3 terms, per the academic year's structure
   const quarters = gradingPeriods.values
 
@@ -478,28 +531,26 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
   const componentOptions = [
     { value: 'All', label: 'All components' },
     ...components.map((component: any) => ({ value: component.id, label: component.title })),
+    { value: NO_COMPONENT, label: 'No component' },
   ]
 
-  // Only process grade items if we have valid subject ECR IDs for this subject
-  // This ensures we don't show items from other subjects
-  const gradeItems = (subjectEcrIds.length > 0 && gradeItemsData?.data) ? gradeItemsData.data : []
-  
+  const gradeItems: GradeItem[] = gradeItemsData?.data ?? []
+
   const filteredItems = gradeItems.filter((item: GradeItem) => {
-    // Ensure the item belongs to one of the current subject's ECRs
     // Check both the relationship and direct property to handle different data structures
-    const itemEcrId = item.subject_ecr?.id || (item as any).subject_ecr_id
-    if (!itemEcrId) {
-      return false // Don't show items without a valid ECR ID
-    }
-    
-    // Only show items that belong to the current subject's ECRs
-    const belongsToSubject = subjectEcrIds.includes(itemEcrId)
-    if (!belongsToSubject) {
+    const itemEcrId = item.subject_ecr?.id || item.subject_ecr_id || null
+
+    // An item under a component must be under one of this subject's, which also keeps
+    // a stale cache from another subject off the screen. An item under none is this
+    // subject's by the query that fetched it.
+    if (itemEcrId && subjectEcrIds.length > 0 && !subjectEcrIds.includes(itemEcrId)) {
       return false
     }
-    
+
     // Apply component filter
-    if (activeComponent !== 'All' && itemEcrId !== activeComponent) {
+    if (activeComponent === NO_COMPONENT) {
+      if (itemEcrId) return false
+    } else if (activeComponent !== 'All' && itemEcrId !== activeComponent) {
       return false
     }
 
@@ -715,6 +766,9 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
               students={filteredStudents}
               scores={studentScoresData?.data || []}
               onEditItem={handleEditGradeItem}
+              // An assessment built in the Assessment Builder is deleted there, where the
+              // questions and the students' attempts that hang off it are also accounted for.
+              onDeleteItem={isAssessmentMethodItem(item) ? undefined : setItemPendingDelete}
               gradeLevel={gradeLevel}
             />
           ))
@@ -741,6 +795,18 @@ export const StudentScoresTab: React.FC<StudentScoresTabProps> = ({ subjectId, c
         onSuccess={handleEditGradeItemSuccess}
         gradeItem={selectedGradeItem}
         gradeLevel={gradeLevel}
+      />
+
+      {/* Delete Grade Item Confirmation */}
+      <ConfirmationModal
+        isOpen={!!itemPendingDelete}
+        onClose={() => setItemPendingDelete(null)}
+        onConfirm={handleConfirmDeleteGradeItem}
+        title="Delete grade item"
+        message={`Delete "${itemPendingDelete?.title ?? ''}"? Every score recorded against it is deleted with it, and the running grades that used it are recalculated. This cannot be undone.`}
+        confirmText="Delete"
+        variant="danger"
+        loading={deleteGradeItem.isPending}
       />
     </div>
   )
