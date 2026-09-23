@@ -50,6 +50,9 @@ export function useUpdateSubjectEcrItem() {
     mutationFn: ({ id, data }: { id: string; data: Partial<Omit<SubjectEcrItem, 'id'>> }) => subjectEcrItemService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjectEcrItems'] });
+      // Moving an item between components, periods or years — or changing what it is
+      // scored out of — makes the server redo the grades it fed into.
+      queryClient.invalidateQueries({ queryKey: ['student-running-grades'] });
     },
   });
 }
@@ -60,6 +63,8 @@ export function useDeleteSubjectEcrItem() {
     mutationFn: (id: string) => subjectEcrItemService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjectEcrItems'] });
+      // The item's scores went with it, so the grades they fed into were redone.
+      queryClient.invalidateQueries({ queryKey: ['student-running-grades'] });
     },
   });
 }

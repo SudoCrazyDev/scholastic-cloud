@@ -69,6 +69,30 @@ class SubjectEcrItemController extends Controller
     }
 
     /**
+     * Redo these students' running grades for one subject and grading period.
+     *
+     * Every caller here has just changed what a period is scored out of, which the
+     * stored grade knows nothing about — nothing else recalculates it until the next
+     * time somebody happens to save a score.
+     *
+     * @param  iterable<string>  $studentIds
+     */
+    private function recalculateRunningGrades(iterable $studentIds, ?string $subjectId, ?string $quarter, ?string $academicYear): void
+    {
+        if (! $subjectId || ! $quarter) {
+            return;
+        }
+
+        // An item saved before the year was stamped on it counts under whichever year
+        // the subject resolves to, alongside the other unstamped ones.
+        $year = $academicYear ?: AcademicYear::forSubject($subjectId);
+
+        foreach ($studentIds as $studentId) {
+            $this->runningGrades->recalculateForSubject($studentId, $subjectId, $quarter, $year, empty($academicYear));
+        }
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Request $request): JsonResponse
@@ -364,6 +388,19 @@ class SubjectEcrItemController extends Controller
                 $item->subject_id = $item->subjectEcr?->subject_id;
             }
 
+            // Where the item sat before this edit, and who it had scores for. Moving it
+            // between components, periods or years, or changing what it is scored out
+            // of, changes the denominator of a grade that is already stored — on both
+            // sides of the move.
+            $gradingBefore = [
+                'subject_id' => $item->subjectEcr?->subject_id,
+                'quarter' => $item->quarter,
+                'academic_year' => $item->academic_year,
+            ];
+            $affectedStudentIds = StudentEcrItemScore::where('subject_ecr_item_id', $item->id)
+                ->distinct()
+                ->pluck('student_id');
+
             // v2 is sticky: an item already on v2 stays v2 even if the client omits the flag.
             $isV2 = $item->isV2() || (int) ($validatedData['content_version'] ?? 0) === 2;
             $questionsProvided = array_key_exists('questions', $validatedData['content'] ?? []);
@@ -372,8 +409,11 @@ class SubjectEcrItemController extends Controller
                 unset($validatedData['content']['questions']);
             }
 
-            DB::transaction(function () use ($item, $validatedData, $isV2, $questions, $questionsProvided) {
+            $gradingChanged = false;
+
+            DB::transaction(function () use ($item, $validatedData, $isV2, $questions, $questionsProvided, &$gradingChanged) {
                 $item->update($validatedData);
+                $gradingChanged = $item->wasChanged(['subject_ecr_id', 'score', 'quarter', 'academic_year']);
                 // Only touch question rows when the client actually sent a questions array,
                 // so a metadata-only PATCH (e.g. status/dates) never disturbs them.
                 if ($isV2 && $questionsProvided) {
@@ -384,6 +424,32 @@ class SubjectEcrItemController extends Controller
                     $item->load('questions');
                 }
             });
+
+            if ($gradingChanged && $affectedStudentIds->isNotEmpty()) {
+                $gradingAfter = [
+                    'subject_id' => $item->subjectEcr?->subject_id,
+                    'quarter' => $item->quarter,
+                    'academic_year' => $item->academic_year,
+                ];
+
+                // Both where it left and where it landed, once each. An item now under no
+                // component only has a side it left.
+                $targets = collect([$gradingBefore, $gradingAfter])
+                    ->unique(fn (array $target) => implode('|', [
+                        $target['subject_id'] ?? '',
+                        $target['quarter'] ?? '',
+                        $target['academic_year'] ?? '',
+                    ]));
+
+                foreach ($targets as $target) {
+                    $this->recalculateRunningGrades(
+                        $affectedStudentIds,
+                        $target['subject_id'],
+                        $target['quarter'],
+                        $target['academic_year'],
+                    );
+                }
+            }
 
             return response()->json([
                 'success' => true,
@@ -436,24 +502,14 @@ class SubjectEcrItemController extends Controller
             // component never reached a running grade, so there is nothing to redo.
             $subjectId = $item->subjectEcr?->subject_id;
             $quarter = $item->quarter;
-            $academicYear = $item->academic_year ?: AcademicYear::forSubject($subjectId);
+            $academicYear = $item->academic_year;
             $affectedStudentIds = StudentEcrItemScore::where('subject_ecr_item_id', $item->id)
                 ->distinct()
                 ->pluck('student_id');
 
             $item->delete();
 
-            if ($subjectId && $quarter) {
-                foreach ($affectedStudentIds as $studentId) {
-                    $this->runningGrades->recalculateForSubject(
-                        $studentId,
-                        $subjectId,
-                        $quarter,
-                        $academicYear,
-                        empty($item->academic_year)
-                    );
-                }
-            }
+            $this->recalculateRunningGrades($affectedStudentIds, $subjectId, $quarter, $academicYear);
 
             return response()->json([
                 'success' => true,
