@@ -48,7 +48,7 @@ import { ClassSectionPerformanceReportTab } from './components/ClassSectionPerfo
 import { useFeatures } from '../../hooks/useFeatures'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useIsKeyStageOne } from '../../hooks/useMatatag'
-import { isGradeTwoToTen } from '../../utils/gradeLevel'
+import { isGradeTwoToTen, parseGradeLevelNumber } from '../../utils/gradeLevel'
 import { Select } from '../../components/select'
 import { roundGrade, getGradeRemarks } from '../../utils/gradeUtils'
 import { useGradingPeriodsForYear } from '../../hooks/useGradingPeriods'
@@ -211,6 +211,16 @@ const ClassSectionDetail: React.FC = () => {
     can('deped-performance-report', 'view') &&
     isGradeTwoToTen(classSectionData?.grade_level)
 
+  /*
+   * A Grade 1 section with the MATATAG Progress tab has its report card there —
+   * the competency grid is what Grade 1 is graded on — so the numeric Report
+   * Cards tab is hidden rather than offered as a second, wrong card. Without
+   * the MATATAG tab (feature or module off) the numeric tab stays, so the
+   * adviser is never left with no report card at all.
+   */
+  const hideReportCards =
+    showMatatag && parseGradeLevelNumber(classSectionData?.grade_level) === 1
+
   const quarterOptions = useMemo(
     () => [
       ...gradingPeriods.periods.map(period => ({ value: period.value, label: period.label })),
@@ -227,8 +237,10 @@ const ClassSectionDetail: React.FC = () => {
   useEffect(() => {
     if (showPerformanceReport && activeTab === 'report-cards') {
       setActiveTab('performance-report')
+    } else if (hideReportCards && activeTab === 'report-cards') {
+      setActiveTab('matatag')
     }
-  }, [showPerformanceReport, activeTab])
+  }, [showPerformanceReport, hideReportCards, activeTab])
 
   // A term-based year has no 4th period, so never leave the filter on one.
   useEffect(() => {
@@ -620,7 +632,9 @@ const ClassSectionDetail: React.FC = () => {
                */
               ...(showPerformanceReport
                 ? [{ key: 'performance-report' as const, icon: ClipboardList, label: 'Report Cards' }]
-                : [{ key: 'report-cards' as const, icon: FileText, label: 'Report Cards' }]),
+                : hideReportCards
+                  ? []
+                  : [{ key: 'report-cards' as const, icon: FileText, label: 'Report Cards' }]),
               { key: 'consolidated-grades' as const, icon: BarChart3, label: 'Consolidated Grades' },
               { key: 'core-values' as const, icon: Award, label: 'Core Values' },
               { key: 'attendance' as const, icon: Calendar, label: 'Attendance' },
@@ -737,7 +751,7 @@ const ClassSectionDetail: React.FC = () => {
                 </motion.div>
               )}
 
-              {activeTab === 'report-cards' && (
+              {activeTab === 'report-cards' && !hideReportCards && (
                 <motion.div
                   key="report-cards"
                   initial={{ opacity: 0, x: 20 }}
