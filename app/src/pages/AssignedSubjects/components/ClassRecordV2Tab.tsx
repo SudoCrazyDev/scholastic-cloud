@@ -20,6 +20,7 @@ import { isGradeTwoToTen } from '../../../utils/gradeLevel'
 import { getGradeRemarks } from '../../../utils/gradeUtils'
 import { performanceDescriptorFor } from '../../../components/depedPerformanceReport/depedPerformanceDescriptors'
 import { mapScoreToLabel, type GradeBandLike } from '../../../utils/gradeScale'
+import { transmuteGrade, transmutesIn } from '../../../utils/transmutation'
 import type { Student } from '../../../types'
 
 /**
@@ -44,6 +45,8 @@ import type { Student } from '../../../types'
  *   PS = (scores entered) / (highest possible for the component) × 100
  *   WS = PS × (the component's percentage) / 100
  *   Initial Grade = the sum of every component's WS
+ *   Transmuted Grade = the Initial Grade read off DepEd's transmutation table
+ *                      (SY 2026-2027 only; any other year has no such column)
  *
  * It is recomputed in the browser rather than read off `student_running_grades`
  * so a typed score moves the row before the round trip finishes — the whole
@@ -61,8 +64,9 @@ import type { Student } from '../../../types'
  * The Initial Grade is arithmetic; the Term Grade is a decision, and
  * `student_running_grades.final_grade` only ever holds what a teacher applied
  * (see `depedPerformanceGrades.ts` on why the two must not be conflated).
- * So the Term Grade column is drafted locally — "Fill from Initial Grade" only
- * fills the drafts — and nothing is written until Save is pressed.
+ * So the Term Grade column is drafted locally — "Fill from Transmuted Grade"
+ * (or "Fill from Initial Grade" in a year without transmutation) only fills
+ * the drafts — and nothing is written until Save is pressed.
  */
 interface ClassRecordV2TabProps {
   subjectId: string
@@ -355,6 +359,7 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
   const { hasFeature } = useFeatures()
   const effectiveAcademicYear = academicYear ?? currentAcademicYear ?? ''
   const gradingPeriods = useGradingPeriods(gradeLevel)
+  const transmutes = transmutesIn(effectiveAcademicYear)
 
   const [period, setPeriod] = useState<string>('1')
   /** Scores saved in this session, laid over the fetched set so the sheet never flickers back. */
@@ -551,22 +556,26 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
     [termDrafts, runningGradeByStudent]
   )
 
-  const fillTermGradesFromInitial = () => {
+  const fillTermGrades = () => {
     const next: Record<string, string> = { ...termDrafts }
     let filled = 0
     for (const group of roster) {
       for (const student of group.students) {
+        // An Initial Grade of 0 means nothing is scored yet, not a grade of 60.
         const initial = computed[student.id]?.initial
         if (initial === null || initial === undefined || initial <= 0) continue
-        next[student.id] = String(Math.round(initial))
+        const grade = transmutes ? transmuteGrade(initial) : Math.round(initial)
+        if (grade === null) continue
+        next[student.id] = String(grade)
         filled += 1
       }
     }
     setTermDrafts(next)
+    const source = transmutes ? 'transmuted' : 'initial'
     toast.success(
       filled === 0
-        ? 'No initial grades to copy yet'
-        : `Copied ${filled} initial grade${filled === 1 ? '' : 's'} — review, then save`
+        ? `No ${source} grades to copy yet`
+        : `Copied ${filled} ${source} grade${filled === 1 ? '' : 's'} — review, then save`
     )
   }
 
@@ -674,7 +683,7 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
   }
 
   const totalColumns =
-    2 + columnGroups.reduce((total, group) => total + Math.max(group.items.length, 0) + 3, 0) + 3
+    2 + columnGroups.reduce((total, group) => total + Math.max(group.items.length, 0) + 3, 0) + (transmutes ? 4 : 3)
 
   const itemCount = columnGroups.reduce((total, group) => total + group.items.length, 0)
 
@@ -753,9 +762,9 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={fillTermGradesFromInitial}>
+          <Button type="button" variant="outline" size="sm" onClick={fillTermGrades}>
             <ArrowDownTrayIcon className="h-4 w-4" />
-            Fill from Initial Grade
+            {transmutes ? 'Fill from Transmuted Grade' : 'Fill from Initial Grade'}
           </Button>
           <Button
             type="button"
@@ -831,6 +840,17 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                 <br />
                 Grade
               </th>
+              {transmutes && (
+                <th
+                  rowSpan={2}
+                  className={`${frozenHeader} z-30 w-20 min-w-20 leading-tight`}
+                  style={{ top: 0, position: 'sticky' }}
+                >
+                  Transmuted
+                  <br />
+                  Grade
+                </th>
+              )}
               <th
                 rowSpan={2}
                 className={`${frozenHeader} z-30 w-20 min-w-20 leading-tight`}
@@ -932,7 +952,7 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                 )
               })}
               <th
-                colSpan={3}
+                colSpan={transmutes ? 4 : 3}
                 className={`${headerCell} ${resultsEdge} z-30 bg-slate-100`}
                 style={{ top: headerOffsets[1], position: 'sticky' }}
               />
@@ -970,6 +990,11 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
 
                 {group.students.map((student, rowIndex) => {
                   const row = computed[student.id]
+                  // Nothing scored yet reads as a dash, not as the table's floor of 60.
+                  const transmuted =
+                    transmutes && row?.initial != null && row.initial > 0
+                      ? transmuteGrade(row.initial)
+                      : null
                   const draftDirty = isTermDraftDirty(student.id)
                   const termValue = termGradeValue(student.id)
                   const termNumber = termValue === '' ? null : Number(termValue)
@@ -1052,6 +1077,13 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
                       >
                         {decimals(row?.initial ?? null)}
                       </td>
+                      {transmutes && (
+                        <td
+                          className={`${cellBorder} ${hover} px-1 text-center text-sm font-semibold tabular-nums ${gradeTone(transmuted)}`}
+                        >
+                          {transmuted ?? '—'}
+                        </td>
+                      )}
                       <td className={`${cellBorder} p-0`}>
                         <input
                           type="number"
@@ -1097,7 +1129,15 @@ export const ClassRecordV2Tab: React.FC<ClassRecordV2TabProps> = ({
         <span className="font-semibold text-slate-700">WS</span> is that percentage carrying the
         component&apos;s weight. The{' '}
         <span className="font-semibold text-slate-700">Initial Grade</span> is the sum of the
-        weighted scores; the <span className="font-semibold text-slate-700">Term Grade</span> is the
+        weighted scores
+        {transmutes && (
+          <>
+            , and the <span className="font-semibold text-slate-700">Transmuted Grade</span> is
+            that grade read off DepEd&apos;s SY 2026-2027 transmutation table (70.00 transmutes to
+            75)
+          </>
+        )}
+        ; the <span className="font-semibold text-slate-700">Term Grade</span> is the
         grade you apply, and it is what the report card prints.
       </p>
     </div>
