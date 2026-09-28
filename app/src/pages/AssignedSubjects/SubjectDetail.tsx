@@ -30,6 +30,7 @@ import { MatatagTab } from '../MyClassSections/components/MatatagTab'
 import { useFeatures } from '../../hooks/useFeatures'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useIsKeyStageOne, useMatatagSubjectLearningArea } from '../../hooks/useMatatag'
+import { parseGradeLevelNumber } from '../../utils/gradeLevel'
 import type { Subject, Student, ClassSection } from '../../types'
 
 type TabType = 'matatag' | 'class-record' | 'class-record-v2' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'assessment-methods' | 'ai-planner' | 'lesson-plan-calendar'
@@ -107,20 +108,28 @@ const SubjectDetail: React.FC = () => {
     )
   }
 
+  // Grade 1 is graded on MATATAG competencies, not a numeric class record, so
+  // neither class record is offered for a Grade 1 subject.
+  const isGradeOne = parseGradeLevelNumber(subject.class_section?.grade_level) === 1
+
   const tabs = [
     ...(matatagLink
       ? [{ id: 'matatag' as TabType, label: 'MATATAG Progress', icon: SparklesIcon }]
       : []),
-    {
-      id: 'class-record' as TabType,
-      label: 'Class Record',
-      icon: DocumentTextIcon,
-    },
-    {
-      id: 'class-record-v2' as TabType,
-      label: 'Class Record V2',
-      icon: TableCellsIcon,
-    },
+    ...(isGradeOne
+      ? []
+      : [
+          {
+            id: 'class-record' as TabType,
+            label: 'Class Record',
+            icon: DocumentTextIcon,
+          },
+          {
+            id: 'class-record-v2' as TabType,
+            label: 'Class Record V2',
+            icon: TableCellsIcon,
+          },
+        ]),
     {
       id: 'student-scores' as TabType,
       label: 'Student Scores',
@@ -265,7 +274,7 @@ const SubjectDetail: React.FC = () => {
               lockedLearningAreaId={matatagLink.learning_area.id}
             />
           )}
-          {activeTab === 'class-record' && (
+          {activeTab === 'class-record' && !isGradeOne && (
             <ClassRecordTab
               key={`${subject.id}-${subject.class_section_id}`}
               subjectId={subject.id}
@@ -277,7 +286,7 @@ const SubjectDetail: React.FC = () => {
               gradeLevel={subject.class_section?.grade_level}
             />
           )}
-          {activeTab === 'class-record-v2' && (
+          {activeTab === 'class-record-v2' && !isGradeOne && (
             <ClassRecordV2Tab
               key={`${subject.id}-${subject.class_section_id}`}
               subjectId={subject.id}
