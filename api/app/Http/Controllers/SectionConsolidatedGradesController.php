@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ClassSection;
 use App\Models\StudentRunningGrade;
+use App\Support\AcademicYear;
 use App\Support\GradingPeriods;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,9 +53,13 @@ class SectionConsolidatedGradesController extends Controller
             }
         });
 
-        // Get grades: every grading period for final, single period otherwise
+        // Get grades: every grading period for final, single period otherwise.
+        // Only the section's own year: a student can hold a second row for the same
+        // subject and period under another year, and picking it up here shows its
+        // grade (often an empty 0) in place of the real one.
         $gradesQuery = StudentRunningGrade::whereIn('student_id', $students->pluck('id'))
-            ->whereIn('subject_id', $subjects->pluck('id'));
+            ->whereIn('subject_id', $subjects->pluck('id'))
+            ->where('academic_year', AcademicYear::forSection($section));
 
         if ($isFinal) {
             $gradesQuery->whereIn('quarter', $periodValues);

@@ -630,6 +630,64 @@ class GradingPeriodStructureTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_consolidated_grades_ignores_a_row_filed_under_another_year(): void
+    {
+        $this->academicYear('2026-2027', 'quarter', true);
+        $user = $this->makeUserWithRole('principal', 'consolidated-year-token');
+
+        $section = ClassSection::create([
+            'institution_id' => $this->institution->id,
+            'grade_level' => 'Grade 5',
+            'title' => 'Unity',
+            'academic_year' => '2026-2027',
+        ]);
+        $mapeh = Subject::create([
+            'institution_id' => $this->institution->id,
+            'class_section_id' => $section->id,
+            'adviser' => $user->id,
+            'subject_type' => 'parent',
+            'title' => 'MAPEH',
+            'order' => 1,
+        ]);
+        $student = \App\Models\Student::create([
+            'first_name' => 'Samantha',
+            'last_name' => 'Mendoza',
+            'gender' => 'female',
+            'birthdate' => '2015-06-15',
+            'is_active' => true,
+        ]);
+        \App\Models\StudentSection::create([
+            'student_id' => $student->id,
+            'section_id' => $section->id,
+            'academic_year' => '2026-2027',
+            'is_active' => true,
+            'is_promoted' => false,
+        ]);
+
+        // A stray, empty row under last year, created before the real one — the
+        // one an unscoped `first()` picks up.
+        \App\Models\StudentRunningGrade::create([
+            'student_id' => $student->id,
+            'subject_id' => $mapeh->id,
+            'quarter' => 1,
+            'academic_year' => '2025-2026',
+            'grade' => 0,
+        ]);
+        \App\Models\StudentRunningGrade::create([
+            'student_id' => $student->id,
+            'subject_id' => $mapeh->id,
+            'quarter' => 1,
+            'academic_year' => '2026-2027',
+            'grade' => 96,
+            'final_grade' => 96,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer consolidated-year-token')
+            ->getJson("/api/section-consolidated-grades?section_id={$section->id}&quarter=1")
+            ->assertOk()
+            ->assertJsonPath('data.students.0.subjects.0.grade', 96);
+    }
+
     public function test_grading_periods_endpoint_scopes_to_a_grade_level(): void
     {
         $year = $this->academicYear('2026-2027', 'term', true);
