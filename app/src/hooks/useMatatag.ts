@@ -6,6 +6,7 @@ import { matatagService } from '../services/matatagService'
 import type {
   MatatagDescriptor,
   MatatagGrid,
+  MatatagLearningAreaLinkWrite,
   MatatagNarrativeWrite,
   MatatagRatingWrite,
 } from '../types'
@@ -30,6 +31,9 @@ const keys = {
     ['matatag', 'narratives', sectionId, year ?? ''] as const,
   attendance: (sectionId: string, year?: string) =>
     ['matatag', 'attendance', sectionId, year ?? ''] as const,
+  areaTeachers: (sectionId: string, year?: string) =>
+    ['matatag', 'area-teachers', sectionId, year ?? ''] as const,
+  subjectArea: (subjectId: string) => ['matatag', 'subject-area', subjectId] as const,
 }
 
 /** Terms, descriptors and macro skills. Config; it changes about once a year. */
@@ -92,6 +96,55 @@ export function useMatatagSectionMutations(institutionId?: string, academicYear?
   void institutionId
 
   return { optIn, optOut }
+}
+
+/** Which subject — and so which subject teacher — marks each learning area. */
+export function useMatatagLearningAreaTeachers(params: {
+  sectionId: string
+  academicYear?: string
+  enabled?: boolean
+}) {
+  return useQuery({
+    queryKey: keys.areaTeachers(params.sectionId, params.academicYear),
+    queryFn: () =>
+      matatagService.getLearningAreaTeachers(params.sectionId, { academic_year: params.academicYear }),
+    enabled: params.enabled !== false && Boolean(params.sectionId),
+  })
+}
+
+export function useMatatagLearningAreaTeacherMutations(params: { sectionId: string; academicYear?: string }) {
+  const queryClient = useQueryClient()
+
+  const save = useMutation({
+    mutationFn: (links: MatatagLearningAreaLinkWrite[]) =>
+      matatagService.saveLearningAreaTeachers(params.sectionId, {
+        academic_year: params.academicYear,
+        links,
+      }),
+    onSuccess: response => {
+      toast.success(response.message ?? 'Learning-area teachers saved.')
+      queryClient.setQueryData(keys.areaTeachers(params.sectionId, params.academicYear), response.data)
+      queryClient.invalidateQueries({ queryKey: ['matatag', 'subject-area'] })
+    },
+    onError: error => {
+      toast.error(messageFrom(error, 'Could not save the learning-area teachers.'))
+    },
+  })
+
+  return { save }
+}
+
+/**
+ * The learning area a subject stands for, if its section reports on MATATAG
+ * and the adviser has linked it. Null for every other subject.
+ */
+export function useMatatagSubjectLearningArea(subjectId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: keys.subjectArea(subjectId ?? ''),
+    queryFn: () => matatagService.getSubjectLearningArea(subjectId!),
+    enabled: enabled && Boolean(subjectId),
+    retry: false,
+  })
 }
 
 /**

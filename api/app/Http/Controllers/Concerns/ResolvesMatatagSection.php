@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\ClassSection;
 use App\Models\MatatagSectionCurriculum;
 use App\Models\StudentSection;
+use App\Services\Matatag\LearningAreaTeachers;
 use App\Support\AcademicYear;
 use App\Support\MatatagTerms;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +29,9 @@ use Illuminate\Http\Request;
  *    than being fetched and then judged — there is no window in which another
  *    school's row is in memory.
  * 2. **May this person mark it?** The adviser may, and so may anyone holding
- *    `matatag-grading.view-all`. Nobody else. This is the clause
+ *    `matatag-grading.view-all`. On the competency grid only, so may the
+ *    teacher of a subject linked to one of its learning areas — for that area
+ *    and no other (see `markableAreaIds()`). Nobody else. This is the clause
  *    `SF9Controller::denyUnlessOwnStudent()` lacks: institution membership
  *    alone would let every teacher in a school open every other Grade 1
  *    adviser's grid.
@@ -46,6 +49,12 @@ trait ResolvesMatatagSection
     /**
      * The section a request names, scoped to the caller, or a response to send.
      *
+     * `$subjectTeachers` also lets in someone who teaches a subject linked to
+     * one of the section's learning areas. Only the competency grid passes it,
+     * and it must then narrow what that person touches with
+     * `markableAreaIds()` — being let into the section is not being let into
+     * all of it.
+     *
      * @param  ClassSection|null  $section  out-param: the resolved section
      * @return JsonResponse|null response to return, or null to continue
      */
@@ -54,6 +63,7 @@ trait ResolvesMatatagSection
         string $sectionId,
         ?ClassSection &$section,
         string $ability = 'view',
+        bool $subjectTeachers = false,
     ): ?JsonResponse {
         if ($deny = $this->denyUnlessStaff($request)) {
             return $deny;
@@ -83,7 +93,10 @@ trait ResolvesMatatagSection
             return $this->forbidden('You do not have access to this module');
         }
 
-        if (! $this->canReachSection($request, $section)) {
+        $reachable = $this->canReachSection($request, $section)
+            || ($subjectTeachers && app(LearningAreaTeachers::class)->teachesAnyAreaOf($user->id, $section));
+
+        if (! $reachable) {
             return $this->forbidden(
                 'You can only work on the sections you advise. Ask for the "See every Key Stage 1 '
                 .'section in the school" permission to reach the others.'
@@ -114,6 +127,28 @@ trait ResolvesMatatagSection
         }
 
         return $section->adviser === $user->id;
+    }
+
+    /**
+     * The learning areas the caller may work on in a section-year.
+     *
+     * Null means every area — the adviser, or someone holding `view-all`.
+     * Otherwise the areas whose linked subject the caller teaches, which may
+     * be none at all when the link belongs to another year.
+     *
+     * @return array<int, string>|null
+     */
+    protected function markableAreaIds(Request $request, ClassSection $section, string $academicYear): ?array
+    {
+        if ($this->canReachSection($request, $section)) {
+            return null;
+        }
+
+        $user = $this->staffUser($request);
+
+        return $user
+            ? app(LearningAreaTeachers::class)->areaIdsTaughtBy($user->id, $section, $academicYear)
+            : [];
     }
 
     /**

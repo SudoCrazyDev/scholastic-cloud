@@ -27,6 +27,7 @@ import { MatatagFocusList } from './MatatagFocusList'
 import { MatatagNarrativesPanel } from './MatatagNarrativesPanel'
 import { MatatagAttendancePanel } from './MatatagAttendancePanel'
 import { MatatagReportsPanel } from './MatatagReportsPanel'
+import { MatatagAreaTeachersPanel } from './MatatagAreaTeachersPanel'
 
 const HIGH_CONTRAST_KEY = 'matatag.highContrast'
 const VIEW_KEY = 'matatag.view'
@@ -45,9 +46,17 @@ interface Props {
   gradeLevel: string
   academicYear?: string
   institutionId?: string
+  /**
+   * Set when a subject teacher opens the tab from their own subject page: the
+   * grid is held to the one learning area their subject stands for, and the
+   * adviser's panels — narratives, attendance, report cards, teachers — are
+   * not offered. The API enforces the same narrowing; this only keeps the
+   * screen honest about it.
+   */
+  lockedLearningAreaId?: string
 }
 
-type Panel = 'grid' | 'narratives' | 'attendance' | 'reports'
+type Panel = 'grid' | 'narratives' | 'attendance' | 'reports' | 'teachers'
 
 /**
  * The adviser's MATATAG workspace: one tab in the class-section screen they
@@ -57,10 +66,17 @@ type Panel = 'grid' | 'narratives' | 'attendance' | 'reports'
  * learning areas — so this is where the whole record is kept, and the three
  * panels below are the three things that make up a progress report.
  */
-export function MatatagTab({ classSectionId, gradeLevel, academicYear, institutionId }: Props) {
+export function MatatagTab({
+  classSectionId,
+  gradeLevel,
+  academicYear,
+  institutionId,
+  lockedLearningAreaId,
+}: Props) {
   const { can } = usePermissions()
+  const subjectMode = Boolean(lockedLearningAreaId)
   const [panel, setPanel] = useState<Panel>('grid')
-  const [areaId, setAreaId] = useState<string | undefined>(undefined)
+  const [areaId, setAreaId] = useState<string | undefined>(lockedLearningAreaId)
   const [term, setTerm] = useState(1)
   const [activeColumn, setActiveColumn] = useState<MatatagGridColumn | null>(null)
   const [highContrast, setHighContrast] = useState(false)
@@ -90,9 +106,12 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
   )
 
   const { data: reference } = useMatatagReference()
+  // A subject teacher is not on the section list — it is the adviser's — and
+  // only reaches this tab once the section is known to be on MATATAG.
   const { data: sectionList, isLoading: sectionsLoading } = useMatatagSections({
     institutionId,
     academicYear,
+    enabled: !subjectMode,
   })
   const { optIn, optOut } = useMatatagSectionMutations(institutionId, academicYear)
 
@@ -101,7 +120,7 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
     [sectionList, classSectionId]
   )
 
-  const optedIn = Boolean(status?.opted_in)
+  const optedIn = subjectMode || Boolean(status?.opted_in)
 
   const grid = useMatatagGrid({
     sectionId: classSectionId,
@@ -192,7 +211,7 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
   // so anything typed is written before the grid underneath it changes.
   useEffect(() => () => void save.flush(), [areaId, term]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (sectionsLoading) {
+  if (sectionsLoading && !subjectMode) {
     return (
       <div className="flex items-center gap-2 py-12 justify-center text-gray-500">
         <Loader2 className="w-4 h-4 animate-spin" />
@@ -224,15 +243,17 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
         <div>
           <h3 className="text-base font-semibold text-gray-900">MATATAG Progress</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            {status?.curriculum_version?.title}
-            {status?.curriculum_version
+            {subjectMode
+              ? `${data?.learning_area.title ?? ''}${data ? ` · ${data.section.grade_level} – ${data.section.title}` : ''}`
+              : status?.curriculum_version?.title}
+            {!subjectMode && status?.curriculum_version
               ? ` · ${status.curriculum_version.competency_count} competencies, ${status.curriculum_version.slot_count} marks a year`
               : ''}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {can('matatag-grading', 'set-up') && (
+          {!subjectMode && can('matatag-grading', 'set-up') && (
             <Button
               type="button"
               variant="ghost"
@@ -246,12 +267,13 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
         </div>
       </header>
 
-      <nav className="flex gap-1 border-b border-gray-200">
+      {!subjectMode && <nav className="flex gap-1 border-b border-gray-200">
         {([
           ['grid', 'Competencies'],
           ['narratives', 'Narratives'],
           ['attendance', 'Attendance'],
           ['reports', 'Report cards'],
+          ['teachers', 'Learning area teachers'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -266,22 +288,26 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
             {label}
           </button>
         ))}
-      </nav>
+      </nav>}
 
       {panel === 'grid' && (
         <>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="text-xs font-medium text-gray-600">
-              <span className="block mb-1">Learning area</span>
-              <div className="min-w-[220px]">
-                <Select
-                  inputSize="sm"
-                  value={areaId ?? data?.learning_area.id ?? ''}
-                  onChange={event => setAreaId(event.target.value || undefined)}
-                  options={areaOptions}
-                />
-              </div>
-            </label>
+            {/* A subject teacher usually teaches one area, and a selector with
+                one option is noise; it appears only when there is a choice. */}
+            {(!subjectMode || areaOptions.length > 1) && (
+              <label className="text-xs font-medium text-gray-600">
+                <span className="block mb-1">Learning area</span>
+                <div className="min-w-[220px]">
+                  <Select
+                    inputSize="sm"
+                    value={areaId ?? data?.learning_area.id ?? ''}
+                    onChange={event => setAreaId(event.target.value || undefined)}
+                    options={areaOptions}
+                  />
+                </div>
+              </label>
+            )}
 
             <label className="text-xs font-medium text-gray-600">
               <span className="block mb-1">Term</span>
@@ -486,6 +512,14 @@ export function MatatagTab({ classSectionId, gradeLevel, academicYear, instituti
             </p>
           )}
         </>
+      )}
+
+      {panel === 'teachers' && (
+        <MatatagAreaTeachersPanel
+          classSectionId={classSectionId}
+          academicYear={academicYear}
+          canManage={can('matatag-grading', 'manage')}
+        />
       )}
 
       {panel === 'narratives' && (

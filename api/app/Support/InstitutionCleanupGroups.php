@@ -141,10 +141,11 @@ class InstitutionCleanupGroups
             'matatag' => [
                 'label' => 'MATATAG Progress (Key Stage 1)',
                 'area' => 'Academics',
-                'description' => "Competency descriptors, the adviser's two narratives per term, and each section's opt-in to a DepEd catalog, for Grades 1 to 3. The catalog itself is platform-wide and is never touched.",
+                'description' => "Competency descriptors, the adviser's two narratives per term, which subject teacher marks each learning area, and each section's opt-in to a DepEd catalog, for Grades 1 to 3. The catalog itself is platform-wide and is never touched.",
                 'tables' => [
                     'matatag_competency_ratings',
                     'matatag_term_narratives',
+                    'matatag_subject_learning_areas',
                     'matatag_section_curricula',
                 ],
                 'soft_deletes' => [],

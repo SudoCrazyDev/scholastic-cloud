@@ -239,4 +239,24 @@ return [
         ],
     ],
 
+    /*
+     * Other names a school gives the subject that stands for a learning area,
+     * keyed by the area's catalog `key`.
+     *
+     * Only used to *suggest* which of a section's subjects to link to an area
+     * (see App\Services\Matatag\LearningAreaTeachers). The area's own title,
+     * the part of it outside brackets, the bracketed abbreviation and its key
+     * are always tried as well, so only genuinely different spellings belong
+     * here. Compared after lower-casing, turning '&' into 'and' and dropping
+     * punctuation. A school whose names match none of these simply links the
+     * area by hand.
+     */
+    'subject_aliases' => [
+        'reading-literacy' => ['reading literacy', 'reading', 'literacy'],
+        'language' => ['lang', 'mother tongue', 'mtb', 'mtb mle'],
+        'mathematics' => ['math', 'maths'],
+        'gmrc' => ['good manners right conduct', 'values', 'values education'],
+        'makabansa' => [],
+    ],
+
 ];

@@ -32,7 +32,7 @@ against a live tenant and argues down both transmutation and ECR-to-competency t
 | Value | numeric score → transmuted grade | **letter descriptor A–E** |
 | Aggregation | weighted, averaged, transmuted | **none at all** |
 | Report card | numeric SF9 | narrative progress report + attached PACE forms |
-| Record owner | the subject teacher | **the adviser**, for all learning areas |
+| Record owner | the subject teacher | **the adviser**, for all learning areas — a linked subject teacher may also mark one area (see [Learning-area teachers](#learning-area-teachers)) |
 
 ### Key Stage 1 is phased: Grade 2 and Grade 3 are still numeric
 
@@ -338,6 +338,7 @@ clean-up:
 | `matatag_section_curricula` | opt-in + **version pin** + `grade_level` snapshot | `UNIQUE (class_section_id, academic_year)` |
 | `matatag_competency_ratings` | the descriptors | `UNIQUE (student_id, academic_year, slot_id)` |
 | `matatag_term_narratives` | the two per-term paragraphs | `UNIQUE (student_id, academic_year, term)` |
+| `matatag_subject_learning_areas` | which of the section's `subjects` stands for each learning area | `UNIQUE (class_section_id, academic_year, learning_area_id)` |
 
 Four schema decisions that each prevent a specific bug, and which a future change must not undo:
 
@@ -358,6 +359,31 @@ Four schema decisions that each prevent a specific bug, and which a future chang
 `InstitutionCleanupGroups` records that `core_value_markings` is the one table it cannot scope
 through a parent, so cleaning School A deletes a dual-enrolled learner's School B markings. None of
 these tables needs a `scoping()` entry.
+
+### Learning-area teachers
+
+DepEd makes the adviser the record owner, but schools such as Maranatha have subject teachers
+teaching Grade 1's five learning areas, and those sections already have one `subjects` row per area,
+each with its teacher in `subjects.adviser`. `matatag_subject_learning_areas` links a learning area
+to one of those subjects, and **whoever teaches that subject may mark that area** — from a
+*MATATAG Progress* tab on their own subject page (`/assigned-subjects/:id`), and nowhere else.
+
+- **The link names a subject, not a person.** Reassign the subject and the right to mark moves with
+  it. Delete the subject and the link cascades away, handing the area back to the adviser.
+- **Titles only suggest.** Opting a section in links each area to the one subject whose title names
+  it (`LearningAreaTeachers::suggest()`: case, `&`/`and` and punctuation ignored; aliases in
+  `config('matatag.subject_aliases')`). Two matching subjects means no link. A link is never
+  overwritten automatically — once the adviser has chosen, a rename or re-opt-in leaves it alone.
+  `2026_09_28_000002_…` did the same once for sections already opted in.
+- **The adviser keeps everything.** Every area, the narratives, attendance, the report cards and the
+  workbook stay the adviser's (or `view-all`'s). The adviser sets the links on the tab's
+  *Learning area teachers* panel.
+- **A subject teacher reaches exactly one thing: the grid, for their areas.** `resolveSection(...,
+  subjectTeachers: true)` is passed only by `MatatagGridController`, which then narrows with
+  `markableAreaIds()`: the area list and default area are theirs only, another area is a 403, and
+  `bulkUpsert` refuses the whole save if any one slot is outside their areas (`area_not_yours`).
+  Every other MATATAG endpoint still lets in only the adviser and `view-all`.
+- The link is per academic year, like the pin. A link from last year reaches nothing this year.
 
 ---
 
@@ -512,6 +538,9 @@ Rows marked *planned* do not exist yet. Everything else is built and tested.
 | `api/app/Services/Matatag/CurriculumTree.php` | the tree, and one (area, term) block of grid columns | |
 | `api/app/Http/Controllers/Concerns/ResolvesMatatagSection.php` | **the single place every cross-tenant guard lives** | |
 | `api/app/Http/Controllers/Matatag{Reference,Curriculum,Section,Grid,Narrative,Attendance}Controller.php` | the six controllers | |
+| `api/app/Services/Matatag/LearningAreaTeachers.php` | subject ↔ learning-area links: name matching, auto-link, who teaches which area | |
+| `api/app/Http/Controllers/MatatagLearningAreaTeacherController.php` | the adviser's links, and a subject's own area for its teacher's page | |
+| `api/tests/Feature/Matatag/MatatagLearningAreaTeacherTest.php` | a subject teacher reaches their area and nothing else | |
 | `api/tests/Feature/Matatag/*` | opt-in, grid, narratives, attendance, access — sharing a two-school fixture | |
 | `api/app/Services/Matatag/ProgressReport.php` | composes the card and the forms; the one place the payload's shape is decided | |
 | `api/app/Http/Controllers/MatatagProgressReportController.php` | the report-card + PACE payload, section-wide or one learner | |
@@ -539,6 +568,8 @@ reaches this at a school that has not been switched on.
 | `GET matatag/attendance` | `view` |
 | `GET matatag/progress-report[/{studentId}]` | `view` |
 | `GET matatag/workbook` | `view` |
+| `GET/PUT matatag/sections/{id}/learning-area-teachers` | `view` / `manage` (adviser or `view-all` only) |
+| `GET matatag/subjects/{subjectId}/learning-area` | `view` (the subject's teacher, adviser or `view-all`) |
 
 `set-up` is separate from `manage` on purpose: deciding how a whole year is reported is not the same
 act as recording one learner's descriptor, and a school must be able to grant the second without the
@@ -582,6 +613,8 @@ eight hours wrong about.
 | `app/src/pages/MyClassSections/components/matatagRoster.ts` | how a class is listed: males first, `DELA CRUZ, JUAN M.`, and the search match | |
 | `app/src/pages/MyClassSections/components/MatatagNarrativesPanel.tsx` | the two paragraphs, capped with a live counter, searchable | |
 | `app/src/pages/MyClassSections/components/MatatagAttendancePanel.tsx` | the derived table, read-only | |
+| `app/src/pages/MyClassSections/components/MatatagAreaTeachersPanel.tsx` | the adviser links each learning area to a subject | |
+| `app/src/pages/AssignedSubjects/SubjectDetail.tsx` | a *MATATAG Progress* tab for a linked subject: `MatatagTab` with `lockedLearningAreaId` | |
 | `app/src/hooks/useMatatag.ts`, `app/src/services/matatagService.ts` | per the mandated `pages → hooks → services → lib/api.ts` layering | |
 | `app/src/pages/MyClassSections/ClassSectionDetail.tsx` | a ninth tab, shown only on a Key Stage 1 section | |
 | `app/src/pages/MyClassSections/components/MatatagReportsPanel.tsx` | the printing panel: preview one learner, download by learner or by area | |
@@ -854,6 +887,7 @@ Reads, without writing:
 | Source | Used for |
 |---|---|
 | `class_sections` | the section, its `grade_level`, `adviser` and `department_id` |
+| `subjects` | a section's subjects and their teachers (`subjects.adviser`), for learning-area teachers |
 | `student_sections` | the roster — **directly**, not via `App\Support\SubjectRoster`, which resolves a *subject's* roster; the five learning areas are not `subjects` rows |
 | `students` | names, LRN, sex, birthdate (ages at start and end of year) |
 | `student_attendances`, `school_days` | the derived attendance table |

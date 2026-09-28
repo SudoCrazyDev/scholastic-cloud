@@ -31,6 +31,7 @@ use App\Http\Controllers\InstitutionPaymentGatewayController;
 use App\Http\Controllers\MatatagAttendanceController;
 use App\Http\Controllers\MatatagCurriculumController;
 use App\Http\Controllers\MatatagGridController;
+use App\Http\Controllers\MatatagLearningAreaTeacherController;
 use App\Http\Controllers\MatatagNarrativeController;
 use App\Http\Controllers\MatatagProgressReportController;
 use App\Http\Controllers\MatatagReferenceController;
@@ -392,7 +393,10 @@ Route::middleware('auth.token')->group(function () {
     Route::get('class-sections/by-institution/{institutionId?}', [ClassSectionController::class, 'getByInstitution'])->middleware('module:class-sections,view');
     Route::get('class-sections/academic-years', [ClassSectionController::class, 'getAcademicYears'])->middleware('module:class-sections,view');
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve'])->middleware('module:class-sections,manage');
-    Route::post('class-sections/{id}/transfer-student', [ClassSectionController::class, 'transferStudent'])->middleware('module:class-sections,manage');
+    // Ungated so a subject teacher, who holds class-sections.view only, can move a
+    // student out of My Class Sections. The controller still scopes both sections
+    // to the caller's institution.
+    Route::post('class-sections/{id}/transfer-student', [ClassSectionController::class, 'transferStudent']);
     Route::apiResource('class-sections', ClassSectionController::class)->middleware('module:class-sections,view');
 
     // Timetable routes
@@ -732,6 +736,15 @@ Route::middleware('auth.token')->group(function () {
             ->middleware('module:matatag-grading,set-up');
         Route::delete('matatag/sections/{sectionId}/opt-in', [MatatagSectionController::class, 'destroy'])
             ->middleware('module:matatag-grading,set-up');
+
+        // Which subject stands for each learning area, and so which subject
+        // teacher may mark it. The adviser's to set; see LearningAreaTeachers.
+        Route::get('matatag/sections/{sectionId}/learning-area-teachers', [MatatagLearningAreaTeacherController::class, 'index'])
+            ->middleware('module:matatag-grading,view');
+        Route::put('matatag/sections/{sectionId}/learning-area-teachers', [MatatagLearningAreaTeacherController::class, 'update'])
+            ->middleware('module:matatag-grading,manage');
+        Route::get('matatag/subjects/{subjectId}/learning-area', [MatatagLearningAreaTeacherController::class, 'forSubject'])
+            ->middleware('module:matatag-grading,view');
 
         Route::get('matatag/grid', [MatatagGridController::class, 'show'])
             ->middleware('module:matatag-grading,view');

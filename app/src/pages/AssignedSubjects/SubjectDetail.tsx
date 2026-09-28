@@ -10,7 +10,8 @@ import {
   BuildingOfficeIcon,
   ListBulletIcon,
   DocumentTextIcon,
-  TableCellsIcon
+  TableCellsIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline'
 import { useSubjectDetail } from '@hooks'
 import { useQuery } from '@tanstack/react-query'
@@ -25,9 +26,13 @@ import { LessonPlanCalendarTab } from './components/LessonPlanCalendarTab'
 import SummativeAssessmentTab from './components/SummativeAssessmentTab'
 import { AssessmentBuilderTab } from './components/AssessmentBuilderTab'
 import { GradingTypeControl } from './components/GradingTypeControl'
+import { MatatagTab } from '../MyClassSections/components/MatatagTab'
+import { useFeatures } from '../../hooks/useFeatures'
+import { usePermissions } from '../../hooks/usePermissions'
+import { useIsKeyStageOne, useMatatagSubjectLearningArea } from '../../hooks/useMatatag'
 import type { Subject, Student, ClassSection } from '../../types'
 
-type TabType = 'class-record' | 'class-record-v2' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'assessment-methods' | 'ai-planner' | 'lesson-plan-calendar'
+type TabType = 'matatag' | 'class-record' | 'class-record-v2' | 'topics' | 'calendar' | 'student-scores' | 'summative-assessment' | 'assessment-methods' | 'ai-planner' | 'lesson-plan-calendar'
 
 // Extend types locally to allow students array on class_section
 interface ClassSectionWithStudents extends ClassSection {
@@ -56,6 +61,20 @@ const SubjectDetail: React.FC = () => {
     staleTime: 30_000,
   })
   const assignedStudentIds = (assignedRes?.data || []).map((a: any) => a.student_id) as string[]
+
+  /*
+   * A Grade 1 subject the adviser has linked to a MATATAG learning area gets
+   * the competency grid for that one area, so its teacher marks it here rather
+   * than on the adviser's class-section screen, which they cannot open. The
+   * lookup answers null for every other subject.
+   */
+  const { hasFeature } = useFeatures()
+  const { can } = usePermissions()
+  const isKeyStageOne = useIsKeyStageOne(subject?.class_section?.grade_level)
+  const { data: matatagLink } = useMatatagSubjectLearningArea(
+    subject?.id,
+    hasFeature('matatag-grading') && can('matatag-grading', 'view') && isKeyStageOne
+  )
 
   if (isLoading) {
     return (
@@ -89,6 +108,9 @@ const SubjectDetail: React.FC = () => {
   }
 
   const tabs = [
+    ...(matatagLink
+      ? [{ id: 'matatag' as TabType, label: 'MATATAG Progress', icon: SparklesIcon }]
+      : []),
     {
       id: 'class-record' as TabType,
       label: 'Class Record',
@@ -234,6 +256,15 @@ const SubjectDetail: React.FC = () => {
             quarters through a year the rest of the school runs on terms. Every
             tab that names or counts a grading period needs it.
           */}
+          {activeTab === 'matatag' && matatagLink && (
+            <MatatagTab
+              key={`${subject.id}-matatag`}
+              classSectionId={matatagLink.class_section_id}
+              gradeLevel={matatagLink.grade_level}
+              academicYear={matatagLink.academic_year}
+              lockedLearningAreaId={matatagLink.learning_area.id}
+            />
+          )}
           {activeTab === 'class-record' && (
             <ClassRecordTab
               key={`${subject.id}-${subject.class_section_id}`}

@@ -10,6 +10,7 @@ use App\Models\MatatagGradeLevelCurriculum;
 use App\Models\MatatagSectionCurriculum;
 use App\Models\MatatagTermNarrative;
 use App\Services\Matatag\CurriculumTree;
+use App\Services\Matatag\LearningAreaTeachers;
 use App\Support\AcademicYear;
 use App\Support\MatatagTerms;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +29,10 @@ class MatatagSectionController extends Controller
 {
     use ResolvesMatatagSection;
 
-    public function __construct(private readonly CurriculumTree $tree) {}
+    public function __construct(
+        private readonly CurriculumTree $tree,
+        private readonly LearningAreaTeachers $teachers,
+    ) {}
 
     /**
      * The Key Stage 1 sections the caller can reach, and where each one stands.
@@ -173,6 +177,11 @@ class MatatagSectionController extends Controller
                 'enabled_at' => now(),
             ],
         );
+
+        // Link each learning area to the section's own subject of the same
+        // name, so its subject teacher can mark it. Only unambiguous matches,
+        // and never over a link the adviser has already chosen.
+        $this->teachers->autoLink($section, $pin, $request->user()->id);
 
         return response()->json([
             'success' => true,

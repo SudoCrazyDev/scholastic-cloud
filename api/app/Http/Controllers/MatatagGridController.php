@@ -41,7 +41,7 @@ class MatatagGridController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        if ($deny = $this->resolveSection($request, (string) $request->input('class_section_id'), $section)) {
+        if ($deny = $this->resolveSection($request, (string) $request->input('class_section_id'), $section, 'view', true)) {
             return $deny;
         }
 
@@ -55,7 +55,13 @@ class MatatagGridController extends Controller
             return $deny;
         }
 
-        if ($deny = $this->resolveArea($request, $pin, $area)) {
+        $markable = $this->markableAreaIds($request, $section, $academicYear);
+
+        if ($deny = $this->denyUnlessAnyArea($markable, $academicYear)) {
+            return $deny;
+        }
+
+        if ($deny = $this->resolveArea($request, $pin, $markable, $area)) {
             return $deny;
         }
 
@@ -95,12 +101,18 @@ class MatatagGridController extends Controller
                 // Every area of the pinned catalog, so the client can offer
                 // the area selector without fetching the whole competency
                 // tree. Five rows; the tree is a quarter of a megabyte.
+                //
+                // A subject teacher is offered only the areas they teach.
                 'learning_areas' => MatatagLearningArea::where('curriculum_version_id', $pin->curriculum_version_id)
+                    ->when($markable !== null, fn ($q) => $q->whereIn('id', $markable))
                     ->orderBy('sort_order')
                     ->get()
                     ->map(fn (MatatagLearningArea $a) => $this->tree->area($a))
                     ->all(),
                 'learning_area' => $this->tree->area($area),
+                // Null for the adviser, who reaches every area; otherwise the
+                // areas this subject teacher may mark.
+                'markable_learning_area_ids' => $markable,
                 'domains' => $this->tree->domainsFor($area, $term),
                 'slot_counts_by_term' => $this->tree->slotCountsByTerm($area),
                 'columns' => $columns,
@@ -136,20 +148,23 @@ class MatatagGridController extends Controller
      * order matters — each one narrows what the next is allowed to assume:
      *
      * 1. the section resolves *and* is institution-scoped, in one query
-     * 2. the caller advises it, or holds `view-all`
+     * 2. the caller advises it, holds `view-all`, or teaches a subject linked
+     *    to one of its learning areas
      * 3. it is opted in and enabled, or there is nothing to write against
      * 4. every slot belongs to **this section's pinned version** — the guard
      *    against writing Grade 2's catalog into a Grade 1 section, or a
      *    revision's slots into a section still mid-year on the old one
      * 5. every slot's term is the posted term, which stops a stale term
      *    selector in an open tab writing Term 3's work into Term 1
-     * 6. every learner is on this section's active roster for this year — the
+     * 6. a subject teacher's slots are all in the areas they teach — the
+     *    guard that keeps the Mathematics teacher out of Reading & Literacy
+     * 7. every learner is on this section's active roster for this year — the
      *    cross-tenant guard on the write path, and the one that matters most
-     * 7. the descriptor is one of DepEd's five letters, or null to clear
+     * 8. the descriptor is one of DepEd's five letters, or null to clear
      */
     public function bulkUpsert(Request $request): JsonResponse
     {
-        if ($deny = $this->resolveSection($request, (string) $request->input('class_section_id'), $section, 'manage')) {
+        if ($deny = $this->resolveSection($request, (string) $request->input('class_section_id'), $section, 'manage', true)) {
             return $deny;
         }
 
@@ -160,6 +175,12 @@ class MatatagGridController extends Controller
         $academicYear = $this->resolveAcademicYear($request, $section);
 
         if ($deny = $this->resolvePin($section, $academicYear, $pin)) {
+            return $deny;
+        }
+
+        $markable = $this->markableAreaIds($request, $section, $academicYear);
+
+        if ($deny = $this->denyUnlessAnyArea($markable, $academicYear)) {
             return $deny;
         }
 
@@ -181,6 +202,10 @@ class MatatagGridController extends Controller
         }
 
         if ($error = $this->rejectBadSlots($ratings, $pin, $term, $slots)) {
+            return $error;
+        }
+
+        if ($error = $this->rejectOtherAreas($slots, $markable)) {
             return $error;
         }
 
@@ -252,6 +277,56 @@ class MatatagGridController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * A subject teacher may write only to the areas they teach.
+     *
+     * Checked per slot rather than trusting the grid the client loaded: the
+     * area selector is a courtesy, and the request body is what is written.
+     *
+     * @param  \Illuminate\Support\Collection  $slots  keyed by id
+     * @param  array<int, string>|null  $markable  null for the adviser
+     */
+    private function rejectOtherAreas($slots, ?array $markable): ?JsonResponse
+    {
+        if ($markable === null) {
+            return null;
+        }
+
+        $outside = $slots->reject(
+            fn (MatatagCompetencySlot $slot) => in_array($slot->learning_area_id, $markable, true)
+        );
+
+        if ($outside->isNotEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => $outside->count().' of the competencies in this save belong to a '
+                    .'learning area you do not teach in this section. The adviser marks those.',
+                'code' => 'area_not_yours',
+                'errors' => ['slot_id' => $outside->keys()->take(10)->all()],
+            ], 403);
+        }
+
+        return null;
+    }
+
+    /**
+     * A subject teacher whose link belongs to another year reaches nothing in
+     * this one.
+     *
+     * @param  array<int, string>|null  $markable
+     */
+    private function denyUnlessAnyArea(?array $markable, string $academicYear): ?JsonResponse
+    {
+        if ($markable === null || $markable !== []) {
+            return null;
+        }
+
+        return $this->forbidden(
+            'None of your subjects is linked to a learning area of this section for '
+            .$academicYear.'. Ask the adviser to link it on the MATATAG Progress tab.'
+        );
     }
 
     /**
@@ -439,13 +514,31 @@ class MatatagGridController extends Controller
      * is not found, so there is no moment at which the wrong curriculum is in
      * hand.
      *
+     * A subject teacher (`$markable` not null) opens one of their own areas
+     * by default, and is refused any other.
+     *
+     * @param  array<int, string>|null  $markable  null for the adviser
      * @param  MatatagLearningArea|null  $area  out-param
      */
-    private function resolveArea(Request $request, MatatagSectionCurriculum $pin, ?MatatagLearningArea &$area): ?JsonResponse
-    {
+    private function resolveArea(
+        Request $request,
+        MatatagSectionCurriculum $pin,
+        ?array $markable,
+        ?MatatagLearningArea &$area,
+    ): ?JsonResponse {
         $requested = $request->input('learning_area_id');
 
-        $query = MatatagLearningArea::where('curriculum_version_id', $pin->curriculum_version_id);
+        if ($markable !== null && is_string($requested) && $requested !== ''
+            && ! in_array($requested, $markable, true)) {
+            $area = null;
+
+            return $this->forbidden(
+                'You can only open the learning areas you teach in this section.'
+            );
+        }
+
+        $query = MatatagLearningArea::where('curriculum_version_id', $pin->curriculum_version_id)
+            ->when($markable !== null, fn ($q) => $q->whereIn('id', $markable));
 
         $area = is_string($requested) && $requested !== ''
             ? $query->whereKey($requested)->first()

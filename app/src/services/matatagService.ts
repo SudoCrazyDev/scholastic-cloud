@@ -2,6 +2,8 @@ import { api } from '../lib/api'
 import type {
   ApiResponse,
   MatatagGrid,
+  MatatagLearningAreaLinkWrite,
+  MatatagLearningAreaTeachers,
   MatatagNarrativeWrite,
   MatatagNarratives,
   MatatagProgressReport,
@@ -10,6 +12,7 @@ import type {
   MatatagSectionAttendance,
   MatatagSectionStatus,
   MatatagStudentAttendance,
+  MatatagSubjectLearningArea,
 } from '../types'
 
 /**
@@ -62,6 +65,37 @@ class MatatagService {
       `/matatag/sections/${sectionId}/opt-in${this.query(params)}`
     )
     return response.data
+  }
+
+  /** Which subject stands for each learning area. The adviser's to see and set. */
+  async getLearningAreaTeachers(sectionId: string, params: { academic_year?: string } = {}) {
+    const response = await api.get<ApiResponse<MatatagLearningAreaTeachers>>(
+      `/matatag/sections/${sectionId}/learning-area-teachers${this.query(params)}`
+    )
+    return response.data.data
+  }
+
+  /** Links only the areas named; a null subject hands an area back to the adviser. */
+  async saveLearningAreaTeachers(
+    sectionId: string,
+    params: { academic_year?: string; links: MatatagLearningAreaLinkWrite[] }
+  ) {
+    const response = await api.put<ApiResponse<MatatagLearningAreaTeachers>>(
+      `/matatag/sections/${sectionId}/learning-area-teachers`,
+      params
+    )
+    return response.data
+  }
+
+  /**
+   * The learning area a subject stands for, or null — the ordinary answer for
+   * every subject outside a Grade 1 section on MATATAG.
+   */
+  async getSubjectLearningArea(subjectId: string) {
+    const response = await api.get<ApiResponse<MatatagSubjectLearningArea | null>>(
+      `/matatag/subjects/${subjectId}/learning-area`
+    )
+    return response.data.data
   }
 
   /**

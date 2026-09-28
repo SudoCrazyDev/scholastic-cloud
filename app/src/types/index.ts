@@ -4145,6 +4145,11 @@ export interface MatatagGrid {
   /** Every area of the pinned catalog, for the area selector. */
   learning_areas: MatatagLearningAreaSummary[];
   learning_area: MatatagLearningAreaSummary;
+  /**
+   * Null for the adviser, who reaches every area. Otherwise the areas this
+   * subject teacher may mark — the ones whose linked subject they teach.
+   */
+  markable_learning_area_ids: string[] | null;
   domains: MatatagDomainSummary[];
   /** How many slots each term of this area holds — the curriculum's pacing. */
   slot_counts_by_term: Record<string, number>;
@@ -4154,6 +4159,44 @@ export interface MatatagGrid {
   ratings: Record<string, MatatagDescriptor>;
   can_manage: boolean;
   counts: { columns: number; learners: number; recorded: number };
+}
+
+/** One of a section's subjects, as offered for a learning area. */
+export interface MatatagAreaTeacherSubject {
+  id: string;
+  title: string;
+  teacher: { id: string; name: string } | null;
+}
+
+/** Which subject — and so which subject teacher — marks each learning area. */
+export interface MatatagLearningAreaTeachers {
+  class_section_id: string;
+  academic_year: string;
+  adviser_id: string | null;
+  areas: {
+    learning_area: MatatagLearningAreaSummary;
+    /** Null while the area is the adviser's alone. */
+    subject: MatatagAreaTeacherSubject | null;
+    /** The one subject whose title names this area, when it is unlinked. */
+    suggested_subject_id: string | null;
+  }[];
+  subjects: MatatagAreaTeacherSubject[];
+}
+
+export interface MatatagLearningAreaLinkWrite {
+  learning_area_id: string;
+  /** Null hands the area back to the adviser. */
+  subject_id: string | null;
+}
+
+/** The learning area a subject stands for on its section's MATATAG record. */
+export interface MatatagSubjectLearningArea {
+  subject_id: string;
+  class_section_id: string;
+  section_title: string;
+  grade_level: string;
+  academic_year: string;
+  learning_area: MatatagLearningAreaSummary;
 }
 
 export interface MatatagRatingWrite {
