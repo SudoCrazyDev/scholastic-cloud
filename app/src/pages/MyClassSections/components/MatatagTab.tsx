@@ -440,6 +440,16 @@ export function MatatagTab({
                 ) : null}
               </p>
 
+              {/* Without this a read-only grid looks broken: a cell highlights
+                  on click and no picker opens. */}
+              {!data.can_manage && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  You can view {data.learning_area.title} but not mark it. To mark it, the adviser can
+                  link a subject you teach to this learning area on the MATATAG Progress tab, or the
+                  school can give your role <strong>Manage</strong> on MATATAG Progress.
+                </div>
+              )}
+
               {view === 'grid' && <InspectorStrip column={activeColumn} />}
             </>
           )}

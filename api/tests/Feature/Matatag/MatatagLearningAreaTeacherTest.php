@@ -331,6 +331,58 @@ class MatatagLearningAreaTeacherTest extends MatatagTestCase
         $this->assertNotContains($section, $ids);
     }
 
+    /**
+     * The field report: a department head teaching Grade 1 Mathematics holds
+     * `view-all` but not `manage`, opened the grid, and every cell was
+     * read-only. The adviser's link is the grant — for that area only.
+     */
+    public function test_a_view_all_role_teaching_the_subject_marks_that_area_only(): void
+    {
+        $head = $this->makeUser($this->schoolA, 'curriculum-head', 'head@matatag.test', 'tok-head');
+        $this->assertFalse($head->hasModuleAccess('matatag-grading', 'manage', $this->schoolA->id));
+        $this->math->update(['adviser' => $head->id]);
+        $this->optInThroughApi();
+
+        $this->as($head)
+            ->getJson($this->gridUrl($this->area('mathematics')->id))
+            ->assertOk()
+            ->assertJsonPath('data.can_manage', true);
+
+        $this->as($head)
+            ->getJson($this->gridUrl($this->area('reading-literacy')->id))
+            ->assertOk()
+            ->assertJsonPath('data.can_manage', false);
+
+        $this->write($head, 'mathematics')->assertOk();
+        $this->write($head, 'reading-literacy')->assertForbidden()->assertJsonPath('code', 'area_not_yours');
+        $this->assertSame(1, MatatagCompetencyRating::count());
+    }
+
+    public function test_a_linked_subject_teacher_marks_without_manage_on_their_role(): void
+    {
+        $this->revoke($this->mathTeacher, 'matatag-grading.manage');
+        $this->optInThroughApi();
+
+        $this->as($this->mathTeacher)->getJson($this->gridUrl())->assertOk()->assertJsonPath('data.can_manage', true);
+        $this->write($this->mathTeacher, 'mathematics')->assertOk();
+        $this->write($this->mathTeacher, 'gmrc')->assertForbidden();
+    }
+
+    public function test_view_alone_without_a_linked_subject_still_cannot_mark(): void
+    {
+        $this->revoke($this->adviserA1, 'matatag-grading.manage');
+        $this->optInThroughApi();
+
+        // GMRC is linked to a subject the adviser teaches, so that one area opens.
+        $this->write($this->adviserA1, 'gmrc')->assertOk();
+        $this->write($this->adviserA1, 'mathematics')->assertForbidden();
+
+        $this->as($this->adviserA1)
+            ->getJson($this->gridUrl($this->area('mathematics')->id))
+            ->assertOk()
+            ->assertJsonPath('data.can_manage', false);
+    }
+
     // -----------------------------------------------------------------
     // The subject page's lookup
     // -----------------------------------------------------------------

@@ -130,6 +130,26 @@ trait ResolvesMatatagSection
     }
 
     /**
+     * The learning areas whose linked subject the caller teaches in a
+     * section-year — whether or not they also advise the section.
+     *
+     * The adviser linking a subject is what lets its teacher mark that area,
+     * so this is the grant on its own: it does not wait on `manage` as well.
+     * A department head who teaches Grade 1 Mathematics holds `view-all`
+     * without `manage`, and without this could open the grid and not mark it.
+     *
+     * @return array<int, string>
+     */
+    protected function taughtAreaIds(Request $request, ClassSection $section, string $academicYear): array
+    {
+        $user = $this->staffUser($request);
+
+        return $user
+            ? app(LearningAreaTeachers::class)->areaIdsTaughtBy($user->id, $section, $academicYear)
+            : [];
+    }
+
+    /**
      * The learning areas the caller may work on in a section-year.
      *
      * Null means every area — the adviser, or someone holding `view-all`.

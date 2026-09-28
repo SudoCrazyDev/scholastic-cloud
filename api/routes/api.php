@@ -748,8 +748,12 @@ Route::middleware('auth.token')->group(function () {
 
         Route::get('matatag/grid', [MatatagGridController::class, 'show'])
             ->middleware('module:matatag-grading,view');
-        Route::post('matatag/grid/bulk-upsert', [MatatagGridController::class, 'bulkUpsert'])
-            ->middleware('module:matatag-grading,manage');
+        // No `module:` middleware here, deliberately: it would demand `manage`
+        // for a POST, and a subject teacher whose subject the adviser linked
+        // marks that one area without it. The controller still requires
+        // `view`, and `manage` or a linked subject for every slot written —
+        // see MatatagGridController::bulkUpsert().
+        Route::post('matatag/grid/bulk-upsert', [MatatagGridController::class, 'bulkUpsert']);
 
         Route::get('matatag/narratives', [MatatagNarrativeController::class, 'index'])
             ->middleware('module:matatag-grading,view');

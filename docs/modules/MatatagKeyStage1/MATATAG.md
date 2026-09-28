@@ -383,6 +383,12 @@ to one of those subjects, and **whoever teaches that subject may mark that area*
   `markableAreaIds()`: the area list and default area are theirs only, another area is a 403, and
   `bulkUpsert` refuses the whole save if any one slot is outside their areas (`area_not_yours`).
   Every other MATATAG endpoint still lets in only the adviser and `view-all`.
+- **The link is the grant, without `manage`.** A department or curriculum head who teaches Grade 1
+  Mathematics holds `view-all` but not `manage`; before this they opened the grid and every cell was
+  read-only. Teaching a linked subject now marks that area with `view` alone (`taughtAreaIds()`), and
+  `manage` still marks every area the caller reaches. `bulk-upsert` therefore carries no `module:`
+  middleware — `EnsureModuleAccess` would demand `manage` for a POST — and the controller enforces
+  `view` plus `manage`-or-linked-subject for every slot. A read-only grid says why on screen.
 - The link is per academic year, like the pin. A link from last year reaches nothing this year.
 
 ---
@@ -563,7 +569,7 @@ reaches this at a school that has not been switched on.
 | `GET matatag/sections` | `view` |
 | `POST/DELETE matatag/sections/{id}/opt-in` | `set-up` |
 | `GET matatag/grid` | `view` |
-| `POST matatag/grid/bulk-upsert` | `manage` |
+| `POST matatag/grid/bulk-upsert` | `manage`, or `view` + teaching the area's linked subject (checked in the controller) |
 | `GET matatag/narratives`, `POST matatag/narratives/bulk-upsert` | `view` / `manage` |
 | `GET matatag/attendance` | `view` |
 | `GET matatag/progress-report[/{studentId}]` | `view` |
