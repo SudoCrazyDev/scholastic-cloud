@@ -395,7 +395,8 @@ Route::middleware('auth.token')->group(function () {
     Route::post('class-sections/{id}/dissolve', [ClassSectionController::class, 'dissolve'])->middleware('module:class-sections,manage');
     // Ungated so a subject teacher, who holds class-sections.view only, can move a
     // student out of My Class Sections. The controller still scopes both sections
-    // to the caller's institution.
+    // to the caller's institution. transfer-options feeds the same modal.
+    Route::get('class-sections/{id}/transfer-options', [ClassSectionController::class, 'transferOptions']);
     Route::post('class-sections/{id}/transfer-student', [ClassSectionController::class, 'transferStudent']);
     Route::apiResource('class-sections', ClassSectionController::class)->middleware('module:class-sections,view');
 

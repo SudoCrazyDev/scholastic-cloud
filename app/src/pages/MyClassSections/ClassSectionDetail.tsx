@@ -142,20 +142,6 @@ const ClassSectionDetail: React.FC = () => {
     enabled: !!id,
   })
 
-  // Other sections in the institution the student can be transferred to
-  const {
-    data: institutionSectionsResponse,
-  } = useQuery({
-    queryKey: ['class-sections-by-institution', effectiveInstitutionId],
-    queryFn: () => classSectionService.getClassSectionsByInstitution(effectiveInstitutionId, { per_page: 1000 }),
-    enabled: !!effectiveInstitutionId && activeTab === 'students',
-  })
-
-  const availableTransferSections = useMemo(() => {
-    const all = institutionSectionsResponse?.data || []
-    return all.filter((section: any) => section.id !== id && section.status !== 'dissolve')
-  }, [institutionSectionsResponse?.data, id])
-
   const subjects = useMemo(() => subjectsResponse?.data || [], [subjectsResponse?.data])
   
   const students = useMemo(() => 
@@ -930,7 +916,6 @@ const ClassSectionDetail: React.FC = () => {
         sectionId={id!}
         sectionTitle={classSectionData?.title}
         currentSubjects={subjects}
-        availableSections={availableTransferSections}
         onSuccess={refetchStudents}
       />
 

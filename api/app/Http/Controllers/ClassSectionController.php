@@ -393,6 +393,58 @@ class ClassSectionController extends Controller
     }
 
     /**
+     * What the Transfer Student modal needs, in one call anyone signed in can
+     * make: the other live sections in the caller's school, and which of this
+     * section's subjects the student has grades in. The modal used to read
+     * these from `class-sections/by-institution` and `student-running-grades`,
+     * which are gated on Class Sections and Consolidated Grades — so a teacher
+     * without either could open the modal but found no sections to pick, and
+     * their transfer silently left the grades behind.
+     */
+    public function transferOptions(Request $request, $id)
+    {
+        $institutionId = $request->user()->getDefaultInstitutionId();
+
+        $section = ClassSection::where('institution_id', $institutionId)->findOrFail($id);
+
+        $validated = $request->validate([
+            'student_id' => 'required|uuid',
+        ]);
+
+        $enrolled = StudentSection::where('student_id', $validated['student_id'])
+            ->where('section_id', $section->id)
+            ->where('is_active', true)
+            ->exists();
+
+        if (! $enrolled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student is not actively enrolled in this section.',
+            ], 422);
+        }
+
+        $sections = ClassSection::where('institution_id', $institutionId)
+            ->where('id', '!=', $section->id)
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'dissolve'))
+            ->orderBy('grade_level')
+            ->orderBy('title')
+            ->get(['id', 'title', 'grade_level', 'academic_year', 'status']);
+
+        $gradedSubjectIds = StudentRunningGrade::where('student_id', $validated['student_id'])
+            ->whereIn('subject_id', Subject::where('class_section_id', $section->id)->select('id'))
+            ->distinct()
+            ->pluck('subject_id');
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'sections' => $sections,
+                'graded_subject_ids' => $gradedSubjectIds,
+            ],
+        ]);
+    }
+
+    /**
      * Transfer a single student from this section to another section.
      * Mirrors the dissolve grade-mapping behaviour for one student, but leaves
      * the source section intact and leaves unmapped grades untouched.

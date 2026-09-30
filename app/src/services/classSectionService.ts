@@ -82,6 +82,14 @@ class ClassSectionService {
     return response.data
   }
 
+  async getTransferOptions(id: string, studentId: string) {
+    const response = await api.get<{
+      success: boolean
+      data: { sections: ClassSection[]; graded_subject_ids: string[] }
+    }>(`${this.baseUrl}/${id}/transfer-options`, { params: { student_id: studentId } })
+    return response.data
+  }
+
   async transferStudent(id: string, data: {
     student_id: string
     target_section_id: string

@@ -14,7 +14,6 @@ import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
 import { classSectionService } from '../../../services/classSectionService'
 import { subjectService } from '../../../services/subjectService'
-import { studentRunningGradeService } from '../../../services/studentRunningGradeService'
 import type { Student, ClassSection, Subject } from '../../../types'
 
 interface TransferStudentModalProps {
@@ -24,7 +23,6 @@ interface TransferStudentModalProps {
   sectionId: string
   sectionTitle?: string
   currentSubjects: Subject[]
-  availableSections: ClassSection[]
   onSuccess?: () => void
 }
 
@@ -46,7 +44,6 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
   sectionId,
   sectionTitle,
   currentSubjects,
-  availableSections,
   onSuccess,
 }) => {
   const queryClient = useQueryClient()
@@ -55,32 +52,32 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
   // source_subject_id -> target_subject_id
   const [subjectMappings, setSubjectMappings] = useState<Map<string, string>>(new Map())
 
+  // Target sections and the subjects the student has grades in, from one
+  // endpoint any signed-in staff member may call — transferring a student
+  // needs neither Class Sections nor Consolidated Grades access.
+  const { data: optionsResponse, isLoading: optionsLoading } = useQuery({
+    queryKey: ['class-section-transfer-options', sectionId, student?.id],
+    queryFn: () => classSectionService.getTransferOptions(sectionId, student!.id),
+    enabled: isOpen && !!student?.id,
+  })
+
+  const availableSections: ClassSection[] = useMemo(
+    () => optionsResponse?.data?.sections || [],
+    [optionsResponse?.data?.sections]
+  )
+
   const targetSection = useMemo(
     () => availableSections.find(s => s.id === targetSectionId) || null,
     [availableSections, targetSectionId]
   )
 
-  // Fetch the student's running grades to determine which subjects need mapping
-  const { data: gradesResponse, isLoading: gradesLoading } = useQuery({
-    queryKey: ['student-running-grades', { student_id: student?.id }],
-    queryFn: () => studentRunningGradeService.list({ student_id: student?.id }),
-    enabled: isOpen && !!student?.id,
-  })
+  const gradesLoading = optionsLoading
 
-  // Subject IDs (within the current section) the student actually has active grades in
-  const gradedSubjectIds = useMemo(() => {
-    const currentSectionSubjectIds = new Set(currentSubjects.map(s => s.id))
-    const ids = new Set<string>()
-    const rows = gradesResponse?.data
-    if (Array.isArray(rows)) {
-      rows.forEach((g: { subject_id?: string }) => {
-        if (g.subject_id && currentSectionSubjectIds.has(g.subject_id)) {
-          ids.add(g.subject_id)
-        }
-      })
-    }
-    return ids
-  }, [gradesResponse?.data, currentSubjects])
+  // Subject IDs (within the current section) the student actually has grades in
+  const gradedSubjectIds = useMemo(
+    () => new Set(optionsResponse?.data?.graded_subject_ids || []),
+    [optionsResponse?.data?.graded_subject_ids]
+  )
 
   // Only show subjects relevant to the student's grades. A parent is relevant if it
   // (or any of its children) has grades; within it we surface only the graded children.
@@ -177,6 +174,7 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
       queryClient.invalidateQueries({ queryKey: ['students-by-section'] })
       queryClient.invalidateQueries({ queryKey: ['class-sections'] })
       queryClient.invalidateQueries({ queryKey: ['student-running-grades'] })
+      queryClient.invalidateQueries({ queryKey: ['class-section-transfer-options'] })
       onSuccess?.()
       handleClose()
     },
@@ -247,7 +245,9 @@ export const TransferStudentModal: React.FC<TransferStudentModalProps> = ({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Target Section</label>
-        {availableSections.length === 0 ? (
+        {optionsLoading ? (
+          <p className="text-sm text-gray-500">Loading sections...</p>
+        ) : availableSections.length === 0 ? (
           <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-700">
               <ExclamationCircleIcon className="w-4 h-4 inline mr-1" />
