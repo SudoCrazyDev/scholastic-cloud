@@ -50,7 +50,7 @@ class MatatagSectionOptInTest extends MatatagTestCase
             ->assertStatus(422)
             ->assertJsonPath('code', 'not_key_stage_one')
             ->assertJsonFragment(['message' => "'Grade 10' is not a Key Stage 1 grade level. MATATAG "
-                .'progress reporting covers Grade 1, Grade 2, Grade 3; every other grade level keeps '
+                .'progress reporting covers Kindergarten, Grade 1, Grade 2, Grade 3; every other grade level keeps '
                 .'the numeric record it has now.']);
 
         $this->assertDatabaseCount('matatag_section_curricula', 0);

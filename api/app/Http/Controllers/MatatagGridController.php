@@ -231,7 +231,7 @@ class MatatagGridController extends Controller
             return $error;
         }
 
-        if ($error = $this->rejectBadDescriptors($ratings)) {
+        if ($error = $this->rejectBadDescriptors($ratings, $pin->curriculumVersion?->instrumentKey())) {
             return $error;
         }
 
@@ -385,9 +385,14 @@ class MatatagGridController extends Controller
     }
 
     /**
+     * Every mark must be on the section's own scale — A-E for Grades 1-3,
+     * CO/DV/BG for Kindergarten. The scale comes from the pinned catalog's
+     * instrument, so a Kindergarten `A` is refused even though it is a valid
+     * Grade 1 mark: it would print with no legend entry to explain it.
+     *
      * @param  array<int, array<string, mixed>>  $ratings
      */
-    private function rejectBadDescriptors(array $ratings): ?JsonResponse
+    private function rejectBadDescriptors(array $ratings, ?string $instrument): ?JsonResponse
     {
         $bad = [];
 
@@ -398,7 +403,7 @@ class MatatagGridController extends Controller
                 continue;   // clearing a cell
             }
 
-            if (! MatatagTerms::isValidDescriptor(is_string($descriptor) ? strtoupper($descriptor) : null)) {
+            if (! MatatagTerms::isValidDescriptor(is_string($descriptor) ? strtoupper($descriptor) : null, $instrument)) {
                 $bad[] = $descriptor;
             }
         }
@@ -407,7 +412,7 @@ class MatatagGridController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'A descriptor must be one of '
-                    .implode(', ', MatatagTerms::descriptorLetters())
+                    .implode(', ', MatatagTerms::descriptorLetters($instrument))
                     .'. There are no numbers in this instrument.',
                 'code' => 'invalid_descriptor',
                 'errors' => ['descriptor' => array_values(array_unique(array_slice($bad, 0, 10)))],

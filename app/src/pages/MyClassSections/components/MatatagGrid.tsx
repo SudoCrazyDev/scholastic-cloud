@@ -98,6 +98,14 @@ export const MatatagGrid = React.memo(function MatatagGrid({
 
   const letters = useMemo(() => descriptors.map(d => d.letter), [descriptors])
 
+  // One keystroke per mark. For A-E the key is the letter; Kindergarten's
+  // CO/DV/BG are set with C, D and B — DepEd's codes share no first letter.
+  const byKey = useMemo(() => {
+    const map = new Map<string, MatatagDescriptor>()
+    descriptors.forEach(d => map.set((d.key || d.letter).toUpperCase(), d.letter))
+    return map
+  }, [descriptors])
+
   const skillsByKey = useMemo(() => {
     const map = new Map<string, MatatagMacroSkillDefinition>()
     macroSkills.forEach(skill => map.set(skill.key, skill))
@@ -231,9 +239,10 @@ export const MatatagGrid = React.memo(function MatatagGrid({
       }
 
       // Type-to-set, and advance DOWN — a teacher fills a column, not a row.
-      if (!readOnly && letters.includes(upper as MatatagDescriptor)) {
+      const typed = byKey.get(upper)
+      if (!readOnly && typed) {
         event.preventDefault()
-        onSet(active.studentId, active.slotId, upper as MatatagDescriptor)
+        onSet(active.studentId, active.slotId, typed)
         move(1, 0)
         return
       }
@@ -282,7 +291,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
       }
 
     },
-    [active, readOnly, letters, onSet, move, focusCell, grid, learnerIndex, columns, learners]
+    [active, readOnly, byKey, onSet, move, focusCell, grid, learnerIndex, columns, learners]
   )
 
   /**

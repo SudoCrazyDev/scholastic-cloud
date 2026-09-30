@@ -69,12 +69,14 @@ class MatatagNarrativeController extends Controller
             $query->where('term', $term);
         }
 
+        $instrument = $pin->curriculumVersion?->instrumentKey();
         $narratives = [];
 
         foreach ($query->get() as $row) {
             $narratives[$row->student_id.':'.$row->term] = [
                 'can_do' => $row->can_do,
                 'to_improve' => $row->to_improve,
+                'comments' => $row->comments,
                 'updated_at' => $row->updated_at?->toIso8601String(),
             ];
         }
@@ -85,6 +87,10 @@ class MatatagNarrativeController extends Controller
                 'section' => ['id' => $section->id, 'title' => $section->title],
                 'academic_year' => $academicYear,
                 'max_length' => self::MAX_LENGTH,
+                // Which paragraphs this section's card carries — two for
+                // Grades 1-3, one remarks box for Kindergarten. The client
+                // renders these rather than knowing either list.
+                'fields' => MatatagTerms::instrumentConfig($instrument)['narratives'],
                 'terms' => MatatagTerms::values(),
                 'learners' => $roster->map(fn ($student) => [
                     'student_id' => $student->id,
@@ -120,13 +126,24 @@ class MatatagNarrativeController extends Controller
             return $deny;
         }
 
-        $request->validate([
+        $rules = [
             'narratives' => 'present|array|max:200',
             'narratives.*.student_id' => 'required|uuid',
             'narratives.*.term' => 'required|integer',
-            'narratives.*.can_do' => 'nullable|string|max:'.self::MAX_LENGTH,
-            'narratives.*.to_improve' => 'nullable|string|max:'.self::MAX_LENGTH,
-        ]);
+        ];
+
+        foreach (MatatagTerms::allNarrativeColumns() as $column) {
+            $rules["narratives.*.{$column}"] = 'nullable|string|max:'.self::MAX_LENGTH;
+        }
+
+        $request->validate($rules);
+
+        // Only the section's own instrument's fields are written. A field
+        // another instrument uses is ignored rather than stored, so a
+        // Kindergarten row never grows a `can_do` its card has nowhere to
+        // print — and a row is cleared when every field *this* card prints
+        // is empty.
+        $fields = array_keys(MatatagTerms::narrativeFields($pin->curriculumVersion?->instrumentKey()));
 
         $narratives = $request->input('narratives', []);
 
@@ -179,10 +196,13 @@ class MatatagNarrativeController extends Controller
         $clear = [];
 
         foreach ($narratives as $narrative) {
-            $canDo = $this->trimToNull($narrative['can_do'] ?? null);
-            $toImprove = $this->trimToNull($narrative['to_improve'] ?? null);
+            $values = [];
 
-            if ($canDo === null && $toImprove === null) {
+            foreach ($fields as $field) {
+                $values[$field] = $this->trimToNull($narrative[$field] ?? null);
+            }
+
+            if (array_filter($values, fn ($value) => $value !== null) === []) {
                 $clear[] = [$narrative['student_id'], (int) $narrative['term']];
 
                 continue;
@@ -195,8 +215,7 @@ class MatatagNarrativeController extends Controller
                 'student_id' => $narrative['student_id'],
                 'academic_year' => $academicYear,
                 'term' => (int) $narrative['term'],
-                'can_do' => $canDo,
-                'to_improve' => $toImprove,
+                ...$values,
                 'written_by' => $userId,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -205,7 +224,7 @@ class MatatagNarrativeController extends Controller
 
         $rows = array_values($rows);
 
-        DB::transaction(function () use ($rows, $clear, $section, $academicYear) {
+        DB::transaction(function () use ($rows, $clear, $section, $academicYear, $fields) {
             foreach ($clear as [$studentId, $term]) {
                 MatatagTermNarrative::where('class_section_id', $section->id)
                     ->where('academic_year', $academicYear)
@@ -218,8 +237,7 @@ class MatatagNarrativeController extends Controller
                 DB::table('matatag_term_narratives')->upsert(
                     $chunk,
                     ['student_id', 'academic_year', 'term'],
-                    ['can_do', 'to_improve', 'written_by', 'updated_at',
-                        'class_section_id', 'institution_id'],
+                    [...$fields, 'written_by', 'updated_at', 'class_section_id', 'institution_id'],
                 );
             }
         });

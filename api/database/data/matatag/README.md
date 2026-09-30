@@ -7,6 +7,33 @@ of DepEd's workbooks.
 |---|---|
 | `extract.py` | reads a DepEd workbook, writes a catalog JSON, prints a report |
 | `grade-1.v1.json` | Grade 1, from `2026_v1.0` of the workbook — 199 competencies, 604 slots |
+| `extract_kinder.py` | reads DepEd's Kindergarten e-class record; see below |
+| `kindergarten.v1.json` | Kindergarten (Kinder 1 and Kinder 2) — 60 competencies, 180 slots, instrument `kinder` |
+| `kindergarten.v1.cells.json` | where each Kindergarten slot sits on the workbook; for an export not yet built |
+
+## Kindergarten
+
+```bash
+cd api/database/data/matatag
+python extract_kinder.py "../../../../docs/modules/MatatagKeyStage1/UPDATED [Kinder] E-Class Record with SF9.xlsx" \
+    --code deped-kindergarten-v1 -o kindergarten.v1.json
+```
+
+A separate script because the Kindergarten workbook has nothing for `extract.py`
+to decode: no macro-skill fills, no pacing. Every competency is rated once per
+term on CO/DV/BG. The tree and the wording come from `SF9 - KINDER`, whose
+VLOOKUP column indexes say where each rating lives. The script checks each of
+those columns against the numbered headings on all three `TERM n SUMMARY`
+sheets, reading each sheet on its own. It stops if any disagree.
+
+It reports three anomalies, all in DepEd's file:
+
+- `SF9!O64` reads Term 2 for competency 28's Term 1 rating.
+- One Term 1 dropdown offers `GB` for `BG`.
+- The summary sheets' header tooltips repeat competencies 1 and 2 across all of
+  Cognitive Development.
+
+None of them reaches the catalog.
 
 Loaded by `App\Services\Matatag\CatalogLoader`, which a data migration calls so
 the catalog arrives everywhere a deploy does. `php artisan matatag:load-catalog`

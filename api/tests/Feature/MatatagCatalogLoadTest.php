@@ -75,6 +75,22 @@ class MatatagCatalogLoadTest extends TestCase
         return MatatagCurriculumVersion::where('code', self::CODE)->firstOrFail();
     }
 
+    /**
+     * Rows belonging to Grade 1's catalogs only — every version of it, so a
+     * revision's rows count too. Kindergarten's catalog shares these tables
+     * and is not this test's business.
+     */
+    private function gradeOne(string $model)
+    {
+        return $model::whereIn(
+            'learning_area_id',
+            MatatagLearningArea::whereIn(
+                'curriculum_version_id',
+                MatatagCurriculumVersion::where('grade_level', 'Grade 1')->select('id')
+            )->select('id')
+        );
+    }
+
     // -----------------------------------------------------------------
     // The real artifact
     // -----------------------------------------------------------------
@@ -94,13 +110,13 @@ class MatatagCatalogLoadTest extends TestCase
 
         $this->assertSame(
             self::TOTAL_COMPETENCIES,
-            MatatagCompetency::count(),
+            $this->gradeOne(MatatagCompetency::class)->count(),
             'Competency rows in the database must match the workbook.'
         );
 
         $this->assertSame(
             self::TOTAL_SLOTS,
-            MatatagCompetencySlot::count(),
+            $this->gradeOne(MatatagCompetencySlot::class)->count(),
             'Slot rows in the database must match the workbook. A slot exists only by virtue of '
             .'a macro-skill fill colour, so a short count means the extraction lost one.'
         );
@@ -430,7 +446,7 @@ class MatatagCatalogLoadTest extends TestCase
 
         $this->assertSame(
             self::TOTAL_SLOTS * 2,
-            MatatagCompetencySlot::count(),
+            $this->gradeOne(MatatagCompetencySlot::class)->count(),
             'A revision adds a second catalog; it does not replace the first.'
         );
 
@@ -502,7 +518,7 @@ class MatatagCatalogLoadTest extends TestCase
 
         $this->assertSame(
             self::TOTAL_SLOTS,
-            MatatagCompetencySlot::count(),
+            $this->gradeOne(MatatagCompetencySlot::class)->count(),
             'Nothing may be lost when the load is refused.'
         );
 

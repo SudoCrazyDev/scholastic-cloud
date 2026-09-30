@@ -24,14 +24,31 @@
 return [
 
     /*
-     * The grade levels Key Stage 1 covers. Matched case- and whitespace-
-     * insensitively against `class_sections.grade_level`, which is a free
-     * string a school types, not a foreign key.
+     * The grade levels Key Stage 1 covers — Kindergarten to Grade 3, as DepEd
+     * defines the key stage. Matched case- and whitespace-insensitively against
+     * `class_sections.grade_level`, which is a free string a school types, not
+     * a foreign key.
      *
      * Key Stage 2 (Grades 4-6) is a different instrument and is deliberately
      * absent — do not add it here expecting this module to cover it.
      */
-    'grade_levels' => ['Grade 1', 'Grade 2', 'Grade 3'],
+    'grade_levels' => ['Kindergarten', 'Grade 1', 'Grade 2', 'Grade 3'],
+
+    /*
+     * Other spellings a school gives a grade level above, all resolving to it.
+     *
+     * Private schools commonly run two kindergarten years, "Kinder 1" and
+     * "Kinder 2", and DepEd publishes one Kindergarten instrument for both. So
+     * both resolve to `Kindergarten`, share its catalog, and are snapshotted as
+     * `Kindergarten` on the section's pin — which is what opt-in matches the
+     * catalog's own grade level against.
+     */
+    'grade_level_aliases' => [
+        'Kindergarten' => [
+            'Kinder', 'Kinder 1', 'Kinder 2', 'Kinder I', 'Kinder II',
+            'Kindergarten 1', 'Kindergarten 2', 'K1', 'K2', 'K-1', 'K-2',
+        ],
+    ],
 
     /*
      * The three terms, and the months each one owns.
@@ -56,16 +73,85 @@ return [
     ],
 
     /*
-     * The five letter descriptors, worded exactly as DepEd prints them on the
-     * report card legend.
-     *
-     * Stored as `char(1)` and validated against these keys — deliberately not
-     * a MySQL enum. `core_value_markings.marking` is an enum and would need an
-     * ALTER TABLE on a large table the day a descriptor is renamed, which has
-     * already happened once during the MATATAG rollout.
-     *
-     * This wording is served to clients and printed from the payload. Do not
-     * copy it into a frontend constant; there should be one source for it.
+    |--------------------------------------------------------------------------
+    | Instruments
+    |--------------------------------------------------------------------------
+    |
+    | DepEd prints two different progress reports across Key Stage 1, and a
+    | catalog version says which one it is (`matatag_curriculum_versions.
+    | instrument`). The instrument decides three things and nothing else:
+    |
+    | - `descriptors`: the rating scale a mark is validated against and the
+    |   legend printed beneath it. `key` is the one keystroke that sets it in
+    |   the grid — the letter itself for A-E, the first letter for CO/DV/BG,
+    |   which DepEd chose so that no two share one.
+    | - `narratives`: the prose fields per learner per term, each a column of
+    |   `matatag_term_narratives`.
+    | - `ratings_on_card`: whether the descriptors print on the card itself
+    |   (Kindergarten) or on separate PACE forms behind it (Grades 1-3).
+    |
+    | Descriptors are stored as `varchar(4)` and validated against these keys —
+    | deliberately not a MySQL enum. `core_value_markings.marking` is an enum
+    | and would need an ALTER TABLE on a large table the day a descriptor is
+    | renamed, which has already happened once during the MATATAG rollout.
+    |
+    | All wording here is served to clients and printed from the payload. Do
+    | not copy it into a frontend constant; there should be one source for it.
+    |
+    */
+    'default_instrument' => 'ks1',
+
+    'instruments' => [
+        'ks1' => [
+            'label' => 'Progress Report Card',
+            'ratings_on_card' => false,
+            'descriptors' => 'descriptors',
+            'narratives' => [
+                'can_do' => ['label' => 'What Your Child Can Do', 'filipino' => 'Mga Nagagawa', 'hint' => null],
+                'to_improve' => ['label' => 'What Your Child Is Learning To Improve', 'filipino' => 'Dapat Linangin', 'hint' => null],
+            ],
+        ],
+
+        // `SF9 - KINDER` of DepEd's Kindergarten e-class record: sixty
+        // competencies across four developmental domains, each rated every
+        // term, printed on the card itself with one remarks box per term.
+        'kinder' => [
+            'label' => 'Kindergarten Progress Report Card',
+            'ratings_on_card' => true,
+            'descriptors' => [
+                'CO' => [
+                    'key' => 'C',
+                    'label' => 'Consistent',
+                    'filipino' => null,
+                    'description' => 'Always demonstrates the expected competency. Always participates in the different activities, works independently. Always performs tasks, advanced in some aspects.',
+                ],
+                'DV' => [
+                    'key' => 'D',
+                    'label' => 'Developing',
+                    'filipino' => null,
+                    'description' => 'Sometimes demonstrates the competency. Sometimes participates, minimal supervision. Progresses continuously in doing assigned tasks.',
+                ],
+                'BG' => [
+                    'key' => 'B',
+                    'label' => 'Beginning',
+                    'filipino' => null,
+                    'description' => 'Rarely demonstrates the expected competency. Rarely participates in class activities and/or initiates independent works. Shows interest in doing tasks but needs close supervision.',
+                ],
+            ],
+            'narratives' => [
+                'comments' => [
+                    'label' => 'Teacher’s Comments/Remarks',
+                    'filipino' => null,
+                    'hint' => 'Provide specific observations, strengths, and suggested interventions.',
+                ],
+            ],
+        ],
+    ],
+
+    /*
+     * The Key Stage 1 (Grades 1-3) scale: five letter descriptors, worded
+     * exactly as DepEd prints them on the report card legend. The `ks1`
+     * instrument above points here.
      */
     'descriptors' => [
         'A' => [

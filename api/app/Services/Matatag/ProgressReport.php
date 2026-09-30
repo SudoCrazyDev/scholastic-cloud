@@ -34,6 +34,12 @@ use Illuminate\Support\Collection;
  * and the A-E legend; the descriptor grid is **not on the card** — it prints on
  * the attached PACE forms, so it lives under `pace` and nowhere else.
  *
+ * Kindergarten's card (`SF9 - KINDER`) does print its CO/DV/BG marks on the
+ * card, beside one remarks box per term. The payload keeps the same shape —
+ * the marks still come under `pace` — and `curriculum_version.instrument`
+ * tells the renderer which card to draw. See `paceScope()` for why a
+ * Kindergarten section always gets them.
+ *
  * ## The catalog is hoisted
  *
  * Competency text is the bulk of this payload — 199 rows of up to ~200
@@ -69,7 +75,8 @@ class ProgressReport
         Collection $roster,
         ?MatatagLearningArea $onlyArea = null,
     ): array {
-        $scope = $this->paceScope($roster, $onlyArea);
+        $instrument = MatatagTerms::instrumentConfig($pin->curriculumVersion?->instrumentKey());
+        $scope = $this->paceScope($roster, $onlyArea, $instrument['ratings_on_card']);
 
         $areas = $scope === self::SCOPE_OMITTED
             ? collect()
@@ -93,8 +100,10 @@ class ProgressReport
             'curriculum_version' => $this->tree->version($pin->curriculumVersion),
             // Printed at the foot of the card. Served rather than hardcoded in
             // the renderer, so DepEd rewording a descriptor is a config change.
+            // The section's own scale: A-E, or Kindergarten's CO/DV/BG.
             'legend' => [
-                'descriptors' => $reference['descriptors'],
+                'descriptors' => $instrument['descriptors'],
+                'narratives' => $instrument['narratives'],
                 'terms' => $reference['terms'],
                 'macro_skills' => $reference['macro_skills'],
             ],
@@ -134,12 +143,21 @@ class ProgressReport
      * The caller gets told which of the three it received; nothing is silently
      * missing.
      *
+     * Kindergarten is the exception, because its marks print on the card
+     * itself: a card without them is not a card. It can afford to be — the
+     * whole catalog is 60 competencies and 180 slots, so a 50-learner section
+     * is 9,000 two-letter marks and one page each.
+     *
      * @param  Collection<int, object>  $roster
      */
-    private function paceScope(Collection $roster, ?MatatagLearningArea $onlyArea): string
+    private function paceScope(Collection $roster, ?MatatagLearningArea $onlyArea, bool $ratingsOnCard = false): string
     {
         if ($onlyArea !== null) {
             return self::SCOPE_ONE_AREA;
+        }
+
+        if ($ratingsOnCard) {
+            return self::SCOPE_ALL_AREAS;
         }
 
         return $roster->count() <= 1 ? self::SCOPE_ALL_AREAS : self::SCOPE_OMITTED;
@@ -263,6 +281,9 @@ class ProgressReport
                 'filipino' => MatatagTerms::filipino($term),
                 'can_do' => $row?->can_do,
                 'to_improve' => $row?->to_improve,
+                // Kindergarten's one box. `legend.narratives` says which of
+                // these three the card prints.
+                'comments' => $row?->comments,
                 'updated_at' => $row?->updated_at?->toIso8601String(),
             ];
         }
@@ -342,7 +363,36 @@ class ProgressReport
             'birthdate' => $this->dateString($student->birthdate),
             'age_at_start_of_school_year' => $this->ageOn($student->birthdate, ...$bounds[0]),
             'age_at_end_of_school_year' => $this->ageOn($student->birthdate, ...$bounds[1]),
+            // The months past those whole years. Kindergarten's card prints
+            // age as years *and* months — at four and five, the months are
+            // most of what distinguishes one child from the next.
+            'age_months_at_start_of_school_year' => $this->monthsPastAge($student->birthdate, ...$bounds[0]),
+            'age_months_at_end_of_school_year' => $this->monthsPastAge($student->birthdate, ...$bounds[1]),
         ];
+    }
+
+    /**
+     * Whole months completed since the last birthday, on a given date — the
+     * "Months" beside "Years" on the Kindergarten card, and Excel's
+     * `DATEDIF(..., "YM")`, which is what DepEd's own workbook computes.
+     */
+    private function monthsPastAge(mixed $birthdate, int $year, int $month, int $day): ?int
+    {
+        $date = $this->dateString($birthdate);
+
+        if ($date === null || $this->ageOn($birthdate, $year, $month, $day) === null) {
+            return null;
+        }
+
+        [, $birthMonth, $birthDay] = array_map('intval', explode('-', substr($date, 0, 10)));
+
+        $months = $month - $birthMonth;
+
+        if ($day < $birthDay) {
+            $months--;
+        }
+
+        return ($months + 12) % 12;
     }
 
     /**

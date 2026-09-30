@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MatatagTerms;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,7 @@ class MatatagCurriculumVersion extends Model
         'code',
         'title',
         'grade_level',
+        'instrument',
         'source',
         'published_on',
         'locked_at',
@@ -33,6 +35,16 @@ class MatatagCurriculumVersion extends Model
         'competency_count' => 'integer',
         'slot_count' => 'integer',
     ];
+
+    /**
+     * Which of DepEd's progress reports this catalog is — `ks1` or `kinder`.
+     * Decides the rating scale, the narrative fields and the card; see
+     * config('matatag.instruments').
+     */
+    public function instrumentKey(): string
+    {
+        return MatatagTerms::instrumentOrDefault($this->instrument);
+    }
 
     public function learningAreas()
     {

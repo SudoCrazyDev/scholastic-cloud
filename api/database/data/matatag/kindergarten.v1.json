@@ -1,0 +1,1815 @@
+{
+ "version": {
+  "code": "deped-kindergarten-v1",
+  "title": "DepEd Kindergarten Progress Report",
+  "grade_level": "Kindergarten",
+  "instrument": "kinder",
+  "source": "UPDATED [Kinder] E-Class Record with SF9.xlsx",
+  "published_on": null
+ },
+ "counts": {
+  "competencies": 60,
+  "slots": 180
+ },
+ "learning_areas": [
+  {
+   "key": "sensory-perceptual-and-motor",
+   "title": "I. Sensory Perceptual and Motor Development",
+   "shape": "year_list",
+   "uses_macro_skills": false,
+   "has_domains": false,
+   "carries_values": false,
+   "sort_order": 1,
+   "domains": [],
+   "competencies": [
+    {
+     "path": ".1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Identifies external body parts and their functions",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 1,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Identifies ways to care for and protects one’s body",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Demonstrates gross motor skills (locomotor, non-locomotor)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Moves body parts as directed",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Demonstrates fine motor skills (tearing, cutting, rolling, molding with playdough)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    }
+   ],
+   "counts": {
+    "competencies": 5,
+    "slots": 15
+   }
+  },
+  {
+   "key": "socio-emotional",
+   "title": "II. Socio-emotional Development",
+   "shape": "year_list",
+   "uses_macro_skills": false,
+   "has_domains": false,
+   "carries_values": false,
+   "sort_order": 2,
+   "domains": [],
+   "competencies": [
+    {
+     "path": ".1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Identifies and expresses feelings in appropriate ways",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 1,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Recognizes and respect feelings of others",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Expresses needs and preferences",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Behaves appropriately in different situations",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Participates in classroom routines and activities",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Follows classroom and school rules",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 6,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Fulfills classroom responsibilities",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 7,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    }
+   ],
+   "counts": {
+    "competencies": 7,
+    "slots": 21
+   }
+  },
+  {
+   "key": "cognitive",
+   "title": "III. Cognitive Development",
+   "shape": "year_list",
+   "uses_macro_skills": false,
+   "has_domains": false,
+   "carries_values": false,
+   "sort_order": 3,
+   "domains": [],
+   "competencies": [
+    {
+     "path": ".1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Identifies attributes of objects (color, shape, size)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 1,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Matches objects based on attributes",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Describes objects based on attributes (shape, color, taste, texture)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Classifies objects by a single attribute (color, shape, size)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Reclassifies objects according to multiple attributes",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Arranges objects according to specific attributes",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 6,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Recognizes, extends and create patterns using concrete objects",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 7,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Measures size, length, capacity and mass of objects using non-standard measuring tools",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 8,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Identifies position of objects (in, on, over, under, top, bottom)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 9,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".10",
+     "number": "10",
+     "letter": null,
+     "label": "10",
+     "text": "Compares quantities of objects (more/less)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 10,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".11",
+     "number": "11",
+     "letter": null,
+     "label": "11",
+     "text": "Counts with one-to-one correspondence",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 11,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".12",
+     "number": "12",
+     "letter": null,
+     "label": "12",
+     "text": "Recognizes numerals",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 12,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".13",
+     "number": "13",
+     "letter": null,
+     "label": "13",
+     "text": "Matches numerals to objects",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 13,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".14",
+     "number": "14",
+     "letter": null,
+     "label": "14",
+     "text": "Adds and subtracts using concrete objects",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 14,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".15",
+     "number": "15",
+     "letter": null,
+     "label": "15",
+     "text": "Recognizes clock as measure of time (hours and minutes)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 15,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".16",
+     "number": "16",
+     "letter": null,
+     "label": "16",
+     "text": "Shows awareness and care for the natural and physical environment",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 16,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".17",
+     "number": "17",
+     "letter": null,
+     "label": "17",
+     "text": "Talks about participation in cultural and religious activities",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 17,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".18",
+     "number": "18",
+     "letter": null,
+     "label": "18",
+     "text": "Shows awareness of the importance of caring for the natural and physical environment through simple practices (e.g., sorting trash, helping to clean up)",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 18,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".19",
+     "number": "19",
+     "letter": null,
+     "label": "19",
+     "text": "Predicts outcomes in familiar stories read aloud in class",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 19,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".20",
+     "number": "20",
+     "letter": null,
+     "label": "20",
+     "text": "Suggests solutions to problems in class activities and stories read aloud in class",
+     "term": 0,
+     "domain": null,
+     "is_rateable": true,
+     "sort_order": 20,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    }
+   ],
+   "counts": {
+    "competencies": 20,
+    "slots": 60
+   }
+  },
+  {
+   "key": "language-literacy-and-communication",
+   "title": "IV. Language, Literacy, and Communication Development",
+   "shape": "year_list",
+   "uses_macro_skills": false,
+   "has_domains": true,
+   "carries_values": false,
+   "sort_order": 4,
+   "domains": [
+    {
+     "code": "a-listening-and-viewing",
+     "title": "A. Listening and Viewing",
+     "term": 0,
+     "sort_order": 1
+    },
+    {
+     "code": "b-sight-word-recognition",
+     "title": "B. Sight Word Recognition",
+     "term": 0,
+     "sort_order": 2
+    },
+    {
+     "code": "c-speaking",
+     "title": "C. Speaking",
+     "term": 0,
+     "sort_order": 3
+    },
+    {
+     "code": "d-reading-phonological-phonemic-awareness",
+     "title": "D. Reading — Phonological/Phonemic Awareness",
+     "term": 0,
+     "sort_order": 4
+    },
+    {
+     "code": "d-reading-letter-knowledge",
+     "title": "D. Reading — Letter Knowledge",
+     "term": 0,
+     "sort_order": 5
+    },
+    {
+     "code": "d-reading-letter-sound-relationship",
+     "title": "D. Reading — Letter Sound Relationship",
+     "term": 0,
+     "sort_order": 6
+    },
+    {
+     "code": "e-comprehension",
+     "title": "E. Comprehension",
+     "term": 0,
+     "sort_order": 7
+    },
+    {
+     "code": "f-concepts-of-print",
+     "title": "F. Concepts of Print",
+     "term": 0,
+     "sort_order": 8
+    },
+    {
+     "code": "g-writing",
+     "title": "G. Writing",
+     "term": 0,
+     "sort_order": 9
+    }
+   ],
+   "competencies": [
+    {
+     "path": ".1",
+     "number": "1",
+     "letter": null,
+     "label": "1",
+     "text": "Identifies familiar environmental sound",
+     "term": 0,
+     "domain": "a-listening-and-viewing",
+     "is_rateable": true,
+     "sort_order": 1,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".2",
+     "number": "2",
+     "letter": null,
+     "label": "2",
+     "text": "Recalls what happens first, middle and end in a story",
+     "term": 0,
+     "domain": "a-listening-and-viewing",
+     "is_rateable": true,
+     "sort_order": 2,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".3",
+     "number": "3",
+     "letter": null,
+     "label": "3",
+     "text": "Retells story in sequence",
+     "term": 0,
+     "domain": "a-listening-and-viewing",
+     "is_rateable": true,
+     "sort_order": 3,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".4",
+     "number": "4",
+     "letter": null,
+     "label": "4",
+     "text": "Follows 1-2 step instructions",
+     "term": 0,
+     "domain": "a-listening-and-viewing",
+     "is_rateable": true,
+     "sort_order": 4,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".5",
+     "number": "5",
+     "letter": null,
+     "label": "5",
+     "text": "Recognizes non-decodable words in and out of context automatically",
+     "term": 0,
+     "domain": "b-sight-word-recognition",
+     "is_rateable": true,
+     "sort_order": 5,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".6",
+     "number": "6",
+     "letter": null,
+     "label": "6",
+     "text": "Recognizes sight words",
+     "term": 0,
+     "domain": "b-sight-word-recognition",
+     "is_rateable": true,
+     "sort_order": 6,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".7",
+     "number": "7",
+     "letter": null,
+     "label": "7",
+     "text": "Identifies first and last name",
+     "term": 0,
+     "domain": "c-speaking",
+     "is_rateable": true,
+     "sort_order": 7,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".8",
+     "number": "8",
+     "letter": null,
+     "label": "8",
+     "text": "Identifies classmates, teachers, family member",
+     "term": 0,
+     "domain": "c-speaking",
+     "is_rateable": true,
+     "sort_order": 8,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".9",
+     "number": "9",
+     "letter": null,
+     "label": "9",
+     "text": "Identifies familiar objects at home, in school and in the community",
+     "term": 0,
+     "domain": "c-speaking",
+     "is_rateable": true,
+     "sort_order": 9,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".10",
+     "number": "10",
+     "letter": null,
+     "label": "10",
+     "text": "Uses polite greetings and courteous expressions in varied situations",
+     "term": 0,
+     "domain": "c-speaking",
+     "is_rateable": true,
+     "sort_order": 10,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".11",
+     "number": "11",
+     "letter": null,
+     "label": "11",
+     "text": "Retells personal experiences to story events",
+     "term": 0,
+     "domain": "c-speaking",
+     "is_rateable": true,
+     "sort_order": 11,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".12",
+     "number": "12",
+     "letter": null,
+     "label": "12",
+     "text": "Expresses ideas and feelings using phrases and simple sentences",
+     "term": 0,
+     "domain": "c-speaking",
+     "is_rateable": true,
+     "sort_order": 12,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".13",
+     "number": "13",
+     "letter": null,
+     "label": "13",
+     "text": "Orally segment sounds: a. syllable; b. onset and rime; c. phoneme by phoneme",
+     "term": 0,
+     "domain": "d-reading-phonological-phonemic-awareness",
+     "is_rateable": true,
+     "sort_order": 13,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".14",
+     "number": "14",
+     "letter": null,
+     "label": "14",
+     "text": "Identifies uppercase letters",
+     "term": 0,
+     "domain": "d-reading-letter-knowledge",
+     "is_rateable": true,
+     "sort_order": 14,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".15",
+     "number": "15",
+     "letter": null,
+     "label": "15",
+     "text": "Identifies lowercase letters",
+     "term": 0,
+     "domain": "d-reading-letter-knowledge",
+     "is_rateable": true,
+     "sort_order": 15,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".16",
+     "number": "16",
+     "letter": null,
+     "label": "16",
+     "text": "Matches upper and lowercase letters",
+     "term": 0,
+     "domain": "d-reading-letter-knowledge",
+     "is_rateable": true,
+     "sort_order": 16,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".17",
+     "number": "17",
+     "letter": null,
+     "label": "17",
+     "text": "Identifies letter sounds",
+     "term": 0,
+     "domain": "d-reading-letter-sound-relationship",
+     "is_rateable": true,
+     "sort_order": 17,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".18",
+     "number": "18",
+     "letter": null,
+     "label": "18",
+     "text": "Matches letters and their corresponding sounds",
+     "term": 0,
+     "domain": "d-reading-letter-sound-relationship",
+     "is_rateable": true,
+     "sort_order": 18,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".19",
+     "number": "19",
+     "letter": null,
+     "label": "19",
+     "text": "Uses a variety of strategies to gain meaning of leveled texts",
+     "term": 0,
+     "domain": "e-comprehension",
+     "is_rateable": true,
+     "sort_order": 19,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".20",
+     "number": "20",
+     "letter": null,
+     "label": "20",
+     "text": "Uses print and illustrations to make meaning",
+     "term": 0,
+     "domain": "e-comprehension",
+     "is_rateable": true,
+     "sort_order": 20,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".21",
+     "number": "21",
+     "letter": null,
+     "label": "21",
+     "text": "Demonstrates book handling skills",
+     "term": 0,
+     "domain": "f-concepts-of-print",
+     "is_rateable": true,
+     "sort_order": 21,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".22",
+     "number": "22",
+     "letter": null,
+     "label": "22",
+     "text": "Distinguishes between letters, words, and sentences",
+     "term": 0,
+     "domain": "f-concepts-of-print",
+     "is_rateable": true,
+     "sort_order": 22,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".23",
+     "number": "23",
+     "letter": null,
+     "label": "23",
+     "text": "Demonstrates awareness of print (left to right and top to bottom)",
+     "term": 0,
+     "domain": "f-concepts-of-print",
+     "is_rateable": true,
+     "sort_order": 23,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".24",
+     "number": "24",
+     "letter": null,
+     "label": "24",
+     "text": "Traces/draws/copies shapes, designs, pictures",
+     "term": 0,
+     "domain": "g-writing",
+     "is_rateable": true,
+     "sort_order": 24,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".25",
+     "number": "25",
+     "letter": null,
+     "label": "25",
+     "text": "Traces/copies/writes name, words",
+     "term": 0,
+     "domain": "g-writing",
+     "is_rateable": true,
+     "sort_order": 25,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".26",
+     "number": "26",
+     "letter": null,
+     "label": "26",
+     "text": "Writes uppercase and lowercase letters",
+     "term": 0,
+     "domain": "g-writing",
+     "is_rateable": true,
+     "sort_order": 26,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".27",
+     "number": "27",
+     "letter": null,
+     "label": "27",
+     "text": "Spells sight words",
+     "term": 0,
+     "domain": "g-writing",
+     "is_rateable": true,
+     "sort_order": 27,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    },
+    {
+     "path": ".28",
+     "number": "28",
+     "letter": null,
+     "label": "28",
+     "text": "Spells simple words phonetically",
+     "term": 0,
+     "domain": "g-writing",
+     "is_rateable": true,
+     "sort_order": 28,
+     "slots": [
+      {
+       "term": 1,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 2,
+       "macro_skill": "none",
+       "sort_order": 1
+      },
+      {
+       "term": 3,
+       "macro_skill": "none",
+       "sort_order": 1
+      }
+     ]
+    }
+   ],
+   "counts": {
+    "competencies": 28,
+    "slots": 84
+   }
+  }
+ ]
+}

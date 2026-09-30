@@ -6,6 +6,7 @@ use App\Models\MatatagCurriculumVersion;
 use App\Models\MatatagLearningArea;
 use App\Support\MatatagTerms;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -205,6 +206,16 @@ class CatalogLoader
             );
         }
 
+        $instrument = $payload['version']['instrument'] ?? null;
+
+        if ($instrument !== null && ! MatatagTerms::isValidInstrument($instrument)) {
+            throw new CatalogLoadException(
+                "Catalog file names instrument '{$instrument}', which config/matatag.php does not ".
+                'define. An instrument brings its own rating scale and narrative fields; add it '.
+                'there first.'
+            );
+        }
+
         if ($payload['learning_areas'] === []) {
             throw new CatalogLoadException('Catalog file lists no learning areas.');
         }
@@ -363,6 +374,17 @@ class CatalogLoader
             'source' => $payload['source'] ?? null,
             'published_on' => $payload['published_on'] ?? null,
         ];
+
+        // Absent in a file that predates instruments, which is every Key
+        // Stage 1 file: those are all `ks1`, the column's default.
+        //
+        // Guarded because this loader also runs inside Grade 1's own data
+        // migration, which on a fresh database runs *before* the migration
+        // that adds the column. Writing it unconditionally would fail every
+        // new install and every `migrate:fresh`.
+        if (Schema::hasColumn('matatag_curriculum_versions', 'instrument')) {
+            $attributes['instrument'] = MatatagTerms::instrumentOrDefault($payload['instrument'] ?? null);
+        }
 
         if ($existing) {
             // Counts are written at the end, once they have been asserted.

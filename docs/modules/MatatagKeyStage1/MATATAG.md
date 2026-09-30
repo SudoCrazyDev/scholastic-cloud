@@ -64,6 +64,52 @@ Three consequences worth holding on to:
 - **The `matatag-grading` feature stays off for a school with no Grade 1 sections opted in.** Nothing
   about this module is useful to a school whose youngest numeric-free grade has not arrived.
 
+### Kindergarten: the same module, a different instrument
+
+Kindergarten is part of Key Stage 1, and since 2026-09-30 it has a catalog of its own. It comes from
+DepEd's Kindergarten e-class record,
+[`UPDATED [Kinder] E-Class Record with SF9.xlsx`](UPDATED%20%5BKinder%5D%20E-Class%20Record%20with%20SF9.xlsx),
+which is committed beside this doc. Schools spell the grade level "Kinder 1", "Kinder 2", "Kinder" or
+"Kindergarten". All of these resolve to `Kindergarten` (`config('matatag.grade_level_aliases')`) and
+share that one catalog, because DepEd publishes one Kindergarten instrument.
+
+It differs from Grade 1 in exactly three ways. Each one is carried by the catalog version's
+`instrument` (`kinder`, against Grade 1's `ks1`) and defined in `config('matatag.instruments')`:
+
+| | Grades 1–3 (`ks1`) | Kindergarten (`kinder`) |
+|---|---|---|
+| Scale | A–E | **CO** Consistent · **DV** Developing · **BG** Beginning |
+| Grid keystroke | the letter | the first letter: C, D, B (the codes share none) |
+| Prose per term | *Can Do* + *Learning To Improve* | one **Teacher's Comments/Remarks** (`comments` column) |
+| Where the marks print | PACE forms behind the card | **on the card** (`SF9 - KINDER`, two A4 pages) |
+
+The catalog has four learning areas, which are the four developmental domains: Sensory Perceptual
+and Motor (5 competencies), Socio-emotional (7), Cognitive (20), and Language, Literacy and
+Communication (28). Language, Literacy and Communication has lettered sub-domains A–G, and
+*D. Reading* is split into three bands. Every competency is rated in every term, so the catalog
+holds 60 competencies and 180 slots. The shape is `year_list`, with no macro skills.
+
+Nothing branches on a grade level. The grid, narratives and report endpoints read the scale and the
+fields off the pinned version's instrument, so a Kindergarten section refuses an `A` and a Grade 1
+section refuses a `CO` (`invalid_descriptor`). The client picks `KinderProgressReportCard` because
+`instrument.ratings_on_card` is true. Because its marks are on the card, a Kindergarten report always
+comes back `pace.scope = all_areas`, even for a whole section: 50 learners × 180 marks is small.
+
+Two naming decisions are worth knowing before changing either:
+
+- **The prose field is `comments`, not `remarks`.** On the numeric SF9, "remarks" means
+  Passed/Failed. `MatatagProgressReportTest` refuses any key ending in `remarks` for that reason,
+  and the guard is right.
+- **The card prints age in years *and* months**
+  (`age_months_at_{start,end}_of_school_year`). The workbook computes it with
+  `DATEDIF(…,"YM")` at 8 June and 8 April. We use the school year's first and last printed days,
+  the same bounds as the Grade 1 card. For a child born between the 1st and the 8th, that can put
+  the month count one off DepEd's.
+
+`descriptor` became `varchar(4)` for the two-letter codes. The migration widens the column without
+touching existing values. Its `down()` refuses to narrow the column back while any two-letter mark
+exists.
+
 DO 15 also repealed **DO 8, s. 2015** and **DO 36, s. 2016**, and **DO 9, s. 2026** replaced the
 four-quarter calendar with three terms for *every* grade level — not only Key Stage 1. The "4
 quarters" column in the table above is therefore a statement about what this codebase still supports,
@@ -555,6 +601,9 @@ Rows marked *planned* do not exist yet. Everything else is built and tested.
 | `api/resources/matatag/KEY_STAGE_1_GRADE_1_3_TERM.template.xlsx` | the template the export fills — trimmed, see its README | |
 | `api/resources/matatag/README.md` | what was trimmed from DepEd's file and why, and the runbook for a new one | |
 | `api/tests/Feature/Matatag/MatatagWorkbookExportTest.php` | reads the export back cell by cell, in both directions | |
+| `api/database/data/matatag/extract_kinder.py`, `kindergarten.v1.json`, `kindergarten.v1.cells.json` | the Kindergarten catalog and its extractor | |
+| `api/database/migrations/2026_09_30_00000{1,2}_*` | `instrument`, the wider `descriptor`, `comments`; the Kindergarten catalog load | |
+| `api/tests/Feature/Matatag/MatatagKindergartenTest.php` | Kinder 1/2 opt-in, CO/DV/BG, the remarks box, the card payload | |
 
 Routes in `api/routes/api.php`, near the Proficiency / Core Value Marking block.
 **`feature:matatag-grading` wraps the whole group** rather than being repeated per route, so a route
@@ -626,6 +675,7 @@ eight hours wrong about.
 | `app/src/pages/MyClassSections/components/MatatagReportsPanel.tsx` | the printing panel: preview one learner, download by learner or by area | |
 | `app/src/components/matatagReports/Ks1ProgressReportCard.tsx` | the card — A4 portrait, `@react-pdf/renderer` | |
 | `app/src/components/matatagReports/Ks1PaceForm.tsx` | the PACE forms — A4 portrait, two columns, hand-paginated | |
+| `app/src/components/matatagReports/KinderProgressReportCard.tsx` | `SF9 - KINDER`: the ratings on page one, then remarks, attendance, scale and certificate | |
 | `app/src/components/matatagReports/matatagPdfShared.ts` | page geometry and the helpers both documents share | |
 | `app/src/hooks/useMatatagReports.tsx` | the report query and the five download mutations | |
 | `app/src/utils/reportCardPdfUtils.ts` | gains `fitPdfBlockFontSizePx` / `estimatePdfBlockHeightPt` | |
@@ -920,6 +970,12 @@ instrument.
 - **Grades 2 and 3.** No catalog exists. Their workbooks have not been obtained, and their structure
   may differ from Grade 1's in which learning areas exist, whether an area has domains, and whether
   its list spans the year or restarts each term.
+- **The Kindergarten `.xlsx` export.** The Reports panel hides the button for a Kindergarten
+  section. `GET matatag/workbook` refuses such a section by catalog code, because the only
+  template bundled is Grade 1's. `kindergarten.v1.cells.json` already maps every slot to its cell
+  on DepEd's sheet, so what remains is the template and a Kindergarten branch in `WorkbookExport`.
+  The workbook has no per-learner comments column (its SF9 takes them by hand), so the export
+  would carry ratings, the roster and attendance.
 - **Key Stage 2 (Grades 4–6).** A different key stage with a different instrument. Explicitly out of
   scope; do not stretch this design to cover it on the assumption it looks similar.
 - **A mid-month term boundary for attendance** — see the deviation above.

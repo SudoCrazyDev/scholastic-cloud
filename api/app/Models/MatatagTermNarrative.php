@@ -24,6 +24,7 @@ class MatatagTermNarrative extends Model
         'term',
         'can_do',
         'to_improve',
+        'comments',
         'written_by',
     ];
 

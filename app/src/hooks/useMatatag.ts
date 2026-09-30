@@ -406,12 +406,16 @@ export function useMatatagAttendance(params: {
 export function useIsKeyStageOne(gradeLevel: string | null | undefined) {
   const { data: reference } = useMatatagReference()
 
+  // Aliases included, so a 'Kinder 1' or 'Kinder 2' section is recognised as
+  // the Kindergarten the server resolves it to.
+  const accepted = reference?.accepted_grade_levels ?? reference?.grade_levels
+
   return useMemo(() => {
-    if (!gradeLevel || !reference?.grade_levels) return false
+    if (!gradeLevel || !accepted) return false
 
     const normalise = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ')
     const needle = normalise(gradeLevel)
 
-    return reference.grade_levels.some(candidate => normalise(candidate) === needle)
-  }, [gradeLevel, reference?.grade_levels])
+    return accepted.some(candidate => normalise(candidate) === needle)
+  }, [gradeLevel, accepted])
 }

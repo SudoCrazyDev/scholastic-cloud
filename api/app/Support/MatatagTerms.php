@@ -160,36 +160,152 @@ class MatatagTerms
     }
 
     /**
-     * The five descriptors, keyed by letter, each with its English label,
-     * Filipino label and the description printed in the report-card legend.
-     *
-     * @return array<string, array{label: string, filipino: string, description: string}>
-     */
-    public static function descriptors(): array
-    {
-        return config('matatag.descriptors', []);
-    }
-
-    /**
-     * ['A', 'B', 'C', 'D', 'E'] — for `Rule::in()` on anything accepting a mark.
+     * Every instrument's key: ['ks1', 'kinder'].
      *
      * @return array<int, string>
      */
-    public static function descriptorLetters(): array
+    public static function instruments(): array
     {
-        return array_keys(self::descriptors());
+        return array_keys(config('matatag.instruments', []));
+    }
+
+    public static function isValidInstrument(?string $instrument): bool
+    {
+        return $instrument !== null && in_array($instrument, self::instruments(), true);
     }
 
     /**
-     * Whether a value is a mark this module accepts.
+     * The instrument a catalog version prints, falling back to Key Stage 1's
+     * for a version that names one this config does not know.
+     */
+    public static function instrumentOrDefault(?string $instrument): string
+    {
+        return self::isValidInstrument($instrument)
+            ? $instrument
+            : (string) config('matatag.default_instrument', 'ks1');
+    }
+
+    /**
+     * An instrument's rating scale, keyed by the stored code, each with its
+     * English label, Filipino label, the legend description, and `key` — the
+     * one keystroke that sets it in the grid.
+     *
+     * No instrument named means Key Stage 1's A-E, which is what every caller
+     * that predates Kindergarten meant.
+     *
+     * @return array<string, array{key: string, label: string, filipino: ?string, description: string}>
+     */
+    public static function descriptors(?string $instrument = null): array
+    {
+        $instrument = self::instrumentOrDefault($instrument);
+        $scale = config("matatag.instruments.{$instrument}.descriptors", []);
+
+        // `ks1` points at the top-level `descriptors` block by name, so the
+        // A-E wording stays where DepEd's last rewording was made.
+        if (is_string($scale)) {
+            $scale = config("matatag.{$scale}", []);
+        }
+
+        $out = [];
+
+        foreach ($scale as $code => $definition) {
+            $out[(string) $code] = $definition + ['key' => (string) $code, 'filipino' => null];
+        }
+
+        return $out;
+    }
+
+    /**
+     * ['A', 'B', 'C', 'D', 'E'], or ['CO', 'DV', 'BG'] — for `Rule::in()` on
+     * anything accepting a mark.
+     *
+     * @return array<int, string>
+     */
+    public static function descriptorLetters(?string $instrument = null): array
+    {
+        return array_keys(self::descriptors($instrument));
+    }
+
+    /**
+     * Whether a value is a mark this instrument accepts.
      *
      * Null is not valid here. Clearing a cell is a delete, and the endpoints
-     * treat it as one; a "no mark" sentinel would print as a letter.
+     * treat it as one; a "no mark" sentinel would print as a letter. Nor is
+     * another instrument's mark: an `A` on a Kindergarten card has no legend
+     * entry to explain it.
      */
-    public static function isValidDescriptor(?string $descriptor): bool
+    public static function isValidDescriptor(?string $descriptor, ?string $instrument = null): bool
     {
         return $descriptor !== null
-            && array_key_exists($descriptor, self::descriptors());
+            && array_key_exists($descriptor, self::descriptors($instrument));
+    }
+
+    /**
+     * The prose fields an instrument records per learner per term, keyed by
+     * their `matatag_term_narratives` column, in print order.
+     *
+     * @return array<string, array{label: string, filipino: ?string, hint: ?string}>
+     */
+    public static function narrativeFields(?string $instrument = null): array
+    {
+        $instrument = self::instrumentOrDefault($instrument);
+
+        return config("matatag.instruments.{$instrument}.narratives", []);
+    }
+
+    /**
+     * Every narrative column any instrument uses — what the write endpoint
+     * accepts before it knows which ones the section's instrument keeps.
+     *
+     * @return array<int, string>
+     */
+    public static function allNarrativeColumns(): array
+    {
+        $columns = [];
+
+        foreach (self::instruments() as $instrument) {
+            $columns = [...$columns, ...array_keys(self::narrativeFields($instrument))];
+        }
+
+        return array_values(array_unique($columns));
+    }
+
+    /**
+     * What a client needs to render one instrument: its scale, its prose
+     * fields, and whether the marks print on the card itself.
+     */
+    public static function instrumentConfig(?string $instrument = null): array
+    {
+        $instrument = self::instrumentOrDefault($instrument);
+
+        $descriptors = [];
+        foreach (self::descriptors($instrument) as $code => $definition) {
+            $descriptors[] = [
+                'letter' => $code,
+                'key' => $definition['key'],
+                'label' => $definition['label'] ?? null,
+                'filipino' => $definition['filipino'] ?? null,
+                'description' => $definition['description'] ?? null,
+            ];
+        }
+
+        $narratives = [];
+        foreach (self::narrativeFields($instrument) as $field => $definition) {
+            $narratives[] = [
+                'field' => $field,
+                'label' => $definition['label'] ?? $field,
+                'filipino' => $definition['filipino'] ?? null,
+                'hint' => $definition['hint'] ?? null,
+            ];
+        }
+
+        return [
+            'key' => $instrument,
+            'label' => config("matatag.instruments.{$instrument}.label"),
+            'ratings_on_card' => (bool) config("matatag.instruments.{$instrument}.ratings_on_card", false),
+            'descriptors' => $descriptors,
+            'narratives' => $narratives,
+        ];
     }
 
     /**
@@ -245,6 +361,23 @@ class MatatagTerms
     }
 
     /**
+     * Every spelling of a grade level this module accepts — the canonical
+     * names and their aliases ('Kinder 1', 'Kinder 2' for Kindergarten).
+     *
+     * @return array<int, string>
+     */
+    public static function acceptedGradeLevels(): array
+    {
+        $accepted = self::gradeLevels();
+
+        foreach (config('matatag.grade_level_aliases', []) as $aliases) {
+            $accepted = [...$accepted, ...$aliases];
+        }
+
+        return array_values(array_unique($accepted));
+    }
+
+    /**
      * Whether a section's grade level is one this module reports on.
      *
      * `class_sections.grade_level` is a free string a school types, so compare
@@ -264,7 +397,9 @@ class MatatagTerms
     /**
      * The canonical spelling of a grade level, or null when it is not one of
      * ours. Use this before storing a grade level against a catalog, so that
-     * 'grade 1' and 'GRADE  1' do not become two different things.
+     * 'grade 1' and 'GRADE  1' do not become two different things — and so
+     * that 'Kinder 1' and 'Kinder 2' both become 'Kindergarten', the one
+     * kindergarten grade level DepEd publishes a catalog for.
      */
     public static function canonicalGradeLevel(?string $gradeLevel): ?string
     {
@@ -277,6 +412,14 @@ class MatatagTerms
         foreach (self::gradeLevels() as $candidate) {
             if (self::normalizeGradeLevel($candidate) === $needle) {
                 return $candidate;
+            }
+        }
+
+        foreach (config('matatag.grade_level_aliases', []) as $canonical => $aliases) {
+            foreach ($aliases as $alias) {
+                if (self::normalizeGradeLevel($alias) === $needle) {
+                    return $canonical;
+                }
             }
         }
 
@@ -308,14 +451,14 @@ class MatatagTerms
             ];
         }
 
-        $descriptors = [];
-        foreach (self::descriptors() as $letter => $definition) {
-            $descriptors[] = [
-                'letter' => $letter,
-                'label' => $definition['label'] ?? null,
-                'filipino' => $definition['filipino'] ?? null,
-                'description' => $definition['description'] ?? null,
-            ];
+        // Key Stage 1's A-E, kept at the top level for callers that predate
+        // instruments. A section's own scale rides on its curriculum version;
+        // prefer that.
+        $descriptors = self::instrumentConfig()['descriptors'];
+
+        $instruments = [];
+        foreach (self::instruments() as $instrument) {
+            $instruments[$instrument] = self::instrumentConfig($instrument);
         }
 
         $macroSkills = [];
@@ -336,7 +479,10 @@ class MatatagTerms
             'terms' => $terms,
             'descriptors' => $descriptors,
             'macro_skills' => $macroSkills,
+            'instruments' => $instruments,
             'grade_levels' => self::gradeLevels(),
+            // What a client matches a section's free-text grade level against.
+            'accepted_grade_levels' => self::acceptedGradeLevels(),
         ];
     }
 }

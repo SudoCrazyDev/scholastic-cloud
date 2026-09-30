@@ -5,7 +5,24 @@ import { Select } from '../../../components/select'
 import { SearchInput } from '../../../components/search-input'
 import { groupLearnersByGender, learnerListName, learnerMatches } from './matatagRoster'
 import { useMatatagNarrativeMutations, useMatatagNarratives } from '../../../hooks/useMatatag'
-import type { MatatagNarrativeWrite, MatatagTermDefinition } from '../../../types'
+import type {
+  MatatagNarrativeField,
+  MatatagNarrativeFieldDefinition,
+  MatatagNarrativeWrite,
+  MatatagTermDefinition,
+} from '../../../types'
+
+type Draft = Partial<Record<MatatagNarrativeField, string>>
+
+/**
+ * Grade 1's two paragraphs, for a response that predates `fields`. The server
+ * names the fields a section's card carries — Kindergarten has one — and that
+ * list is always preferred.
+ */
+const FALLBACK_FIELDS: MatatagNarrativeFieldDefinition[] = [
+  { field: 'can_do', label: 'What Your Child Can Do', filipino: 'Mga Nagagawa', hint: null },
+  { field: 'to_improve', label: 'What Your Child Is Learning To Improve', filipino: 'Dapat Linangin', hint: null },
+]
 
 interface Props {
   classSectionId: string
@@ -14,7 +31,9 @@ interface Props {
 }
 
 /**
- * The two paragraphs that are the progress report card.
+ * The paragraphs that are the progress report card — two per term for Grades
+ * 1-3, one "Teacher's Comments/Remarks" box for Kindergarten. Which ones is the
+ * server's answer (`fields`), never decided here.
  *
  * Everything else on the card is derived — attendance from the school's own
  * records, the legend from config — and the competency grid prints on the
@@ -26,28 +45,31 @@ interface Props {
 export function MatatagNarrativesPanel({ classSectionId, academicYear, terms }: Props) {
   const [term, setTerm] = useState(1)
   const [query, setQuery] = useState('')
-  const [drafts, setDrafts] = useState<Record<string, { can_do: string; to_improve: string }>>({})
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
 
   const { data, isLoading } = useMatatagNarratives({ sectionId: classSectionId, academicYear })
   const save = useMatatagNarrativeMutations({ sectionId: classSectionId, academicYear })
+
+  const fields = data?.fields?.length ? data.fields : FALLBACK_FIELDS
 
   // Drafts are seeded from the server once per (term, payload) and then owned
   // by the textarea. Seeding on every render would fight the typist.
   useEffect(() => {
     if (!data) return
 
-    const next: Record<string, { can_do: string; to_improve: string }> = {}
+    const next: Record<string, Draft> = {}
 
     data.learners.forEach(learner => {
       const stored = data.narratives[`${learner.student_id}:${term}`]
-      next[learner.student_id] = {
-        can_do: stored?.can_do ?? '',
-        to_improve: stored?.to_improve ?? '',
-      }
+      const draft: Draft = {}
+      fields.forEach(({ field }) => {
+        draft[field] = stored?.[field] ?? ''
+      })
+      next[learner.student_id] = draft
     })
 
     setDrafts(next)
-  }, [data, term])
+  }, [data, term, fields])
 
   const dirty = useMemo(() => {
     if (!data) return [] as MatatagNarrativeWrite[]
@@ -58,17 +80,16 @@ export function MatatagNarrativesPanel({ classSectionId, academicYear, terms }: 
         const draft = drafts[learner.student_id]
         if (!draft) return false
 
-        return (
-          draft.can_do !== (stored?.can_do ?? '') || draft.to_improve !== (stored?.to_improve ?? '')
-        )
+        return fields.some(({ field }) => (draft[field] ?? '') !== (stored?.[field] ?? ''))
       })
-      .map(learner => ({
-        student_id: learner.student_id,
-        term,
-        can_do: drafts[learner.student_id].can_do.trim() || null,
-        to_improve: drafts[learner.student_id].to_improve.trim() || null,
-      }))
-  }, [data, drafts, term])
+      .map(learner => {
+        const write: MatatagNarrativeWrite = { student_id: learner.student_id, term }
+        fields.forEach(({ field }) => {
+          write[field] = (drafts[learner.student_id][field] ?? '').trim() || null
+        })
+        return write
+      })
+  }, [data, drafts, term, fields])
 
   /**
    * Males then females, alphabetical within each — the same order as the
@@ -170,7 +191,7 @@ export function MatatagNarrativesPanel({ classSectionId, academicYear, terms }: 
             disabled={readOnly || dirty.length === 0 || save.isPending}
             onClick={() => save.mutate(dirty)}
           >
-            {save.isPending ? 'Saving…' : 'Save narratives'}
+            {save.isPending ? 'Saving…' : fields.length === 1 ? `Save ${fields[0].field === 'comments' ? 'remarks' : 'narratives'}` : 'Save narratives'}
           </Button>
         </div>
       </div>
@@ -201,7 +222,7 @@ export function MatatagNarrativesPanel({ classSectionId, academicYear, terms }: 
           </p>
 
           {group.learners.map(learner => {
-            const draft = drafts[learner.student_id] ?? { can_do: '', to_improve: '' }
+            const draft = drafts[learner.student_id] ?? {}
 
             return (
               <div key={learner.student_id} className="rounded-xl border border-gray-200 bg-white p-4">
@@ -212,34 +233,27 @@ export function MatatagNarrativesPanel({ classSectionId, academicYear, terms }: 
                   {learnerListName(learner)}
                 </p>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <NarrativeField
-                    label="What Your Child Can Do"
-                    filipino="Mga Nagagawa"
-                    value={draft.can_do}
-                    maxLength={data.max_length}
-                    readOnly={readOnly}
-                    onChange={value =>
-                      setDrafts(current => ({
-                        ...current,
-                        [learner.student_id]: { ...draft, can_do: value },
-                      }))
-                    }
-                  />
-
-                  <NarrativeField
-                    label="What Your Child Is Learning To Improve"
-                    filipino="Dapat Linangin"
-                    value={draft.to_improve}
-                    maxLength={data.max_length}
-                    readOnly={readOnly}
-                    onChange={value =>
-                      setDrafts(current => ({
-                        ...current,
-                        [learner.student_id]: { ...draft, to_improve: value },
-                      }))
-                    }
-                  />
+                <div className={`grid gap-4 ${fields.length > 1 ? 'md:grid-cols-2' : ''}`}>
+                  {fields.map(definition => (
+                    <NarrativeField
+                      key={definition.field}
+                      label={definition.label}
+                      filipino={definition.filipino}
+                      hint={definition.hint}
+                      value={draft[definition.field] ?? ''}
+                      maxLength={data.max_length}
+                      readOnly={readOnly}
+                      onChange={value =>
+                        setDrafts(current => ({
+                          ...current,
+                          [learner.student_id]: {
+                            ...current[learner.student_id],
+                            [definition.field]: value,
+                          },
+                        }))
+                      }
+                    />
+                  ))}
                 </div>
               </div>
             )
@@ -262,13 +276,15 @@ export function MatatagNarrativesPanel({ classSectionId, academicYear, terms }: 
 function NarrativeField({
   label,
   filipino,
+  hint,
   value,
   maxLength,
   readOnly,
   onChange,
 }: {
   label: string
-  filipino: string
+  filipino: string | null
+  hint: string | null
   value: string
   maxLength: number
   readOnly: boolean
@@ -280,8 +296,9 @@ function NarrativeField({
   return (
     <label className="block">
       <span className="block text-xs font-medium text-gray-700">
-        {label} <span className="text-gray-400 font-normal">({filipino})</span>
+        {label} {filipino && <span className="text-gray-400 font-normal">({filipino})</span>}
       </span>
+      {hint && <span className="block text-[11px] text-gray-500">{hint}</span>}
       <textarea
         rows={4}
         value={value}

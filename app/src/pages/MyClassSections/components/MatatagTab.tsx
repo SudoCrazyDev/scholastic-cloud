@@ -21,7 +21,7 @@ import {
 } from '../../../hooks/useMatatag'
 import toast from 'react-hot-toast'
 import { usePermissions } from '../../../hooks/usePermissions'
-import type { MatatagGridColumn } from '../../../types'
+import type { MatatagCurriculumVersionSummary, MatatagGridColumn } from '../../../types'
 import { MatatagGrid } from './MatatagGrid'
 import { MatatagFocusList } from './MatatagFocusList'
 import { MatatagNarrativesPanel } from './MatatagNarrativesPanel'
@@ -232,6 +232,13 @@ export function MatatagTab({
 
   const data = grid.data
 
+  // The section's own scale — A-E for Grades 1-3, CO/DV/BG for Kindergarten —
+  // read off its pinned catalog. The reference's list is Key Stage 1's, and
+  // is only the fallback for a response that predates instruments.
+  const instrument = data?.curriculum_version.instrument ?? status?.curriculum_version?.instrument
+  const descriptors = instrument?.descriptors ?? reference?.descriptors ?? []
+  const isKinder = instrument?.ratings_on_card === true
+
   const areaOptions = (data?.learning_areas ?? []).map(area => ({
     value: area.id,
     label: area.title,
@@ -270,7 +277,7 @@ export function MatatagTab({
       {!subjectMode && <nav className="flex gap-1 border-b border-gray-200">
         {([
           ['grid', 'Competencies'],
-          ['narratives', 'Narratives'],
+          ['narratives', isKinder ? 'Remarks' : 'Narratives'],
           ['attendance', 'Attendance'],
           ['reports', 'Report cards'],
           ['teachers', 'Learning area teachers'],
@@ -474,7 +481,7 @@ export function MatatagTab({
             <MatatagGrid
               grid={data}
               columns={visibleColumns}
-              descriptors={reference.descriptors}
+              descriptors={descriptors}
               macroSkills={reference.macro_skills}
               failedKeys={save.failedKeys}
               highContrast={highContrast}
@@ -489,7 +496,7 @@ export function MatatagTab({
             <MatatagFocusList
               grid={data}
               columns={visibleColumns}
-              descriptors={reference.descriptors}
+              descriptors={descriptors}
               macroSkills={reference.macro_skills}
               failedKeys={save.failedKeys}
               readOnly={!data.can_manage}
@@ -501,8 +508,15 @@ export function MatatagTab({
 
           {data?.can_manage && view === 'grid' && (
             <p className="text-[11px] text-gray-500">
-              Click a cell, then press <kbd className="px-1 border rounded">A</kbd>–
-              <kbd className="px-1 border rounded">E</kbd> to mark and move down.{' '}
+              Click a cell, then press{' '}
+              {descriptors.map((d, index) => (
+                <span key={d.letter}>
+                  {index > 0 && (index === descriptors.length - 1 ? ' or ' : ', ')}
+                  <kbd className="px-1 border rounded">{d.key || d.letter}</kbd>
+                  {(d.key || d.letter) !== d.letter && ` (${d.letter})`}
+                </span>
+              ))}{' '}
+              to mark and move down.{' '}
               <kbd className="px-1 border rounded">Space</kbd> clears.{' '}
               <kbd className="px-1 border rounded">Ctrl</kbd>+
               <kbd className="px-1 border rounded">D</kbd> fills the rest of the column.{' '}
@@ -561,6 +575,7 @@ export function MatatagTab({
             academicYear={academicYear}
             learners={data.learners}
             learningAreas={data.learning_areas}
+            instrument={data.curriculum_version.instrument}
           />
         ))}
     </div>
@@ -581,7 +596,7 @@ function OptInPrompt({
   isPending,
   onOptIn,
 }: {
-  status?: { available_curriculum_version: { title: string; slot_count: number } | null }
+  status?: { available_curriculum_version: MatatagCurriculumVersionSummary | null }
   gradeLevel: string
   canSetUp: boolean
   isPending: boolean
@@ -598,9 +613,10 @@ function OptInPrompt({
       {available ? (
         <>
           <p className="mt-2 text-sm text-gray-600 max-w-xl mx-auto">
-            Switching it on records a letter descriptor A–E against each of DepEd's{' '}
-            {available.slot_count} learning competencies, three times a year, instead of numeric
-            quarterly grades. Nothing changes for any other section.
+            {available.instrument?.ratings_on_card
+              ? `Switching it on records a rating — ${scaleText(available)} — against each of DepEd's ${available.competency_count} Kindergarten competencies, once every term, with a remarks box per term, on the Kindergarten progress report card.`
+              : `Switching it on records a letter descriptor ${scaleText(available)} against each of DepEd's ${available.slot_count} learning competencies, three times a year, instead of numeric quarterly grades.`}{' '}
+            Nothing changes for any other section.
           </p>
           <p className="mt-1 text-xs text-gray-500">
             Catalog: {available.title}. A section stays on one catalog for the whole year.
@@ -626,6 +642,15 @@ function OptInPrompt({
       )}
     </div>
   )
+}
+
+/** 'A, B, C, D or E', or 'CO (Consistent), DV (Developing) or BG (Beginning)'. */
+function scaleText(version: MatatagCurriculumVersionSummary): string {
+  const scale = version.instrument?.descriptors ?? []
+  if (scale.length === 0) return 'A–E'
+
+  const names = scale.map(d => (d.letter.length > 1 ? `${d.letter} (${d.label})` : d.letter))
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : names[0]
 }
 
 /**

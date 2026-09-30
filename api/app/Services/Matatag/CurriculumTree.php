@@ -289,6 +289,10 @@ class CurriculumTree
             'code' => $version->code,
             'title' => $version->title,
             'grade_level' => $version->grade_level,
+            // The scale, the prose fields and which card prints — everything
+            // a client needs to render this catalog without branching on a
+            // grade-level string.
+            'instrument' => \App\Support\MatatagTerms::instrumentConfig($version->instrumentKey()),
             'source' => $version->source,
             'published_on' => $version->published_on?->toDateString(),
             'competency_count' => $version->competency_count,

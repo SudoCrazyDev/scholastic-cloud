@@ -220,7 +220,7 @@ export function MatatagFocusList({
                               selected ? null : descriptor.letter
                             )
                           }
-                          className={`h-8 w-8 rounded-lg border text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                          className={`h-8 min-w-8 px-1.5 rounded-lg border text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                             selected
                               ? 'border-primary-600 bg-primary-600 text-white'
                               : 'border-gray-300 bg-white text-gray-600 hover:border-primary-400 hover:bg-primary-50'

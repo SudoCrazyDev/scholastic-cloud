@@ -4023,14 +4023,44 @@ export interface TeachingActivityFilters {
  * pages -> hooks -> services -> lib/api chain.
  * ------------------------------------------------------------------ */
 
-/** A, B, C, D or E. Never a number. */
-export type MatatagDescriptor = 'A' | 'B' | 'C' | 'D' | 'E';
+/**
+ * A-E for Grades 1-3; CO, DV or BG for Kindergarten. Never a number. Which
+ * scale a section uses comes from its catalog's `instrument`.
+ */
+export type MatatagDescriptor = 'A' | 'B' | 'C' | 'D' | 'E' | 'CO' | 'DV' | 'BG';
 
 export interface MatatagDescriptorDefinition {
+  /** The stored code: 'A', or 'CO'. */
   letter: MatatagDescriptor;
+  /** The one keystroke that sets it in the grid: 'A', or 'C' for CO. */
+  key: string;
   label: string;
-  filipino: string;
+  filipino: string | null;
   description: string;
+}
+
+/** One prose field a card carries per learner per term. */
+export interface MatatagNarrativeFieldDefinition {
+  field: MatatagNarrativeField;
+  label: string;
+  filipino: string | null;
+  hint: string | null;
+}
+
+export type MatatagNarrativeField = 'can_do' | 'to_improve' | 'comments';
+
+/**
+ * Which of DepEd's progress reports a catalog is. Branch on this — never on a
+ * grade-level string. `ks1` is Grades 1-3 (A-E, two paragraphs, PACE forms);
+ * `kinder` is Kindergarten (CO/DV/BG, one remarks box, marks on the card).
+ */
+export interface MatatagInstrument {
+  key: 'ks1' | 'kinder' | string;
+  label: string | null;
+  /** True when the marks print on the card itself rather than on PACE forms. */
+  ratings_on_card: boolean;
+  descriptors: MatatagDescriptorDefinition[];
+  narratives: MatatagNarrativeFieldDefinition[];
 }
 
 export interface MatatagTermDefinition {
@@ -4051,9 +4081,13 @@ export interface MatatagMacroSkillDefinition {
 
 export interface MatatagReference {
   terms: MatatagTermDefinition[];
+  /** Key Stage 1's A-E. A section's own scale is on its curriculum version. */
   descriptors: MatatagDescriptorDefinition[];
   macro_skills: MatatagMacroSkillDefinition[];
+  instruments?: Record<string, MatatagInstrument>;
   grade_levels: string[];
+  /** Every spelling accepted, aliases included ('Kinder 1', 'Kinder 2'). */
+  accepted_grade_levels?: string[];
 }
 
 export interface MatatagCurriculumVersionSummary {
@@ -4061,6 +4095,7 @@ export interface MatatagCurriculumVersionSummary {
   code: string;
   title: string;
   grade_level: string;
+  instrument: MatatagInstrument;
   source: string | null;
   published_on: string | null;
   competency_count: number;
@@ -4226,20 +4261,22 @@ export interface MatatagSectionStatus {
 export interface MatatagNarrative {
   can_do: string | null;
   to_improve: string | null;
+  comments?: string | null;
   updated_at?: string | null;
 }
 
-export interface MatatagNarrativeWrite {
+/** Only the section's own instrument's fields are written; others are ignored. */
+export type MatatagNarrativeWrite = {
   student_id: string;
   term: number;
-  can_do: string | null;
-  to_improve: string | null;
-}
+} & Partial<Record<MatatagNarrativeField, string | null>>;
 
 export interface MatatagNarratives {
   section: { id: string; title: string };
   academic_year: string;
   max_length: number;
+  /** The paragraphs this section's card carries, in print order. */
+  fields: MatatagNarrativeFieldDefinition[];
   terms: number[];
   learners: MatatagLearner[];
   /** Keyed `studentId:term`. */
@@ -4331,6 +4368,8 @@ export interface MatatagReportNarrative {
   filipino: string;
   can_do: string | null;
   to_improve: string | null;
+  /** Kindergarten's one box; `legend.narratives` says which fields print. */
+  comments: string | null;
   updated_at: string | null;
 }
 
@@ -4347,6 +4386,9 @@ export interface MatatagReportStudent {
   /** Whole years completed on the first and last printed day of the year. */
   age_at_start_of_school_year: number | null;
   age_at_end_of_school_year: number | null;
+  /** Months past those whole years — the Kindergarten card prints both. */
+  age_months_at_start_of_school_year: number | null;
+  age_months_at_end_of_school_year: number | null;
 }
 
 /** One box on a PACE row: the competency in one term, one macro skill. */
@@ -4411,7 +4453,9 @@ export interface MatatagProgressReport {
   section: MatatagReportSection;
   curriculum_version: MatatagCurriculumVersionSummary;
   legend: {
+    /** The section's own scale: A-E, or Kindergarten's CO/DV/BG. */
     descriptors: MatatagDescriptorDefinition[];
+    narratives: MatatagNarrativeFieldDefinition[];
     terms: MatatagTermDefinition[];
     macro_skills: MatatagMacroSkillDefinition[];
   };

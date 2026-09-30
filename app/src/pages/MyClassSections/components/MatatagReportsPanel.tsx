@@ -4,10 +4,13 @@ import { AlertTriangle, Download, FileSpreadsheet, FileText, Loader2 } from 'luc
 import { Button } from '../../../components/button'
 import { Select } from '../../../components/select'
 import { Ks1PaceForm } from '../../../components/matatagReports/Ks1PaceForm'
-import { Ks1ProgressReportCard } from '../../../components/matatagReports/Ks1ProgressReportCard'
-import { useMatatagReport, useMatatagReportDownloads } from '../../../hooks/useMatatagReports'
+import {
+  progressReportCard,
+  useMatatagReport,
+  useMatatagReportDownloads,
+} from '../../../hooks/useMatatagReports'
 import { learnerListName, orderedLearners } from './matatagRoster'
-import type { MatatagLearner, MatatagLearningAreaSummary } from '../../../types'
+import type { MatatagInstrument, MatatagLearner, MatatagLearningAreaSummary } from '../../../types'
 
 interface Props {
   classSectionId: string
@@ -15,6 +18,12 @@ interface Props {
   academicYear?: string
   learners: MatatagLearner[]
   learningAreas: MatatagLearningAreaSummary[]
+  /**
+   * The section's catalog's instrument. When its marks print on the card
+   * (Kindergarten) there are no PACE forms to offer, and DepEd's Kindergarten
+   * workbook is not exported yet.
+   */
+  instrument?: MatatagInstrument
 }
 
 type Preview = 'card' | 'pace'
@@ -37,7 +46,9 @@ export function MatatagReportsPanel({
   academicYear,
   learners,
   learningAreas,
+  instrument,
 }: Props) {
+  const ratingsOnCard = instrument?.ratings_on_card === true
   const [studentId, setStudentId] = useState<string>(learners[0]?.student_id ?? '')
   const [areaId, setAreaId] = useState<string>(learningAreas[0]?.id ?? '')
   const [preview, setPreview] = useState<Preview>('card')
@@ -87,7 +98,9 @@ export function MatatagReportsPanel({
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h4 className="text-sm font-semibold text-gray-900">One learner</h4>
           <p className="mt-0.5 text-xs text-gray-500">
-            Their card, and all {learningAreas.length} PACE forms.
+            {ratingsOnCard
+              ? 'Their card: every competency rating, the remarks and the attendance.'
+              : `Their card, and all ${learningAreas.length} PACE forms.`}
           </p>
 
           <div className="mt-3 space-y-3">
@@ -121,22 +134,24 @@ export function MatatagReportsPanel({
                 {downloads.learnerCard.isPending ? 'Building…' : 'Report card'}
               </Button>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!learner || downloads.isBusy}
-                leftIcon={<FileText className="w-4 h-4" />}
-                onClick={() =>
-                  learner &&
-                  downloads.learnerPaceForms.mutate({
-                    studentId: learner.student_id,
-                    name: learner.name,
-                  })
-                }
-              >
-                {downloads.learnerPaceForms.isPending ? 'Building…' : 'PACE forms'}
-              </Button>
+              {!ratingsOnCard && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!learner || downloads.isBusy}
+                  leftIcon={<FileText className="w-4 h-4" />}
+                  onClick={() =>
+                    learner &&
+                    downloads.learnerPaceForms.mutate({
+                      studentId: learner.student_id,
+                      name: learner.name,
+                    })
+                  }
+                >
+                  {downloads.learnerPaceForms.isPending ? 'Building…' : 'PACE forms'}
+                </Button>
+              )}
             </div>
           </div>
         </section>
@@ -144,12 +159,13 @@ export function MatatagReportsPanel({
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h4 className="text-sm font-semibold text-gray-900">The whole class</h4>
           <p className="mt-0.5 text-xs text-gray-500">
-            {learners.length} learners. PACE forms print one learning area at a time — all five at
-            once is about {learners.length * 5 * 3} pages.
+            {ratingsOnCard
+              ? `${learners.length} learners, two pages each.`
+              : `${learners.length} learners. PACE forms print one learning area at a time — all five at once is about ${learners.length * 5 * 3} pages.`}
           </p>
 
           <div className="mt-3 space-y-3">
-            <label className="block text-xs font-medium text-gray-600">
+            {!ratingsOnCard && <label className="block text-xs font-medium text-gray-600">
               <span className="block mb-1">Learning area</span>
               <Select
                 inputSize="sm"
@@ -157,7 +173,7 @@ export function MatatagReportsPanel({
                 onChange={event => setAreaId(event.target.value)}
                 options={learningAreas.map(a => ({ value: a.id, label: a.title }))}
               />
-            </label>
+            </label>}
 
             <div className="flex flex-wrap gap-2">
               <Button
@@ -171,7 +187,7 @@ export function MatatagReportsPanel({
                 {downloads.classCards.isPending ? 'Building…' : 'All report cards'}
               </Button>
 
-              <Button
+              {!ratingsOnCard && <Button
                 type="button"
                 variant="outline"
                 size="sm"
@@ -186,13 +202,13 @@ export function MatatagReportsPanel({
                 }
               >
                 {downloads.classPaceForms.isPending ? 'Building…' : `${area?.title ?? 'Area'} forms`}
-              </Button>
+              </Button>}
             </div>
           </div>
         </section>
       </div>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
+      {!ratingsOnCard && <section className="rounded-xl border border-gray-200 bg-white p-4">
         <h4 className="text-sm font-semibold text-gray-900">DepEd's own workbook</h4>
         <p className="mt-0.5 text-xs text-gray-500">
           The whole section as the official <span className="font-medium">.xlsx</span> e-class
@@ -217,7 +233,7 @@ export function MatatagReportsPanel({
             Built on the server; takes a few seconds.
           </span>
         </div>
-      </section>
+      </section>}
 
       {report.data && report.data.warnings.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
@@ -237,7 +253,7 @@ export function MatatagReportsPanel({
         <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-2">
           <span className="text-xs font-medium text-gray-600">Preview</span>
 
-          {(['card', 'pace'] as const).map(key => (
+          {(ratingsOnCard ? (['card'] as const) : (['card', 'pace'] as const)).map(key => (
             <button
               key={key}
               type="button"
@@ -279,8 +295,8 @@ export function MatatagReportsPanel({
           {report.data && (
             <PdfErrorBoundary key={viewerKey}>
               <PDFViewer width="100%" height="100%" showToolbar>
-                {preview === 'card' ? (
-                  <Ks1ProgressReportCard report={report.data} />
+                {preview === 'card' || ratingsOnCard ? (
+                  progressReportCard(report.data)
                 ) : (
                   <Ks1PaceForm report={report.data} />
                 )}
@@ -291,8 +307,9 @@ export function MatatagReportsPanel({
       </div>
 
       <p className="text-[11px] text-gray-500">
-        The card carries the narratives, the attendance and the A–E legend. The descriptor grid is
-        not on the card — DepEd prints it on the PACE forms, which staple behind it.
+        {ratingsOnCard
+          ? 'The card follows DepEd’s Kindergarten progress report: every competency rated CO, DV or BG for each term, the teacher’s remarks, the attendance and the rating scale.'
+          : 'The card carries the narratives, the attendance and the A–E legend. The descriptor grid is not on the card — DepEd prints it on the PACE forms, which staple behind it.'}
       </p>
     </div>
   )
