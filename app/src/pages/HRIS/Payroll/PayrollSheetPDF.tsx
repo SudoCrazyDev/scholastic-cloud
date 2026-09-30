@@ -56,19 +56,82 @@ const OVERTIME_WIDTH = 6
 // Landscape A4 less the page's horizontal padding — the width the table spans.
 const TABLE_WIDTH_PT = 841.89 - 44
 
+// Headings wrap between words only. react-pdf's own hyphenation would print
+// "CASH AD-VANCE" when the whole word fits on the next line; a word that truly
+// does not fit is already cut by subHeadingText below.
+const wholeWords = (word: string) => [word]
+
+// Uppercase Helvetica-Bold runs about 0.68em per character.
+const HEADING_CHAR_EM = 0.68
+const MIN_SUB_HEADING = 4.2
+const MAX_SUB_HEADING = 6.5
+
+const subColumnPt = (columnWidthPct: number) => (columnWidthPct / 100) * TABLE_WIDTH_PT - 4
+
+// A deduction line is often named like a code — "PHILHEALTH_ABOVE_10K" — so an
+// underscore is a word break here, not part of a word.
+const headingWords = (label: string) => label.toUpperCase().split(/[\s_]+/).filter(Boolean)
+
 /**
  * A deduction named "PhilHealth" is one unbreakable word that does not fit a
  * sub-column at the base heading size, and react-pdf lets it spill over its
  * neighbour rather than shrink. So size the sub-headings off the longest word
- * that has to fit: uppercase Helvetica-Bold runs about 0.68em per character.
+ * that has to fit.
  */
 const subHeadingFontSize = (labels: string[], columnWidthPct: number): number => {
   const longestWord = labels
-    .flatMap((label) => label.toUpperCase().split(/\s+/))
+    .flatMap(headingWords)
     .reduce((longest, word) => Math.max(longest, word.length), 1)
-  const available = (columnWidthPct / 100) * TABLE_WIDTH_PT - 4
-  return Math.max(4.2, Math.min(6.5, available / (longestWord * 0.68)))
+  return Math.max(
+    MIN_SUB_HEADING,
+    Math.min(MAX_SUB_HEADING, subColumnPt(columnWidthPct) / (longestWord * HEADING_CHAR_EM))
+  )
 }
+
+const subHeadingMaxChars = (columnWidthPct: number, fontSize: number) =>
+  Math.max(2, Math.floor(subColumnPt(columnWidthPct) / (fontSize * HEADING_CHAR_EM)))
+
+/**
+ * The heading as it prints. A word still too long at the smallest size would
+ * spill over the next column — the hyphenation callback registered for the
+ * report cards never breaks inside a word — so cut it into hyphenated pieces
+ * that do fit, and let the line break between them.
+ */
+const subHeadingPieces = (label: string, columnWidthPct: number, fontSize: number): string[] => {
+  const maxChars = subHeadingMaxChars(columnWidthPct, fontSize)
+  return headingWords(label).flatMap((word) => {
+    if (word.length <= maxChars) return [word]
+    const pieces: string[] = []
+    for (let i = 0; i < word.length; i += maxChars - 1) pieces.push(word.slice(i, i + maxChars - 1))
+    return pieces.map((piece, i) => (i < pieces.length - 1 ? `${piece}-` : piece))
+  })
+}
+
+const subHeadingText = (label: string, columnWidthPct: number, fontSize: number): string =>
+  subHeadingPieces(label, columnWidthPct, fontSize).join(' ')
+
+/**
+ * How many lines a heading wraps to, packing its pieces greedily the way the
+ * line breaker will — so the header can grow to fit instead of clipping the
+ * last line of a long deduction name.
+ */
+const subHeadingLineCount = (label: string, columnWidthPct: number, fontSize: number): number => {
+  const maxChars = subHeadingMaxChars(columnWidthPct, fontSize)
+  let lines = 0
+  let used = 0
+  for (const piece of subHeadingPieces(label, columnWidthPct, fontSize)) {
+    if (lines === 0 || used + 1 + piece.length > maxChars) {
+      lines += 1
+      used = piece.length
+    } else {
+      used += 1 + piece.length
+    }
+  }
+  return Math.max(lines, 1)
+}
+
+const GROUP_LABEL_HEIGHT = 15
+const MIN_HEADER_HEIGHT = 42
 
 /**
  * Same problem one row down: every deduction line an institution uses takes
@@ -124,7 +187,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    height: 42,
+    height: MIN_HEADER_HEIGHT,
   },
   // A header column that spans the whole header height.
   headerCell: {
@@ -142,7 +205,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   headerGroupLabel: {
-    height: 15,
+    height: GROUP_LABEL_HEIGHT,
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderColor: BORDER,
@@ -273,17 +336,25 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
   const subWidth = (100 - fixedTotal) / (benefitSubs + deductionSubs)
 
   // One size for every sub-heading, so the two groups stay visually level.
-  const subHeading = {
-    fontSize: subHeadingFontSize(
-      [
-        ...benefitColumns.map((c) => c.label),
-        'TOTAL',
-        ...deductionColumns.map((c) => c.label),
-        ...(penaltyColumn ? ['LATE / UNDERTIME'] : []),
-      ],
-      subWidth
-    ),
-  }
+  const subHeadingLabels = [
+    ...benefitColumns.map((c) => c.label),
+    'TOTAL',
+    ...deductionColumns.map((c) => c.label),
+    ...(penaltyColumn ? ['LATE / UNDERTIME'] : []),
+  ]
+  const subHeading = { fontSize: subHeadingFontSize(subHeadingLabels, subWidth) }
+
+  const heading = (label: string) => subHeadingText(label, subWidth, subHeading.fontSize)
+
+  // Tall enough for the sub-heading that wraps to the most lines.
+  const headerHeight = Math.max(
+    MIN_HEADER_HEIGHT,
+    GROUP_LABEL_HEIGHT +
+      6 +
+      Math.max(...subHeadingLabels.map((label) => subHeadingLineCount(label, subWidth, subHeading.fontSize))) *
+        subHeading.fontSize *
+        1.25
+  )
 
   // ...and one size for every figure beneath them.
   const subFigure = { fontSize: subFigureFontSize(subWidth) }
@@ -326,79 +397,79 @@ export const PayrollSheetPDF: React.FC<PayrollSheetPDFProps> = ({ sheet }) => {
 
   // Repeated at the top of every page — the sheet often runs past one page.
   const tableHeader = (
-    <View style={styles.headerRow} fixed>
+    <View style={[styles.headerRow, { height: headerHeight }]} fixed>
       <View style={[styles.headerCell, { width: pct(FIXED.no) }]}>
-        <Text style={styles.headerText}>NO</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>NO</Text>
       </View>
       <View style={[styles.headerCell, { width: pct(FIXED.name), alignItems: 'flex-start' }]}>
-        <Text style={styles.headerText}>NAME OF EMPLOYEE</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>NAME OF EMPLOYEE</Text>
       </View>
       <View style={[styles.headerCell, { width: pct(FIXED.workingDays) }]}>
-        <Text style={styles.headerText}>TOTAL NO. OF WORKING DAYS</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>TOTAL NO. OF WORKING DAYS</Text>
       </View>
       <View style={[styles.headerCell, { width: pct(FIXED.dailyRate) }]}>
-        <Text style={styles.headerText}>DAILY RATE</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>DAILY RATE</Text>
       </View>
 
       <View style={[styles.headerGroup, { width: pct(subWidth * benefitSubs) }]}>
         <View style={styles.headerGroupLabel}>
-          <Text style={styles.headerText}>OTHER BENEFITS</Text>
+          <Text style={styles.headerText} hyphenationCallback={wholeWords}>OTHER BENEFITS</Text>
         </View>
         <View style={styles.headerGroupSubs}>
           {benefitColumns.map((column) => (
             <View key={column.key} style={[styles.headerCell, { width: pct(100 / benefitSubs) }]}>
-              <Text style={[styles.headerText, subHeading]}>{column.label.toUpperCase()}</Text>
+              <Text style={[styles.headerText, subHeading]} hyphenationCallback={wholeWords}>{heading(column.label)}</Text>
             </View>
           ))}
           <View style={[styles.headerCell, { width: pct(100 / benefitSubs) }]}>
-            <Text style={[styles.headerText, subHeading]}>TOTAL</Text>
+            <Text style={[styles.headerText, subHeading]} hyphenationCallback={wholeWords}>{heading('TOTAL')}</Text>
           </View>
         </View>
       </View>
 
       {overtimeColumn && (
         <View style={[styles.headerCell, { width: pct(OVERTIME_WIDTH) }]}>
-          <Text style={styles.headerText}>OVERTIME PAY</Text>
+          <Text style={styles.headerText} hyphenationCallback={wholeWords}>OVERTIME PAY</Text>
         </View>
       )}
 
       <View style={[styles.headerCell, { width: pct(FIXED.salaryEarned) }]}>
-        <Text style={styles.headerText}>TOTAL SALARY EARNED</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>TOTAL SALARY EARNED</Text>
       </View>
 
       <View style={[styles.headerGroup, { width: pct(subWidth * deductionSubs) }]}>
         <View style={styles.headerGroupLabel}>
-          <Text style={styles.headerText}>DEDUCTIONS</Text>
+          <Text style={styles.headerText} hyphenationCallback={wholeWords}>DEDUCTIONS</Text>
         </View>
         <View style={styles.headerGroupSubs}>
           {deductionColumns.length === 0 && !penaltyColumn ? (
             <View style={[styles.headerCell, { width: '100%' }]}>
-              <Text style={styles.headerText}>—</Text>
+              <Text style={styles.headerText} hyphenationCallback={wholeWords}>—</Text>
             </View>
           ) : (
             deductionColumns.map((column) => (
               <View key={column.key} style={[styles.headerCell, { width: pct(100 / deductionSubs) }]}>
-                <Text style={[styles.headerText, subHeading]}>{column.label.toUpperCase()}</Text>
+                <Text style={[styles.headerText, subHeading]} hyphenationCallback={wholeWords}>{heading(column.label)}</Text>
               </View>
             ))
           )}
           {penaltyColumn && (
             <View style={[styles.headerCell, { width: pct(100 / deductionSubs) }]}>
-              <Text style={[styles.headerText, subHeading]}>LATE / UNDERTIME</Text>
+              <Text style={[styles.headerText, subHeading]} hyphenationCallback={wholeWords}>{heading('LATE / UNDERTIME')}</Text>
             </View>
           )}
         </View>
       </View>
 
       <View style={[styles.headerCell, { width: pct(FIXED.totalDeduction) }]}>
-        <Text style={styles.headerText}>TOTAL DEDUCTION</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>TOTAL DEDUCTION</Text>
       </View>
       <View style={[styles.headerCell, { width: pct(FIXED.netCash) }]}>
-        <Text style={styles.headerText}>NET CASH EARNED</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>NET CASH EARNED</Text>
       </View>
       {/* Signed on collection — the sheet doubles as the payout receipt. */}
       <View style={[styles.headerCell, { width: pct(FIXED.signature) }]}>
-        <Text style={styles.headerText}>TEACHER SIGNATURE</Text>
+        <Text style={styles.headerText} hyphenationCallback={wholeWords}>TEACHER SIGNATURE</Text>
       </View>
     </View>
   )
