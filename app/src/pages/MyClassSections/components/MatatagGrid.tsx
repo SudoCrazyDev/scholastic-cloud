@@ -406,21 +406,30 @@ export const MatatagGrid = React.memo(function MatatagGrid({
         role="grid"
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
-        className="border-collapse text-xs"
+        className="border-separate border-spacing-0 text-xs"
         aria-label={`${grid.learning_area.title}, Term ${grid.term}`}
       >
-        <thead>
+        {/* `border-separate` with zero spacing, and only right/bottom borders
+            per cell, rather than `border-collapse`: a collapsed border belongs
+            to the table, not the cell, so it does not travel with a pinned
+            header and the rows scrolling underneath show through every line.
+            The wrapper's own border draws the outer top and left edges. */}
+        {/* The whole header is pinned as one block rather than row by row:
+            each row's height depends on its text, so per-row `top` offsets
+            drift and let the competency numbers slide under the domain band.
+            Its z-index puts it over the pinned learner column as both scroll. */}
+        <thead className="sticky top-0 z-30">
           {/* Tier 1 — domain bands */}
           {grid.learning_area.has_domains && (
             <tr>
-              <th className="sticky left-0 top-0 z-30 bg-gray-100 border border-gray-200 px-3 py-2 text-left min-w-[200px]">
+              <th className="sticky left-0 z-30 bg-gray-100 border-r border-b border-gray-200 px-3 py-2 text-left min-w-[200px]">
                 <span className="sr-only">Learner</span>
               </th>
               {domainGroups.map((group, index) => (
                 <th
                   key={`${group.id ?? 'none'}-${index}`}
                   colSpan={group.span}
-                  className="sticky top-0 z-20 bg-gray-100 border border-gray-200 px-2 py-1.5 text-[11px] font-semibold text-gray-700 text-center whitespace-nowrap"
+                  className="bg-gray-100 border-r border-b border-gray-200 px-2 py-1.5 text-[11px] font-semibold text-gray-700 text-center whitespace-nowrap"
                   title={group.title}
                 >
                   {group.title}
@@ -431,17 +440,14 @@ export const MatatagGrid = React.memo(function MatatagGrid({
 
           {/* Tier 2 — competency numbers, each spanning its macro skills */}
           <tr>
-            <th
-              className="sticky left-0 z-30 bg-gray-50 border border-gray-200 px-3 py-2 text-left min-w-[200px]"
-              style={{ top: grid.learning_area.has_domains ? 30 : 0 }}
-            >
+            <th className="sticky left-0 z-30 bg-gray-50 border-r border-b border-gray-200 px-3 py-2 text-left min-w-[200px]">
               <span className="sr-only">Learner</span>
             </th>
             {competencyGroups.map(group => (
               <th
                 key={group.key}
                 colSpan={group.span}
-                className="z-10 bg-gray-50 border border-gray-200 px-1 py-1 text-[11px] font-semibold text-gray-700 text-center"
+                className="z-10 bg-gray-50 border-r border-b border-gray-200 px-1 py-1 text-[11px] font-semibold text-gray-700 text-center"
               >
                 {group.label}
               </th>
@@ -451,7 +457,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
           {/* Tier 3 — macro skill, when the area uses them */}
           {grid.learning_area.uses_macro_skills && (
             <tr>
-              <th className="sticky left-0 z-30 bg-white border border-gray-200 px-3 py-2 text-left min-w-[200px]">
+              <th className="sticky left-0 z-30 bg-white border-r border-b border-gray-200 px-3 py-2 text-left min-w-[200px]">
                 Learner
               </th>
               {columns.map(column => {
@@ -460,7 +466,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
                 return (
                   <th
                     key={column.slot_id}
-                    className="border border-gray-200 px-1 py-1 text-[10px] font-bold text-center w-8 min-w-[32px]"
+                    className="border-r border-b border-gray-200 px-1 py-1 text-[10px] font-bold text-center w-8 min-w-[32px]"
                     style={{ backgroundColor: fillFor(column) }}
                     title={skill?.label ?? undefined}
                   >
@@ -478,13 +484,13 @@ export const MatatagGrid = React.memo(function MatatagGrid({
 
           {!grid.learning_area.uses_macro_skills && (
             <tr>
-              <th className="sticky left-0 z-30 bg-white border border-gray-200 px-3 py-2 text-left min-w-[200px]">
+              <th className="sticky left-0 z-30 bg-white border-r border-b border-gray-200 px-3 py-2 text-left min-w-[200px]">
                 Learner
               </th>
               {columns.map(column => (
                 <th
                   key={column.slot_id}
-                  className="border border-gray-200 px-1 py-1 text-[10px] text-center w-8 min-w-[32px] bg-white"
+                  className="border-r border-b border-gray-200 px-1 py-1 text-[10px] text-center w-8 min-w-[32px] bg-white"
                 >
                   <span className="sr-only">{column.label}</span>
                 </th>
@@ -503,12 +509,12 @@ export const MatatagGrid = React.memo(function MatatagGrid({
               <tr>
                 <th
                   scope="colgroup"
-                  className="sticky left-0 z-20 border border-gray-300 bg-gray-200 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-wider text-gray-600"
+                  className="sticky left-0 z-20 border-r border-b border-gray-300 bg-gray-200 px-3 py-1 text-left text-[10px] font-bold uppercase tracking-wider text-gray-600"
                 >
                   {group.label}
                   <span className="ml-1.5 font-semibold text-gray-500">{group.learners.length}</span>
                 </th>
-                <td colSpan={columns.length} className="border border-gray-300 bg-gray-200 p-0" />
+                <td colSpan={columns.length} className="border-r border-b border-gray-300 bg-gray-200 p-0" />
               </tr>
 
               {group.learners.map((learner, indexInGroup) => {
@@ -522,7 +528,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
                   <tr key={learner.student_id} className={striped ? 'bg-gray-50/60' : 'bg-white'}>
                     <th
                       scope="row"
-                      className={`sticky left-0 z-10 border border-gray-200 px-3 py-1.5 text-left font-medium text-gray-800 whitespace-nowrap ${
+                      className={`sticky left-0 z-10 border-r border-b border-gray-200 px-3 py-1.5 text-left font-medium text-gray-800 whitespace-nowrap ${
                         striped ? 'bg-gray-50' : 'bg-white'
                       }`}
                     >
@@ -544,7 +550,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
                           <td
                             key={column.slot_id}
                             data-cell={key}
-                            className="border border-primary-500 p-0 w-8 min-w-[32px] ring-2 ring-primary-400"
+                            className="border-r border-b border-primary-500 p-0 w-8 min-w-[32px] ring-2 ring-primary-400"
                           >
                             <Select
                               autoFocus
@@ -583,7 +589,7 @@ export const MatatagGrid = React.memo(function MatatagGrid({
                           onFocus={() =>
                             setActive({ studentId: learner.student_id, slotId: column.slot_id })
                           }
-                          className={`border px-1 py-1.5 text-center font-semibold cursor-pointer select-none w-8 min-w-[32px] outline-none ${
+                          className={`border-r border-b px-1 py-1.5 text-center font-semibold cursor-pointer select-none w-8 min-w-[32px] outline-none ${
                             hasFailed
                               ? 'border-amber-500 bg-amber-50 text-amber-900'
                               : isActive
