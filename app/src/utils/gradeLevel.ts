@@ -19,6 +19,11 @@ export function parseGradeLevelNumber(value: unknown): number | null {
   const text = String(value ?? '').trim()
   if (!text) return null
 
+  // A numbered kindergarten year — "Kinder 2", "Kindergarten 1", "K2", "K-1",
+  // the aliases config/matatag.php resolves to Kindergarten — carries a digit
+  // that is not a grade. Read as one, Kinder 2 got the Grades 2-10 report card.
+  if (/^(kinder(garten)?\b|k\s*-?\s*\d+$)/i.test(text)) return null
+
   // The first run of digits, so "Grade 10 - Rizal" reads 10 and "Grade 7" reads
   // 7. Anchored to a word boundary so the 9 in "K-9 Annex" is not mistaken for
   // a grade level that the word "Grade" never introduced.
