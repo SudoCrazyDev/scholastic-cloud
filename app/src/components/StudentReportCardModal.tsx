@@ -3,6 +3,8 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import { Button } from './button'
 import { Switch, SwitchField } from './switch'
 import PrintReportCard from './studentReportCard/studentReportCard.tsx'
+import TemplatedReportCard from './reportCardTemplates/TemplatedReportCard'
+import { useReportCardTemplateForGradeLevel } from '../hooks/useReportCardTemplates'
 import { Component, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { staffService } from '../services/staffService'
@@ -51,6 +53,11 @@ interface StudentReportCardModalProps {
   classSectionId?: string
   institutionId?: string
   academicYear?: string
+  /**
+   * The section's grade level. A grade level the school assigned one of its own
+   * report card templates to prints that instead of the standard card.
+   */
+  gradeLevel?: string | null
 }
 
 export function StudentReportCardModal({
@@ -61,10 +68,13 @@ export function StudentReportCardModal({
   classSectionId,
   institutionId,
   academicYear,
+  gradeLevel,
 }: StudentReportCardModalProps) {
   const handleClose = () => {
     onClose()
   }
+
+  const { data: template, isLoading: templateLoading } = useReportCardTemplateForGradeLevel(gradeLevel, isOpen)
 
   // Fetch principals from staff list (filter by role slug)
   const { data: staffsResponse } = useQuery({
@@ -176,6 +186,11 @@ export function StudentReportCardModal({
                   <h3 className="text-lg font-semibold text-gray-900">
                     Report Card - {studentName || 'Student'}
                   </h3>
+                  {template && (
+                    <span className="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">
+                      {template.name}
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={handleClose}
@@ -188,15 +203,18 @@ export function StudentReportCardModal({
               {/* Content */}
               <div className="p-6">
                 <div className="mb-3 flex flex-wrap items-center gap-4">
-                  <SwitchField className="flex flex-row items-center justify-between gap-4 w-auto">
-                    <label className="text-sm font-medium text-gray-700 cursor-pointer">Show General Average Remarks</label>
-                    <Switch
-                      color="indigo"
-                      checked={showGeneralAverageRemarks}
-                      onChange={handleShowGeneralAverageRemarksChange}
-                      className="!bg-zinc-200 dark:!bg-zinc-200 dark:!ring-zinc-300/60"
-                    />
-                  </SwitchField>
+                  {/* The school's own templates print their own remarks. */}
+                  {!template && (
+                    <SwitchField className="flex flex-row items-center justify-between gap-4 w-auto">
+                      <label className="text-sm font-medium text-gray-700 cursor-pointer">Show General Average Remarks</label>
+                      <Switch
+                        color="indigo"
+                        checked={showGeneralAverageRemarks}
+                        onChange={handleShowGeneralAverageRemarksChange}
+                        className="!bg-zinc-200 dark:!bg-zinc-200 dark:!ring-zinc-300/60"
+                      />
+                    </SwitchField>
+                  )}
                   <div className="flex flex-wrap items-center gap-3">
                     <label className="text-sm font-medium text-gray-700">Age (override)</label>
                   <input
@@ -230,6 +248,23 @@ export function StudentReportCardModal({
                 )}
                 <div className="w-full h-[600px]">
                   <PdfErrorBoundary>
+                    {templateLoading ? (
+                      <div className="w-full h-full flex items-center justify-center text-sm text-gray-600">
+                        Loading report card…
+                      </div>
+                    ) : template ? (
+                      <TemplatedReportCard
+                        template={template}
+                        viewerKey={`${pdfKey}|${template.id}|${template.updated_at}|${overrideAge.trim()}`}
+                        viewerHeight="100%"
+                        principalName={principalName}
+                        studentId={studentId || ''}
+                        classSectionId={classSectionId || ''}
+                        institutionId={institutionId || ''}
+                        academicYear={academicYear || '2024-2025'}
+                        overrideAge={overrideAge.trim() || undefined}
+                      />
+                    ) : (
                     <PrintReportCard
                       viewerKey={pdfKey}
                       viewerHeight="100%"
@@ -241,6 +276,7 @@ export function StudentReportCardModal({
                       overrideAge={overrideAge.trim() || undefined}
                       showGeneralAverageRemarks={showGeneralAverageRemarks}
                     />
+                    )}
                   </PdfErrorBoundary>
                 </div>
               </div>

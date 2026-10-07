@@ -9,9 +9,10 @@ import { Select } from '../../../components/select'
 import { Autocomplete } from '../../../components/autocomplete'
 import { useTeachers } from '../../../hooks/useTeachers'
 import { useGradingScales } from '../../../hooks/useGradingScales'
-import type { Subject, CreateSubjectData, UpdateSubjectData, Student } from '../../../types'
+import type { Subject, CreateSubjectData, UpdateSubjectData, Student, ReportCardSubjectCategory } from '../../../types'
 import { studentService } from '../../../services/studentService'
 import { studentSubjectService } from '../../../services/studentSubjectService'
+import { parseGradeLevelNumber } from '../../../utils/gradeLevel'
 
 interface ClassSectionSubjectModalProps {
   isOpen: boolean
@@ -20,6 +21,11 @@ interface ClassSectionSubjectModalProps {
   subject?: Subject | null
   classSectionId: string
   institutionId: string
+  /**
+   * The section's grade level. A Grade 11 or 12 subject also says which
+   * semester and which group it prints under on the Senior High report card.
+   */
+  gradeLevel?: string | null
   parentSubjects?: Subject[]
   loading?: boolean
   error?: string | null
@@ -74,7 +80,22 @@ const validationSchema = Yup.object().shape({
     }),
   is_limited_student: Yup.boolean()
     .optional(),
+  semester: Yup.string().oneOf(['', '1', '2']).optional(),
+  report_card_category: Yup.string().oneOf(['', 'core', 'applied', 'specialized']).optional(),
 })
+
+const SEMESTER_OPTIONS = [
+  { value: '', label: 'By its grades (Q1-Q2 or Q3-Q4)' },
+  { value: '1', label: 'First Semester' },
+  { value: '2', label: 'Second Semester' },
+]
+
+const REPORT_CARD_CATEGORY_OPTIONS = [
+  { value: '', label: 'No group' },
+  { value: 'core', label: 'Core Subjects' },
+  { value: 'applied', label: 'Applied Subjects' },
+  { value: 'specialized', label: 'Specialized Subjects' },
+]
 
 export function ClassSectionSubjectModal({ 
   isOpen, 
@@ -83,6 +104,7 @@ export function ClassSectionSubjectModal({
   subject, 
   classSectionId,
   institutionId,
+  gradeLevel,
   parentSubjects = [],
   loading = false,
   error = null 
@@ -109,6 +131,7 @@ export function ClassSectionSubjectModal({
   })
 
   const isEditing = !!subject
+  const isSeniorHigh = (parseGradeLevelNumber(gradeLevel) ?? 0) >= 11
 
   const { gradingScales } = useGradingScales()
 
@@ -128,6 +151,8 @@ export function ClassSectionSubjectModal({
       end_time: '',
       adviser: '',
       is_limited_student: false,
+      semester: '' as '' | '1' | '2',
+      report_card_category: '' as '' | ReportCardSubjectCategory,
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -145,6 +170,14 @@ export function ClassSectionSubjectModal({
           end_time: isEditing ? values.end_time : (values.end_time === '' ? '' : values.end_time || undefined),
           adviser: isEditing ? values.adviser : (values.adviser === '' ? '' : values.adviser || undefined),
           is_limited_student: values.is_limited_student,
+          // Only sent where the fields are shown, so saving a Grade 7 subject
+          // never touches them.
+          ...(isSeniorHigh
+            ? {
+                semester: values.semester ? (Number(values.semester) as 1 | 2) : null,
+                report_card_category: values.report_card_category || null,
+              }
+            : {}),
         }
         
         const result = await onSubmit(submitData)
@@ -181,6 +214,8 @@ export function ClassSectionSubjectModal({
           end_time: subject.end_time || '',
           adviser: subject.adviser || '',
           is_limited_student: subject.is_limited_student || false,
+          semester: subject.semester ? (String(subject.semester) as '1' | '2') : '',
+          report_card_category: subject.report_card_category || '',
         })
         
         // Reset the user cleared flag when opening with a new subject
@@ -507,6 +542,37 @@ export function ClassSectionSubjectModal({
                     Use variants for subjects with the same name but different specializations (e.g., TLE - Sewing, TLE - Machineries)
                   </p>
                 </div>
+
+                {/* Senior High report card placement */}
+                {isSeniorHigh && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Semester
+                      </label>
+                      <Select
+                        name="semester"
+                        value={formik.values.semester}
+                        onChange={formik.handleChange}
+                        options={SEMESTER_OPTIONS}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Report Card Group
+                      </label>
+                      <Select
+                        name="report_card_category"
+                        value={formik.values.report_card_category}
+                        onChange={formik.handleChange}
+                        options={REPORT_CARD_CATEGORY_OPTIONS}
+                      />
+                    </div>
+                    <p className="sm:col-span-2 -mt-2 text-xs text-gray-500">
+                      Where this subject prints on the Senior High report card. Applied and Specialized subjects share one table.
+                    </p>
+                  </div>
+                )}
 
                 {/* Grading Type */}
                 <div>

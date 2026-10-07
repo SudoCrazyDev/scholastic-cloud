@@ -311,6 +311,7 @@ const ClassSections: React.FC = () => {
         onSubmit={handleSubjectSubmit}
         subject={editingSubject}
         classSectionId={selectedClassSection?.id || ''}
+        gradeLevel={selectedClassSection?.grade_level}
         institutionId={institutionId}
         parentSubjects={subjects.filter(s => 
           selectedClassSection && 

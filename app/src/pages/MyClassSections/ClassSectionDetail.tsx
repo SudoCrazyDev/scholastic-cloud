@@ -943,6 +943,7 @@ const ClassSectionDetail: React.FC = () => {
         subject={editingSubject}
         classSectionId={id!}
         institutionId={institutionId}
+        gradeLevel={classSectionData?.grade_level}
         parentSubjects={subjects.filter((s: Subject) => s.subject_type === 'parent')}
         loading={createSubjectMutation.isPending || updateSubjectMutation.isPending}
         error={subjectModalError}
@@ -1011,6 +1012,7 @@ const ClassSectionDetail: React.FC = () => {
         classSectionId={id}
         institutionId={effectiveInstitutionId}
         academicYear={enhancedClassSectionData?.academic_year}
+        gradeLevel={enhancedClassSectionData?.grade_level}
       />
     </motion.div>
   )

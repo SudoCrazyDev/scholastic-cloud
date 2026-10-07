@@ -259,6 +259,14 @@ Route::middleware('auth.token')->group(function () {
     // Temporarily close the student portal for the caller's own institution.
     Route::get('student-portal-access', [\App\Http\Controllers\StudentPortalAccessController::class, 'show'])->middleware('module:settings,view');
     Route::put('student-portal-access', [\App\Http\Controllers\StudentPortalAccessController::class, 'update'])->middleware('module:settings,manage');
+    // The school's own report card designs, assigned to grade levels. Which
+    // template a grade level prints is read by every adviser opening a report
+    // card, so that lookup is staff-only but not gated on Settings.
+    Route::get('report-card-templates/for-grade-level', [\App\Http\Controllers\ReportCardTemplateController::class, 'forGradeLevel']);
+    Route::get('report-card-templates', [\App\Http\Controllers\ReportCardTemplateController::class, 'index'])->middleware('module:settings,view');
+    Route::post('report-card-templates', [\App\Http\Controllers\ReportCardTemplateController::class, 'store'])->middleware('module:settings,manage');
+    Route::put('report-card-templates/{id}', [\App\Http\Controllers\ReportCardTemplateController::class, 'update'])->middleware('module:settings,manage');
+    Route::delete('report-card-templates/{id}', [\App\Http\Controllers\ReportCardTemplateController::class, 'destroy'])->middleware('module:settings,manage');
     Route::get('institutions/{id}/academic-years', [InstitutionController::class, 'getAcademicYears']);
     Route::put('institutions/{id}/academic-years/grading-periods', [InstitutionController::class, 'updateAcademicYearGradingPeriods'])->middleware('module:settings,manage');
     // Grade levels that depart from a year's structure - Senior High staying on

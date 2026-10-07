@@ -20,6 +20,8 @@ class Subject extends Model
         'parent_subject_id',
         'title',
         'variant',
+        'semester',
+        'report_card_category',
         'grading_type',
         'grading_scale_id',
         'start_time',
@@ -31,6 +33,7 @@ class Subject extends Model
 
     protected $casts = [
         'is_limited_student' => 'boolean',
+        'semester' => 'integer',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
         'meeting_days' => 'array',

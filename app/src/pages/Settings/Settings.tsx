@@ -15,6 +15,7 @@ import { Building2, CalendarDays } from 'lucide-react'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import AppearanceSettings from './components/AppearanceSettings'
 import StudentAccessSettings from './components/StudentAccessSettings'
+import ReportCardTemplatesSettings from './components/ReportCardTemplatesSettings'
 import type {
   GradeLevelGradingPeriod,
   GradingPeriodType,
@@ -605,6 +606,11 @@ const Settings: React.FC = () => {
 
       {/* Student portal access */}
       {institution && <StudentAccessSettings />}
+
+      {/* The school's own report card designs, by grade level */}
+      {institution && institutionId && (
+        <ReportCardTemplatesSettings institutionId={institutionId} institutionName={institution.title} />
+      )}
 
       {/* Form */}
       {institution && (

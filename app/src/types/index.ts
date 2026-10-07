@@ -1866,6 +1866,10 @@ export interface Subject {
   parent_subject?: Subject; // Full parent subject object
   title: string;
   variant?: string; // Optional variant (e.g., "Sewing", "Machineries", "Plumbing")
+  /** Senior High semester (1 or 2) the subject prints under on a semestral report card. */
+  semester?: 1 | 2 | null;
+  /** Group the subject prints under on a Senior High report card. */
+  report_card_category?: ReportCardSubjectCategory | null;
   grading_type?: GradingType;
   grading_scale_id?: string | null;
   grading_scale?: GradingScale | null;
@@ -2071,6 +2075,8 @@ export interface CreateSubjectData {
   end_time?: string;
   meeting_days?: string[] | null;
   is_limited_student?: boolean;
+  semester?: 1 | 2 | null;
+  report_card_category?: ReportCardSubjectCategory | null;
 }
 
 export interface UpdateSubjectData {
@@ -2087,6 +2093,8 @@ export interface UpdateSubjectData {
   end_time?: string;
   meeting_days?: string[] | null;
   is_limited_student?: boolean;
+  semester?: 1 | 2 | null;
+  report_card_category?: ReportCardSubjectCategory | null;
 }
 
 export interface TimetableConflict {
@@ -4467,4 +4475,33 @@ export interface MatatagProgressReport {
   };
   learners: MatatagReportLearner[];
   warnings: MatatagAttendanceWarning[];
+}
+
+// ── Report card templates ───────────────────────────────────────────────────
+
+export type ReportCardSubjectCategory = 'core' | 'applied' | 'specialized';
+
+/** A card layout the SPA knows how to draw. */
+export type ReportCardLayout = 'shs_semestral';
+
+/**
+ * A school's own report card design, assigned to the grade levels that print it.
+ * `settings` is the school's wording for the layout; keys the layout does not
+ * find fall back to its defaults.
+ */
+export interface ReportCardTemplate {
+  id: string;
+  name: string;
+  layout: ReportCardLayout;
+  settings: Record<string, string | number | boolean>;
+  grade_levels: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportCardTemplatePayload {
+  name: string;
+  layout: ReportCardLayout;
+  settings: Record<string, string | number | boolean>;
+  grade_levels: string[];
 }
