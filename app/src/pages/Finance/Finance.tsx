@@ -2396,7 +2396,7 @@ const Finance: React.FC = () => {
             </div>
             {selectedLedgerStudent && ledgerNoaQuery.data?.data && (
               <Button variant="outline" size="sm" onClick={() => setShowNoaOptions(true)}>
-                Download Notice of Account
+                Notice of Account
               </Button>
             )}
           </div>
@@ -4127,7 +4127,6 @@ const Finance: React.FC = () => {
       {showNoaOptions && selectedLedgerStudent && ledgerNoaQuery.data?.data && (
         <NoticeOfAccountModal
           data={ledgerNoaQuery.data.data}
-          student={selectedLedgerStudent}
           academicYear={ledgerAcademicYear}
           institutionName={institution?.title}
           institutionAddress={institution?.address}

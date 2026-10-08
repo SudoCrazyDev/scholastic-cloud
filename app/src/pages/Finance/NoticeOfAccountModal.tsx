@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { PDFDownloadLink } from '@react-pdf/renderer'
+import { BlobProvider } from '@react-pdf/renderer'
 import { Button } from '../../components/button'
 import { Select } from '../../components/select'
 import { StudentNOAPDF } from '../../components/StudentNOAPDF'
@@ -9,11 +9,10 @@ import {
   summarizeMonthlyNOA,
 } from '../../components/studentNOAStatement'
 import type { NOAScopeMode } from '../../components/studentNOAStatement'
-import type { Student, StudentNOAResponse } from '../../types'
+import type { StudentNOAResponse } from '../../types'
 
 interface NoticeOfAccountModalProps {
   data: StudentNOAResponse
-  student: Student
   academicYear: string
   institutionName?: string
   institutionAddress?: string
@@ -28,11 +27,8 @@ const formatCurrency = (amount?: number | null) =>
     minimumFractionDigits: 2,
   }).format(Number(amount || 0))
 
-const sanitizeFileName = (value: string) => value.replace(/[^a-zA-Z0-9-_]/g, '-')
-
 export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
   data,
-  student,
   academicYear,
   institutionName,
   institutionAddress,
@@ -75,17 +71,11 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
   const { lines: printedLines, total: printedTotal } = buildNOALines(data, preview)
   const canPrintMonth = installments.length > 0
 
-  const fileName = sanitizeFileName(
-    preview
-      ? `NOA-${student.last_name}-${student.first_name}-${academicYear}-${preview.selected.label}`
-      : `NOA-${student.last_name}-${student.first_name}-${academicYear}`
-  )
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-lg rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="px-5 py-4 border-b border-gray-100">
-          <h3 className="text-base font-semibold text-gray-900">Download Notice of Account</h3>
+          <h3 className="text-base font-semibold text-gray-900">Notice of Account</h3>
           <p className="text-sm text-gray-500 mt-1">
             Choose what the notice should bill: the whole academic year, or a single month.
           </p>
@@ -183,9 +173,9 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
             Close
           </Button>
           {/* Remounted per selection so the blob is rebuilt for the scope being printed.
-              The modal stays open on click: unmounting it mid-click would cancel the
-              anchor's download before the browser acts on it. */}
-          <PDFDownloadLink
+              Opened in a new tab rather than downloaded, so the cashier can view or print
+              it straight from the browser's PDF viewer. */}
+          <BlobProvider
             key={`${scope}-${sequence ?? 'all'}-${logoUrl ? 'logo' : 'nologo'}`}
             document={
               <StudentNOAPDF
@@ -197,14 +187,17 @@ export const NoticeOfAccountModal: React.FC<NoticeOfAccountModalProps> = ({
                 installmentSequence={sequence}
               />
             }
-            fileName={fileName}
           >
-            {({ loading }) => (
-              <Button type="button" disabled={loading}>
-                {loading ? 'Preparing...' : 'Download PDF'}
+            {({ url, loading }) => (
+              <Button
+                type="button"
+                disabled={loading || !url}
+                onClick={() => url && window.open(url, '_blank')}
+              >
+                {loading ? 'Preparing...' : 'Open PDF'}
               </Button>
             )}
-          </PDFDownloadLink>
+          </BlobProvider>
         </div>
       </div>
     </div>
