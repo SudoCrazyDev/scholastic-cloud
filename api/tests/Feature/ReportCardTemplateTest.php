@@ -89,6 +89,28 @@ class ReportCardTemplateTest extends TestCase
             ->assertJsonPath('layouts.0.value', 'shs_semestral');
     }
 
+    public function test_kinder_1_and_kinder_2_share_one_kindergarten_template(): void
+    {
+        $id = $this->createTemplate('token-a', [
+            'name' => 'Kindergarten Progress Report',
+            'layout' => 'kinder_trifold',
+            'settings' => ['chapter' => 'General Santos City', 'title_style' => 'image'],
+            'grade_levels' => ['Kinder 1', 'Kinder 2'],
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.layout', 'kinder_trifold')
+            ->assertJsonPath('data.grade_levels', ['Kinder 1', 'Kinder 2'])
+            ->json('data.id');
+
+        foreach (['Kinder 1', 'kinder 2'] as $gradeLevel) {
+            $this->as('teacher-token-a')
+                ->getJson('/api/report-card-templates/for-grade-level?grade_level='.urlencode($gradeLevel))
+                ->assertOk()
+                ->assertJsonPath('data.id', $id)
+                ->assertJsonPath('data.settings.chapter', 'General Santos City');
+        }
+    }
+
     public function test_a_grade_level_resolves_to_its_template_whatever_the_spelling(): void
     {
         $id = $this->createTemplate('token-a')->json('data.id');

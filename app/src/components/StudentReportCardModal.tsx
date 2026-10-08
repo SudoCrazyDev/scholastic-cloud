@@ -4,6 +4,7 @@ import { Button } from './button'
 import { Switch, SwitchField } from './switch'
 import PrintReportCard from './studentReportCard/studentReportCard.tsx'
 import TemplatedReportCard from './reportCardTemplates/TemplatedReportCard'
+import { getReportCardLayout } from './reportCardTemplates/layouts'
 import { useReportCardTemplateForGradeLevel } from '../hooks/useReportCardTemplates'
 import { Component, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -74,7 +75,10 @@ export function StudentReportCardModal({
     onClose()
   }
 
-  const { data: template, isLoading: templateLoading } = useReportCardTemplateForGradeLevel(gradeLevel, isOpen)
+  const { data: assignedTemplate, isLoading: templateLoading } = useReportCardTemplateForGradeLevel(gradeLevel, isOpen)
+  // A Kindergarten template prints MATATAG Progress ratings, not grades, so it
+  // belongs to that tab's printing; here the grade level keeps the standard card.
+  const template = getReportCardLayout(assignedTemplate?.layout)?.source === 'grades' ? assignedTemplate : null
 
   // Fetch principals from staff list (filter by role slug)
   const { data: staffsResponse } = useQuery({

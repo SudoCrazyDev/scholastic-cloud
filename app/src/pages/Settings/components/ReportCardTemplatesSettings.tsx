@@ -17,10 +17,13 @@ import {
   REPORT_CARD_LAYOUTS,
   getReportCardLayout,
   resolveReportCardSettings,
+  type ReportCardLayoutDefinition,
   type ReportCardSettingValue,
 } from '../../../components/reportCardTemplates/layouts'
 import { sampleShsCardData } from '../../../components/reportCardTemplates/shsSemestral/data'
 import { ShsSemestralDocument } from '../../../components/reportCardTemplates/shsSemestral/ShsSemestralDocument'
+import { KinderTrifoldDocument } from '../../../components/reportCardTemplates/kinderTrifold/KinderTrifoldDocument'
+import { sampleKinderReport } from '../../../components/reportCardTemplates/kinderTrifold/sample'
 import type { ReportCardLayout, ReportCardTemplate } from '../../../types'
 
 interface Props {
@@ -65,16 +68,21 @@ const ReportCardTemplatesSettings: React.FC<Props> = ({ institutionId, instituti
   const [draft, setDraft] = useState<Draft | null>(null)
   const [toDelete, setToDelete] = useState<ReportCardTemplate | null>(null)
 
+  // A new template starts on its layout's usual grade levels — the ones this
+  // school actually has — and the person can untick them before saving.
+  const suggestedGradeLevels = (layout: ReportCardLayoutDefinition) =>
+    gradeLevels
+      .filter((g) => layout.suggestedGradeLevels.some((suggested) => sameGradeLevel(g.title, suggested)))
+      .map((g) => g.title)
+
   const startNew = () => {
     const layout = REPORT_CARD_LAYOUTS.shs_semestral
     setDraft({
       id: null,
-      name: 'Senior High School Report Card',
+      name: layout.suggestedName,
       layout: layout.value,
       settings: { ...layout.defaults },
-      // The layout this ships with is the Senior High one, so it starts on
-      // Grade 11 — the person can untick it before saving.
-      grade_levels: gradeLevels.some((g) => sameGradeLevel(g.title, 'Grade 11')) ? ['Grade 11'] : [],
+      grade_levels: suggestedGradeLevels(layout),
     })
   }
 
@@ -253,6 +261,9 @@ function TemplateEditor({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  const suggestedFor = (definition: ReportCardLayoutDefinition) =>
+    gradeLevels.filter((g) => definition.suggestedGradeLevels.some((suggested) => sameGradeLevel(g, suggested)))
+
   const setSetting = (key: string, value: ReportCardSettingValue) =>
     onChange({ ...draft, settings: { ...draft.settings, [key]: value } })
 
@@ -277,11 +288,15 @@ function TemplateEditor({
   // after a pause in typing rather than on each keystroke.
   const previewSettings = useDebounce(draft.settings, 600)
   const preview = useMemo(
-    () => ({
-      settings: previewSettings,
-      data: sampleShsCardData(previewSettings, institutionName, schoolLogoUrl || null),
-    }),
-    [previewSettings, institutionName, schoolLogoUrl]
+    () =>
+      layout.value === 'kinder_trifold'
+        ? { kind: 'kinder' as const, settings: previewSettings, report: sampleKinderReport(institutionName) }
+        : {
+            kind: 'shs' as const,
+            settings: previewSettings,
+            data: sampleShsCardData(previewSettings, institutionName, schoolLogoUrl || null),
+          },
+    [layout.value, previewSettings, institutionName, schoolLogoUrl]
   )
 
   const canSave = !readOnly && draft.name.trim() !== '' && !saving
@@ -314,7 +329,22 @@ function TemplateEditor({
                   value={draft.layout}
                   onChange={(e) => {
                     const next = getReportCardLayout(e.target.value)
-                    if (next) onChange({ ...draft, layout: next.value, settings: resolveReportCardSettings(next, draft.settings) })
+                    if (!next || next.value === draft.layout) return
+                    // Each layout has its own wording, so a switch starts from
+                    // the new layout's design rather than carrying the old one's.
+                    // A template still being made also takes the new layout's
+                    // name and grade levels, unless the person changed them.
+                    const untouchedName = draft.name === layout.suggestedName
+                    const untouchedGrades =
+                      draft.grade_levels.length === suggestedFor(layout).length &&
+                      draft.grade_levels.every((g) => suggestedFor(layout).some((s) => sameGradeLevel(g, s)))
+                    onChange({
+                      ...draft,
+                      layout: next.value,
+                      settings: { ...next.defaults },
+                      name: !draft.id && untouchedName ? next.suggestedName : draft.name,
+                      grade_levels: !draft.id && untouchedGrades ? suggestedFor(next) : draft.grade_levels,
+                    })
                   }}
                   options={Object.values(REPORT_CARD_LAYOUTS).map((l) => ({ value: l.value, label: l.label }))}
                 />
@@ -409,8 +439,12 @@ function TemplateEditor({
           </div>
 
           <div className="min-h-[420px] flex-1 bg-gray-100">
-            <PDFViewer key={JSON.stringify(preview.settings)} className="h-full w-full" showToolbar={false}>
-              <ShsSemestralDocument data={preview.data} settings={preview.settings} />
+            <PDFViewer key={`${layout.value}|${JSON.stringify(preview.settings)}`} className="h-full w-full" showToolbar={false}>
+              {preview.kind === 'kinder' ? (
+                <KinderTrifoldDocument report={preview.report} settings={preview.settings} schoolLogoUrl={schoolLogoUrl || null} />
+              ) : (
+                <ShsSemestralDocument data={preview.data} settings={preview.settings} />
+              )}
             </PDFViewer>
           </div>
         </div>

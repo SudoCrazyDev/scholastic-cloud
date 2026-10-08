@@ -9,12 +9,16 @@ import {
   useMatatagReport,
   useMatatagReportDownloads,
 } from '../../../hooks/useMatatagReports'
+import { useReportCardTemplateForGradeLevel } from '../../../hooks/useReportCardTemplates'
+import { useInstitutionLogo } from '../../../hooks/useInstitutionLogo'
 import { learnerListName, orderedLearners } from './matatagRoster'
 import type { MatatagInstrument, MatatagLearner, MatatagLearningAreaSummary } from '../../../types'
 
 interface Props {
   classSectionId: string
   sectionTitle: string
+  /** Looks up the school's own card design for this grade level, if it has one. */
+  gradeLevel?: string
   academicYear?: string
   learners: MatatagLearner[]
   learningAreas: MatatagLearningAreaSummary[]
@@ -43,21 +47,22 @@ type Preview = 'card' | 'pace'
 export function MatatagReportsPanel({
   classSectionId,
   sectionTitle,
+  gradeLevel,
   academicYear,
   learners,
   learningAreas,
   instrument,
 }: Props) {
   const ratingsOnCard = instrument?.ratings_on_card === true
+  // Only a card whose marks print on it can take a school's own design.
+  const { data: assignedTemplate, isLoading: templateLoading } = useReportCardTemplateForGradeLevel(
+    gradeLevel,
+    ratingsOnCard
+  )
+  const template = assignedTemplate?.layout === 'kinder_trifold' ? assignedTemplate : null
   const [studentId, setStudentId] = useState<string>(learners[0]?.student_id ?? '')
   const [areaId, setAreaId] = useState<string>(learningAreas[0]?.id ?? '')
   const [preview, setPreview] = useState<Preview>('card')
-
-  const downloads = useMatatagReportDownloads({
-    sectionId: classSectionId,
-    sectionTitle,
-    academicYear,
-  })
 
   const learner = learners.find(l => l.student_id === studentId)
   const area = learningAreas.find(a => a.id === areaId)
@@ -71,14 +76,27 @@ export function MatatagReportsPanel({
     enabled: Boolean(studentId),
   })
 
+  // The school's own design prints its logo, fetched once the report says
+  // which school this is.
+  const { schoolLogoUrl } = useInstitutionLogo(template ? (report.data?.school.id ?? undefined) : undefined)
+  const card = useMemo(() => ({ template, schoolLogoUrl }), [template, schoolLogoUrl])
+
+  const downloads = useMatatagReportDownloads({
+    sectionId: classSectionId,
+    sectionTitle,
+    academicYear,
+    card,
+  })
+
   /**
    * react-pdf v4 mis-renders on incremental prop updates, so the viewer is
    * remounted on anything that changes the document rather than updated in
    * place. The same trick `StudentReportCardModal` uses, and for the same bug.
    */
   const viewerKey = useMemo(
-    () => `${studentId}|${preview}|${academicYear ?? ''}|${report.dataUpdatedAt}`,
-    [studentId, preview, academicYear, report.dataUpdatedAt]
+    () =>
+      `${studentId}|${preview}|${academicYear ?? ''}|${report.dataUpdatedAt}|${template?.id ?? ''}|${template?.updated_at ?? ''}|${schoolLogoUrl ?? ''}`,
+    [studentId, preview, academicYear, report.dataUpdatedAt, template, schoolLogoUrl]
   )
 
   if (learners.length === 0) {
@@ -292,11 +310,11 @@ export function MatatagReportsPanel({
             </div>
           )}
 
-          {report.data && (
+          {report.data && !templateLoading && (
             <PdfErrorBoundary key={viewerKey}>
               <PDFViewer width="100%" height="100%" showToolbar>
                 {preview === 'card' || ratingsOnCard ? (
-                  progressReportCard(report.data)
+                  progressReportCard(report.data, card)
                 ) : (
                   <Ks1PaceForm report={report.data} />
                 )}
@@ -308,7 +326,9 @@ export function MatatagReportsPanel({
 
       <p className="text-[11px] text-gray-500">
         {ratingsOnCard
-          ? 'The card follows DepEd’s Kindergarten progress report: every competency rated CO, DV or BG for each term, the teacher’s remarks, the attendance and the rating scale.'
+          ? template
+            ? `${gradeLevel} prints your school’s own card, “${template.name}” (Settings → Report Card Templates): every competency rated CO, DV or BG for each term, the teacher’s remarks and the attendance.`
+            : 'The card follows DepEd’s Kindergarten progress report: every competency rated CO, DV or BG for each term, the teacher’s remarks, the attendance and the rating scale.'
           : 'The card carries the narratives, the attendance and the A–E legend. The descriptor grid is not on the card — DepEd prints it on the PACE forms, which staple behind it.'}
       </p>
     </div>

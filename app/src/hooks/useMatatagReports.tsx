@@ -6,8 +6,10 @@ import { Ks1PaceForm } from '../components/matatagReports/Ks1PaceForm'
 import { Ks1ProgressReportCard } from '../components/matatagReports/Ks1ProgressReportCard'
 import { KinderProgressReportCard } from '../components/matatagReports/KinderProgressReportCard'
 import { safeFilename, saveBlob } from '../components/matatagReports/matatagPdfShared'
+import { KinderTrifoldDocument } from '../components/reportCardTemplates/kinderTrifold/KinderTrifoldDocument'
+import { getReportCardLayout, resolveReportCardSettings } from '../components/reportCardTemplates/layouts'
 import { matatagService } from '../services/matatagService'
-import type { MatatagProgressReport } from '../types'
+import type { MatatagProgressReport, ReportCardTemplate } from '../types'
 
 /**
  * The progress report card and the PACE forms.
@@ -46,17 +48,39 @@ function messageFrom(error: unknown, fallback: string): string {
   return fallback
 }
 
+/** The school's own design for this section's card, when its grade level has one. */
+export interface ProgressCardOptions {
+  template?: ReportCardTemplate | null
+  /** A blob URL: react-pdf cannot send the token a logo request needs. */
+  schoolLogoUrl?: string | null
+}
+
 /**
  * The card a report prints on, chosen by the catalog's instrument rather than
  * by grade level: Kindergarten's marks print on the card itself, Key Stage 1's
  * on PACE forms behind it.
+ *
+ * A Kindergarten section whose grade level is assigned the school's own
+ * Kindergarten template prints that design instead of DepEd's — the same
+ * ratings, remarks and attendance either way.
  */
-export function progressReportCard(report: MatatagProgressReport) {
-  return report.curriculum_version.instrument?.ratings_on_card ? (
-    <KinderProgressReportCard report={report} />
-  ) : (
-    <Ks1ProgressReportCard report={report} />
-  )
+export function progressReportCard(report: MatatagProgressReport, options: ProgressCardOptions = {}) {
+  if (!report.curriculum_version.instrument?.ratings_on_card) {
+    return <Ks1ProgressReportCard report={report} />
+  }
+
+  const layout = options.template ? getReportCardLayout(options.template.layout) : null
+  if (options.template && layout?.value === 'kinder_trifold') {
+    return (
+      <KinderTrifoldDocument
+        report={report}
+        settings={resolveReportCardSettings(layout, options.template.settings)}
+        schoolLogoUrl={options.schoolLogoUrl ?? null}
+      />
+    )
+  }
+
+  return <KinderProgressReportCard report={report} />
 }
 
 export const matatagReportKeys = {
@@ -110,6 +134,7 @@ interface DownloadParams {
   sectionId: string
   sectionTitle: string
   academicYear?: string
+  card?: ProgressCardOptions
 }
 
 /**
@@ -120,7 +145,7 @@ interface DownloadParams {
  * serve it either — `pace.scope` comes back `omitted` and says so. Both real
  * jobs narrow it, by learner or by area.
  */
-export function useMatatagReportDownloads({ sectionId, sectionTitle, academicYear }: DownloadParams) {
+export function useMatatagReportDownloads({ sectionId, sectionTitle, academicYear, card }: DownloadParams) {
   const section = safeFilename(sectionTitle)
   const year = academicYear ?? ''
 
@@ -139,7 +164,7 @@ export function useMatatagReportDownloads({ sectionId, sectionTitle, academicYea
   const learnerCard = useMutation({
     mutationFn: async ({ studentId, name }: { studentId: string; name: string }) => {
       const report = await learnerReport(studentId)
-      await render(progressReportCard(report), `Report Card - ${safeFilename(name)} - ${year}.pdf`)
+      await render(progressReportCard(report, card), `Report Card - ${safeFilename(name)} - ${year}.pdf`)
     },
     onError: onError('Could not build this report card.'),
   })
@@ -164,7 +189,7 @@ export function useMatatagReportDownloads({ sectionId, sectionTitle, academicYea
         throw new Error('This section has no learners on its roster for this year.')
       }
 
-      await render(progressReportCard(report), `Report Cards - ${section} - ${year}.pdf`)
+      await render(progressReportCard(report, card), `Report Cards - ${section} - ${year}.pdf`)
     },
     onError: onError('Could not build the report cards.'),
   })

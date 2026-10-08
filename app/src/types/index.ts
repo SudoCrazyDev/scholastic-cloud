@@ -4482,7 +4482,7 @@ export interface MatatagProgressReport {
 export type ReportCardSubjectCategory = 'core' | 'applied' | 'specialized';
 
 /** A card layout the SPA knows how to draw. */
-export type ReportCardLayout = 'shs_semestral';
+export type ReportCardLayout = 'shs_semestral' | 'kinder_trifold';
 
 /**
  * A school's own report card design, assigned to the grade levels that print it.

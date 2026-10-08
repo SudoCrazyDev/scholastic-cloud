@@ -30,6 +30,15 @@ export interface ReportCardSettingField {
 export interface ReportCardLayoutDefinition {
   value: ReportCardLayout
   label: string
+  /**
+   * Where the card's marks come from. A `grades` card replaces the standard
+   * Report Card of a class section; a `matatag` card replaces the progress
+   * report printed from MATATAG Progress, whose ratings are not grades.
+   */
+  source: 'grades' | 'matatag'
+  /** What a new template on this layout is called, and the grade levels it starts on. */
+  suggestedName: string
+  suggestedGradeLevels: string[]
   description: string
   defaults: Record<string, ReportCardSettingValue>
   fields: ReportCardSettingField[]
@@ -56,6 +65,9 @@ const SHS_LETTER_BODY = [
 export const SHS_SEMESTRAL_LAYOUT: ReportCardLayoutDefinition = {
   value: 'shs_semestral',
   label: 'Senior High School — Semestral (SF 9)',
+  source: 'grades',
+  suggestedName: 'Senior High School Report Card',
+  suggestedGradeLevels: ['Grade 11'],
   description:
     'Two semesters of two quarters, each split into Core and Applied and Specialized subjects, with a semester final grade and general average. Observed values, attendance and the certificate of promotion on the same folded sheet.',
   defaults: {
@@ -141,8 +153,126 @@ export const SHS_SEMESTRAL_LAYOUT: ReportCardLayoutDefinition = {
   ],
 }
 
+const KINDER_INTRO =
+  "This progress report informs parents about their child's learning achievements based on the Kindergarten " +
+  "Curriculum Guide. It provides a summary of the child's performance and indicates their level of progress " +
+  'across different developmental domains every ten (10) weeks or each term. The report also helps determine ' +
+  'whether additional time and follow-up support are needed for the child to achieve the expected competencies. ' +
+  'Each competency is marked as: BG - Beginning, DV - Developing, and CO - Consistent.'
+
+const KINDER_SCALE_NOTE =
+  "This rating scale is used to record the learner's level of attainment for each competency across the " +
+  'developmental domains. It guides teachers in assigning ratings based on observed performance and assessment ' +
+  'results for each term.'
+
+/**
+ * Kindergarten, rated CO, DV or BG in each of three terms — a sheet printed
+ * landscape on both sides and folded in three. The outside carries the
+ * attendance and certificate of transfer, the teacher's remarks and the cover;
+ * the inside carries every developmental competency.
+ *
+ * The competencies, their ratings and the remarks are the ones the adviser
+ * keeps in MATATAG Progress: this layout is how they print, not a second place
+ * to record them.
+ */
+export const KINDER_TRIFOLD_LAYOUT: ReportCardLayoutDefinition = {
+  value: 'kinder_trifold',
+  label: 'Kindergarten Progress Report — Tri-fold',
+  source: 'matatag',
+  suggestedName: 'Kindergarten Progress Report',
+  suggestedGradeLevels: ['Kinder 1', 'Kinder 2'],
+  description:
+    "Every developmental competency rated CO, DV or BG for each term, with the teacher's remarks, the attendance and the certificate of transfer, on one sheet folded in three. Prints the ratings kept in MATATAG Progress.",
+  defaults: {
+    paper_size: 'A4',
+    show_deped_header: true,
+    deped_header: 'Republic of the Philippines\nDepartment of Education',
+    region: '',
+    district: '',
+    school_name: '',
+    chapter: '',
+    title_style: 'image',
+    card_title: 'Kindergarten Progress Report',
+    intro: KINDER_INTRO,
+    scale_note_title: 'IMPORTANT NOTE TO PARENTS/GUARDIANS',
+    scale_note: KINDER_SCALE_NOTE,
+    competencies_title: 'DEVELOPMENTAL COMPETENCIES',
+    comments_title: "TEACHER'S COMMENTS/REMARKS",
+    comments_hint: '(Provides specific observations, strengths, and suggested interventions)',
+    show_parent_signatures: true,
+    show_certificate: true,
+    certificate_text: 'has developed the general competencies based on the Kindergarten Curriculum Guide.',
+    heading_color: '#1f2a9e',
+    band_color: '#2633c4',
+    domain_color: '#fdf6c3',
+  },
+  fields: [
+    {
+      key: 'paper_size',
+      label: 'Paper size',
+      type: 'select',
+      section: 'Page',
+      help: 'Printed landscape and folded in three.',
+      options: [
+        { value: 'A4', label: 'A4' },
+        { value: 'LETTER', label: 'Letter (8.5 × 11 in)' },
+        { value: 'FOLIO', label: 'Long / Folio (8.5 × 13 in)' },
+        { value: 'LEGAL', label: 'Legal (8.5 × 14 in)' },
+      ],
+    },
+    { key: 'heading_color', label: 'Heading text colour', type: 'text', section: 'Page', placeholder: '#1f2a9e' },
+    { key: 'band_color', label: 'Table header colour', type: 'text', section: 'Page', placeholder: '#2633c4' },
+    { key: 'domain_color', label: 'Domain row colour', type: 'text', section: 'Page', placeholder: '#fdf6c3' },
+    { key: 'show_deped_header', label: 'Show the DepEd header and logo', type: 'boolean', section: 'Cover' },
+    { key: 'deped_header', label: 'DepEd header', type: 'textarea', section: 'Cover', rows: 2 },
+    {
+      key: 'region',
+      label: 'Region',
+      type: 'text',
+      section: 'Cover',
+      help: "Leave blank to print the region from the school's profile.",
+    },
+    { key: 'district', label: 'District', type: 'text', section: 'Cover' },
+    {
+      key: 'school_name',
+      label: 'School name as printed',
+      type: 'text',
+      section: 'Cover',
+      help: "Leave blank to print the school's name from Settings.",
+    },
+    { key: 'chapter', label: 'Chapter', type: 'text', section: 'Cover', placeholder: 'e.g. General Santos City' },
+    {
+      key: 'title_style',
+      label: 'Card title',
+      type: 'select',
+      section: 'Cover',
+      options: [
+        { value: 'image', label: 'Colourful "Kindergarten Progress Report" artwork' },
+        { value: 'text', label: 'Plain text (the wording below)' },
+      ],
+    },
+    { key: 'card_title', label: 'Card title wording', type: 'text', section: 'Cover' },
+    {
+      key: 'intro',
+      label: 'Note to parents',
+      type: 'textarea',
+      section: 'Cover',
+      rows: 6,
+    },
+    { key: 'scale_note_title', label: 'Rating scale heading', type: 'text', section: 'Cover' },
+    { key: 'scale_note', label: 'Rating scale note', type: 'textarea', section: 'Cover', rows: 4 },
+    { key: 'competencies_title', label: 'Competencies heading', type: 'text', section: 'Competencies' },
+    { key: 'comments_title', label: 'Remarks heading', type: 'text', section: 'Remarks' },
+    { key: 'comments_hint', label: 'Line under the remarks heading', type: 'text', section: 'Remarks' },
+    { key: 'show_parent_signatures', label: "Parent/Guardian's signature lines", type: 'boolean', section: 'Remarks' },
+    { key: 'show_certificate', label: 'Certificate of Transfer', type: 'boolean', section: 'Back page' },
+    { key: 'certificate_text', label: 'Certificate wording', type: 'textarea', section: 'Back page', rows: 2 },
+  ],
+}
+
 export const REPORT_CARD_LAYOUTS: Record<ReportCardLayout, ReportCardLayoutDefinition> = {
   shs_semestral: SHS_SEMESTRAL_LAYOUT,
+  kinder_trifold: KINDER_TRIFOLD_LAYOUT,
 }
 
 export const getReportCardLayout = (layout: string | null | undefined): ReportCardLayoutDefinition | null =>

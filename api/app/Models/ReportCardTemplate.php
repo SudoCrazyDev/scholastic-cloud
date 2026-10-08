@@ -24,6 +24,7 @@ class ReportCardTemplate extends Model
      */
     public const LAYOUTS = [
         'shs_semestral' => 'Senior High School — Semestral (SF 9)',
+        'kinder_trifold' => 'Kindergarten Progress Report — Tri-fold',
     ];
 
     protected $fillable = [

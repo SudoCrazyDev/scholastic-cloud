@@ -572,6 +572,7 @@ export function MatatagTab({
           <MatatagReportsPanel
             classSectionId={classSectionId}
             sectionTitle={data.section.title}
+            gradeLevel={data.section.grade_level}
             academicYear={academicYear}
             learners={data.learners}
             learningAreas={data.learning_areas}
