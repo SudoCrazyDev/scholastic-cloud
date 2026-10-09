@@ -125,11 +125,9 @@ class MatatagGridController extends Controller
                     'gender' => $student->gender,
                 ])->values()->all(),
                 'ratings' => (object) $ratings,
-                // `manage` marks every area the caller reaches; teaching the
-                // area's linked subject marks that area without it.
-                'can_manage' => $request->user()->hasModuleAccess(
-                    self::MODULE, 'manage', $section->institution_id
-                ) || in_array($area->id, $this->taughtAreaIds($request, $section, $academicYear), true),
+                // Whoever reaches the section marks every area of it; a linked
+                // subject teacher, only their own.
+                'can_manage' => $markable === null || in_array($area->id, $markable, true),
                 'counts' => [
                     'columns' => count($columns),
                     'learners' => $roster->count(),
@@ -166,9 +164,8 @@ class MatatagGridController extends Controller
      */
     public function bulkUpsert(Request $request): JsonResponse
     {
-        // `view`, not `manage`: a linked subject teacher may mark their own
-        // area without `manage`. Which areas the caller may write is settled
-        // below, once the year is known.
+        // `view`, not `manage`: anyone on staff who can open the section marks
+        // it. Which areas they may write is settled below, once the year is known.
         if ($deny = $this->resolveSection($request, (string) $request->input('class_section_id'), $section, 'view', true)) {
             return $deny;
         }
@@ -183,23 +180,11 @@ class MatatagGridController extends Controller
             return $deny;
         }
 
-        // With `manage`: every area the caller reaches (null = all).
-        // Without it: only the areas whose linked subject they teach.
-        $canManage = $request->user()->hasModuleAccess(self::MODULE, 'manage', $section->institution_id);
+        // Every area for anyone who reaches the section (null = all).
+        $markable = $this->markableAreaIds($request, $section, $academicYear);
 
-        $markable = $canManage
-            ? $this->markableAreaIds($request, $section, $academicYear)
-            : $this->taughtAreaIds($request, $section, $academicYear);
-
-        if ($canManage && ($deny = $this->denyUnlessAnyArea($markable, $academicYear))) {
+        if ($deny = $this->denyUnlessAnyArea($markable, $academicYear)) {
             return $deny;
-        }
-
-        if ($markable === []) {
-            return $this->forbidden(
-                'You can view this grid but not mark it. Marking needs MATATAG Progress Manage on your '
-                .'role, or the adviser linking a subject you teach to the learning area.'
-            );
         }
 
         $request->validate([

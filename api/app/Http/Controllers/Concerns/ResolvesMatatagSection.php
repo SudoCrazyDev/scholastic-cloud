@@ -28,13 +28,12 @@ use Illuminate\Http\Request;
  *    itself, so a section from another tenant comes back as "not found" rather
  *    than being fetched and then judged — there is no window in which another
  *    school's row is in memory.
- * 2. **May this person mark it?** The adviser may, and so may anyone holding
- *    `matatag-grading.view-all`. On the competency grid only, so may the
- *    teacher of a subject linked to one of its learning areas — for that area
- *    and no other (see `markableAreaIds()`). Nobody else. This is the clause
- *    `SF9Controller::denyUnlessOwnStudent()` lacks: institution membership
- *    alone would let every teacher in a school open every other Grade 1
- *    adviser's grid.
+ * 2. **May this person mark it?** Any staff member of the section's own school
+ *    who holds `matatag-grading.view` may open every section there and mark
+ *    every learning area and remark — a school's decision, so that whoever is
+ *    on hand can fill a card in. The school still decides who that is, by
+ *    which roles it grants MATATAG Progress at all; and only `set-up` switches
+ *    a section onto MATATAG.
  * 3. **Is the section reporting on MATATAG this year, and against which
  *    catalog?** The answer is the section's own pin and never the grade-level
  *    default, because the pin is what makes a new DepEd version invisible to a
@@ -107,12 +106,13 @@ trait ResolvesMatatagSection
     }
 
     /**
-     * Whether the caller may reach a section they are not the adviser of.
+     * Whether the caller may open — and so mark — a section.
      *
-     * Deliberately not folded into the module check: `manage` says what a
-     * person may do to a section they can reach, and `view-all` says which
-     * sections those are. A school grants an adviser the first without the
-     * second.
+     * Every staff member with MATATAG Progress in the section's school, not
+     * only its adviser: the school asked that anyone on its staff can enter a
+     * learner's ratings and remarks. The section is already scoped to the
+     * caller's own schools by `resolveSection()`, so this never reaches across
+     * tenants.
      */
     protected function canReachSection(Request $request, ClassSection $section): bool
     {
@@ -122,31 +122,8 @@ trait ResolvesMatatagSection
             return false;
         }
 
-        if ($user->hasFullAccess() || $user->hasModuleAccess(self::MODULE, 'view-all', $section->institution_id)) {
-            return true;
-        }
-
-        return $section->adviser === $user->id;
-    }
-
-    /**
-     * The learning areas whose linked subject the caller teaches in a
-     * section-year — whether or not they also advise the section.
-     *
-     * The adviser linking a subject is what lets its teacher mark that area,
-     * so this is the grant on its own: it does not wait on `manage` as well.
-     * A department head who teaches Grade 1 Mathematics holds `view-all`
-     * without `manage`, and without this could open the grid and not mark it.
-     *
-     * @return array<int, string>
-     */
-    protected function taughtAreaIds(Request $request, ClassSection $section, string $academicYear): array
-    {
-        $user = $this->staffUser($request);
-
-        return $user
-            ? app(LearningAreaTeachers::class)->areaIdsTaughtBy($user->id, $section, $academicYear)
-            : [];
+        return $user->hasFullAccess()
+            || $user->hasModuleAccess(self::MODULE, 'view', $section->institution_id);
     }
 
     /**

@@ -170,34 +170,34 @@ class MatatagAccessTest extends MatatagTestCase
     // -----------------------------------------------------------------
 
     /**
-     * An adviser holds `manage` — on their own section. Without `view-all`,
-     * the section next door is closed, which is the clause
-     * `denyUnlessOwnStudent()` lacks: institution membership alone would open
-     * every Grade 1 grid in the school to every teacher in it.
+     * Any staff member with MATATAG Progress opens and marks every section in
+     * their own school, not only the one they advise — the school wants
+     * whoever is on hand to be able to fill a card in.
      */
-    public function test_an_adviser_cannot_reach_the_section_next_door(): void
+    public function test_an_adviser_marks_the_section_next_door(): void
     {
         $this->optIn($this->sectionA2);
 
         $this->as($this->adviserA1)
             ->getJson("/api/matatag/grid?class_section_id={$this->sectionA2->id}&term=1")
-            ->assertForbidden()
-            ->assertJsonFragment(['message' => 'You can only work on the sections you advise. Ask for '
-                .'the "See every Key Stage 1 section in the school" permission to reach the others.']);
+            ->assertOk()
+            ->assertJsonPath('data.can_manage', true);
+
+        $learner = $this->makeLearner($this->schoolA, $this->sectionA2, 'Dana', 'Esteban', 'female');
 
         $this->as($this->adviserA1)
             ->postJson('/api/matatag/grid/bulk-upsert', [
                 'class_section_id' => $this->sectionA2->id,
                 'term' => 1,
                 'ratings' => [[
-                    'student_id' => $this->learnersA1[0]->id,
+                    'student_id' => $learner->id,
                     'slot_id' => $this->slotsFor('gmrc', 1)[0]->id,
                     'descriptor' => 'A',
                 ]],
             ])
-            ->assertForbidden();
+            ->assertOk();
 
-        $this->assertSame(0, MatatagCompetencyRating::count());
+        $this->assertSame(1, MatatagCompetencyRating::count());
     }
 
     public function test_view_all_opens_the_other_sections(): void
@@ -211,11 +211,10 @@ class MatatagAccessTest extends MatatagTestCase
     }
 
     /**
-     * `view-all` is reach, not permission to mark. A curriculum head who
-     * oversees every section still has no business recording a descriptor
-     * unless the school gave them `manage` as well.
+     * View is enough to mark competencies and write remarks. Switching a
+     * section on or off MATATAG still needs `set-up`.
      */
-    public function test_a_view_only_role_is_refused_every_write(): void
+    public function test_a_view_only_role_marks_and_writes_remarks_but_cannot_opt_in(): void
     {
         $head = $this->makeUser($this->schoolA, 'curriculum-head', 'head@matatag.test', 'tok-head');
 
@@ -223,16 +222,27 @@ class MatatagAccessTest extends MatatagTestCase
             $head->hasModuleAccess('matatag-grading', 'view', $this->schoolA->id),
             'the fixture must actually be able to read, or this test proves nothing',
         );
+        $this->assertFalse(
+            $head->hasModuleAccess('matatag-grading', 'manage', $this->schoolA->id),
+            'the fixture must lack manage, or this test proves nothing',
+        );
 
-        $this->as($head)
-            ->getJson("/api/matatag/grid?class_section_id={$this->sectionA1->id}&term=1")
-            ->assertOk();
+        $this->optIn($this->sectionA1);
+        $routes = $this->writeRoutes();
 
-        foreach ($this->writeRoutes() as $name => [$method, $url, $body]) {
-            $this->as($head)->{$method}($url, $body)->assertForbidden();
+        foreach (['grid write', 'narrative write'] as $name) {
+            [$method, $url, $body] = $routes[$name];
+            $this->as($head)->{$method}($url, $body)->assertOk();
         }
 
-        $this->assertSame(0, MatatagCompetencyRating::count());
+        $this->assertSame(1, MatatagCompetencyRating::count());
+
+        $this->assertFalse($head->hasModuleAccess('matatag-grading', 'set-up', $this->schoolA->id));
+
+        foreach (['opt-in', 'opt-out'] as $name) {
+            [$method, $url, $body] = $routes[$name];
+            $this->as($head)->{$method}($url, $body)->assertForbidden();
+        }
     }
 
     /**

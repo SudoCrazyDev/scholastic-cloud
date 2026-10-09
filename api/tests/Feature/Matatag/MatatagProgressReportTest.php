@@ -537,11 +537,11 @@ class MatatagProgressReportTest extends MatatagTestCase
     }
 
     /**
-     * A principal with `view-all` prints any section's cards; an adviser
-     * without it prints only their own. Printing is reading, so `view` is
-     * enough for both — a curriculum head who may not mark may still print.
+     * Any staff member with MATATAG Progress prints any section's cards in
+     * their own school, and printing needs no `manage`; another school's
+     * section is not found at all.
      */
-    public function test_reach_follows_view_all_and_printing_needs_no_manage(): void
+    public function test_any_staff_member_prints_any_section_and_printing_needs_no_manage(): void
     {
         $this->optIn($this->sectionA2);
 
@@ -551,7 +551,11 @@ class MatatagProgressReportTest extends MatatagTestCase
 
         $this->as($this->adviserA1)
             ->getJson("/api/matatag/progress-report?class_section_id={$this->sectionA2->id}")
-            ->assertForbidden();
+            ->assertOk();
+
+        $this->as($this->principalB)
+            ->getJson("/api/matatag/progress-report?class_section_id={$this->sectionA2->id}")
+            ->assertNotFound();
 
         $this->revoke($this->principalA, 'matatag-grading.manage');
 

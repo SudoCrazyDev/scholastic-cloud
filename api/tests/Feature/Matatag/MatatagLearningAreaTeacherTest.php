@@ -11,10 +11,10 @@ use App\Services\Matatag\LearningAreaTeachers;
 /**
  * Subject teachers marking the learning area their subject stands for.
  *
- * The adviser owns the record and reaches every area. A subject teacher
- * reaches one section's grid only through a linked subject, and only that
- * subject's area — every test below that asserts a 403 is a place where one
- * missing check would let the Mathematics teacher rewrite Reading & Literacy.
+ * A link records which subject stands for each learning area. It no longer
+ * decides who may mark: any staff member with MATATAG Progress in the school
+ * marks every area of every section (see ResolvesMatatagSection). What must
+ * still hold is the school boundary, and Manage for changing the links.
  */
 class MatatagLearningAreaTeacherTest extends MatatagTestCase
 {
@@ -182,45 +182,52 @@ class MatatagLearningAreaTeacherTest extends MatatagTestCase
         $this->assertSame(0, MatatagSubjectLearningArea::count());
     }
 
-    public function test_a_subject_teacher_cannot_see_or_change_the_links(): void
+    public function test_any_staff_member_sees_the_links_and_only_manage_changes_them(): void
     {
         $this->optInThroughApi();
         $url = "/api/matatag/sections/{$this->sectionA1->id}/learning-area-teachers";
+        $head = $this->makeUser($this->schoolA, 'curriculum-head', 'head@matatag.test', 'tok-head');
+        $this->assertFalse($head->hasModuleAccess('matatag-grading', 'manage', $this->schoolA->id));
 
-        $this->as($this->mathTeacher)->getJson($url)->assertForbidden();
-        $this->as($this->mathTeacher)->putJson($url, [
+        $this->as($this->mathTeacher)->getJson($url)->assertOk();
+        $this->as($head)->getJson($url)->assertOk();
+        $this->as($head)->putJson($url, [
             'links' => [['learning_area_id' => $this->area('reading-literacy')->id, 'subject_id' => $this->math->id]],
         ])->assertForbidden();
     }
 
-    public function test_deleting_the_subject_hands_the_area_back_to_the_adviser(): void
+    public function test_deleting_the_subject_removes_its_link(): void
     {
         $this->optInThroughApi();
 
         $this->math->delete();
 
         $this->assertFalse(MatatagSubjectLearningArea::where('learning_area_id', $this->area('mathematics')->id)->exists());
-        $this->as($this->mathTeacher)->getJson($this->gridUrl())->assertForbidden();
+        $this->as($this->mathTeacher)->getJson($this->gridUrl())->assertOk();
     }
 
     // -----------------------------------------------------------------
-    // The subject teacher on the grid
+    // Any staff member on the grid
     // -----------------------------------------------------------------
 
-    public function test_a_subject_teacher_opens_only_their_own_area(): void
+    /**
+     * The school's decision: anyone on its staff with MATATAG Progress opens
+     * every learning area of every section and marks it, whatever subject
+     * they teach.
+     */
+    public function test_a_subject_teacher_opens_and_marks_every_area(): void
     {
         $this->optInThroughApi();
 
         $response = $this->as($this->mathTeacher)->getJson($this->gridUrl())->assertOk();
 
-        $this->assertSame('mathematics', $response->json('data.learning_area.key'));
-        $this->assertSame(['mathematics'], array_column($response->json('data.learning_areas'), 'key'));
-        $this->assertSame([$this->area('mathematics')->id], $response->json('data.markable_learning_area_ids'));
+        $this->assertCount(5, $response->json('data.learning_areas'));
+        $this->assertNull($response->json('data.markable_learning_area_ids'));
         $this->assertTrue($response->json('data.can_manage'));
 
-        $this->as($this->mathTeacher)
-            ->getJson($this->gridUrl($this->area('reading-literacy')->id))
-            ->assertForbidden();
+        $this->write($this->mathTeacher, 'mathematics')->assertOk();
+        $this->write($this->mathTeacher, 'reading-literacy')->assertOk();
+        $this->assertSame(2, MatatagCompetencyRating::count());
     }
 
     public function test_the_adviser_still_reaches_every_area(): void
@@ -246,141 +253,44 @@ class MatatagLearningAreaTeacherTest extends MatatagTestCase
         $this->assertSame($this->mathTeacher->id, $rating->marked_by);
     }
 
-    public function test_a_subject_teacher_cannot_write_into_another_area(): void
+    public function test_a_staff_member_with_no_subject_in_the_section_marks_it_without_manage(): void
     {
         $this->optInThroughApi();
+        $colleague = $this->makeUser($this->schoolA, 'subject-teacher', 'colleague@matatag.test', 'tok-colleague');
+        $this->revoke($colleague, 'matatag-grading.manage');
 
-        $this->write($this->mathTeacher, 'reading-literacy')
-            ->assertForbidden()
-            ->assertJsonPath('code', 'area_not_yours');
+        $this->as($colleague)->getJson($this->gridUrl())->assertOk()->assertJsonPath('data.can_manage', true);
+        $this->write($colleague, 'gmrc')->assertOk();
 
-        // One stray slot in an otherwise legitimate save refuses all of it.
-        $this->as($this->mathTeacher)->postJson('/api/matatag/grid/bulk-upsert', [
+        $this->as($colleague)->postJson('/api/matatag/narratives/bulk-upsert', [
             'class_section_id' => $this->sectionA1->id,
-            'term' => 1,
-            'ratings' => [
-                ['student_id' => $this->learnersA1[0]->id, 'slot_id' => $this->slotsFor('mathematics', 1)[0]->id, 'descriptor' => 'A'],
-                ['student_id' => $this->learnersA1[0]->id, 'slot_id' => $this->slotsFor('gmrc', 1)[0]->id, 'descriptor' => 'A'],
-            ],
-        ])->assertForbidden();
-
-        $this->assertSame(0, MatatagCompetencyRating::count());
+            'narratives' => [['student_id' => $this->learnersA1[0]->id, 'term' => 1, 'can_do' => 'Counts to 100.']],
+        ])->assertOk();
     }
 
-    public function test_a_teacher_with_no_linked_subject_is_kept_out(): void
+    public function test_a_staff_member_without_matatag_progress_is_kept_out(): void
     {
         $this->optInThroughApi();
-        $stranger = $this->makeUser($this->schoolA, 'subject-teacher', 'stranger@matatag.test', 'tok-stranger');
-
-        $this->as($stranger)->getJson($this->gridUrl())->assertForbidden();
-        $this->write($stranger, 'mathematics')->assertForbidden();
-
-        // Teaching a subject in the section next door reaches nothing here.
-        $this->makeSubject('Math', $stranger, $this->sectionA2);
-        $this->as($stranger)->getJson($this->gridUrl())->assertForbidden();
-    }
-
-    public function test_reassigning_the_subject_moves_the_right_to_mark(): void
-    {
-        $this->optInThroughApi();
-
-        $this->math->update(['adviser' => $this->readingTeacher->id]);
-
-        $this->write($this->mathTeacher, 'mathematics')->assertForbidden();
-        $this->write($this->readingTeacher, 'mathematics')->assertOk();
-        $this->write($this->readingTeacher, 'reading-literacy')->assertOk();
-    }
-
-    public function test_a_link_from_another_year_reaches_nothing_in_this_one(): void
-    {
-        $this->optInThroughApi();
-
-        MatatagSubjectLearningArea::query()->update(['academic_year' => '2025-2026']);
+        $this->revoke($this->mathTeacher, 'matatag-grading.view');
+        $this->revoke($this->mathTeacher, 'matatag-grading.manage');
 
         $this->as($this->mathTeacher)->getJson($this->gridUrl())->assertForbidden();
         $this->write($this->mathTeacher, 'mathematics')->assertForbidden();
+        $this->assertSame(0, MatatagCompetencyRating::count());
     }
 
-    public function test_a_subject_teacher_reaches_nothing_else_in_the_section(): void
+    public function test_another_school_cannot_reach_the_section(): void
     {
         $this->optInThroughApi();
-        $section = $this->sectionA1->id;
-        $student = $this->learnersA1[0]->id;
 
-        foreach ([
-            "/api/matatag/narratives?class_section_id={$section}",
-            "/api/matatag/attendance?class_section_id={$section}",
-            "/api/matatag/progress-report?class_section_id={$section}",
-            "/api/matatag/progress-report/{$student}?class_section_id={$section}",
-            "/api/matatag/workbook?class_section_id={$section}",
-        ] as $url) {
-            $this->as($this->mathTeacher)->getJson($url)->assertForbidden();
-        }
+        $this->as($this->principalB)->getJson($this->gridUrl())->assertNotFound();
+        $this->write($this->principalB, 'mathematics')->assertNotFound();
+        $this->as($this->principalB)->postJson('/api/matatag/narratives/bulk-upsert', [
+            'class_section_id' => $this->sectionA1->id,
+            'narratives' => [['student_id' => $this->learnersA1[0]->id, 'term' => 1, 'can_do' => 'x']],
+        ])->assertNotFound();
 
-        $this->as($this->mathTeacher)->postJson('/api/matatag/narratives/bulk-upsert', [
-            'class_section_id' => $section,
-            'narratives' => [['student_id' => $student, 'term' => 1, 'can_do' => 'Counts to 100.']],
-        ])->assertForbidden();
-
-        $this->as($this->mathTeacher)
-            ->postJson("/api/matatag/sections/{$section}/opt-in")
-            ->assertForbidden();
-
-        // Nor does the section appear in their list of Key Stage 1 sections.
-        $ids = array_column($this->as($this->mathTeacher)->getJson('/api/matatag/sections')->json('data.sections'), 'id');
-        $this->assertNotContains($section, $ids);
-    }
-
-    /**
-     * The field report: a department head teaching Grade 1 Mathematics holds
-     * `view-all` but not `manage`, opened the grid, and every cell was
-     * read-only. The adviser's link is the grant — for that area only.
-     */
-    public function test_a_view_all_role_teaching_the_subject_marks_that_area_only(): void
-    {
-        $head = $this->makeUser($this->schoolA, 'curriculum-head', 'head@matatag.test', 'tok-head');
-        $this->assertFalse($head->hasModuleAccess('matatag-grading', 'manage', $this->schoolA->id));
-        $this->math->update(['adviser' => $head->id]);
-        $this->optInThroughApi();
-
-        $this->as($head)
-            ->getJson($this->gridUrl($this->area('mathematics')->id))
-            ->assertOk()
-            ->assertJsonPath('data.can_manage', true);
-
-        $this->as($head)
-            ->getJson($this->gridUrl($this->area('reading-literacy')->id))
-            ->assertOk()
-            ->assertJsonPath('data.can_manage', false);
-
-        $this->write($head, 'mathematics')->assertOk();
-        $this->write($head, 'reading-literacy')->assertForbidden()->assertJsonPath('code', 'area_not_yours');
-        $this->assertSame(1, MatatagCompetencyRating::count());
-    }
-
-    public function test_a_linked_subject_teacher_marks_without_manage_on_their_role(): void
-    {
-        $this->revoke($this->mathTeacher, 'matatag-grading.manage');
-        $this->optInThroughApi();
-
-        $this->as($this->mathTeacher)->getJson($this->gridUrl())->assertOk()->assertJsonPath('data.can_manage', true);
-        $this->write($this->mathTeacher, 'mathematics')->assertOk();
-        $this->write($this->mathTeacher, 'gmrc')->assertForbidden();
-    }
-
-    public function test_view_alone_without_a_linked_subject_still_cannot_mark(): void
-    {
-        $this->revoke($this->adviserA1, 'matatag-grading.manage');
-        $this->optInThroughApi();
-
-        // GMRC is linked to a subject the adviser teaches, so that one area opens.
-        $this->write($this->adviserA1, 'gmrc')->assertOk();
-        $this->write($this->adviserA1, 'mathematics')->assertForbidden();
-
-        $this->as($this->adviserA1)
-            ->getJson($this->gridUrl($this->area('mathematics')->id))
-            ->assertOk()
-            ->assertJsonPath('data.can_manage', false);
+        $this->assertSame(0, MatatagCompetencyRating::count());
     }
 
     // -----------------------------------------------------------------
@@ -419,13 +329,14 @@ class MatatagLearningAreaTeacherTest extends MatatagTestCase
             ->assertJsonPath('data', null);
     }
 
-    public function test_another_teachers_subject_is_not_looked_up(): void
+    public function test_another_schools_subject_is_not_looked_up(): void
     {
         $this->optInThroughApi();
 
+        // Anyone in the same school may look it up; nobody outside it.
         $this->as($this->readingTeacher)
             ->getJson("/api/matatag/subjects/{$this->math->id}/learning-area")
-            ->assertForbidden();
+            ->assertOk();
 
         $this->as($this->principalB)
             ->getJson("/api/matatag/subjects/{$this->math->id}/learning-area")

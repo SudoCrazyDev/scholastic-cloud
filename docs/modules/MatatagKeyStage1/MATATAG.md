@@ -32,7 +32,7 @@ against a live tenant and argues down both transmutation and ECR-to-competency t
 | Value | numeric score → transmuted grade | **letter descriptor A–E** |
 | Aggregation | weighted, averaged, transmuted | **none at all** |
 | Report card | numeric SF9 | narrative progress report + attached PACE forms |
-| Record owner | the subject teacher | **the adviser**, for all learning areas — a linked subject teacher may also mark one area (see [Learning-area teachers](#learning-area-teachers)) |
+| Record owner | the subject teacher | **the adviser** on DepEd's form — but **any staff member** with MATATAG Progress *View* may mark every area and write the remarks of every section in their school (see [Who may mark](#who-may-mark)) |
 
 ### Key Stage 1 is phased: Grade 2 and Grade 3 are still numeric
 
@@ -406,6 +406,22 @@ Four schema decisions that each prevent a specific bug, and which a future chang
 through a parent, so cleaning School A deletes a dual-enrolled learner's School B markings. None of
 these tables needs a `scoping()` entry.
 
+### Who may mark
+
+Since 2026-10-09, **any staff member with MATATAG Progress *View*** opens every Key Stage 1 and
+Kindergarten section in their own school and marks every learning area, writes every remark, and
+prints every card — not only the adviser, `view-all` holders or a linked subject's teacher. The
+school asked for it so that whoever is on hand can fill a card in. `canReachSection()` is now just
+`view` on the section's institution; `resolveSection()` still scopes the section to the caller's own
+schools in the query, so nothing reaches across tenants. Neither `bulk-upsert` route carries
+`module:` middleware (it would demand `manage` for a POST); both controllers require `view`.
+What still needs more than *View*: **`set-up`** to switch a section on or off MATATAG, and
+**`manage`** to change the learning-area links. A school that wants marking narrower restricts who
+holds MATATAG Progress at all.
+
+The subsections below describe the earlier, narrower rule where it explains the links; where they
+disagree with this one, this one is current.
+
 ### Learning-area teachers
 
 DepEd makes the adviser the record owner, but schools such as Maranatha have subject teachers
@@ -592,7 +608,7 @@ Rows marked *planned* do not exist yet. Everything else is built and tested.
 | `api/app/Http/Controllers/Matatag{Reference,Curriculum,Section,Grid,Narrative,Attendance}Controller.php` | the six controllers | |
 | `api/app/Services/Matatag/LearningAreaTeachers.php` | subject ↔ learning-area links: name matching, auto-link, who teaches which area | |
 | `api/app/Http/Controllers/MatatagLearningAreaTeacherController.php` | the adviser's links, and a subject's own area for its teacher's page | |
-| `api/tests/Feature/Matatag/MatatagLearningAreaTeacherTest.php` | a subject teacher reaches their area and nothing else | |
+| `api/tests/Feature/Matatag/MatatagLearningAreaTeacherTest.php` | any staff member marks every area; the school boundary and `manage` for links still hold | |
 | `api/tests/Feature/Matatag/*` | opt-in, grid, narratives, attendance, access — sharing a two-school fixture | |
 | `api/app/Services/Matatag/ProgressReport.php` | composes the card and the forms; the one place the payload's shape is decided | |
 | `api/app/Http/Controllers/MatatagProgressReportController.php` | the report-card + PACE payload, section-wide or one learner | |
@@ -618,13 +634,13 @@ reaches this at a school that has not been switched on.
 | `GET matatag/sections` | `view` |
 | `POST/DELETE matatag/sections/{id}/opt-in` | `set-up` |
 | `GET matatag/grid` | `view` |
-| `POST matatag/grid/bulk-upsert` | `manage`, or `view` + teaching the area's linked subject (checked in the controller) |
-| `GET matatag/narratives`, `POST matatag/narratives/bulk-upsert` | `view` / `manage` |
+| `POST matatag/grid/bulk-upsert` | `view` (checked in the controller; every area) |
+| `GET matatag/narratives`, `POST matatag/narratives/bulk-upsert` | `view` / `view` (the write checked in the controller) |
 | `GET matatag/attendance` | `view` |
 | `GET matatag/progress-report[/{studentId}]` | `view` |
 | `GET matatag/workbook` | `view` |
-| `GET/PUT matatag/sections/{id}/learning-area-teachers` | `view` / `manage` (adviser or `view-all` only) |
-| `GET matatag/subjects/{subjectId}/learning-area` | `view` (the subject's teacher, adviser or `view-all`) |
+| `GET/PUT matatag/sections/{id}/learning-area-teachers` | `view` / `manage` |
+| `GET matatag/subjects/{subjectId}/learning-area` | `view` |
 
 `set-up` is separate from `manage` on purpose: deciding how a whole year is reported is not the same
 act as recording one learner's descriptor, and a school must be able to grant the second without the

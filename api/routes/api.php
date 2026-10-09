@@ -766,8 +766,10 @@ Route::middleware('auth.token')->group(function () {
 
         Route::get('matatag/narratives', [MatatagNarrativeController::class, 'index'])
             ->middleware('module:matatag-grading,view');
-        Route::post('matatag/narratives/bulk-upsert', [MatatagNarrativeController::class, 'bulkUpsert'])
-            ->middleware('module:matatag-grading,manage');
+        // No `module:` middleware, like the grid's write: it would demand
+        // `manage` for a POST, and any staff member with View writes remarks.
+        // The controller still requires `view` and scopes the section.
+        Route::post('matatag/narratives/bulk-upsert', [MatatagNarrativeController::class, 'bulkUpsert']);
 
         Route::get('matatag/attendance', [MatatagAttendanceController::class, 'index'])
             ->middleware('module:matatag-grading,view');

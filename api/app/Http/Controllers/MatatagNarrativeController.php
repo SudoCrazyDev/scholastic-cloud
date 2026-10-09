@@ -99,9 +99,8 @@ class MatatagNarrativeController extends Controller
                     'gender' => $student->gender,
                 ])->values()->all(),
                 'narratives' => (object) $narratives,
-                'can_manage' => $request->user()->hasModuleAccess(
-                    self::MODULE, 'manage', $section->institution_id
-                ),
+                // Anyone who reaches the section writes its remarks.
+                'can_manage' => true,
             ],
         ]);
     }
@@ -116,7 +115,9 @@ class MatatagNarrativeController extends Controller
      */
     public function bulkUpsert(Request $request): JsonResponse
     {
-        if ($deny = $this->resolveSection($request, (string) $request->input('class_section_id'), $section, 'manage')) {
+        // `view`, not `manage`: any staff member who can open the section
+        // writes its remarks.
+        if ($deny = $this->resolveSection($request, (string) $request->input('class_section_id'), $section, 'view')) {
             return $deny;
         }
 

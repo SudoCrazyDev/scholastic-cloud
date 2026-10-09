@@ -270,14 +270,18 @@ class MatatagSectionOptInTest extends MatatagTestCase
         );
     }
 
-    public function test_an_adviser_without_view_all_sees_only_their_own_sections(): void
+    public function test_an_adviser_sees_every_section_in_their_own_school(): void
     {
         $sections = $this->as($this->adviserA1)
             ->getJson('/api/matatag/sections?academic_year='.self::YEAR)
             ->assertOk()
             ->json('data.sections');
 
-        $this->assertSame(['Sampaguita'], array_column($sections, 'title'));
+        $titles = array_column($sections, 'title');
+        sort($titles);
+
+        // Every Key Stage 1 section of School A, and nothing of School B's.
+        $this->assertSame(['Rosal', 'Sampaguita'], $titles);
     }
 
     // -----------------------------------------------------------------
