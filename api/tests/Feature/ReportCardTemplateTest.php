@@ -111,6 +111,27 @@ class ReportCardTemplateTest extends TestCase
         }
     }
 
+    public function test_the_school_can_assign_the_grade_levels_its_own_sections_use(): void
+    {
+        foreach (['Kinder 1', 'kinder  1', 'Kinder 1', 'Kinder 2'] as $index => $gradeLevel) {
+            ClassSection::create([
+                'institution_id' => $this->schoolA->id,
+                'grade_level' => $gradeLevel,
+                'title' => 'Section '.$index,
+            ]);
+        }
+        ClassSection::create(['institution_id' => $this->schoolB->id, 'grade_level' => 'Nursery', 'title' => 'Other']);
+
+        $gradeLevels = $this->as('token-a')->getJson('/api/report-card-templates')
+            ->assertOk()
+            ->json('grade_levels');
+
+        $this->assertContains('Kinder 1', $gradeLevels);
+        $this->assertContains('Kinder 2', $gradeLevels);
+        $this->assertCount(1, array_filter($gradeLevels, fn ($g) => mb_strtolower($g) === 'kinder 1'));
+        $this->assertNotContains('Nursery', $gradeLevels);
+    }
+
     public function test_a_grade_level_resolves_to_its_template_whatever_the_spelling(): void
     {
         $id = $this->createTemplate('token-a')->json('data.id');

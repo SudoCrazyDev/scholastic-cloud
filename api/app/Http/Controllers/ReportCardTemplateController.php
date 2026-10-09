@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
+use App\Models\ClassSection;
+use App\Models\GradeLevel;
 use App\Models\ReportCardTemplate;
 use App\Models\ReportCardTemplateGradeLevel;
 use App\Support\GradingPeriods;
@@ -51,7 +53,42 @@ class ReportCardTemplateController extends Controller
             'layouts' => collect(ReportCardTemplate::LAYOUTS)
                 ->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])
                 ->values(),
+            'grade_levels' => $this->assignableGradeLevels($institutionId),
         ]);
+    }
+
+    /**
+     * The grade levels a template can be assigned to: the platform's list, then
+     * any other spelling the school's own class sections use.
+     *
+     * The sections come first in importance, not order. A section's grade
+     * level is free text and is what a card is matched against, so a school
+     * whose sections say "Kinder 1" must be able to tick "Kinder 1" even when
+     * the platform list is empty or spells it differently.
+     *
+     * @return list<string>
+     */
+    private function assignableGradeLevels(string $institutionId): array
+    {
+        $platform = GradeLevel::orderBy('sort_order')->orderBy('title')->pluck('title');
+
+        // Not DISTINCT: MySQL folds case there and keeps whichever spelling it
+        // meets first. Each grade level is listed as most of its sections spell it.
+        $sections = ClassSection::where('institution_id', $institutionId)
+            ->pluck('grade_level')
+            ->map(fn ($gradeLevel) => GradingPeriods::canonicalGradeLevel((string) $gradeLevel))
+            ->filter()
+            ->groupBy(fn (string $gradeLevel) => mb_strtolower($gradeLevel))
+            ->map(fn ($spellings) => $spellings->countBy()->sortDesc()->keys()->first())
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        return $platform->concat($sections)
+            ->map(fn ($gradeLevel) => GradingPeriods::canonicalGradeLevel((string) $gradeLevel))
+            ->filter()
+            ->unique(fn (string $gradeLevel) => mb_strtolower($gradeLevel))
+            ->values()
+            ->all();
     }
 
     public function store(Request $request): JsonResponse

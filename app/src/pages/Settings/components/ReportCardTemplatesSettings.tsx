@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { PDFViewer } from '@react-pdf/renderer'
 import { FileText, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '../../../components/button'
@@ -12,7 +11,6 @@ import { usePermissions } from '../../../hooks/usePermissions'
 import { useDebounce } from '../../../hooks/useDebounce'
 import { useInstitutionLogo } from '../../../hooks/useInstitutionLogo'
 import { useReportCardTemplateMutations, useReportCardTemplates } from '../../../hooks/useReportCardTemplates'
-import { gradeLevelService } from '../../../services/gradeLevelService'
 import {
   REPORT_CARD_LAYOUTS,
   getReportCardLayout,
@@ -59,11 +57,9 @@ const ReportCardTemplatesSettings: React.FC<Props> = ({ institutionId, instituti
   const templates = data?.templates ?? []
   const { createTemplate, updateTemplate, deleteTemplate } = useReportCardTemplateMutations()
 
-  const { data: gradeLevels = [] } = useQuery({
-    queryKey: ['public-grade-levels'],
-    queryFn: () => gradeLevelService.getPublicGradeLevels(),
-    staleTime: 60 * 60 * 1000,
-  })
+  // From the API rather than the platform list alone: it adds the grade
+  // levels this school's sections actually use, which a card is matched on.
+  const gradeLevels = data?.gradeLevels ?? []
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [toDelete, setToDelete] = useState<ReportCardTemplate | null>(null)
@@ -71,9 +67,7 @@ const ReportCardTemplatesSettings: React.FC<Props> = ({ institutionId, instituti
   // A new template starts on its layout's usual grade levels — the ones this
   // school actually has — and the person can untick them before saving.
   const suggestedGradeLevels = (layout: ReportCardLayoutDefinition) =>
-    gradeLevels
-      .filter((g) => layout.suggestedGradeLevels.some((suggested) => sameGradeLevel(g.title, suggested)))
-      .map((g) => g.title)
+    gradeLevels.filter((g) => layout.suggestedGradeLevel.test(g.trim()))
 
   const startNew = () => {
     const layout = REPORT_CARD_LAYOUTS.shs_semestral
@@ -199,7 +193,7 @@ const ReportCardTemplatesSettings: React.FC<Props> = ({ institutionId, instituti
           onSave={save}
           saving={createTemplate.isPending || updateTemplate.isPending}
           readOnly={!canChange}
-          gradeLevels={gradeLevels.map((g) => g.title)}
+          gradeLevels={gradeLevels}
           otherTemplates={templates.filter((t) => t.id !== draft.id)}
           institutionId={institutionId}
           institutionName={institutionName}
@@ -262,7 +256,7 @@ function TemplateEditor({
   }, [onClose])
 
   const suggestedFor = (definition: ReportCardLayoutDefinition) =>
-    gradeLevels.filter((g) => definition.suggestedGradeLevels.some((suggested) => sameGradeLevel(g, suggested)))
+    gradeLevels.filter((g) => definition.suggestedGradeLevel.test(g.trim()))
 
   const setSetting = (key: string, value: ReportCardSettingValue) =>
     onChange({ ...draft, settings: { ...draft.settings, [key]: value } })

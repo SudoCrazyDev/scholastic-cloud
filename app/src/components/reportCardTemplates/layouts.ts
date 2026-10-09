@@ -38,7 +38,7 @@ export interface ReportCardLayoutDefinition {
   source: 'grades' | 'matatag'
   /** What a new template on this layout is called, and the grade levels it starts on. */
   suggestedName: string
-  suggestedGradeLevels: string[]
+  suggestedGradeLevel: RegExp
   description: string
   defaults: Record<string, ReportCardSettingValue>
   fields: ReportCardSettingField[]
@@ -67,7 +67,7 @@ export const SHS_SEMESTRAL_LAYOUT: ReportCardLayoutDefinition = {
   label: 'Senior High School — Semestral (SF 9)',
   source: 'grades',
   suggestedName: 'Senior High School Report Card',
-  suggestedGradeLevels: ['Grade 11'],
+  suggestedGradeLevel: /^grade\s*11$/i,
   description:
     'Two semesters of two quarters, each split into Core and Applied and Specialized subjects, with a semester final grade and general average. Observed values, attendance and the certificate of promotion on the same folded sheet.',
   defaults: {
@@ -180,7 +180,8 @@ export const KINDER_TRIFOLD_LAYOUT: ReportCardLayoutDefinition = {
   label: 'Kindergarten Progress Report — Tri-fold',
   source: 'matatag',
   suggestedName: 'Kindergarten Progress Report',
-  suggestedGradeLevels: ['Kinder 1', 'Kinder 2'],
+  // Every spelling a school uses: "Kinder 1", "Kindergarten 2", "Kinder", "K1", "K-2".
+  suggestedGradeLevel: /^(kinder(garten)?\b|k\s*-?\s*\d+$)/i,
   description:
     "Every developmental competency rated CO, DV or BG for each term, with the teacher's remarks, the attendance and the certificate of transfer, on one sheet folded in three. Prints the ratings kept in MATATAG Progress.",
   defaults: {

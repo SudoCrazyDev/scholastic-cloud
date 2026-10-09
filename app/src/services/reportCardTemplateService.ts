@@ -4,6 +4,8 @@ import type { ReportCardLayout, ReportCardTemplate, ReportCardTemplatePayload } 
 export interface ReportCardTemplateList {
   templates: ReportCardTemplate[]
   layouts: { value: ReportCardLayout; label: string }[]
+  /** The platform's grade levels plus every spelling this school's sections use. */
+  gradeLevels: string[]
 }
 
 /**
@@ -18,8 +20,13 @@ class ReportCardTemplateService {
       success: boolean
       data: ReportCardTemplate[]
       layouts: ReportCardTemplateList['layouts']
+      grade_levels?: string[]
     }>(this.baseUrl)
-    return { templates: response.data.data, layouts: response.data.layouts }
+    return {
+      templates: response.data.data,
+      layouts: response.data.layouts,
+      gradeLevels: response.data.grade_levels ?? [],
+    }
   }
 
   /** The template this grade level prints, or null for the standard card. */
