@@ -8,6 +8,7 @@ import { Search, User, Plus, Edit, Trash2, ArrowRightLeft, Printer } from 'lucid
 import type { Student, Subject, Institution, ClassSection } from '../../../types';
 import { ClassSectionMasterListPDF } from './ClassSectionMasterListPDF';
 import { useAuth } from '../../../hooks/useAuth';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { brandPrimaryHex } from '../../../theme/institutionTheme';
 
 // Student Card Component with image error handling
@@ -20,7 +21,8 @@ const StudentCard: React.FC<{
   onRemoveStudent: (student: Student & { assignmentId: string }) => void;
   goToStudentDetail: (studentId: string) => void;
   removeStudentMutationPending: boolean;
-}> = ({ student, index, getFullName, onEditStudent, onTransferStudent, onRemoveStudent, goToStudentDetail, removeStudentMutationPending }) => {
+  canEditStudent: boolean;
+}> = ({ student, index, getFullName, onEditStudent, onTransferStudent, onRemoveStudent, goToStudentDetail, removeStudentMutationPending, canEditStudent }) => {
   const [imageError, setImageError] = useState(false);
   const hasProfilePicture = student.profile_picture && student.profile_picture.trim() !== '';
 
@@ -72,18 +74,20 @@ const StudentCard: React.FC<{
           </div>
         </div>
         <div className="flex flex-col items-center space-x-1">
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEditStudent(student);
-            }}
-            variant="ghost"
-            size="sm"
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all"
-            title="Edit student information"
-          >
-            <Edit className="w-4 h-4" />
-          </Button>
+          {canEditStudent && (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditStudent(student);
+              }}
+              variant="ghost"
+              size="sm"
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all"
+              title="Edit student information"
+            >
+              <Edit className="w-4 h-4" />
+            </Button>
+          )}
           <Button
             onClick={(e) => {
               e.stopPropagation();
@@ -178,6 +182,10 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
   schoolLogoUrl,
 }) => {
   const { user } = useAuth();
+  // `students.edit-profile` is a subject teacher's: the API lets it edit the
+  // students of a section they advise or teach, which is what this list is.
+  const { canManage, can } = usePermissions();
+  const canEditStudent = canManage('students') || can('students', 'edit-profile');
   const pdfBrandColor = brandPrimaryHex(user);
   const masterListFileName = section
     ? `master-list-${section.grade_level}-${section.title}${section.academic_year ? `-${section.academic_year}` : ''}.pdf`
@@ -353,6 +361,7 @@ const ClassSectionStudentsTab: React.FC<ClassSectionStudentsTabProps> = ({
                     onRemoveStudent={onRemoveStudent}
                     goToStudentDetail={goToStudentDetail}
                     removeStudentMutationPending={removeStudentMutationPending}
+                    canEditStudent={canEditStudent}
                   />
                 ))}
               </div>

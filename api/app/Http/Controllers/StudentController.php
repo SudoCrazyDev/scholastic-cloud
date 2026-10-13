@@ -7,6 +7,7 @@ use App\Models\Student;
 use App\Models\StudentInstitution;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -419,6 +420,49 @@ class StudentController extends Controller
     }
 
     /**
+     * Deny an edit reached through `students.edit-profile` alone unless the
+     * student is in a section the caller advises or teaches a subject in.
+     *
+     * `students.manage` reaches every student in the school, as it always has.
+     * The narrower grant is a subject teacher's, for fixing the details of the
+     * students in front of them — not anyone else's class.
+     */
+    private function denyUnlessMayEdit(Request $request, Student $student): ?JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->hasModuleAccess('students', 'manage')) {
+            return null;
+        }
+
+        $teaches = $student->sections()
+            ->wherePivot('is_active', true)
+            ->where(function ($q) use ($user) {
+                $q->where('class_sections.adviser', $user->id)
+                    ->orWhereHas('subjects', fn ($sq) => $sq->where('adviser', $user->id));
+            })
+            ->exists();
+
+        return $teaches
+            ? null
+            : response()->json([
+                'success' => false,
+                'message' => 'You can only edit students in a section you advise or teach.',
+            ], 403);
+    }
+
+    /**
+     * Fields a caller without `students.manage` may not change. Whether a
+     * student is active is enrolment, not a detail of who they are.
+     *
+     * @return array<string>
+     */
+    private function manageOnlyFields(Request $request): array
+    {
+        return $request->user()->hasModuleAccess('students', 'manage') ? [] : ['is_active'];
+    }
+
+    /**
      * Update the specified student in storage.
      */
     public function update(Request $request, $id): JsonResponse
@@ -449,7 +493,11 @@ class StudentController extends Controller
         if (!$student) {
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
-        
+
+        if ($deny = $this->denyUnlessMayEdit($request, $student)) {
+            return $deny;
+        }
+
         // Build validation rules
         $rules = [
             'lrn' => 'nullable|string|unique:students,lrn,' . $id,
@@ -473,7 +521,7 @@ class StudentController extends Controller
         $validated = $request->validate($rules);
 
         // Prepare update data (exclude file from validated data)
-        $updateData = $validated;
+        $updateData = Arr::except($validated, $this->manageOnlyFields($request));
         unset($updateData['profile_picture']);
 
         // Handle profile picture upload to R2
@@ -548,7 +596,11 @@ class StudentController extends Controller
         if (!$student) {
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
-        
+
+        if ($deny = $this->denyUnlessMayEdit($request, $student)) {
+            return $deny;
+        }
+
         // Build validation rules
         $rules = [
             'lrn' => 'nullable|string|unique:students,lrn,' . $id,
@@ -570,7 +622,7 @@ class StudentController extends Controller
         $validated = $request->validate($rules);
 
         // Prepare update data (exclude file from validated data)
-        $updateData = $validated;
+        $updateData = Arr::except($validated, $this->manageOnlyFields($request));
         unset($updateData['profile_picture']);
 
         // Handle profile picture upload to R2

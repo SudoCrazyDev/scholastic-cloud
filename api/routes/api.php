@@ -363,14 +363,18 @@ Route::middleware('auth.token')->group(function () {
     // they read the whole school's roll, so no `shared` argument here.
     Route::get('students/statistics', [StudentReportController::class, 'statistics'])->middleware('module:students,view');
     Route::get('students/roster', [StudentReportController::class, 'roster'])->middleware('module:students,view');
-    Route::post('students/{id}/update', [StudentController::class, 'updateWithFile'])->middleware('module:students,manage');
+    // Editing a student's own details is reached two ways: `students.manage` for
+    // any student in the school, and `students.edit-profile` — a subject
+    // teacher's — which StudentController narrows to their own sections.
+    Route::post('students/{id}/update', [StudentController::class, 'updateWithFile'])->middleware('module:students,manage|edit-profile');
+    Route::match(['put', 'patch'], 'students/{student}', [StudentController::class, 'update'])->middleware('module:students,manage|edit-profile');
     Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord'])->middleware('module:students,manage');
     Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index'])->middleware('module:students,view,shared');
     Route::post('students/{studentId}/documents', [StudentDocumentController::class, 'store'])->middleware('module:students,manage,shared');
     Route::post('students/{studentId}/documents/{documentId}/cross-check', [StudentDocumentController::class, 'crossCheck'])->middleware('module:students,manage');
     Route::delete('students/{studentId}/documents/{documentId}', [StudentDocumentController::class, 'destroy'])->middleware('module:students,manage');
     // Students read their own record here (My Finance loads the student first).
-    Route::apiResource('students', StudentController::class)->middleware('module:students,view,shared');
+    Route::apiResource('students', StudentController::class)->except(['update'])->middleware('module:students,view,shared');
     // Staff routes
     Route::put('staffs/{id}/role', [StaffController::class, 'updateRole'])->middleware('module:staffs,manage');
     Route::post('staffs/{id}/reset-password', [StaffController::class, 'resetPassword'])->middleware('module:staffs,manage');
