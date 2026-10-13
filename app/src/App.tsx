@@ -57,6 +57,7 @@ import MyPersonalInfo from './pages/MyPersonalInfo';
 // Temporarily disabled: the student My Subject screen is off for now.
 // import MySubjects from './pages/MySubjects';
 import MyFinance from './pages/MyFinance';
+import MyReportCards from './pages/MyReportCards';
 import GateEnter from './pages/Gate/GateEnter';
 import GateExit from './pages/Gate/GateExit';
 import FormBuilderPage from './pages/FormBuilder/FormBuilderPage';
@@ -202,6 +203,14 @@ function App() {
               <Route path="my-personal-info" element={<MyPersonalInfo />} />
               {/* Temporarily disabled — send anyone holding the old link back to their dashboard. */}
               <Route path="my-subjects" element={<Navigate to="/dashboard" replace />} />
+              <Route
+                path="my-report-cards"
+                element={(
+                  <StudentOnlyRoute>
+                    <MyReportCards />
+                  </StudentOnlyRoute>
+                )}
+              />
               <Route
                 path="my-finance"
                 element={(

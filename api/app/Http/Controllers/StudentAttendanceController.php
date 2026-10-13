@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\StudentAttendance;
 use App\Models\Student;
 use App\Models\ClassSection;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\DB;
 
 class StudentAttendanceController extends Controller
 {
+    use AuthorizesModuleAccess;
+
     /**
      * Display a listing of attendance records.
      */
@@ -34,6 +37,12 @@ class StudentAttendanceController extends Controller
 
         $query = StudentAttendance::with(['student', 'classSection'])
             ->where('class_section_id', $request->class_section_id);
+
+        // The route is shared with the student portal: a student reads their
+        // own attendance, never the rest of their section's.
+        if ($this->isStudentActor($request)) {
+            $query->where('student_id', $this->actingStudentId($request));
+        }
 
         if ($request->filled('academic_year')) {
             $query->where('academic_year', $request->academic_year);
@@ -118,9 +127,15 @@ class StudentAttendanceController extends Controller
     /**
      * Display the specified attendance record.
      */
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $attendance = StudentAttendance::with(['student', 'classSection'])->find($id);
+        $query = StudentAttendance::with(['student', 'classSection']);
+
+        if ($this->isStudentActor($request)) {
+            $query->where('student_id', $this->actingStudentId($request));
+        }
+
+        $attendance = $query->find($id);
 
         if (!$attendance) {
             return response()->json([

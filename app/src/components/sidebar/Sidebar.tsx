@@ -173,6 +173,13 @@ const menuGroups: MenuGroup[] = [
         allowedRoles: ['student'],
       },
       {
+        id: 'my-report-cards',
+        label: 'My Report Cards',
+        icon: <ClipboardList className="w-5 h-5" />,
+        path: '/my-report-cards',
+        allowedRoles: ['student'],
+      },
+      {
         id: 'my-finance',
         label: 'My Finance',
         icon: <Wallet className="w-5 h-5" />,

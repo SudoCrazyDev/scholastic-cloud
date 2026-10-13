@@ -189,9 +189,26 @@ class ReportCardTemplateController extends Controller
             return $this->noInstitution();
         }
 
-        $gradeLevel = GradingPeriods::canonicalGradeLevel($request->query('grade_level'));
+        return response()->json([
+            'success' => true,
+            'data' => $this->payloadForGradeLevel($institutionId, $request->query('grade_level')),
+        ]);
+    }
+
+    /**
+     * The template a school's grade level prints, as the client reads it, or
+     * null for the standard card.
+     *
+     * Public so the student portal resolves the same design an adviser prints
+     * (see `MyReportCardController`) without a second copy of the lookup.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function payloadForGradeLevel(string $institutionId, ?string $gradeLevel): ?array
+    {
+        $gradeLevel = GradingPeriods::canonicalGradeLevel($gradeLevel);
         if ($gradeLevel === null) {
-            return response()->json(['success' => true, 'data' => null]);
+            return null;
         }
 
         $assignment = ReportCardTemplateGradeLevel::where('institution_id', $institutionId)
@@ -204,10 +221,7 @@ class ReportCardTemplateController extends Controller
                 ->find($assignment->report_card_template_id)
             : null;
 
-        return response()->json([
-            'success' => true,
-            'data' => $template ? $this->payload($template) : null,
-        ]);
+        return $template ? $this->payload($template) : null;
     }
 
     /**

@@ -9,6 +9,8 @@ import { studentRunningGradeService } from '../../../services/studentRunningGrad
 import type { StudentRunningGrade } from '../../../services/studentRunningGradeService';
 import type { Student, Subject } from '../../../types';
 import { useGradingPeriodsForYear } from '../../../hooks/useGradingPeriods';
+import { useSectionReportCardPublishing } from '../../../hooks/useReportCardPublications';
+import { ReportCardPublishBar, ReportCardPublishButton } from '../../../components/ReportCardPublishControls';
 
 // ─── Debounce hook ────────────────────────────────────────────────────────────
 
@@ -376,6 +378,9 @@ function DebugGradesModal({ isOpen, studentId, studentName, subjects, academicYe
 // ─── Main Tab Component ───────────────────────────────────────────────────────
 
 interface ClassSectionReportCardsTabProps {
+  classSectionId: string;
+  /** The whole roster, not the search-filtered list: "Publish all" means everyone. */
+  rosterStudentIds: string[];
   filteredStudents: (Student & { assignmentId: string })[];
   getFullName: (student: any) => string;
   studentSearchTerm: string;
@@ -393,6 +398,8 @@ interface ClassSectionReportCardsTabProps {
 }
 
 const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
+  classSectionId,
+  rosterStudentIds,
   filteredStudents,
   getFullName,
   studentSearchTerm,
@@ -405,6 +412,11 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
   academicYear = '',
 }) => {
   const [debugStudent, setDebugStudent] = useState<{ id: string; name: string } | null>(null);
+  const publishing = useSectionReportCardPublishing({
+    sectionId: classSectionId,
+    cardType: 'report-card',
+    studentIds: rosterStudentIds,
+  });
   // Group students by gender and sort alphabetically by last name
   const groupedStudents = useMemo(() => {
     const groups = {
@@ -501,6 +513,11 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
                       >
                         Report Card
                       </Button>
+                      <ReportCardPublishButton
+                        publishing={publishing}
+                        studentId={student.id}
+                        studentName={getFullName(student)}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -525,6 +542,7 @@ const ClassSectionReportCardsTab: React.FC<ClassSectionReportCardsTabProps> = ({
           className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm w-full"
         />
       </div>
+      <ReportCardPublishBar publishing={publishing} />
       {/* Students List */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">

@@ -8,6 +8,8 @@ import { Autocomplete } from '../../../components/autocomplete'
 import { Textarea } from '../../../components/textarea'
 import { Button } from '../../../components/button'
 import DepedPerformanceReportCard from '../../../components/depedPerformanceReport/DepedPerformanceReportCard'
+import { ReportCardPublishBar, ReportCardPublishButton } from '../../../components/ReportCardPublishControls'
+import { useSectionReportCardPublishing } from '../../../hooks/useReportCardPublications'
 import { useGradingPeriodsForYear } from '../../../hooks/useGradingPeriods'
 import {
   usePerformanceReportComments,
@@ -76,6 +78,16 @@ export function ClassSectionPerformanceReportTab({
       ),
     [students, getFullName]
   )
+
+  const rosterStudentIds = useMemo(() => orderedStudents.map((student) => student.id), [orderedStudents])
+
+  // Whether each learner can see this card in the student portal.
+  const publishing = useSectionReportCardPublishing({
+    sectionId: classSectionId,
+    cardType: 'performance-report',
+    studentIds: rosterStudentIds,
+    enabled: isTermBased,
+  })
 
   useEffect(() => {
     if (!studentId && orderedStudents.length > 0) {
@@ -264,9 +276,18 @@ export function ClassSectionPerformanceReportTab({
         </p>
       </div>
 
+      <ReportCardPublishBar publishing={publishing} />
+
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-xs font-medium text-gray-600">
-          <span className="block mb-1">Learner</span>
+          <span className="flex items-center justify-between mb-1">
+            <span>Learner</span>
+            <ReportCardPublishButton
+              publishing={publishing}
+              studentId={studentId}
+              studentName={selectedLearnerOption?.label}
+            />
+          </span>
           {/*
             * Type-to-search rather than a dropdown: a section runs to fifty
             * learners and scrolling to one by eye is the slow way to do it.

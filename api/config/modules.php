@@ -44,6 +44,9 @@ return [
         'my-lessons',
         'my-assessments',
         'my-finance',
+        // A student's own report cards — only those a teacher has published
+        // (App\Http\Controllers\MyReportCardController).
+        'my-report-cards',
         'my-class-sections',
         'my-assigned-subjects',
         'my-timesheet',

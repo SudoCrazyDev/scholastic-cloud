@@ -11,6 +11,8 @@ import {
 } from '../../../hooks/useMatatagReports'
 import { useReportCardTemplateForGradeLevel } from '../../../hooks/useReportCardTemplates'
 import { useInstitutionLogo } from '../../../hooks/useInstitutionLogo'
+import { useSectionReportCardPublishing } from '../../../hooks/useReportCardPublications'
+import { ReportCardPublishBar, ReportCardPublishButton } from '../../../components/ReportCardPublishControls'
 import { learnerListName, orderedLearners } from './matatagRoster'
 import type { MatatagInstrument, MatatagLearner, MatatagLearningAreaSummary } from '../../../types'
 
@@ -88,6 +90,14 @@ export function MatatagReportsPanel({
     card,
   })
 
+  // Whether each learner can see their progress report card in the student portal.
+  const rosterStudentIds = useMemo(() => learners.map(l => l.student_id), [learners])
+  const publishing = useSectionReportCardPublishing({
+    sectionId: classSectionId,
+    cardType: 'matatag',
+    studentIds: rosterStudentIds,
+  })
+
   /**
    * react-pdf v4 mis-renders on incremental prop updates, so the viewer is
    * remounted on anything that changes the document rather than updated in
@@ -112,6 +122,8 @@ export function MatatagReportsPanel({
 
   return (
     <div className="space-y-4">
+      <ReportCardPublishBar publishing={publishing} />
+
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-gray-200 bg-white p-4">
           <h4 className="text-sm font-semibold text-gray-900">One learner</h4>
@@ -170,6 +182,12 @@ export function MatatagReportsPanel({
                   {downloads.learnerPaceForms.isPending ? 'Building…' : 'PACE forms'}
                 </Button>
               )}
+
+              <ReportCardPublishButton
+                publishing={publishing}
+                studentId={learner?.student_id ?? ''}
+                studentName={learner?.name}
+              />
             </div>
           </div>
         </section>

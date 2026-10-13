@@ -820,6 +820,16 @@ Route::middleware('auth.token')->group(function () {
     Route::post('sf9/generate', [SF9Controller::class, 'generate'])->middleware('module:consolidated-grades,view');
     Route::get('sf9/academic-years/{studentId}', [SF9Controller::class, 'getAcademicYears'])->middleware('module:consolidated-grades,view');
 
+    // Report cards in the student portal. A teacher publishes one learner's
+    // card at a time (and can take it back); the portal shows only those.
+    // No `module:` middleware on either side: publishing is decided per section
+    // (its school, its adviser) and the portal's are a student's own records.
+    // Both controllers do the checking — see their docblocks.
+    Route::get('report-card-publications', [\App\Http\Controllers\ReportCardPublicationController::class, 'index']);
+    Route::put('report-card-publications', [\App\Http\Controllers\ReportCardPublicationController::class, 'update']);
+    Route::get('my/report-cards', [\App\Http\Controllers\MyReportCardController::class, 'index']);
+    Route::get('my/report-cards/{id}', [\App\Http\Controllers\MyReportCardController::class, 'show']);
+
     // Certificate routes
     Route::apiResource('certificates', CertificateController::class)->middleware('module:certificate-builder,view');
 

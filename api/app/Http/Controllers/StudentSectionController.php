@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesModuleAccess;
 use App\Models\StudentSection;
 use App\Models\Student;
 use App\Models\ClassSection;
@@ -13,6 +14,8 @@ use App\Models\StudentInstitution;
 
 class StudentSectionController extends Controller
 {
+    use AuthorizesModuleAccess;
+
     /**
      * Display a listing of the resource.
      * Fetch only students by section_id
@@ -38,6 +41,9 @@ class StudentSectionController extends Controller
         $students = Student::join('student_sections', 'students.id', '=', 'student_sections.student_id')
             ->where('student_sections.section_id', $sectionId)
             ->where('student_sections.is_active', true)
+            // The route is shared with the student portal: a student sees
+            // their own placement, never their classmates' records.
+            ->when($this->isStudentActor($request), fn ($q) => $q->where('students.id', $this->actingStudentId($request)))
             ->select(
                 'students.id', 
                 'students.lrn', 
@@ -118,12 +124,14 @@ class StudentSectionController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         $studentSection = StudentSection::with([
             'student:id,lrn,first_name,middle_name,last_name,ext_name,gender,religion,birthdate,profile_picture,is_active',
             'classSection:id,grade_level,title,academic_year,institution_id'
-        ])->find($id);
+        ])
+            ->when($this->isStudentActor($request), fn ($q) => $q->where('student_id', $this->actingStudentId($request)))
+            ->find($id);
 
         if (!$studentSection) {
             return response()->json([

@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { studentService } from '../services/studentService'
 import { institutionService } from '../services/institutionService'
@@ -9,6 +10,19 @@ import { studentAttendanceService } from '../services/studentAttendanceService'
 import { schoolDayService } from '../services/schoolDayService'
 import type { Student, Institution, ClassSection, Subject, StudentAttendance, SchoolDay } from '../types'
 import type { StudentRunningGrade } from '../services/studentRunningGradeService'
+import type { ReportCardBundle } from '../services/reportCardPublicationService'
+
+/**
+ * A card's data, already composed by the API, for screens that may not call the
+ * endpoints below — the student portal, where most of them are staff-only.
+ *
+ * Inside this provider the hook fetches nothing and returns what it is given,
+ * so the portal prints a published card with the same components an adviser
+ * prints with. See `MyReportCardController` on the API.
+ */
+const ReportCardDataContext = createContext<ReportCardBundle | null>(null)
+
+export const ReportCardDataProvider = ReportCardDataContext.Provider
 
 interface UseStudentReportCardParams {
   studentId: string
@@ -38,6 +52,10 @@ export const useStudentReportCard = ({
   academicYear = '2024-2025',
   enabled = true
 }: UseStudentReportCardParams): StudentReportCardData => {
+  const preloaded = useContext(ReportCardDataContext)
+  // Nothing to fetch when the card's data was handed down already.
+  enabled = enabled && !preloaded
+
   // Fetch student data
   const {
     data: studentData,
@@ -187,6 +205,21 @@ export const useStudentReportCard = ({
     attendancesError?.message ||
     schoolDaysError?.message ||
     null
+
+  if (preloaded) {
+    return {
+      student: preloaded.student,
+      institution: preloaded.institution,
+      classSection: preloaded.class_section,
+      subjects: preloaded.subjects,
+      grades: preloaded.grades,
+      coreValueMarkings: preloaded.core_value_markings,
+      attendances: preloaded.attendances.filter((attendance) => attendance.student_id === studentId),
+      schoolDays: preloaded.school_days,
+      isLoading: false,
+      error: null,
+    }
+  }
 
   // Filter attendances for this specific student
   const studentAttendances = (attendancesData?.data || []).filter(

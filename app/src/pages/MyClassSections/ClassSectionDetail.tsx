@@ -151,7 +151,8 @@ const ClassSectionDetail: React.FC = () => {
     })) || [], 
     [studentsResponse?.data]
   )
-  
+  const rosterStudentIds = useMemo(() => students.map((student: Student) => student.id), [students])
+
   const classSectionData = classSection?.data
 
   // 4 quarters or 3 terms, per this section's academic year — a section from an
@@ -755,6 +756,8 @@ const ClassSectionDetail: React.FC = () => {
                     />
                   )}
                   <ClassSectionReportCardsTab
+                    classSectionId={id!}
+                    rosterStudentIds={rosterStudentIds}
                     filteredStudents={filteredStudents}
                     getFullName={getFullName}
                     studentSearchTerm={studentSearchTerm}
