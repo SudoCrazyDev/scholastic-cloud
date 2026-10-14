@@ -142,6 +142,19 @@ class StaffStudentEditTest extends TestCase
         $this->assertSame('123456789012', $this->advised->lrn);
     }
 
+    public function test_every_religion_the_form_offers_can_be_saved(): void
+    {
+        // The column is an enum; one the form offers but the column lacks is a
+        // "Data truncated" error in MySQL strict mode, not a validation message.
+        foreach (['Islam', 'Catholic', 'Iglesia Ni Cristo', 'Baptists', 'PMCC (4w)', 'Others'] as $religion) {
+            $this->asTeacher()
+                ->putJson("/api/students/{$this->advised->id}", ['religion' => $religion])
+                ->assertOk();
+
+            $this->assertSame($religion, $this->advised->refresh()->religion);
+        }
+    }
+
     public function test_the_file_upload_endpoint_is_reached_the_same_way(): void
     {
         $this->asTeacher()
