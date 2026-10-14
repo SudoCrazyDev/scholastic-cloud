@@ -15,14 +15,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * A subject teacher may correct the details of a student in their own class
- * section, from the Edit Student modal on My Class Sections.
+ * Any staff member may correct a student's details from the Edit Student modal
+ * on My Class Sections — no module permission stands behind it.
  *
- * They hold `students` read-only, so the grant is `students.edit-profile`, and
- * the edge of it is the point: a student in a section they advise or teach a
- * subject in, and nobody else — not another teacher's class, not another school.
+ * What still holds: their own school only, a student cannot edit through the
+ * portal, and whether a student is active stays with `students.manage`.
  */
-class SubjectTeacherStudentEditTest extends TestCase
+class StaffStudentEditTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -161,26 +160,19 @@ class SubjectTeacherStudentEditTest extends TestCase
         $this->assertSame('Corrected', $this->taught->refresh()->first_name);
     }
 
-    public function test_a_subject_teacher_cannot_edit_a_student_in_someone_elses_class(): void
+    public function test_a_subject_teacher_can_edit_a_student_in_someone_elses_class(): void
     {
         $this->asTeacher()
-            ->putJson("/api/students/{$this->otherClass->id}", ['first_name' => 'Hijacked'])
-            ->assertForbidden();
+            ->putJson("/api/students/{$this->otherClass->id}", ['first_name' => 'Corrected'])
+            ->assertOk();
 
         $this->asTeacher()
-            ->post("/api/students/{$this->otherClass->id}/update", ['first_name' => 'Hijacked'], ['Accept' => 'application/json'])
-            ->assertForbidden();
+            ->post("/api/students/{$this->otherClass->id}/update", ['last_name' => 'Fixed'], ['Accept' => 'application/json'])
+            ->assertOk();
 
-        $this->assertSame('Misspelt', $this->otherClass->refresh()->first_name);
-    }
-
-    public function test_a_student_who_has_left_the_section_is_no_longer_the_teachers(): void
-    {
-        StudentSection::where('student_id', $this->advised->id)->update(['is_active' => false]);
-
-        $this->asTeacher()
-            ->putJson("/api/students/{$this->advised->id}", ['first_name' => 'Late'])
-            ->assertForbidden();
+        $this->otherClass->refresh();
+        $this->assertSame('Corrected', $this->otherClass->first_name);
+        $this->assertSame('Fixed', $this->otherClass->last_name);
     }
 
     public function test_a_subject_teacher_cannot_deactivate_a_student(): void
@@ -204,13 +196,36 @@ class SubjectTeacherStudentEditTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_a_role_holding_neither_permission_is_refused(): void
+    public function test_a_role_with_no_student_permission_can_still_edit(): void
     {
         $this->makeStaff($this->schoolA, 'hr', 'hr@edit.test', 'hr-token');
 
         $this->withHeader('Authorization', 'Bearer hr-token')
-            ->putJson("/api/students/{$this->advised->id}", ['first_name' => 'Hijacked'])
+            ->putJson("/api/students/{$this->advised->id}", ['first_name' => 'Corrected'])
+            ->assertOk();
+
+        $this->assertSame('Corrected', $this->advised->refresh()->first_name);
+    }
+
+    public function test_a_signed_in_student_cannot_edit_their_own_record(): void
+    {
+        \App\Models\StudentAuth::create([
+            'student_id' => $this->advised->id,
+            'email' => 'advised@edit.test',
+            'password' => \Illuminate\Support\Facades\Hash::make('student-password'),
+            'is_new' => false,
+        ]);
+
+        $token = $this->postJson('/api/login', [
+            'email' => 'advised@edit.test',
+            'password' => 'student-password',
+        ])->assertOk()->json('token');
+
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->putJson("/api/students/{$this->advised->id}", ['first_name' => 'Self'])
             ->assertForbidden();
+
+        $this->assertSame('Misspelt', $this->advised->refresh()->first_name);
     }
 
     public function test_a_principal_still_edits_any_student_in_the_school(): void

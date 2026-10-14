@@ -202,12 +202,7 @@ class SystemRolePermissions
         // does not change; the one thing the grant stops short of is moving a
         // login that already exists to a different email address, which is how
         // you would point a student's account at your own inbox.
-        //
-        // `students.edit-profile` lets them fix a misspelt name, a wrong
-        // birthdate or a missing LRN from their own class section, without the
-        // whole-school reach of `students.manage`. StudentController narrows it
-        // to students in a section they advise or teach a subject in.
-        'subject-teacher' => ['students.reset-portal-password', 'students.edit-profile'],
+        'subject-teacher' => ['students.reset-portal-password'],
 
         // What separates a department head from a teacher. Their module sets are
         // identical, so these — not `subjects.manage`, which a teacher also holds —

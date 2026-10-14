@@ -363,11 +363,12 @@ Route::middleware('auth.token')->group(function () {
     // they read the whole school's roll, so no `shared` argument here.
     Route::get('students/statistics', [StudentReportController::class, 'statistics'])->middleware('module:students,view');
     Route::get('students/roster', [StudentReportController::class, 'roster'])->middleware('module:students,view');
-    // Editing a student's own details is reached two ways: `students.manage` for
-    // any student in the school, and `students.edit-profile` — a subject
-    // teacher's — which StudentController narrows to their own sections.
-    Route::post('students/{id}/update', [StudentController::class, 'updateWithFile'])->middleware('module:students,manage|edit-profile');
-    Route::match(['put', 'patch'], 'students/{student}', [StudentController::class, 'update'])->middleware('module:students,manage|edit-profile');
+    // Editing a student's details is open to any staff member, so the Edit
+    // Student modal on My Class Sections works for whoever can see the section.
+    // StudentController still keeps it to the caller's own school and refuses
+    // the student portal.
+    Route::post('students/{id}/update', [StudentController::class, 'updateWithFile']);
+    Route::match(['put', 'patch'], 'students/{student}', [StudentController::class, 'update']);
     Route::put('students/{id}/admission-record', [StudentController::class, 'updateAdmissionRecord'])->middleware('module:students,manage');
     Route::get('students/{studentId}/documents', [StudentDocumentController::class, 'index'])->middleware('module:students,view,shared');
     Route::post('students/{studentId}/documents', [StudentDocumentController::class, 'store'])->middleware('module:students,manage,shared');

@@ -224,10 +224,6 @@ return [
                             'label' => 'Reset a student portal password',
                             'description' => 'Set up a student portal login, and issue a new password for one that exists, without being able to move an existing login to a different email address. Manage already includes this; tick it for a role that should help a student sign in but not edit student records.',
                         ],
-                        'edit-profile' => [
-                            'label' => 'Edit students in their own sections',
-                            'description' => 'Correct the name, birthdate, gender, religion, LRN and photo of a student in a section they advise or teach a subject in. Manage already includes this, for every student in the school.',
-                        ],
                     ],
                 ],
                 'student-attendance' => [

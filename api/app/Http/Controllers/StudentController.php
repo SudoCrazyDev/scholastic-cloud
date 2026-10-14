@@ -420,35 +420,20 @@ class StudentController extends Controller
     }
 
     /**
-     * Deny an edit reached through `students.edit-profile` alone unless the
-     * student is in a section the caller advises or teaches a subject in.
-     *
-     * `students.manage` reaches every student in the school, as it always has.
-     * The narrower grant is a subject teacher's, for fixing the details of the
-     * students in front of them — not anyone else's class.
+     * Any staff member may correct a student's details — the Edit Student modal
+     * on My Class Sections is open to whoever can see the section, with no
+     * module permission behind it. The student portal may not: a student does
+     * not rewrite their own record. The institution scope in the caller still
+     * keeps everyone to their own school.
      */
-    private function denyUnlessMayEdit(Request $request, Student $student): ?JsonResponse
+    private function denyUnlessMayEdit(Request $request): ?JsonResponse
     {
-        $user = $request->user();
-
-        if ($user->hasModuleAccess('students', 'manage')) {
-            return null;
-        }
-
-        $teaches = $student->sections()
-            ->wherePivot('is_active', true)
-            ->where(function ($q) use ($user) {
-                $q->where('class_sections.adviser', $user->id)
-                    ->orWhereHas('subjects', fn ($sq) => $sq->where('adviser', $user->id));
-            })
-            ->exists();
-
-        return $teaches
-            ? null
-            : response()->json([
+        return $request->user() instanceof StudentPortalUser
+            ? response()->json([
                 'success' => false,
-                'message' => 'You can only edit students in a section you advise or teach.',
-            ], 403);
+                'message' => 'Students are not allowed to make changes here.',
+            ], 403)
+            : null;
     }
 
     /**
@@ -467,6 +452,10 @@ class StudentController extends Controller
      */
     public function update(Request $request, $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessMayEdit($request)) {
+            return $deny;
+        }
+
         // Get the authenticated user's institution
         $user = $request->user();
         $defaultInstitutionId = $user->getDefaultInstitutionId();
@@ -493,11 +482,7 @@ class StudentController extends Controller
         if (!$student) {
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
-
-        if ($deny = $this->denyUnlessMayEdit($request, $student)) {
-            return $deny;
-        }
-
+        
         // Build validation rules
         $rules = [
             'lrn' => 'nullable|string|unique:students,lrn,' . $id,
@@ -569,6 +554,10 @@ class StudentController extends Controller
      */
     public function updateWithFile(Request $request, $id): JsonResponse
     {
+        if ($deny = $this->denyUnlessMayEdit($request)) {
+            return $deny;
+        }
+
 
         // Get the authenticated user's institution
         $user = $request->user();
@@ -596,11 +585,7 @@ class StudentController extends Controller
         if (!$student) {
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
-
-        if ($deny = $this->denyUnlessMayEdit($request, $student)) {
-            return $deny;
-        }
-
+        
         // Build validation rules
         $rules = [
             'lrn' => 'nullable|string|unique:students,lrn,' . $id,
