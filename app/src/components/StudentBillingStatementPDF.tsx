@@ -107,11 +107,10 @@ const styles = StyleSheet.create({
   cellLast: {
     borderRightWidth: 0,
   },
-  colDate: { width: '18%' },
-  colParticulars: { width: '24%' },
-  colOr: { width: '16%' },
-  colOthers: { width: '18%' },
-  colTotal: { width: '24%' },
+  colDate: { width: '20%' },
+  colParticulars: { width: '30%' },
+  colOr: { width: '22%' },
+  colTotal: { width: '28%' },
   head: {
     fontWeight: 'bold',
     textAlign: 'center',
@@ -132,7 +131,7 @@ const styles = StyleSheet.create({
     minHeight: 15,
   },
   summaryLabel: {
-    width: '76%',
+    width: '72%',
     paddingVertical: 2.5,
     paddingHorizontal: 4,
     textAlign: 'right',
@@ -140,7 +139,7 @@ const styles = StyleSheet.create({
     borderRightColor: RULE,
   },
   summaryValue: {
-    width: '24%',
+    width: '28%',
     paddingVertical: 2.5,
     paddingHorizontal: 3,
     textAlign: 'right',
@@ -214,7 +213,6 @@ interface StatementRow {
   date?: string
   particulars: string
   orNumber?: string
-  others?: string
   total: string
   highlight?: boolean
 }
@@ -265,7 +263,6 @@ export const StudentBillingStatementPDF: React.FC<StudentBillingStatementPDFProp
       date: formatDate(payment.date),
       particulars: 'PAYMENT',
       orNumber: payment.orNumber,
-      others: payment.others > 0 ? formatAmount(payment.others) : '',
       total: formatAmount(payment.total),
     })
   })
@@ -318,9 +315,6 @@ export const StudentBillingStatementPDF: React.FC<StudentBillingStatementPDFProp
               <View style={[styles.cell, styles.colOr]}>
                 <Text style={styles.head}>OR No</Text>
               </View>
-              <View style={[styles.cell, styles.colOthers]}>
-                <Text style={styles.head}>Others</Text>
-              </View>
               <View style={[styles.cell, styles.cellLast, styles.colTotal]}>
                 <Text style={styles.head}>Total</Text>
               </View>
@@ -343,9 +337,6 @@ export const StudentBillingStatementPDF: React.FC<StudentBillingStatementPDFProp
                 </View>
                 <View style={[styles.cell, styles.colOr]}>
                   <Text style={styles.center}>{row.orNumber ?? ''}</Text>
-                </View>
-                <View style={[styles.cell, styles.colOthers]}>
-                  <Text style={styles.amount}>{row.others ?? ''}</Text>
                 </View>
                 <View style={[styles.cell, styles.cellLast, styles.colTotal]}>
                   <Text style={styles.amount}>{row.total}</Text>
