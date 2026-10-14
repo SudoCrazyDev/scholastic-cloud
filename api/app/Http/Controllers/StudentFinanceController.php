@@ -757,6 +757,9 @@ class StudentFinanceController extends Controller
                         'payment_date' => $payment->payment_date?->toDateString(),
                         'receipt_number' => $payment->receipt_number,
                         'reference_number' => $payment->reference_number,
+                        // Matches `fees[].fee_id`, so a billing statement can tell a payment
+                        // against the schedule from one against a fee collected on its own.
+                        'fee_id' => $payment->school_fee_id ?? $payment->student_additional_fee_id,
                         'fee_name' => $payment->schoolFee?->name ?? $payment->additionalFee?->name,
                     ];
                 }),

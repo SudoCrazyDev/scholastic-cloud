@@ -51,6 +51,7 @@ import SiblingDiscountsView from './SiblingDiscountsView'
 import ReceiptBuilderView from './ReceiptBuilderView'
 import ReceiptPrintModal from './ReceiptPrintModal'
 import NoticeOfAccountModal from './NoticeOfAccountModal'
+import BillingStatementModal from './BillingStatementModal'
 import DataClearingView from './DataClearingView'
 import FeeNamingView from './FeeNamingView'
 import type { SchoolFee, SchoolFeeDefault, DefaultDiscount, StudentFee, Student, CreateStudentDiscountData, CreateStudentAdditionalFeeData, CreatePaymentTransactionData, PaymentReceiptSubmission, PaymentTransaction, StudentLedgerEntry, PaymentVoidStatus, FeeBillingType, UpdateReceiptPaymentDetailsData, UserInstitution } from '../../types'
@@ -332,6 +333,7 @@ const Finance: React.FC = () => {
   // The notice of account is printed for a chosen scope, so the button opens the picker
   // rather than downloading the whole academic year outright.
   const [showNoaOptions, setShowNoaOptions] = useState(false)
+  const [showBillingStatement, setShowBillingStatement] = useState(false)
 
   const createLedgerDiscountMutation = useMutation({
     mutationFn: (payload: CreateStudentDiscountData) => studentDiscountService.createDiscount(payload),
@@ -2395,9 +2397,14 @@ const Finance: React.FC = () => {
               </p>
             </div>
             {selectedLedgerStudent && ledgerNoaQuery.data?.data && (
-              <Button variant="outline" size="sm" onClick={() => setShowNoaOptions(true)}>
-                Notice of Account
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowNoaOptions(true)}>
+                  Notice of Account
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowBillingStatement(true)}>
+                  Billing Statement
+                </Button>
+              </div>
             )}
           </div>
 
@@ -4132,6 +4139,18 @@ const Finance: React.FC = () => {
           institutionAddress={institution?.address}
           logoUrl={schoolLogoUrl}
           onClose={() => setShowNoaOptions(false)}
+        />
+      )}
+
+      {/* Billing statement (from the ledger) */}
+      {showBillingStatement && selectedLedgerStudent && ledgerNoaQuery.data?.data && (
+        <BillingStatementModal
+          data={ledgerNoaQuery.data.data}
+          institutionName={institution?.title}
+          institutionAddress={institution?.address}
+          logoUrl={schoolLogoUrl}
+          defaultPreparedBy={user ? `${user.first_name} ${user.last_name}`.trim() : undefined}
+          onClose={() => setShowBillingStatement(false)}
         />
       )}
 

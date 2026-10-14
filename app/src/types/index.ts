@@ -1138,6 +1138,7 @@ export interface StudentNOAResponse {
     payment_date?: string | null;
     receipt_number?: string | null;
     reference_number?: string | null;
+    fee_id?: string | null;
     fee_name?: string | null;
   }>;
   totals: {
