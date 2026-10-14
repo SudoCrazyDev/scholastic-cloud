@@ -53,18 +53,20 @@ export const buildBillingStatement = (
   // A receipt is stored as one row per fee it paid, but the payer holds one OR for it.
   const byReceipt = new Map<string, BillingStatementPayment>()
   ;(data.payments ?? []).forEach((payment) => {
-    const orNumber = payment.receipt_number || payment.reference_number || ''
-    const key = orNumber || payment.payment_id
+    // Grouped by the system receipt, which every collection carries; printed with the OR
+    // number the cashier entered, which is the one on the paper the payer holds.
+    const key = payment.receipt_number || payment.or_number || payment.payment_id
     const amount = Number(payment.amount || 0)
     const isOther = Boolean(payment.fee_id && offScheduleFeeIds.has(payment.fee_id))
     const row = byReceipt.get(key) ?? {
       key,
       date: payment.payment_date ?? null,
-      orNumber,
+      orNumber: payment.or_number ?? '',
       scheduled: 0,
       others: 0,
       total: 0,
     }
+    if (!row.orNumber && payment.or_number) row.orNumber = payment.or_number
     if (isOther) row.others = round2(row.others + amount)
     else row.scheduled = round2(row.scheduled + amount)
     row.total = round2(row.total + amount)

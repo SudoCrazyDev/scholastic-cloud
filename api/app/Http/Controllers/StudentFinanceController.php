@@ -575,7 +575,7 @@ class StudentFinanceController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $payments = StudentPayment::with(['schoolFee', 'additionalFee'])
+        $payments = StudentPayment::with(['schoolFee', 'additionalFee', 'paymentTransaction:id,or_number'])
             ->where('institution_id', $institutionId)
             ->where('student_id', $studentId)
             ->where('academic_year', $academicYear)
@@ -757,6 +757,10 @@ class StudentFinanceController extends Controller
                         'payment_date' => $payment->payment_date?->toDateString(),
                         'receipt_number' => $payment->receipt_number,
                         'reference_number' => $payment->reference_number,
+                        // The OR number the cashier wrote on the paper receipt, as distinct from
+                        // the system-issued receipt number.
+                        'or_number' => $payment->or_number
+                            ?: ($payment->paymentTransaction?->or_number ?: null),
                         // Matches `fees[].fee_id`, so a billing statement can tell a payment
                         // against the schedule from one against a fee collected on its own.
                         'fee_id' => $payment->school_fee_id ?? $payment->student_additional_fee_id,
