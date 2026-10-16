@@ -1,6 +1,5 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { PDFViewer } from '@react-pdf/renderer'
 import { FileText, Loader2 } from 'lucide-react'
 import PrintReportCard from '../components/studentReportCard/studentReportCard'
 import TemplatedReportCard from '../components/reportCardTemplates/TemplatedReportCard'
@@ -9,6 +8,7 @@ import { getReportCardLayout } from '../components/reportCardTemplates/layouts'
 import { ReportCardDataProvider } from '../hooks/useStudentReportCard'
 import { progressReportCard } from '../hooks/useMatatagReports'
 import { useInstitutionLogo } from '../hooks/useInstitutionLogo'
+import { ResponsivePdfViewer } from '../components/ResponsivePdfViewer'
 import { useMyReportCard, useMyReportCards } from '../hooks/useReportCardPublications'
 import type { MyReportCard, MyReportCardSummary, ReportCardType } from '../services/reportCardPublicationService'
 
@@ -210,8 +210,14 @@ function MatatagCard({ card }: { card: MyReportCard }) {
   if (!report) return null
 
   return (
-    <PDFViewer key={`${card.id}|${schoolLogoUrl ?? ''}`} width="100%" height="100%" showToolbar>
+    <ResponsivePdfViewer
+      key={`${card.id}|${schoolLogoUrl ?? ''}`}
+      width="100%"
+      height="100%"
+      showToolbar
+      fileName="progress-report-card.pdf"
+    >
       {progressReportCard(report, options)}
-    </PDFViewer>
+    </ResponsivePdfViewer>
   )
 }

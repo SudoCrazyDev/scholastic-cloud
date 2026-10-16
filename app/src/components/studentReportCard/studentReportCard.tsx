@@ -1,6 +1,7 @@
 
 import { useMemo } from 'react';
-import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
+import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
+import { ResponsivePdfViewer } from '../ResponsivePdfViewer';
 
 // How words break is registered once in reportCardPdfUtils — the callback is
 // global to @react-pdf/renderer, so a copy here would silently fight the one in
@@ -335,7 +336,7 @@ export default function PrintReportCard({
     const pdfKey = viewerKey || `${studentId}|${classSectionId}|${institutionId}|${academicYear}`
 
     return(
-        <PDFViewer key={pdfKey} className='w-full' style={{height: viewerHeight}}>
+        <ResponsivePdfViewer key={pdfKey} className='w-full' style={{height: viewerHeight}} fileName='report-card.pdf'>
             <Document>
                 <Page size="A5" orientation="landscape" style={{display: 'flex', flexDirection: 'row'}}>
                     <View style={{width: '50%', padding: '20px'}}>
@@ -920,6 +921,6 @@ export default function PrintReportCard({
                     
                 </Page>
             </Document>
-        </PDFViewer>
+        </ResponsivePdfViewer>
     );
 };

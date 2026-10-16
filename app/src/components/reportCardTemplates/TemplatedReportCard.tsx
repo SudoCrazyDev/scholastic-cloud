@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { PDFViewer } from '@react-pdf/renderer'
+import { ResponsivePdfViewer } from '../ResponsivePdfViewer'
 import { useStudentReportCard } from '../../hooks/useStudentReportCard'
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo'
 import type { ReportCardTemplate } from '../../types'
@@ -104,8 +104,8 @@ export default function TemplatedReportCard({
   }
 
   return (
-    <PDFViewer key={viewerKey} className="w-full" style={{ height: viewerHeight }}>
+    <ResponsivePdfViewer key={viewerKey} className="w-full" style={{ height: viewerHeight }} fileName="report-card.pdf">
       <ShsSemestralDocument data={data} settings={settings} />
-    </PDFViewer>
+    </ResponsivePdfViewer>
   )
 }

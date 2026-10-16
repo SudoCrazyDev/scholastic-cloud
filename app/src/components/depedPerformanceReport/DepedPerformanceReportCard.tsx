@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Page, Text, View, Document, PDFViewer, StyleSheet, Image } from '@react-pdf/renderer';
+import { Page, Text, View, Document, StyleSheet, Image } from '@react-pdf/renderer';
+import { ResponsivePdfViewer } from '../ResponsivePdfViewer';
 
 import { useStudentReportCard } from '../../hooks/useStudentReportCard';
 import { useInstitutionLogo } from '../../hooks/useInstitutionLogo';
@@ -358,7 +359,7 @@ export default function DepedPerformanceReportCard({
     const pdfKey = viewerKey || `${studentId}|${classSectionId}|${institutionId}|${academicYear}`;
 
     return (
-        <PDFViewer key={pdfKey} className="w-full" style={{ height: viewerHeight }}>
+        <ResponsivePdfViewer key={pdfKey} className="w-full" style={{ height: viewerHeight }} fileName="performance-report.pdf">
             <Document>
                 <Page size="A4" orientation="landscape" style={styles.page}>
 
@@ -652,6 +653,6 @@ export default function DepedPerformanceReportCard({
 
                 </Page>
             </Document>
-        </PDFViewer>
+        </ResponsivePdfViewer>
     );
 }
