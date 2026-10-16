@@ -216,18 +216,24 @@ export const useGradingPeriods = (
  */
 export const useGradingPeriodsForYear = (
   academicYear: string | null | undefined,
-  gradeLevel?: string | null
+  gradeLevel?: string | null,
+  /**
+   * The school the record belongs to, when the screen knows it. Without one the
+   * server answers for the caller's own school - right for staff chrome, but a
+   * report card prints its section's school, whoever is looking at it.
+   */
+  institutionId?: string | null
 ): UseGradingPeriodsResult => {
   const currentConfig = useCurrentYearConfig()
 
-  // Keyed on the year only. The response carries every grade level's exception,
-  // so switching sections within a year is resolved locally rather than
-  // refetching once per grade level.
+  // Keyed on the year (and school) only. The response carries every grade
+  // level's exception, so switching sections within a year is resolved locally
+  // rather than refetching once per grade level.
   const { data } = useQuery({
-    queryKey: ['grading-periods', academicYear],
+    queryKey: ['grading-periods', academicYear, institutionId ?? null],
     queryFn: async () => {
       const response = await api.get('/grading-periods', {
-        params: { academic_year: academicYear },
+        params: { academic_year: academicYear, institution_id: institutionId || undefined },
       })
       return response.data?.data as GradingPeriodConfig
     },

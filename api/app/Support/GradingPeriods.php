@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Auth\StudentPortalUser;
 use App\Models\ClassSection;
 use App\Models\InstitutionAcademicYear;
 use App\Models\InstitutionGradeLevelGradingPeriod;
@@ -384,11 +385,20 @@ class GradingPeriods
 
     /**
      * The user's default institution id, mirroring how the client picks one.
+     *
+     * A portal student has no staff institutions — their school is the one they
+     * are enrolled in, which is also the first institution their profile lists.
+     * Without this they resolved to no school at all, and so to 4 quarters, and
+     * every portal screen of a term-based year drew a 4th quarter.
      */
     public static function institutionIdForUser($user): ?string
     {
         if (! $user) {
             return null;
+        }
+
+        if ($user instanceof StudentPortalUser) {
+            return $user->student->studentInstitutions()->value('institution_id');
         }
 
         if (! empty($user->institution_id)) {

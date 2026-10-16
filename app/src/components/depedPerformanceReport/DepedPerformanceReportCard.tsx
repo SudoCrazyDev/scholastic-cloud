@@ -204,7 +204,7 @@ export default function DepedPerformanceReportCard({
      * this, so `periods` is three here — but reading it keeps the labels ("Term
      * 1") coming from the one place that owns them.
      */
-    const gradingPeriods = useGradingPeriodsForYear(academicYear);
+    const gradingPeriods = useGradingPeriodsForYear(academicYear, null, institutionId);
     const periodValues = gradingPeriods.values;
     /** Of the *header band*, which is 27% of the row. */
     const periodColumnWidth = `${100 / gradingPeriods.count}%`;

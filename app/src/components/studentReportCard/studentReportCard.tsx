@@ -159,7 +159,8 @@ export default function PrintReportCard({
     // entered under, and a Senior High card prints 4 columns even in a term year.
     const gradingPeriods = useGradingPeriodsForYear(
         academicYear,
-        classSection?.grade_level
+        classSection?.grade_level,
+        institutionId
     );
     const periodValues = gradingPeriods.values;
     /** Grade columns split the fixed-width period block evenly (25% for 4, 33.33% for 3). */

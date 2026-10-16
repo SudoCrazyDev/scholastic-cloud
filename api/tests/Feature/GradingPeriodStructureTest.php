@@ -7,11 +7,15 @@ use App\Models\Institution;
 use App\Models\InstitutionAcademicYear;
 use App\Models\InstitutionGradeLevelGradingPeriod;
 use App\Models\Role;
+use App\Models\Student;
+use App\Models\StudentAuth;
+use App\Models\StudentInstitution;
 use App\Models\Subject;
 use App\Models\User;
 use App\Models\UserInstitution;
 use App\Support\GradingPeriods;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -167,6 +171,43 @@ class GradingPeriodStructureTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.type', 'quarter')
             ->assertJsonPath('data.count', 4);
+    }
+
+    /**
+     * A portal student holds no staff institution, so the endpoint used to find
+     * no school for them and answer 4 quarters - and their published report
+     * card printed a 4th quarter the school does not have.
+     */
+    public function test_grading_periods_endpoint_answers_for_a_portal_students_school(): void
+    {
+        $this->academicYear('2026-2027', 'term', true);
+
+        $student = Student::create([
+            'first_name' => 'Iñigo',
+            'last_name' => 'Salazar',
+            'gender' => 'male',
+            'birthdate' => '2013-01-01',
+            'is_active' => true,
+        ]);
+        StudentInstitution::create([
+            'student_id' => $student->id,
+            'institution_id' => $this->institution->id,
+            'is_active' => true,
+        ]);
+        StudentAuth::create([
+            'student_id' => $student->id,
+            'email' => 'inigo@terms.test',
+            'password' => Hash::make('student-password'),
+            'is_new' => false,
+            'token' => 'portal-student-token',
+            'token_expiry' => now()->addYear()->toDateTimeString(),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer portal-student-token')
+            ->getJson('/api/grading-periods?academic_year=2026-2027')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'term')
+            ->assertJsonPath('data.count', 3);
     }
 
     public function test_principal_can_switch_a_year_between_quarters_and_terms(): void
