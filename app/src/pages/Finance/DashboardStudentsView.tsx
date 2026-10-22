@@ -1,16 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'react-hot-toast'
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Select } from '../../components/select'
 import { financeDashboardService } from '../../services/financeDashboardService'
 import { studentFinanceService } from '../../services/studentFinanceService'
 import type { FinanceDashboardStudent, LedgerFeeBreakdown } from '../../types'
+import NoticeOfAccountModal from './NoticeOfAccountModal'
+import BillingStatementModal from './BillingStatementModal'
 
 interface DashboardStudentsViewProps {
   academicYearOptions: { value: string; label: string }[]
   defaultAcademicYear: string
+  institutionName?: string
+  institutionAddress?: string
+  logoUrl?: string | null
+  defaultPreparedBy?: string
 }
+
+type StudentDocument = 'noa' | 'billing-statement'
 
 const formatCurrency = (amount?: number | null) =>
   new Intl.NumberFormat('en-PH', {
@@ -28,12 +38,20 @@ const formatCurrency = (amount?: number | null) =>
 const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
   academicYearOptions,
   defaultAcademicYear,
+  institutionName,
+  institutionAddress,
+  logoUrl,
+  defaultPreparedBy,
 }) => {
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear)
   const [gradeFilter, setGradeFilter] = useState('')
   const [sectionFilter, setSectionFilter] = useState('')
   const [search, setSearch] = useState('')
   const [openStudentId, setOpenStudentId] = useState<string | null>(null)
+  const [documentRequest, setDocumentRequest] = useState<{
+    studentId: string
+    kind: StudentDocument
+  } | null>(null)
 
   const studentsQuery = useQuery({
     queryKey: ['finance-dashboard', 'students', academicYear, gradeFilter, sectionFilter],
@@ -45,6 +63,23 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
       }),
     enabled: Boolean(academicYear),
   })
+
+  // The same NOA payload the ledger's two buttons print from, fetched only once a row's
+  // button is pressed — the modal opens when it arrives.
+  const documentQuery = useQuery({
+    queryKey: ['student-noa', documentRequest?.studentId, academicYear],
+    queryFn: () =>
+      studentFinanceService.getNoticeOfAccount(documentRequest!.studentId, academicYear),
+    enabled: Boolean(documentRequest),
+  })
+
+  useEffect(() => {
+    if (!documentQuery.isError || !documentRequest) return
+    toast.error("Failed to load this student's account.")
+    setDocumentRequest(null)
+  }, [documentQuery.isError, documentRequest])
+
+  const documentData = documentRequest ? documentQuery.data?.data : undefined
 
   const data = studentsQuery.data?.data
   const students = useMemo(() => data?.students ?? [], [data?.students])
@@ -286,6 +321,12 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                     >
                       Remaining Balance
                     </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
+                    >
+                      Action
+                    </th>
                   </tr>
                   <tr>
                     <th className="border-l border-gray-200 px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -306,7 +347,7 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                   <tbody key={group.grade_level} className="divide-y divide-gray-200">
                     <tr className="bg-gray-100/70">
                       <th
-                        colSpan={8}
+                        colSpan={9}
                         scope="colgroup"
                         className="px-4 py-2 text-left text-sm font-semibold text-gray-900"
                       >
@@ -382,10 +423,42 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                             >
                               {formatCurrency(student.remaining_balance)}
                             </td>
+                            {/* The buttons sit inside the clickable row, so their clicks and
+                                key presses stop here instead of also expanding it. */}
+                            <td
+                              className="px-4 py-3"
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <div className="flex gap-2 whitespace-nowrap">
+                                {(
+                                  [
+                                    ['noa', 'Notice of Account'],
+                                    ['billing-statement', 'Billing Statement'],
+                                  ] as const
+                                ).map(([kind, label]) => (
+                                  <Button
+                                    key={kind}
+                                    variant="outline"
+                                    size="sm"
+                                    loading={
+                                      documentRequest?.studentId === student.id &&
+                                      documentRequest.kind === kind &&
+                                      !documentData
+                                    }
+                                    onClick={() =>
+                                      setDocumentRequest({ studentId: student.id, kind })
+                                    }
+                                  >
+                                    {label}
+                                  </Button>
+                                ))}
+                              </div>
+                            </td>
                           </tr>
                           {isOpen && (
                             <tr>
-                              <td colSpan={8} className="bg-gray-50 px-4 py-4">
+                              <td colSpan={9} className="bg-gray-50 px-4 py-4">
                                 <StudentOtherFees
                                   student={student}
                                   academicYear={academicYear}
@@ -403,6 +476,28 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
           </>
         )}
       </div>
+
+      {documentRequest?.kind === 'noa' && documentData && (
+        <NoticeOfAccountModal
+          data={documentData}
+          academicYear={academicYear}
+          institutionName={institutionName}
+          institutionAddress={institutionAddress}
+          logoUrl={logoUrl}
+          onClose={() => setDocumentRequest(null)}
+        />
+      )}
+
+      {documentRequest?.kind === 'billing-statement' && documentData && (
+        <BillingStatementModal
+          data={documentData}
+          institutionName={institutionName}
+          institutionAddress={institutionAddress}
+          logoUrl={logoUrl}
+          defaultPreparedBy={defaultPreparedBy}
+          onClose={() => setDocumentRequest(null)}
+        />
+      )}
 
       <p className="text-xs text-gray-500">
         Total payable is made of school fees (the grade's fee amounts, less every discount —

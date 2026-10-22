@@ -1466,6 +1466,10 @@ const Finance: React.FC = () => {
         <DashboardStudentsView
           academicYearOptions={academicYearOptions}
           defaultAcademicYear={defaultAcademicYear}
+          institutionName={institution?.title}
+          institutionAddress={institution?.address}
+          logoUrl={schoolLogoUrl}
+          defaultPreparedBy={user ? `${user.first_name} ${user.last_name}`.trim() : undefined}
         />
       )}
 
