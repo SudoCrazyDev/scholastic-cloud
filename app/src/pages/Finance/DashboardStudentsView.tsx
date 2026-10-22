@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
-import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import {
+  ChevronRightIcon,
+  DocumentCurrencyDollarIcon,
+  DocumentTextIcon,
+  MagnifyingGlassIcon,
+} from '@heroicons/react/24/outline'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Select } from '../../components/select'
@@ -433,25 +438,42 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                               <div className="flex gap-2 whitespace-nowrap">
                                 {(
                                   [
-                                    ['noa', 'Notice of Account'],
-                                    ['billing-statement', 'Billing Statement'],
+                                    ['noa', 'Notice of Account', DocumentTextIcon],
+                                    [
+                                      'billing-statement',
+                                      'Billing Statement',
+                                      DocumentCurrencyDollarIcon,
+                                    ],
                                   ] as const
-                                ).map(([kind, label]) => (
-                                  <Button
-                                    key={kind}
-                                    variant="outline"
-                                    size="sm"
-                                    loading={
-                                      documentRequest?.studentId === student.id &&
-                                      documentRequest.kind === kind &&
-                                      !documentData
-                                    }
-                                    onClick={() =>
-                                      setDocumentRequest({ studentId: student.id, kind })
-                                    }
-                                  >
-                                    {label}
-                                  </Button>
+                                ).map(([kind, label, Icon]) => (
+                                  // The tooltip opens to the left: the table scrolls
+                                  // sideways, so anything above or below the first and
+                                  // last rows would be clipped.
+                                  <div key={kind} className="group relative">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="px-2"
+                                      aria-label={label}
+                                      loading={
+                                        documentRequest?.studentId === student.id &&
+                                        documentRequest.kind === kind &&
+                                        !documentData
+                                      }
+                                      onClick={() =>
+                                        setDocumentRequest({ studentId: student.id, kind })
+                                      }
+                                    >
+                                      <Icon className="h-4 w-4" />
+                                    </Button>
+                                    <span
+                                      role="tooltip"
+                                      className="pointer-events-none absolute right-full top-1/2 z-10 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                                    >
+                                      {label}
+                                    </span>
+                                  </div>
                                 ))}
                               </div>
                             </td>
