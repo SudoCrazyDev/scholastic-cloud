@@ -195,8 +195,11 @@ students from a two-day-old list — withdrawn students still resolve, new cards
 pairing. Re-pair it with a new code.
 
 **Nothing on screen at all / the browser was closed.** On a Pi, `kiosk.sh` restarts Chromium after
-3 seconds. To stop that for maintenance, `pkill -f kiosk.sh` **first**, then `pkill chromium` — the
-other order just makes it come back.
+3 seconds. To stop that for maintenance, SSH in and run `kiosk` → **Stop**. By hand it's
+`pkill -f kiosk.sh` **first**, then `pkill chromium`; the other order just makes it come back.
+
+**The gate is stuck on an old version after an update.** Run `kiosk` → **Clear the browser cache
+and restart**. That keeps the pairing and any scans still waiting to upload.
 
 ---
 

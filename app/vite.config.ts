@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, searchForWorkspaceRoot } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
@@ -14,6 +14,12 @@ export default defineConfig({
       '@api': resolve(__dirname, './src/api'),
       '@utils': resolve(__dirname, './src/utils'),
       '@types': resolve(__dirname, './src/types'),
+    },
+  },
+  server: {
+    fs: {
+      // The SMS Gateways page bundles the Pi kiosk installer from ../kiosk.
+      allow: [searchForWorkspaceRoot(process.cwd()), resolve(__dirname, '../kiosk')],
     },
   },
 })

@@ -10,6 +10,7 @@ on:
     branches: [ master ]
     paths:
       - 'app/**'
+      - 'kiosk/**'   # bundled into the SMS Gateways page's kiosk download
   workflow_dispatch:
 
 jobs:

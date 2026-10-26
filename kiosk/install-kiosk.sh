@@ -11,7 +11,12 @@
 set -euo pipefail
 
 LAUNCHER=/usr/local/bin/kiosk.sh
+MENU=/usr/local/bin/kiosk        # same script; run under this name it opens the menu
 CONFIG=/etc/default/kiosk
+# A copy of this folder, so the menu can always uninstall/re-install even after
+# the USB stick or scp'd folder it came from is gone.
+LIB_DIR=/usr/local/lib/scholasticcloud-kiosk
+SOURCE_RECORD=${XDG_CONFIG_HOME:-$HOME/.config}/kiosk-source
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
 MARKER="ScholasticCloud kiosk"
 
@@ -120,9 +125,11 @@ if [ "${1:-}" = "--uninstall" ]; then
   uninstall_labwc || true
   uninstall_wayfire || true
   uninstall_xdg || true
-  sudo rm -f "$LAUNCHER"
+  sudo rm -f "$LAUNCHER" "$MENU"
+  sudo rm -rf "$LIB_DIR"
+  rm -f "$SOURCE_RECORD"
   say "left $CONFIG in place (delete it yourself if you want the URL gone)"
-  say "Done. Stop the running kiosk with:  pkill -f kiosk.sh; pkill chromium"
+  say "Done. Stop a kiosk that is still running with:  pkill -f kiosk.sh; pkill chromium"
   exit 0
 fi
 
@@ -140,6 +147,17 @@ fi
 
 say "Installing $LAUNCHER"
 sudo install -m 0755 "$SRC_DIR/kiosk.sh" "$LAUNCHER"
+sudo ln -sf "$LAUNCHER" "$MENU"
+
+# Re-running from $LIB_DIR itself (the menu's uninstall does) must not copy
+# files onto themselves, or record $LIB_DIR as where updates come from.
+if [ "$SRC_DIR" != "$LIB_DIR" ]; then
+  sudo install -d "$LIB_DIR"
+  sudo install -m 0755 "$SRC_DIR/install-kiosk.sh" "$SRC_DIR/kiosk.sh" "$LIB_DIR/"
+  sudo install -m 0644 "$SRC_DIR/kiosk.default" "$LIB_DIR/"
+  mkdir -p "$(dirname "$SOURCE_RECORD")"
+  echo "$SRC_DIR" >"$SOURCE_RECORD"
+fi
 
 if [ -e "$CONFIG" ]; then
   say "Keeping your existing $CONFIG"
@@ -165,15 +183,12 @@ Installed.
        sudo nano $CONFIG        # KIOSK_URL is currently: ${CURRENT_URL:-unset}
 
   2. Try it now, without rebooting:
-       $LAUNCHER
+       kiosk start
 
   3. Confirm it survives a reboot:
        sudo reboot
 
-Handy afterwards:
-  pkill chromium              restart the browser (kiosk.sh puts it back)
-  pkill -f kiosk.sh           stop the kiosk for this session
-  journalctl -t kiosk         what kiosk.sh did
-  tail -f ~/.local/state/kiosk.log    Chromium's own output
-  $(basename "$0") --uninstall  undo all of this
+Afterwards, run  kiosk  (over SSH or on Ctrl-Alt-F2) for a menu to restart,
+stop, update, clear the cache, read the logs or uninstall.  kiosk help  lists
+the same actions as commands.
 EOF
