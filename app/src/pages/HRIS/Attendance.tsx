@@ -8,14 +8,54 @@ import { biometricService } from '../../services/biometricService'
 import { Select } from '../../components/select'
 import type { AttendanceLog, BiometricDevice } from '../../types'
 
-const PUNCH_LABELS: Record<string, { label: string; color: string }> = {
-  check_in:  { label: 'Check In',   color: 'bg-green-100 text-green-700' },
-  check_out: { label: 'Check Out',  color: 'bg-blue-100 text-blue-700' },
-  break_out: { label: 'Break Out',  color: 'bg-amber-100 text-amber-700' },
-  break_in:  { label: 'Break In',   color: 'bg-amber-100 text-amber-700' },
-  ot_in:     { label: 'OT In',      color: 'bg-purple-100 text-purple-700' },
-  ot_out:    { label: 'OT Out',     color: 'bg-purple-100 text-purple-700' },
-  unknown:   { label: 'Unknown',    color: 'bg-gray-100 text-gray-500' },
+const PER_PAGE = 50
+
+interface StaffDayRow {
+  key: string
+  date: string
+  staffName: string
+  linked: boolean
+  checkIn: AttendanceLog | null
+  checkOut: AttendanceLog | null
+  first: AttendanceLog
+}
+
+// punched_at is the device's local wall-clock time, so read the clock straight off the string.
+const formatTime = (punchedAt: string) => {
+  const [h, m] = punchedAt.slice(11, 16).split(':').map(Number)
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+// One row per staff per day. Check-in is the earliest check-in punch (or the earliest
+// punch of any kind); check-out is the latest check-out punch (or the latest other punch).
+const groupByStaffDay = (logs: AttendanceLog[]): StaffDayRow[] => {
+  const groups = new Map<string, AttendanceLog[]>()
+  for (const log of logs) {
+    const key = `${log.user_id ?? `zk:${log.zk_user_id}`}|${log.punched_at.slice(0, 10)}`
+    const group = groups.get(key)
+    if (group) group.push(log)
+    else groups.set(key, [log])
+  }
+
+  const rows: StaffDayRow[] = []
+  groups.forEach((punches, key) => {
+    const sorted = [...punches].sort((a, b) => a.punched_at.localeCompare(b.punched_at))
+    const first = sorted[0]
+    const checkIn = sorted.find((p) => p.punch_type === 'check_in') ?? first
+    const checkOut = [...sorted].reverse().find((p) => p.punch_type === 'check_out')
+      ?? (sorted.length > 1 && sorted[sorted.length - 1] !== checkIn ? sorted[sorted.length - 1] : null)
+    rows.push({
+      key,
+      date: first.punched_at.slice(0, 10),
+      staffName: first.user ? `${first.user.first_name} ${first.user.last_name}` : `ZK #${first.zk_user_id}`,
+      linked: !!first.user,
+      checkIn,
+      checkOut,
+      first,
+    })
+  })
+
+  return rows.sort((a, b) => b.date.localeCompare(a.date) || a.staffName.localeCompare(b.staffName))
 }
 
 const VerifyIcon: React.FC<{ type: string }> = ({ type }) => {
@@ -45,19 +85,23 @@ const Attendance: React.FC = () => {
   ]
 
   const logsQuery = useQuery({
-    queryKey: ['attendance-logs', deviceId, fromDate, toDate, page],
+    queryKey: ['attendance-logs', deviceId, fromDate, toDate],
+    // Rows are grouped per staff per day, so pull every punch in the range and page the rows here.
     queryFn: () => attendanceLogService.getLogs({
       device_id: deviceId || undefined,
       from: fromDate || undefined,
       to: toDate || undefined,
-      page,
-      per_page: 50,
+      per_page: 5000,
     }),
     refetchInterval: 30_000,
   })
 
   const logs: AttendanceLog[] = logsQuery.data?.data ?? []
-  const pagination = logsQuery.data?.pagination
+  const rows = groupByStaffDay(logs)
+  const lastPage = Math.max(1, Math.ceil(rows.length / PER_PAGE))
+  const pageRows = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+  // The date is only worth showing when the filter spans more than one day.
+  const singleDay = !!fromDate && fromDate === toDate
 
   const queryClient = useQueryClient()
   const fetchMutation = useMutation({
@@ -152,7 +196,7 @@ const Attendance: React.FC = () => {
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         {logsQuery.isLoading ? (
           <div className="p-8 text-center text-gray-400">Loading attendance logs…</div>
-        ) : logs.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="p-8 text-center space-y-2">
             <Clock className="w-10 h-10 text-gray-200 mx-auto" />
             <p className="text-gray-400 text-sm">
@@ -167,56 +211,51 @@ const Attendance: React.FC = () => {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Staff</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500">Date & Time</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500">Type</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Check-In</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Check-Out</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Verify</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Device</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {logs.map((log) => {
-                const punch = PUNCH_LABELS[log.punch_type] ?? PUNCH_LABELS.unknown
-                const staffName = log.user
-                  ? `${log.user.first_name} ${log.user.last_name}`
-                  : `ZK #${log.zk_user_id}`
-                return (
-                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-800">{staffName}</div>
-                      {!log.user && (
-                        <div className="text-xs text-gray-400">Not linked to staff</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">
-                      {log.punched_at.slice(0, 19).replace('T', ' ')}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${punch.color}`}>
-                        {punch.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 text-xs text-gray-500 capitalize">
-                        <VerifyIcon type={log.verify_type} />
-                        {log.verify_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-400">
-                      {log.device?.name ?? '—'}
-                    </td>
-                  </tr>
-                )
-              })}
+              {pageRows.map((row) => (
+                <tr key={row.key} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-800">{row.staffName}</div>
+                    {!singleDay && (
+                      <div className="text-xs text-gray-400">{row.date}</div>
+                    )}
+                    {!row.linked && (
+                      <div className="text-xs text-gray-400">Not linked to staff</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-green-700">
+                    {row.checkIn ? formatTime(row.checkIn.punched_at) : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-blue-700">
+                    {row.checkOut ? formatTime(row.checkOut.punched_at) : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 capitalize">
+                      <VerifyIcon type={row.first.verify_type} />
+                      {row.first.verify_type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-400">
+                    {row.first.device?.name ?? '—'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.last_page > 1 && (
+      {lastPage > 1 && (
         <div className="flex items-center justify-between text-sm text-gray-500">
           <span>
-            Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, pagination.total)} of {pagination.total}
+            Showing {((page - 1) * PER_PAGE) + 1}–{Math.min(page * PER_PAGE, rows.length)} of {rows.length}
           </span>
           <div className="flex gap-2">
             <button
@@ -225,8 +264,8 @@ const Attendance: React.FC = () => {
               className="px-3 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
             >Previous</button>
             <button
-              onClick={() => setPage((p) => Math.min(pagination.last_page, p + 1))}
-              disabled={page === pagination.last_page}
+              onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+              disabled={page === lastPage}
               className="px-3 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
             >Next</button>
           </div>
