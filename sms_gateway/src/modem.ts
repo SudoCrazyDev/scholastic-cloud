@@ -13,6 +13,16 @@ export interface StoredMessage {
   pdu: string
 }
 
+/** A CMGS that stalled — before the '>' prompt, or after the payload went out. */
+export class CmgsTimeoutError extends Error {
+  constructor(
+    message: string,
+    readonly afterPrompt: boolean,
+  ) {
+    super(message)
+  }
+}
+
 /**
  * Thin AT-command driver over a serial port. Serializes commands (one at a time),
  * assembles CRLF-delimited lines, and understands the `>` prompt used by CMGS.
@@ -212,6 +222,36 @@ export class Modem {
     await this.init()
   }
 
+  /**
+   * Why won't the modem take a text? Asked after a send gets no '>' prompt
+   * while plain AT still works — almost always the SIM or network registration,
+   * and without this every failure reads the same in the portal.
+   */
+  async diagnose(): Promise<string> {
+    const ask = async (cmd: string, re: RegExp) =>
+      (await this.command(cmd, 4000).catch(() => [] as string[])).join(' ').match(re)?.[1]?.trim() ?? null
+
+    if (!(await this.ping())) return 'modem not answering AT'
+    const pin = await ask('AT+CPIN?', /\+CPIN:\s*(.+)/)
+    const reg = await ask('AT+CREG?', /\+CREG:\s*\d+,(\d+)/)
+    const csq = await ask('AT+CSQ', /\+CSQ:\s*(\d+)/)
+
+    const regText: Record<string, string> = {
+      '0': 'not registered on the network',
+      '1': 'registered',
+      '2': 'searching for network',
+      '3': 'network registration denied',
+      '4': 'registration unknown',
+      '5': 'registered (roaming)',
+    }
+    const parts = [
+      pin === null ? 'SIM status unknown' : pin === 'READY' ? 'SIM ready' : `SIM ${pin}`,
+      reg === null ? 'registration unknown' : (regText[reg] ?? `CREG ${reg}`),
+      csq === null || csq === '99' ? 'no signal reading' : `signal ${csq}/31`,
+    ]
+    return parts.join(', ')
+  }
+
   /** Signal quality: AT+CSQ -> rssi 0..31 (99 = unknown). */
   async signal(): Promise<number | null> {
     try {
@@ -273,7 +313,11 @@ export class Modem {
       new Promise<string | null>((resolve, reject) => {
         const lines: string[] = []
         let promptFired = false
-        const timer = setTimeout(() => {
+        // A healthy modem shows '>' within a second; only the network hand-off
+        // after the payload can take long. Waiting 30s for a prompt that isn't
+        // coming just stalls every text queued behind it.
+        let timer = setTimeout(() => onTimeout(), 10000)
+        const onTimeout = () => {
           cleanup()
           // Abort a half-entered CMGS so the modem returns to command mode and
           // the next message isn't wedged. ESC (0x1B) cancels PDU input.
@@ -290,8 +334,8 @@ export class Modem {
           const detail = promptFired
             ? 'sent message but no +CMGS/OK from modem (check SIM balance / network registration)'
             : "modem never showed the '>' prompt"
-          reject(new Error(`CMGS timeout: ${cmd} — ${detail}`))
-        }, 30000)
+          reject(new CmgsTimeoutError(`CMGS timeout: ${cmd} — ${detail}`, promptFired))
+        }
         const handler = (line: string) => {
           if (line === 'OK') {
             cleanup()
@@ -307,6 +351,8 @@ export class Modem {
         }
         const onPrompt = () => {
           promptFired = true
+          clearTimeout(timer)
+          timer = setTimeout(() => onTimeout(), 60000)
           this.lineWaiters.push(handler)
           this.write(payload)
         }
