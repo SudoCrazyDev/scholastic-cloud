@@ -66,7 +66,7 @@ const GateStatusChip: React.FC<GateStatusChipProps> = ({ state }) => {
       >
         <span
           className={`w-1.5 h-1.5 rounded-full ${
-            syncing ? 'bg-amber-400 animate-pulse' : online ? 'bg-emerald-500' : 'bg-gray-300'
+            syncing ? 'bg-amber-400' : online ? 'bg-emerald-500' : 'bg-gray-300'
           }`}
         />
         <span className="tabular-nums">{parts.join(' · ') || 'no roster yet'}</span>

@@ -447,8 +447,9 @@ Findings from building it, each of which would have shipped silently:
 - **`AnimatePresence mode="wait"` was the latency.** It holds the incoming card until the outgoing
   subtree finishes leaving, and the idle block contains two `repeat: Infinity` pulse rings on a
   three-second cycle — so the card waited on wherever that cycle happened to be, measured at
-  1.5–2 s. This was always there; the network round trip used to hide it. Exits are now explicitly
-  bounded. **Worth remembering when optimising anything else behind this component:** removing the
+  1.5–2 s. This was always there; the network round trip used to hide it. The kiosk has since
+  dropped animation altogether — cards swap in place, and a card stays up until the next tap
+  replaces it rather than clearing on a timer. **Worth remembering when optimising anything else behind this component:** removing the
   network cost only revealed what was underneath it.
 
 ### What the phase-3 review found

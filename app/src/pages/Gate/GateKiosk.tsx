@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { rfidScanLogService } from '../../services/rfidScanLogService';
 import { correctedNow } from './offline/clock';
 import { resolveLocally } from './offline/resolve';
@@ -17,8 +16,6 @@ interface GateKioskProps {
   sync?: GateSyncState;
 }
 
-const DISPLAY_DURATION_MS = 5000;
-
 /**
  * What is on screen right now.
  *
@@ -34,6 +31,8 @@ const DISPLAY_DURATION_MS = 5000;
  *    that tells the truth about it.
  */
 interface DisplayResult {
+  /** The tap this card belongs to — see `scanSeq`. */
+  seq: number;
   name: string;
   gradeAndSection: string | null;
   photoUrl: string | null;
@@ -60,12 +59,15 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
    */
   const [errorNote, setErrorNote] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Which tap the display belongs to. A scan that is still in flight when the
    * next student taps must not be allowed to overwrite the newer card — that is
    * precisely the queue-forming behaviour the local roster exists to remove.
+   *
+   * There is no auto-clear: a card stays up until the next tap replaces it, so
+   * whatever is on screen when a reply lands may be the *previous* student's.
+   * A reply only fills in from the card on screen when that card is its own.
    */
   const scanSeq = useRef(0);
 
@@ -107,26 +109,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
     };
   }, [focusInput]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      releasePhoto();
-    };
-  }, [releasePhoto]);
-
-  const scheduleClear = useCallback((seq: number) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-
-    timerRef.current = setTimeout(() => {
-      // Only clear if nothing newer has taken the screen since.
-      if (scanSeq.current !== seq) return;
-      setResult(null);
-      setError(null);
-      setErrorNote(null);
-      releasePhoto();
-      focusInput();
-    }, DISPLAY_DURATION_MS);
-  }, [focusInput, releasePhoto]);
+  useEffect(() => releasePhoto, [releasePhoto]);
 
   const handleScan = async (scanned: string) => {
     const value = scanned.trim();
@@ -164,13 +147,13 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
       photoUrlRef.current = photoUrl;
 
       setResult({
+        seq,
         name: local.name,
         gradeAndSection: local.gradeAndSection,
         photoUrl,
         scannedAt: correctedNow(),
         status: 'pending',
       });
-      scheduleClear(seq);
     }
 
     // Returns once the scan is durable, saying whether it also got through.
@@ -190,7 +173,6 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
           : 'Scan could not be recorded',
       );
       setErrorNote(null);
-      scheduleClear(seq);
       return;
     }
 
@@ -216,22 +198,28 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
       setResult(null);
       setError('Card not recognised');
       setErrorNote('Saved on this kiosk — it will upload when the link returns');
-      scheduleClear(seq);
       return;
     }
 
-    setResult((current) => ({
+    // The roster could not name this tap, so any photo still held is the
+    // previous student's.
+    if (!local) releasePhoto();
+
+    setResult((current) => {
       // The local roster's answer first: it is what is already on screen, and
       // re-fetching a photo over the same slow link would undo the caching.
-      name: current?.name || named,
-      gradeAndSection: current?.gradeAndSection ?? serverSection,
-      photoUrl: current?.photoUrl ?? null,
-      // The device's own stamp is the record now — see `outbox.ts`.
-      scannedAt: current?.scannedAt ?? correctedNow(),
-      status: submission.status === 'recorded' ? 'recorded' : 'queued',
-    }));
+      const own = current?.seq === seq ? current : null;
 
-    scheduleClear(seq);
+      return {
+        seq,
+        name: own?.name || named,
+        gradeAndSection: own?.gradeAndSection ?? serverSection,
+        photoUrl: own?.photoUrl ?? null,
+        // The device's own stamp is the record now — see `outbox.ts`.
+        scannedAt: own?.scannedAt ?? correctedNow(),
+        status: submission.status === 'recorded' ? 'recorded' : 'queued',
+      };
+    });
   };
 
   /**
@@ -259,23 +247,16 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
             .join(' ')
         : '';
 
-      setResult((current) => {
-        // Keep the cached photo already on screen; re-fetching the server's URL
-        // over the same slow link would undo the point of caching it.
-        const photoUrl = current?.photoUrl ?? student?.profile_picture ?? null;
-
-        return {
-          name: name || current?.name || '',
-          gradeAndSection: section
-            ? `${section.grade_level} — ${section.title}`
-            : (current?.gradeAndSection ?? null),
-          photoUrl,
-          scannedAt: new Date(response.data.scanned_at),
-          status: 'recorded',
-        };
+      // The card on screen, if any, is the previous tap's; nothing of it carries over.
+      releasePhoto();
+      setResult({
+        seq,
+        name,
+        gradeAndSection: section ? `${section.grade_level} — ${section.title}` : null,
+        photoUrl: student?.profile_picture ?? null,
+        scannedAt: new Date(response.data.scanned_at),
+        status: 'recorded',
       });
-
-      scheduleClear(seq);
     } catch (err: unknown) {
       if (scanSeq.current !== seq) return;
 
@@ -286,7 +267,6 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
       releasePhoto();
       setResult(null);
       setError(message);
-      scheduleClear(seq);
     } finally {
       focusInput();
     }
@@ -340,7 +320,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
       <header className="w-full flex items-center justify-between px-8 pt-6 pb-4">
         <div className="flex items-center gap-3">
           <div
-            className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+            className={`w-2.5 h-2.5 rounded-full ${
               isEnter ? 'bg-emerald-500' : 'bg-rose-500'
             }`}
           />
@@ -372,241 +352,145 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
       {/* ───── Main Content ───── */}
       <main className="flex-1 flex flex-col items-center justify-center w-full max-w-3xl px-8">
         {/* Clock */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-14"
-        >
+        <div className="text-center mb-14">
           <div className="text-[6.5rem] leading-none font-extralight tracking-wider tabular-nums text-gray-800">
             {formattedTime}
           </div>
           <div className="text-lg text-gray-400 mt-4 tracking-wide font-light">
             {formattedDate}
           </div>
-        </motion.div>
+        </div>
 
         {/* Scan Area */}
         <div className="w-full">
-          <AnimatePresence mode="wait">
-            {result ? (
-              /* ── Scan Result Card ── */
-              <motion.div
-                key="result"
-                initial={{ opacity: 0, scale: 0.92, y: 24 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.92, y: -24, transition: { duration: 0.15 } }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                className={`rounded-3xl border backdrop-blur-sm p-10 text-center ${
+          {result ? (
+            /* ── Scan Result Card — stays up until the next tap replaces it ── */
+            <div
+              className={`rounded-3xl border backdrop-blur-sm p-10 text-center ${
+                isEnter
+                  ? 'border-emerald-200 bg-white/80 shadow-[0_4px_40px_-8px_rgba(16,185,129,0.15)]'
+                  : 'border-rose-200 bg-white/80 shadow-[0_4px_40px_-8px_rgba(244,63,94,0.15)]'
+              }`}
+            >
+              {/* Status badge */}
+              <div
+                className={`inline-flex items-center gap-2.5 px-5 py-2 rounded-full mb-8 ${
                   isEnter
-                    ? 'border-emerald-200 bg-white/80 shadow-[0_4px_40px_-8px_rgba(16,185,129,0.15)]'
-                    : 'border-rose-200 bg-white/80 shadow-[0_4px_40px_-8px_rgba(244,63,94,0.15)]'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-700 border border-rose-200'
                 }`}
               >
-                {/* Status badge */}
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 22 }}
-                  className={`inline-flex items-center gap-2.5 px-5 py-2 rounded-full mb-8 ${
+                {isEnter ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                    <polyline points="10 17 15 12 10 7" />
+                    <line x1="15" y1="12" x2="3" y2="12" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                )}
+                <span className="font-semibold text-sm tracking-wider uppercase">
+                  {isEnter ? 'Welcome' : 'Goodbye'}
+                </span>
+              </div>
+
+              {/* Profile picture */}
+              <div className="flex justify-center mb-8">
+                <div
+                  className={`w-56 h-56 rounded-full border-4 overflow-hidden ${
+                    isEnter ? 'border-emerald-300' : 'border-rose-300'
+                  } bg-gray-100`}
+                >
+                  {result.photoUrl ? (
+                    <img
+                      src={result.photoUrl}
+                      alt={result.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-28 h-28 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Student name */}
+              <h2 className="text-6xl font-bold text-gray-900 mb-3">{result.name}</h2>
+
+              {/* Grade level and section */}
+              {result.gradeAndSection && (
+                <p className="text-3xl text-gray-500">{result.gradeAndSection}</p>
+              )}
+
+              {/* Timestamp */}
+              <p className="text-sm text-gray-400 mt-5">
+                Scanned at{' '}
+                {result.scannedAt.toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true,
+                })}
+                {result.status === 'pending' && <span className="text-gray-300"> · saving…</span>}
+                {result.status === 'queued' && (
+                  <span className="text-amber-600"> · saved, waiting to upload</span>
+                )}
+              </p>
+            </div>
+          ) : error ? (
+            /* ── Error Card ── */
+            <div
+              className="rounded-3xl border border-red-200 bg-white/80 backdrop-blur-sm p-10 text-center shadow-[0_4px_40px_-8px_rgba(239,68,68,0.12)]"
+            >
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-50 border border-red-200 mb-5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+              </div>
+              <p className="text-xl font-semibold text-red-600 mb-1">{error}</p>
+              <p className="text-sm text-gray-400">{errorNote ?? 'Please try again'}</p>
+            </div>
+          ) : (
+            /* ── Idle / Waiting for the first scan ── */
+            <div className="text-center">
+              {/* Scan indicator */}
+              <div className="inline-flex items-center justify-center mb-8">
+                <div
+                  className={`w-24 h-24 rounded-full flex items-center justify-center border ${
                     isEnter
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                      : 'bg-rose-50 text-rose-600 border-rose-200'
                   }`}
                 >
-                  {isEnter ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                      <polyline points="10 17 15 12 10 7" />
-                      <line x1="15" y1="12" x2="3" y2="12" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                  )}
-                  <span className="font-semibold text-sm tracking-wider uppercase">
-                    {isEnter ? 'Welcome' : 'Goodbye'}
-                  </span>
-                </motion.div>
-
-                {/* Profile picture */}
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 20 }}
-                  className="flex justify-center mb-8"
-                >
-                  <div
-                    className={`w-56 h-56 rounded-full border-4 overflow-hidden ${
-                      isEnter ? 'border-emerald-300' : 'border-rose-300'
-                    } bg-gray-100`}
-                  >
-                    {result.photoUrl ? (
-                      <img
-                        src={result.photoUrl}
-                        alt={result.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-28 h-28 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-
-                {/* Student name */}
-                <motion.h2
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="text-6xl font-bold text-gray-900 mb-3"
-                >
-                  {result.name}
-                </motion.h2>
-
-                {/* Grade level and section */}
-                {result.gradeAndSection && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.35 }}
-                    className="text-3xl text-gray-500"
-                  >
-                    {result.gradeAndSection}
-                  </motion.p>
-                )}
-
-                {/* Timestamp */}
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.45 }}
-                  className="text-sm text-gray-400 mt-5"
-                >
-                  Scanned at{' '}
-                  {result.scannedAt.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: true,
-                  })}
-                  {result.status === 'pending' && <span className="text-gray-300"> · saving…</span>}
-                  {result.status === 'queued' && (
-                    <span className="text-amber-600"> · saved, waiting to upload</span>
-                  )}
-                </motion.p>
-
-                {/* Auto-dismiss progress bar */}
-                <div className="mt-8 mx-auto max-w-[12rem]">
-                  <div className="h-px bg-gray-200 rounded-full overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${
-                        isEnter ? 'bg-emerald-500' : 'bg-rose-500'
-                      }`}
-                      initial={{ width: '100%' }}
-                      animate={{ width: '0%' }}
-                      transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            ) : error ? (
-              /* ── Error Card ── */
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, scale: 0.92, y: 24 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.92, y: -24, transition: { duration: 0.15 } }}
-                transition={{ duration: 0.3 }}
-                className="rounded-3xl border border-red-200 bg-white/80 backdrop-blur-sm p-10 text-center shadow-[0_4px_40px_-8px_rgba(239,68,68,0.12)]"
-              >
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-50 border border-red-200 mb-5">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    <line x1="2" y1="10" x2="22" y2="10" />
                   </svg>
                 </div>
-                <p className="text-xl font-semibold text-red-600 mb-1">{error}</p>
-                <p className="text-sm text-gray-400">{errorNote ?? 'Please try again'}</p>
-                <div className="mt-8 mx-auto max-w-[12rem]">
-                  <div className="h-px bg-gray-200 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full bg-red-500"
-                      initial={{ width: '100%' }}
-                      animate={{ width: '0%' }}
-                      transition={{ duration: DISPLAY_DURATION_MS / 1000, ease: 'linear' }}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              /* ── Idle / Waiting for scan ── */
-              <motion.div
-                key="idle"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                /*
-                 * Explicit, and short, on purpose. `AnimatePresence mode="wait"`
-                 * holds the incoming card until this subtree has finished
-                 * leaving, and this one contains two `repeat: Infinity` pulse
-                 * rings on a three-second cycle — left to the default, the
-                 * result card waited on wherever that cycle happened to be,
-                 * which measured 1.5–2s. The network round trip used to hide
-                 * that; with the roster local it *is* the latency.
-                 */
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
-                className="text-center"
-              >
-                {/* Pulsing scan indicator */}
-                <div className="relative inline-flex items-center justify-center mb-8">
-                  <motion.div
-                    className={`absolute w-32 h-32 rounded-full ${
-                      isEnter ? 'bg-emerald-200/40' : 'bg-rose-200/40'
-                    }`}
-                    animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                  <motion.div
-                    className={`absolute w-32 h-32 rounded-full ${
-                      isEnter ? 'bg-emerald-200/30' : 'bg-rose-200/30'
-                    }`}
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0, 0.4] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
-                  />
-                  <div
-                    className={`relative w-24 h-24 rounded-full flex items-center justify-center border ${
-                      isEnter
-                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                        : 'bg-rose-50 text-rose-600 border-rose-200'
-                    }`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="5" width="20" height="14" rx="2" />
-                      <line x1="2" y1="10" x2="22" y2="10" />
-                    </svg>
-                  </div>
-                </div>
+              </div>
 
-                <p
-                  className={`text-2xl font-light ${
-                    isEnter ? 'text-emerald-700' : 'text-rose-700'
-                  }`}
-                >
-                  Scan your ID to {isEnter ? 'enter' : 'exit'}
-                </p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Place your ID card on the scanner
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <p
+                className={`text-2xl font-light ${
+                  isEnter ? 'text-emerald-700' : 'text-rose-700'
+                }`}
+              >
+                Scan your ID to {isEnter ? 'enter' : 'exit'}
+              </p>
+              <p className="text-sm text-gray-400 mt-2">
+                Place your ID card on the scanner
+              </p>
+            </div>
+          )}
         </div>
       </main>
 
