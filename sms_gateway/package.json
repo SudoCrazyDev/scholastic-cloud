@@ -1,6 +1,6 @@
 {
   "name": "scholasticcloud-sms-gateway",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Headless on-prem SMS kiosk agent for ScholasticCloud. Sends and receives SMS through a USB GSM modem via AT commands, driven entirely by the ScholasticCloud portal.",
   "type": "module",
@@ -20,7 +20,8 @@
     "restart": "node scripts/ctl.mjs restart",
     "stop": "node scripts/ctl.mjs stop",
     "status": "node scripts/ctl.mjs status",
-    "logs": "node scripts/ctl.mjs logs"
+    "logs": "node scripts/ctl.mjs logs",
+    "update": "node scripts/update.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

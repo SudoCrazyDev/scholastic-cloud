@@ -52,7 +52,11 @@ mkdir -p "$APP_DIR"
 cp -r "$SRC_DIR/package.json" "$SRC_DIR/tsconfig.json" "$SRC_DIR/src" "$SRC_DIR/scripts" "$SRC_DIR/deploy" "$APP_DIR/"
 [ -f "$SRC_DIR/package-lock.json" ] && cp "$SRC_DIR/package-lock.json" "$APP_DIR/"
 # Config precedence: portal-downloaded sms-gateway.env, then .env, then the example.
-if [ -f "$SRC_DIR/sms-gateway.env" ]; then
+# A reinstall over a paired kiosk keeps its config: the downloaded file has no
+# token, and an already-paired gateway can't pair again.
+if [ -f "$APP_DIR/sms-gateway.env" ] || [ -f "$APP_DIR/.env" ]; then
+  echo "   Keeping the existing config in $APP_DIR"
+elif [ -f "$SRC_DIR/sms-gateway.env" ]; then
   cp "$SRC_DIR/sms-gateway.env" "$APP_DIR/sms-gateway.env"
 elif [ -f "$SRC_DIR/.env" ]; then
   cp "$SRC_DIR/.env" "$APP_DIR/.env"

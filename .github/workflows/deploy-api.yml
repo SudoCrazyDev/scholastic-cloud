@@ -9,6 +9,9 @@ on:
     branches: [ master ]
     paths:
       - 'api/**'
+      # The installer download and `npm run update` serve the agent from the
+      # API's bundled copy, so an agent change has to redeploy the API too.
+      - 'sms_gateway/**'
   workflow_dispatch:
 
 env:

@@ -124,6 +124,28 @@ npm run pair -- <CODE>            # code is printed at the bottom of sms-gateway
 > on the device. It also omits the long-lived token (that's created at pairing
 > and stays on the device).
 
+## Updating
+
+The portal's gateway list shows each kiosk's agent version and flags the ones
+behind. On the kiosk, from the install folder (`/opt/sms_gateway` on Linux,
+the extracted folder in an elevated PowerShell on Windows):
+
+```bash
+npm run update            # shows installed vs latest, then: 1) Update now  2) Cancel
+npm run update -- --yes   # no menu, for scripted use
+```
+
+It downloads the latest agent from the portal using the kiosk's own gateway
+token, rebuilds, and restarts the service. The kiosk's `.env` /
+`sms-gateway.env`, `node_modules` and logs are left alone; if the new version
+fails to build, the previous files are put back and the service keeps running.
+
+Kiosks on agent 0.2.x predate this command and need one manual upgrade: download
+a fresh installer zip, extract it, and run `sudo ./deploy/install.sh` again — it
+keeps the existing paired config — then `npm run restart`. On Windows, copy the
+existing `.env`/`sms-gateway.env` into the new folder before running
+`deploy\install.ps1`.
+
 ## Configuration (`.env`)
 
 | Key | Meaning |

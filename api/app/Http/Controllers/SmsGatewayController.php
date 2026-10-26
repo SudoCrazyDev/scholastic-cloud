@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SmsGateway;
 use App\Support\GatewayRuntime;
+use App\Support\SmsAgentBundle;
 use App\Support\ZipBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -205,18 +206,13 @@ class SmsGatewayController extends Controller
             return response('Gateway not found', 404);
         }
 
-        // Vendored snapshot (present on API-only deploys) preferred; fall back to
-        // the sibling sms_gateway/ folder in a full monorepo checkout.
-        $agentPath = is_dir(resource_path('sms-agent'))
-            ? resource_path('sms-agent')
-            : base_path('..'.DIRECTORY_SEPARATOR.'sms_gateway');
-
-        if (! is_dir($agentPath)) {
+        $files = SmsAgentBundle::files();
+        if (! $files) {
             return response('Agent bundle unavailable. Run: php artisan sms:bundle-agent', 503);
         }
 
         $zip = new ZipBuilder;
-        foreach ($this->agentFiles($agentPath) as $relative => $absolute) {
+        foreach ($files as $relative => $absolute) {
             $zip->addFile('sms_gateway/'.$relative, (string) file_get_contents($absolute));
         }
         $zip->addFile('sms_gateway/sms-gateway.env', $this->buildEnvContent($request, $gateway));
@@ -226,41 +222,6 @@ class SmsGatewayController extends Controller
         return response($zip->build(), 200)
             ->header('Content-Type', 'application/zip')
             ->header('Content-Disposition', "attachment; filename=\"sms-gateway-{$slug}.zip\"");
-    }
-
-    /**
-     * Relative => absolute paths of the agent source, excluding build/runtime
-     * artifacts (so the sibling-folder fallback doesn't drag in node_modules).
-     *
-     * @return array<string,string>
-     */
-    private function agentFiles(string $root): array
-    {
-        $excludeDirs = ['node_modules', 'dist', '.git'];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveCallbackFilterIterator(
-                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
-                function (\SplFileInfo $current) use ($excludeDirs) {
-                    if ($current->isDir()) {
-                        return ! in_array($current->getFilename(), $excludeDirs, true);
-                    }
-
-                    return $current->getFilename() !== '.env'
-                        && ! str_ends_with($current->getFilename(), '.log');
-                }
-            )
-        );
-
-        $files = [];
-        foreach ($iterator as $file) {
-            /** @var \SplFileInfo $file */
-            if ($file->isFile()) {
-                $relative = ltrim(str_replace($root, '', $file->getPathname()), '/\\');
-                $files[str_replace('\\', '/', $relative)] = $file->getPathname();
-            }
-        }
-
-        return $files;
     }
 
     /** Build the pre-filled agent .env, minting a fresh pairing code when needed. */
@@ -345,6 +306,7 @@ ENV;
             'imei' => $gateway->imei,
             'modem_model' => $gateway->modem_model,
             'agent_version' => $gateway->agent_version,
+            'latest_agent_version' => SmsAgentBundle::version(),
             'last_seen_at' => $gateway->last_seen_at?->toISOString(),
             'pairing_code_expires_at' => $gateway->pairing_code_expires_at?->toISOString(),
             'created_at' => $gateway->created_at->toISOString(),

@@ -468,7 +468,19 @@ const Gateways: React.FC = () => {
                   <td className="px-4 py-3 text-gray-600">{g.network_operator ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{g.sim_msisdn ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{g.sim_balance ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600 capitalize">{g.platform}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <div className="capitalize">{g.platform}</div>
+                    {g.agent_version && <div className="text-xs text-gray-400">v{g.agent_version}</div>}
+                    {g.agent_version && g.latest_agent_version &&
+                      g.agent_version.localeCompare(g.latest_agent_version, undefined, { numeric: true }) < 0 && (
+                        <div
+                          className="text-xs text-amber-600"
+                          title="On the kiosk, run: npm run update"
+                        >
+                          v{g.latest_agent_version} available
+                        </div>
+                      )}
+                  </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {g.last_seen_at ? new Date(g.last_seen_at).toLocaleString() : '—'}
                   </td>

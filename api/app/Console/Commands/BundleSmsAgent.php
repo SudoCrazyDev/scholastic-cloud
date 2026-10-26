@@ -21,7 +21,7 @@ class BundleSmsAgent extends Command
     /** Directories/files never included in the bundle. */
     private const EXCLUDE_DIRS = ['node_modules', 'dist', '.git'];
 
-    private const EXCLUDE_FILES = ['.env'];
+    private const EXCLUDE_FILES = ['.env', 'sms-gateway.env'];
 
     public function handle(): int
     {

@@ -8,6 +8,7 @@ use App\Models\SmsOptOut;
 use App\Models\SmsSetting;
 use App\Services\SmsService;
 use App\Support\GatewayRuntime;
+use App\Support\SmsAgentBundle;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -368,5 +369,31 @@ class SmsBridgeController extends Controller
         }
 
         return response()->json(['success' => true, 'stored' => $stored]);
+    }
+
+    /** The agent version this API would install, so a kiosk can tell it is behind. */
+    public function agentVersion(): JsonResponse
+    {
+        return response()->json(['version' => SmsAgentBundle::version()]);
+    }
+
+    /**
+     * The whole agent source, for `npm run update` on the kiosk. Files travel
+     * as base64 in JSON rather than a zip so the kiosk needs no unzip tool —
+     * the bundle is a few hundred KB. Never includes the kiosk's own .env.
+     */
+    public function agentBundle(): JsonResponse
+    {
+        $files = SmsAgentBundle::files();
+        if (! $files) {
+            return response()->json(['message' => 'Agent bundle unavailable'], 503);
+        }
+
+        $out = [];
+        foreach ($files as $relative => $absolute) {
+            $out[] = ['path' => $relative, 'content' => base64_encode((string) file_get_contents($absolute))];
+        }
+
+        return response()->json(['version' => SmsAgentBundle::version(), 'files' => $out]);
     }
 }

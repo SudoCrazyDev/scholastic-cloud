@@ -1,6 +1,6 @@
 import { AGENT_VERSION, type Config } from './config.js'
 import { log, logTail, logsSince, runId } from './logger.js'
-import { Modem, type ModemInfo } from './modem.js'
+import { CmgsTimeoutError, Modem, type ModemInfo } from './modem.js'
 import { Portal, withRetry, type OutboxMessage } from './portal.js'
 import { ConcatBuffer } from './concat.js'
 
@@ -192,11 +192,30 @@ export class Agent {
         results.push({ id: m.id, status: 'sent', provider_ref: ref ?? undefined, sent_at: new Date().toISOString() })
         log.info(`sent ${m.to_number} ref=${ref ?? '-'}`)
       } catch (e) {
-        results.push({ id: m.id, status: 'failed', error: String(e).slice(0, 480) })
-        log.warn(`send failed ${m.to_number}: ${String(e)}`)
+        let error = String(e)
+        if (e instanceof CmgsTimeoutError && !e.afterPrompt) {
+          error += ` [${await this.modem.diagnose()}]`
+          await this.reinitModem()
+        }
+        results.push({ id: m.id, status: 'failed', error: error.slice(0, 480) })
+        log.warn(`send failed ${m.to_number}: ${error}`)
       }
     }
     return results
+  }
+
+  /**
+   * Re-apply echo-off, PDU mode and message storage. A modem that browned out
+   * or reset itself comes back answering AT with all of that lost, and refuses
+   * every send until it is set again — the heartbeat never notices.
+   */
+  private async reinitModem(): Promise<void> {
+    try {
+      await this.modem.init()
+      log.info('Modem re-initialised after a stalled send')
+    } catch (e) {
+      log.warn('modem re-init failed', String(e))
+    }
   }
 
   private async inboxLoop(): Promise<void> {

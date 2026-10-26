@@ -3535,6 +3535,8 @@ export interface SmsGateway {
   imei: string | null;
   modem_model: string | null;
   agent_version: string | null;
+  /** The agent version this API serves to `npm run update` on the kiosk. */
+  latest_agent_version: string | null;
   /**
    * Modem presence, reported on each heartbeat and held only in the server's
    * cache — null means no agent running 0.2.0+ has reported yet. Distinct from

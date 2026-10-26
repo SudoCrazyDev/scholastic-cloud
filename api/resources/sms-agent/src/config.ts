@@ -82,4 +82,6 @@ export function persistToken(token: string): void {
   writeFileSync(ENV_PATH, contents, 'utf8')
 }
 
-export const AGENT_VERSION = '0.2.0'
+// Read from package.json so the version the portal sees and the one
+// `npm run update` compares against can never disagree.
+export const AGENT_VERSION: string = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')).version

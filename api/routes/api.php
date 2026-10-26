@@ -118,6 +118,8 @@ Route::middleware('auth.sms.token')->group(function () {
     Route::post('/sms-gateway/delivery-reports', [SmsBridgeController::class, 'deliveryReports']);
     Route::post('/sms-gateway/inbox', [SmsBridgeController::class, 'inbox']);
     Route::post('/sms-gateway/logs', [SmsBridgeController::class, 'logs']);
+    Route::get('/sms-gateway/agent/version', [SmsBridgeController::class, 'agentVersion']);
+    Route::get('/sms-gateway/agent/bundle', [SmsBridgeController::class, 'agentBundle']);
 });
 
 // Public routes (no authentication required)
