@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import GateKiosk from './GateKiosk'
 import GatePairing from './GatePairing'
 import GateConfigError from './GateConfigError'
@@ -11,25 +10,21 @@ interface GateTerminalProps {
 }
 
 /**
- * Decides which of the three states a gate terminal is in.
+ * Decides which of the two states a gate terminal is in.
  *
  *  1. **Paired** — the device has its own token, so it holds a local roster and
  *     resolves taps without the network. Institution and gate come from the
  *     token, not the URL.
- *  2. **Legacy** — no token, but `?institution_id=` is present. Behaves exactly
- *     as this page always has: online-only, one round trip per tap. Kiosks
- *     already in the field keep working untouched until someone pairs them.
- *  3. **Unpaired** — neither. Shows the pairing screen instead of the old
- *     "configuration required" error, because that is now a step in an install
- *     rather than a mistake.
+ *  2. **Unpaired** — shows the pairing screen.
+ *
+ * There used to be a third: no token but `?institution_id=` in the URL, which
+ * ran online-only with one round trip per tap. At a morning rush that was slow,
+ * and its public endpoint shares the pairing throttle — ten a minute per
+ * address — so taps started failing with "Too Many Attempts". It is gone; an
+ * old URL that still carries `institution_id` now lands on the pairing screen,
+ * and the parameter is ignored.
  */
 const GateTerminal: React.FC<GateTerminalProps> = ({ type }) => {
-  const [searchParams] = useSearchParams()
-
-  const legacyInstitutionId = searchParams.get('institution_id') || ''
-  const legacyDeviceName =
-    searchParams.get('device_name') || (type === 'enter' ? 'Gate Entrance' : 'Gate Exit')
-
   const [device, setDevice] = useState<GateDeviceIdentity | null>(() =>
     isPaired() ? storedDevice() : null,
   )
@@ -60,22 +55,7 @@ const GateTerminal: React.FC<GateTerminalProps> = ({ type }) => {
       )
     }
 
-    return (
-      <GateKiosk
-        type={type}
-        institutionId={device.institution_id}
-        deviceName={device.name}
-        sync={sync}
-      />
-    )
-  }
-
-  // A revoked kiosk must not quietly carry on through the legacy public
-  // endpoint just because its URL still carries an `institution_id`. Revoking
-  // is how a school stops a device it no longer trusts; falling back here would
-  // make that button do nothing.
-  if (legacyInstitutionId && !sync.revoked) {
-    return <GateKiosk type={type} institutionId={legacyInstitutionId} deviceName={legacyDeviceName} />
+    return <GateKiosk type={type} deviceName={device.name} sync={sync} />
   }
 
   return <GatePairing type={type} onPaired={setDevice} />

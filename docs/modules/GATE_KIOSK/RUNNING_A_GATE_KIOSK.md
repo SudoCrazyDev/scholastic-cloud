@@ -57,7 +57,9 @@ across a campus without confusion.
 
 ### Raspberry Pi
 
-Follow [`kiosk/README.md`](../../../kiosk/README.md) for the full install. The only setting that
+Get the installer from **Download kiosk** on the same **Kiosk devices** card (it is also in the
+setup steps shown with the pairing code), then follow [`kiosk/README.md`](../../../kiosk/README.md)
+for the full install. The only setting that
 matters here is in `/etc/default/kiosk`:
 
 ```bash
@@ -65,8 +67,8 @@ KIOSK_URL="https://app.<school>.edu.ph/gate-enter"      # or /gate-exit
 ```
 
 **No `?institution_id=` on the end.** A paired kiosk gets its school and its gate from its own
-token; the query string is the old way and is only there so kiosks installed before this feature
-keep working.
+token. The query string was the old online-only mode, which has been retired: it is ignored now, and
+a kiosk still on such a URL shows the pairing screen until it is paired.
 
 Then `systemctl reboot`, or `pkill chromium` to restart the browser in place.
 

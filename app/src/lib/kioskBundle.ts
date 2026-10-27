@@ -1,10 +1,10 @@
 // The Pi gate-kiosk installer, straight from the repo's kiosk/ folder at build
 // time — so the download is always whatever this deploy shipped with.
-import installScript from '../../../../kiosk/install-kiosk.sh?raw'
-import kioskScript from '../../../../kiosk/kiosk.sh?raw'
-import kioskDefault from '../../../../kiosk/kiosk.default?raw'
-import kioskReadme from '../../../../kiosk/README.md?raw'
-import { buildZip } from '../../lib/zip'
+import installScript from '../../../kiosk/install-kiosk.sh?raw'
+import kioskScript from '../../../kiosk/kiosk.sh?raw'
+import kioskDefault from '../../../kiosk/kiosk.default?raw'
+import kioskReadme from '../../../kiosk/README.md?raw'
+import { buildZip } from './zip'
 
 export function downloadKioskInstaller() {
   const blob = buildZip([

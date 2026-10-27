@@ -82,7 +82,7 @@ modules should consume its data.
   `late_threshold_minutes`** (default 15, editable per gate), which is what stops a backlog texting
   parents hours late. The portal shows each kiosk's cache/queue/clock, marks a scan whose timestamp
   the device could not vouch for, and lists **cards that tapped and could not be matched** so an
-  unregistered tag stops being invisible. Unpaired kiosks keep working on `?institution_id=`.
+  unregistered tag stops being invisible. A kiosk must be paired; the online-only `?institution_id=` mode is retired.
   **Boot still needs the network** — see the known gaps. Read it before touching
   `RfidScanLogController::kioskScan`, `GateSmsNotifier`, or `app/src/pages/Gate/`.
   [Running a gate kiosk](GATE_KIOSK/RUNNING_A_GATE_KIOSK.md) is the operator-facing companion:

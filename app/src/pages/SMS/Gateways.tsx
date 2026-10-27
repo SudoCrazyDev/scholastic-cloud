@@ -4,10 +4,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import {
   Smartphone, Plus, Trash2, RefreshCw, Wifi, WifiOff, HelpCircle, Copy, Check, Signal, Download,
-  Usb, Unplug, Terminal, X, MonitorDown,
+  Usb, Unplug, Terminal, X,
 } from 'lucide-react'
 import { smsService, type SmsGatewayLogLine } from '../../services/smsService'
-import { downloadKioskInstaller } from './kioskBundle'
 import { Button } from '../../components/button'
 import { Input } from '../../components/input'
 import { Dialog } from '../../components/dialog'
@@ -392,17 +391,6 @@ const Gateways: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Temporary home for the Pi gate-kiosk installer until it has a page of its own. */}
-          <Button
-            variant="outline"
-            title="Chromium kiosk installer for a Raspberry Pi gate terminal (.zip)"
-            onClick={() => {
-              downloadKioskInstaller()
-              toast.success('Kiosk installer downloaded')
-            }}
-          >
-            <MonitorDown className="w-4 h-4 mr-1" /> Download kiosk
-          </Button>
           <Button onClick={() => { setShowAddForm((v) => !v); setNewResult(null) }}>
             <Plus className="w-4 h-4 mr-1" /> Add gateway
           </Button>

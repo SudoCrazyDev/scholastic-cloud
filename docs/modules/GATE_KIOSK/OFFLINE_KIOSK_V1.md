@@ -11,7 +11,10 @@
 > that exact `client_scan_id`, and retrying is free because ingest is idempotent. A queued scan says
 > "saved, waiting to upload" on the card rather than pretending to be recorded.
 >
-> Kiosks that have not been paired keep working unchanged on `/gate-enter?institution_id=…`. See
+> **Pairing is now required.** The online-only `/gate-enter?institution_id=…` mode was retired after
+> it failed at a production morning rush: one round trip per tap was slow, and its public endpoint
+> shares the `pairing` throttle (10/min per IP), so rapid taps came back "Too Many Attempts". An
+> unpaired kiosk now shows the pairing screen whatever its URL carries. See
 > [Rollout](#rollout) for what each phase actually shipped, and
 > [Non-goals and known gaps](#non-goals-and-known-gaps) for what this deliberately does not do —
 > chiefly that **boot still needs the network**.
@@ -96,7 +99,6 @@ DB_CONNECTION=mysql DB_DATABASE=scholastic_cloud_test \
 
 **Frontend (`app/`)**
 - `src/services/gateDeviceService.ts`, `src/services/gateUnresolvedScanService.ts`
-- `src/services/rfidScanLogService.ts` — `kioskScan` bounded at 15s (legacy path only)
 - `src/types/index.ts` — `GateDevice`, `GateUnresolvedScan`, `RfidScanLog.clock_suspect` /
   `client_scan_id`, `GateSmsSetting.late_threshold_minutes`
 - `src/pages/GateEntries/GateEntries.tsx` — mounts the cards per tab and shows `time unverified`
@@ -408,13 +410,13 @@ swallowed the wrong campus would resolve taps against strangers and look like it
 
 ## The kiosk side — **built**
 
-Three states, decided by `GateTerminal.tsx`: **paired** (token → local roster), **legacy**
-(`?institution_id=`, unchanged online-only behaviour), and **unpaired** (the pairing screen, which
-replaces the old "configuration required" error because that is now a step in an install rather
-than a mistake). A device paired to the wrong direction is stopped rather than accepted —
-recording entrances as exits would corrupt attendance while looking like a working gate. A device
-whose token has been **revoked** does not fall back to legacy mode even if its URL still carries an
-`institution_id`: revoking is how a school stops a kiosk it no longer trusts.
+Two states, decided by `GateTerminal.tsx`: **paired** (token → local roster) and **unpaired** (the
+pairing screen). There was a third, **legacy** (`?institution_id=`, online-only, one round trip per
+tap through the public `/kiosk/scan`); it was removed after it failed under rapid taps in
+production — see the note at the top. `?institution_id=` is now ignored, and the SPA no longer
+calls `/kiosk/scan` at all; the API endpoint is still there. A device paired to the wrong direction
+is stopped rather than accepted — recording entrances as exits would corrupt attendance while
+looking like a working gate. A revoked device goes back to the pairing screen.
 
 **Pairing is two steps**, and has to be. Step one takes the code; step two offers the USB seed
 bundle and a **Start the gate** button, because the bundle is validated against the device it was

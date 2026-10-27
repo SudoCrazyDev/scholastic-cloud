@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Copy, MonitorSmartphone, Plus, RefreshCw, Trash2, Unplug } from 'lucide-react'
+import { Copy, MonitorDown, MonitorSmartphone, Plus, RefreshCw, Trash2, Unplug } from 'lucide-react'
 import { gateDeviceService } from '../../../services/gateDeviceService'
+import { downloadKioskInstaller } from '../../../lib/kioskBundle'
 import { Button } from '../../../components/button'
 import { Input } from '../../../components/input'
 import { ConfirmationModal } from '../../../components/ConfirmationModal'
@@ -116,6 +117,19 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
 
   const label = gateType === 'enter' ? 'entrance' : 'exit'
 
+  /** The page the kiosk opens — no `?institution_id=`; a paired kiosk ignores it. */
+  const kioskUrl = `${window.location.origin}/${gateType === 'enter' ? 'gate-enter' : 'gate-exit'}`
+
+  const copyKioskUrl = () => {
+    navigator.clipboard.writeText(kioskUrl)
+    toast.success('Kiosk URL copied')
+  }
+
+  const downloadInstaller = () => {
+    downloadKioskInstaller()
+    toast.success('Kiosk installer downloaded')
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm ring-1 ring-gray-200 p-4 mb-6">
       <div className="flex items-start justify-between gap-4">
@@ -125,19 +139,32 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
             Kiosk devices on the {label} gate
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            Register each physical kiosk here, then pair it once with the code below. A paired kiosk
-            identifies itself by its own token instead of the institution ID in the URL.
+            Register each physical kiosk here, then pair it once with the code it is given. A gate
+            only records scans from a paired kiosk, which keeps the roster on the device and works
+            through an internet outage.
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Plus className="w-4 h-4" />}
-          onClick={() => setShowForm((open) => !open)}
-        >
-          Add device
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<MonitorDown className="w-4 h-4" />}
+            onClick={downloadInstaller}
+            title="Chromium kiosk installer for a Raspberry Pi gate terminal (.zip)"
+          >
+            Download kiosk
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Plus className="w-4 h-4" />}
+            onClick={() => setShowForm((open) => !open)}
+          >
+            Add device
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -182,8 +209,8 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
           <p className="text-sm text-gray-400">Loading devices…</p>
         ) : devices.length === 0 ? (
           <p className="text-sm text-gray-500">
-            No kiosk registered for this gate yet. Until one is paired, this gate keeps working the
-            old way — online only, with the institution ID in the kiosk URL.
+            No kiosk registered for this gate yet. Press <em>Add device</em> to get a pairing code —
+            a kiosk records nothing until it is paired.
           </p>
         ) : (
           <ul className="divide-y divide-gray-100">
@@ -259,8 +286,39 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
                 {codes[device.id] && !device.is_paired && (
                   <div className="mt-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2">
                     <p className="text-[11px] uppercase tracking-wider text-indigo-500">
-                      Pairing code — shown once, expires in 15 minutes
+                      Set up this kiosk
                     </p>
+                    <ol className="mt-1 space-y-2 text-xs text-indigo-900">
+                      <li className="flex flex-wrap items-center gap-2">
+                        <span>
+                          1. On a Raspberry Pi, install the kiosk. On a Windows PC, skip this and open
+                          the page in Chrome in fullscreen.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={downloadInstaller}
+                          className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                        >
+                          <MonitorDown className="w-3.5 h-3.5" />
+                          Download kiosk
+                        </button>
+                      </li>
+                      <li className="flex flex-wrap items-center gap-2">
+                        <span>2. Point the kiosk at</span>
+                        <code className="font-mono rounded bg-white border border-indigo-200 px-1.5 py-0.5 select-all break-all">
+                          {kioskUrl}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={copyKioskUrl}
+                          className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          Copy
+                        </button>
+                      </li>
+                      <li>3. Enter this pairing code on the kiosk — shown once, expires in 15 minutes:</li>
+                    </ol>
                     <div className="mt-1 flex items-center gap-2">
                       <code className="font-mono text-lg tracking-[0.25em] text-indigo-900 select-all">
                         {codes[device.id]}

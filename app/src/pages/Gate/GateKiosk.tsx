@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { rfidScanLogService } from '../../services/rfidScanLogService';
 import { correctedNow } from './offline/clock';
 import { resolveLocally } from './offline/resolve';
 import GateStatusChip from './GateStatusChip';
@@ -7,13 +6,9 @@ import type { GateSyncState } from './offline/useGateSync';
 
 interface GateKioskProps {
   type: 'enter' | 'exit';
-  institutionId: string;
-  deviceName?: string;
-  /**
-   * Sync state when this kiosk is paired and holds a local roster. Absent means
-   * the legacy `?institution_id=` mode, which behaves exactly as it always has.
-   */
-  sync?: GateSyncState;
+  deviceName: string;
+  /** The paired device's local roster, outbox and connection state. */
+  sync: GateSyncState;
 }
 
 /**
@@ -40,7 +35,7 @@ interface DisplayResult {
   status: 'pending' | 'recorded' | 'queued';
 }
 
-const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, sync }) => {
+const GateKiosk: React.FC<GateKioskProps> = ({ type, deviceName, sync }) => {
   /**
    * `correctedNow`, not `new Date()`: on a device with no real-time clock the
    * raw reading can be days out, and this is the number rendered in 6.5rem type
@@ -121,24 +116,17 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
     setErrorNote(null);
     focusInput();
 
-    if (sync) {
-      await handlePairedScan(value, seq);
-      return;
-    }
-
-    await handleLegacyScan(value, seq);
+    await handleScanLocally(value, seq);
   };
 
   /**
-   * A tap on a paired kiosk. **Nothing here waits on the network.**
+   * A tap. **Nothing here waits on the network.**
    *
    * The roster answers who tapped and the outbox takes the record, both from
    * local storage; the upload attempt that follows only decides which of two
    * true things the card says — "recorded" or "saved, waiting to upload".
    */
-  const handlePairedScan = async (value: string, seq: number) => {
-    if (!sync) return;
-
+  const handleScanLocally = async (value: string, seq: number) => {
     const local = await resolveLocally(value);
 
     if (local && scanSeq.current === seq) {
@@ -222,56 +210,6 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
     });
   };
 
-  /**
-   * A tap on an unpaired kiosk, still on `?institution_id=`: one round trip,
-   * online only, exactly as this page worked before any of this existed. Kept so
-   * a kiosk in the field keeps working until someone pairs it.
-   */
-  const handleLegacyScan = async (value: string, seq: number) => {
-    try {
-      const response = await rfidScanLogService.kioskScan({
-        rfid_uid: value,
-        institution_id: institutionId,
-        type,
-        device_name: deviceName,
-      });
-
-      if (scanSeq.current !== seq) return;
-
-      const student = response.data.student;
-      const section = response.data.class_section;
-
-      const name = student
-        ? [student.first_name, student.middle_name, student.last_name, student.ext_name]
-            .filter(Boolean)
-            .join(' ')
-        : '';
-
-      // The card on screen, if any, is the previous tap's; nothing of it carries over.
-      releasePhoto();
-      setResult({
-        seq,
-        name,
-        gradeAndSection: section ? `${section.grade_level} — ${section.title}` : null,
-        photoUrl: student?.profile_picture ?? null,
-        scannedAt: new Date(response.data.scanned_at),
-        status: 'recorded',
-      });
-    } catch (err: unknown) {
-      if (scanSeq.current !== seq) return;
-
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Scan failed. Please try again.';
-
-      releasePhoto();
-      setResult(null);
-      setError(message);
-    } finally {
-      focusInput();
-    }
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -344,7 +282,7 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, institutionId, deviceName, 
         </div>
 
         <div className="flex items-center gap-3">
-          {sync && <GateStatusChip state={sync} />}
+          <GateStatusChip state={sync} />
           <span className="text-sm text-gray-400 tabular-nums font-medium">{formattedTime}</span>
         </div>
       </header>
