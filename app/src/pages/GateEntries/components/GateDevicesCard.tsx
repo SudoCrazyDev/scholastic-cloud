@@ -120,13 +120,20 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
   /** The page the kiosk opens — no `?institution_id=`; a paired kiosk ignores it. */
   const kioskUrl = `${window.location.origin}/${gateType === 'enter' ? 'gate-enter' : 'gate-exit'}`
 
-  const copyKioskUrl = () => {
-    navigator.clipboard.writeText(kioskUrl)
+  /**
+   * The same page carrying a pairing code, which the kiosk submits on its own the
+   * first time it opens. The code is single-use, so a paired kiosk that keeps
+   * this URL simply never looks at it again.
+   */
+  const pairingUrl = (code: string) => `${kioskUrl}?pair=${encodeURIComponent(code)}`
+
+  const copyKioskUrl = (url: string) => {
+    navigator.clipboard.writeText(url)
     toast.success('Kiosk URL copied')
   }
 
-  const downloadInstaller = () => {
-    downloadKioskInstaller()
+  const downloadInstaller = (url: string) => {
+    downloadKioskInstaller(url)
     toast.success('Kiosk installer downloaded')
   }
 
@@ -150,8 +157,8 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
             variant="outline"
             size="sm"
             leftIcon={<MonitorDown className="w-4 h-4" />}
-            onClick={downloadInstaller}
-            title="Chromium kiosk installer for a Raspberry Pi gate terminal (.zip)"
+            onClick={() => downloadInstaller(kioskUrl)}
+            title={`Chromium kiosk installer for a Raspberry Pi, set to open ${kioskUrl} (.zip)`}
           >
             Download kiosk
           </Button>
@@ -291,12 +298,12 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
                     <ol className="mt-1 space-y-2 text-xs text-indigo-900">
                       <li className="flex flex-wrap items-center gap-2">
                         <span>
-                          1. On a Raspberry Pi, install the kiosk. On a Windows PC, skip this and open
-                          the page in Chrome in fullscreen.
+                          1. On a Raspberry Pi, download the kiosk and run its installer. It is already
+                          set to this gate and this code, so the kiosk pairs itself when it starts.
                         </span>
                         <button
                           type="button"
-                          onClick={downloadInstaller}
+                          onClick={() => downloadInstaller(pairingUrl(codes[device.id]))}
                           className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
                         >
                           <MonitorDown className="w-3.5 h-3.5" />
@@ -304,20 +311,23 @@ export default function GateDevicesCard({ gateType }: GateDevicesCardProps) {
                         </button>
                       </li>
                       <li className="flex flex-wrap items-center gap-2">
-                        <span>2. Point the kiosk at</span>
+                        <span>2. On a Windows PC instead, open this in Chrome fullscreen:</span>
                         <code className="font-mono rounded bg-white border border-indigo-200 px-1.5 py-0.5 select-all break-all">
-                          {kioskUrl}
+                          {pairingUrl(codes[device.id])}
                         </code>
                         <button
                           type="button"
-                          onClick={copyKioskUrl}
+                          onClick={() => copyKioskUrl(pairingUrl(codes[device.id]))}
                           className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
                         >
                           <Copy className="w-3.5 h-3.5" />
                           Copy
                         </button>
                       </li>
-                      <li>3. Enter this pairing code on the kiosk — shown once, expires in 15 minutes:</li>
+                      <li>
+                        3. The code expires in 15 minutes. If the kiosk starts after that, it asks for
+                        one — press <em>New code</em> and type it there:
+                      </li>
                     </ol>
                     <div className="mt-1 flex items-center gap-2">
                       <code className="font-mono text-lg tracking-[0.25em] text-indigo-900 select-all">

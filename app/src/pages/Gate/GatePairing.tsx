@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { pairDevice, type GateDeviceIdentity } from './offline/client'
 import { importSeed, SeedMismatchError } from './offline/seed'
@@ -24,36 +25,62 @@ interface GatePairingProps {
  * kiosk on a successful pair left the seed step with nowhere to live and no way
  * to reach it.
  *
+ * A code can also arrive on the URL as `?pair=<code>` — the Gate Entries page
+ * writes it into the kiosk download — and is then submitted on its own, so a
+ * freshly installed kiosk pairs with nobody at the keyboard. It is single-use
+ * and lasts 15 minutes, so a late or repeated boot falls back to typing one.
+ *
  * Step two starts the gate on its own after a minute. A technician who pairs a
  * terminal and walks away must not leave a wall-mounted screen sitting on a
  * setup prompt, and the countdown holds while a bundle is still importing.
  */
 const GatePairing: React.FC<GatePairingProps> = ({ type, onPaired }) => {
-  const [code, setCode] = useState('')
+  const [searchParams] = useSearchParams()
+  const linkCode = (searchParams.get('pair') ?? '').trim().toUpperCase()
+
+  const [code, setCode] = useState(linkCode)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [paired, setPaired] = useState<GateDeviceIdentity | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const triedLinkCode = useRef(false)
+
   const isEnter = type === 'enter'
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (busy || code.trim().length < 4) return
-
+  const pair = useCallback(async (value: string, fromLink: boolean) => {
     setBusy(true)
     setError(null)
 
     try {
       // Held here rather than handed straight up: the seed step below needs a
       // paired device, and this is the only moment it has one.
-      setPaired(await pairDevice(code))
+      setPaired(await pairDevice(value))
     } catch (pairError) {
-      setError(pairError instanceof Error ? pairError.message : 'Pairing failed.')
+      if (fromLink) {
+        setCode('')
+        setError(
+          'The pairing code from the kiosk download was not accepted — it may have expired or been used. Press New code in the portal and type it here.',
+        )
+      } else {
+        setError(pairError instanceof Error ? pairError.message : 'Pairing failed.')
+      }
     } finally {
       setBusy(false)
     }
+  }, [])
+
+  useEffect(() => {
+    if (!linkCode || triedLinkCode.current) return
+    triedLinkCode.current = true
+    void pair(linkCode, true)
+  }, [linkCode, pair])
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (busy || code.trim().length < 4) return
+    await pair(code, false)
   }
 
   const loadSeed = async (event: React.ChangeEvent<HTMLInputElement>) => {

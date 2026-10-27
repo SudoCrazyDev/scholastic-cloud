@@ -6,11 +6,23 @@ import kioskDefault from '../../../kiosk/kiosk.default?raw'
 import kioskReadme from '../../../kiosk/README.md?raw'
 import { buildZip } from './zip'
 
-export function downloadKioskInstaller() {
+/** The placeholder `kiosk.sh` refuses to start on. */
+const PLACEHOLDER_URL = 'KIOSK_URL="https://example.com"'
+
+/**
+ * @param kioskUrl Written into the bundled `kiosk.default` as `KIOSK_URL`, so the
+ *   installer sets up the right gate page without anyone editing the file. It may
+ *   carry `?pair=<code>`, which the gate page uses to pair itself on first boot.
+ */
+export function downloadKioskInstaller(kioskUrl?: string) {
+  const settings = kioskUrl
+    ? kioskDefault.replace(PLACEHOLDER_URL, `KIOSK_URL="${kioskUrl}"`)
+    : kioskDefault
+
   const blob = buildZip([
     { name: 'kiosk/install-kiosk.sh', content: installScript, mode: 0o755 },
     { name: 'kiosk/kiosk.sh', content: kioskScript, mode: 0o755 },
-    { name: 'kiosk/kiosk.default', content: kioskDefault },
+    { name: 'kiosk/kiosk.default', content: settings },
     { name: 'kiosk/README.md', content: kioskReadme },
   ])
   const url = URL.createObjectURL(blob)

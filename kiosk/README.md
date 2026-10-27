@@ -18,7 +18,7 @@ auto-logs in (not root — it sudos on its own for the two system files):
 cd kiosk
 chmod +x install-kiosk.sh kiosk.sh   # scp/USB/zip transfers drop the exec bit
 ./install-kiosk.sh
-sudo nano /etc/default/kiosk     # set KIOSK_URL
+sudo nano /etc/default/kiosk     # set KIOSK_URL — already done in a Gate Entries download
 kiosk start                      # try it now, without rebooting
 sudo reboot                      # confirm it comes back on its own
 ```
@@ -36,7 +36,10 @@ user file *replaces* the system one, so skipping that step would cost you the
 taskbar and desktop.
 
 It installs Chromium if it isn't there, and won't overwrite an existing
-`/etc/default/kiosk`, so re-running it is safe.
+`/etc/default/kiosk`, so re-running it is safe. The one exception: a download
+from the portal's Gate Entries page carries the gate's `KIOSK_URL`, and the
+installer sets that line in an existing file, leaving every other setting
+alone.
 
 ## Two prerequisites the script can't do for you
 

@@ -57,13 +57,16 @@ across a campus without confusion.
 
 ### Raspberry Pi
 
-Get the installer from **Download kiosk** on the same **Kiosk devices** card (it is also in the
-setup steps shown with the pairing code), then follow [`kiosk/README.md`](../../../kiosk/README.md)
-for the full install. The only setting that
-matters here is in `/etc/default/kiosk`:
+Press **Download kiosk** in the setup steps shown with the pairing code. That download is already
+set to this gate's page **and carries the pairing code**, so after `./install-kiosk.sh` and a
+reboot the kiosk pairs itself — step 3 happens with nobody at the keyboard, as long as it boots
+within the code's 15 minutes. (The **Download kiosk** button in the card's header carries the
+gate's page but no code.) Follow [`kiosk/README.md`](../../../kiosk/README.md) for the full
+install. The installer writes the URL into `/etc/default/kiosk`, replacing the `KIOSK_URL` line of
+an existing one and keeping everything else; it ends up as:
 
 ```bash
-KIOSK_URL="https://app.<school>.edu.ph/gate-enter"      # or /gate-exit
+KIOSK_URL="https://app.<school>.edu.ph/gate-enter?pair=AB3CD7"   # or /gate-exit; ?pair= only from a setup-step download
 ```
 
 **No `?institution_id=` on the end.** A paired kiosk gets its school and its gate from its own
@@ -85,7 +88,11 @@ chrome.exe --kiosk "https://app.<school>.edu.ph/gate-enter"
 
 ## 3. Pair the kiosk
 
-The gate page shows **Pair this kiosk** with a single box.
+A kiosk installed from the setup-step download, or opened at the URL with `?pair=` shown there,
+submits its code by itself and goes straight to **Kiosk paired**. If the code had already expired
+or been used, it says so and asks for one: press **New code** in the portal and carry on below.
+
+Otherwise the gate page shows **Pair this kiosk** with a single box.
 
 1. Type the 6-character code. It uppercases as you type.
 2. Press **Pair kiosk**.

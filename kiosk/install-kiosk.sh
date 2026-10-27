@@ -161,6 +161,21 @@ fi
 
 if [ -e "$CONFIG" ]; then
   say "Keeping your existing $CONFIG"
+
+  # A download from the portal's Gate Entries page carries the gate's URL (with
+  # a one-time pairing code on it). Apply just that line over an existing config
+  # so re-pairing a kiosk is running the new download, while any other setting
+  # someone tuned by hand survives. Not when re-running from $LIB_DIR: that copy
+  # is the last install's, and its code has long been used.
+  BUNDLED_URL=$(sh -c ". '$SRC_DIR/kiosk.default' 2>/dev/null; echo \"\$KIOSK_URL\"" 2>/dev/null || true)
+  if [ "$SRC_DIR" != "$LIB_DIR" ] && [ -n "$BUNDLED_URL" ] && [ "$BUNDLED_URL" != "https://example.com" ]; then
+    say "Setting KIOSK_URL from this download"
+    if grep -q '^KIOSK_URL=' "$CONFIG"; then
+      sudo sed -i "s|^KIOSK_URL=.*|KIOSK_URL=\"$BUNDLED_URL\"|" "$CONFIG"
+    else
+      echo "KIOSK_URL=\"$BUNDLED_URL\"" | sudo tee -a "$CONFIG" >/dev/null
+    fi
+  fi
 else
   say "Installing $CONFIG"
   sudo install -m 0644 "$SRC_DIR/kiosk.default" "$CONFIG"
@@ -175,12 +190,19 @@ esac
 # $CONFIG is world-readable, so no sudo needed just to report the current URL.
 CURRENT_URL=$(sh -c ". '$CONFIG' 2>/dev/null; echo \"\$KIOSK_URL\"" 2>/dev/null || true)
 
+if [ -n "$CURRENT_URL" ] && [ "$CURRENT_URL" != "https://example.com" ]; then
+  STEP_ONE="The page to open is already set (change it with  sudo nano $CONFIG):
+       $CURRENT_URL"
+else
+  STEP_ONE="Set the page to open:
+       sudo nano $CONFIG        # KIOSK_URL is currently: ${CURRENT_URL:-unset}"
+fi
+
 cat <<EOF
 
 Installed.
 
-  1. Set the page to open:
-       sudo nano $CONFIG        # KIOSK_URL is currently: ${CURRENT_URL:-unset}
+  1. $STEP_ONE
 
   2. Try it now, without rebooting:
        kiosk start
