@@ -66,6 +66,58 @@ const BILLING_TYPE_OPTIONS = [
   { value: 'installment', label: 'Installment Plan (added to the schedule)' },
 ]
 
+const LEDGER_TYPE_ORDER: StudentLedgerEntry['type'][] = ['balance_forward', 'charge', 'discount', 'payment']
+
+interface LedgerEntryGroup<T> {
+  key: string
+  label: string
+  entries: { entry: StudentLedgerEntry; index: number }[]
+  children: T[]
+}
+
+// Groups the ledger's entries by type, then OR number, then date. Each group keeps the
+// order its first entry appeared in, so the ledger still reads chronologically within it.
+// The original index is carried along because it is part of each row's key.
+function groupLedgerEntries(entries: StudentLedgerEntry[]) {
+  const byKey = <T,>(
+    items: { entry: StudentLedgerEntry; index: number }[],
+    keyOf: (entry: StudentLedgerEntry) => string,
+    labelOf: (key: string) => string,
+    childrenOf: (items: { entry: StudentLedgerEntry; index: number }[]) => T[]
+  ): LedgerEntryGroup<T>[] => {
+    const groups = new Map<string, { entry: StudentLedgerEntry; index: number }[]>()
+    for (const item of items) {
+      const key = keyOf(item.entry)
+      groups.set(key, [...(groups.get(key) ?? []), item])
+    }
+    return [...groups].map(([key, groupItems]) => ({
+      key,
+      label: labelOf(key),
+      entries: groupItems,
+      children: childrenOf(groupItems),
+    }))
+  }
+
+  const byDate = (items: { entry: StudentLedgerEntry; index: number }[]) =>
+    byKey<never>(items, (entry) => entry.date ?? '', (key) => key || 'No date', () => [])
+  const byOrNumber = (items: { entry: StudentLedgerEntry; index: number }[]) =>
+    byKey(items, (entry) => entry.or_number?.trim() ?? '', (key) => (key ? `OR ${key}` : 'No OR Number'), byDate)
+
+  return byKey(
+    entries.map((entry, index) => ({ entry, index })),
+    (entry) => entry.type,
+    (key) => key.replace('_', ' '),
+    byOrNumber
+  ).sort(
+    (a, b) =>
+      LEDGER_TYPE_ORDER.indexOf(a.key as StudentLedgerEntry['type']) -
+      LEDGER_TYPE_ORDER.indexOf(b.key as StudentLedgerEntry['type'])
+  )
+}
+
+const sumLedgerAmounts = (items: { entry: StudentLedgerEntry }[]) =>
+  items.reduce((sum, { entry }) => (entry.voided ? sum : sum + Number(entry.amount)), 0)
+
 type FinanceView =
   | 'dashboard'
   | 'school-fees'
@@ -3211,7 +3263,7 @@ const Finance: React.FC = () => {
                               Amount
                             </th>
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                              Running Balance
+                              Subtotal
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                               Processed By
@@ -3224,111 +3276,184 @@ const Finance: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 bg-white">
-                          {ledgerQuery.data?.data?.entries?.map((entry, index) => (
-                            <tr
-                              key={
-                                `${entry.type}-${entry.payment_id ?? entry.discount_id ?? entry.fee_id ?? index}`
-                              }
-                              className={
-                                entry.voided
-                                  ? 'bg-gray-50'
-                                  : entry.source === 'late_fee'
-                                  ? 'bg-red-50/40'
-                                  : undefined
-                              }
-                            >
-                              <td className="px-4 py-3 text-sm text-gray-600 capitalize">
-                                {entry.type.replace('_', ' ')}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-700">
-                                <span className={entry.voided ? 'line-through text-gray-400' : undefined}>
-                                  {entry.description}
-                                </span>
-                                {entry.source === 'late_fee' && !entry.voided && (
-                                  <span
-                                    className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
-                                    title="Charged automatically for an overdue installment"
-                                  >
-                                    Late fee
-                                  </span>
-                                )}
-                                {entry.voided && (
-                                  <span
-                                    className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
-                                    title={entry.void_note ? `Reason: ${entry.void_note}${entry.voided_by ? ` — by ${entry.voided_by}` : ''}` : 'Voided'}
-                                  >
-                                    Voided
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {entry.date ?? '—'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600 font-mono">
-                                {entry.or_number ?? '—'}
-                              </td>
-                              <td
-                                className={`px-4 py-3 text-sm text-right tabular-nums ${
-                                  entry.voided
-                                    ? 'text-gray-400 line-through'
-                                    : entry.amount < 0
-                                    ? 'text-red-600'
-                                    : 'text-gray-900'
-                                }`}
+                          {(() => {
+                            // Columns after Subtotal: Processed By, plus Action when it is drawn.
+                            const trailingColSpan = showLedgerActions ? 2 : 1
+                            const formatPeso = (value: number) =>
+                              `₱ ${value.toLocaleString('en-PH', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}`
+                            const groupHeader = (
+                              key: string,
+                              label: string,
+                              items: { entry: StudentLedgerEntry }[],
+                              level: 0 | 1 | 2
+                            ) => (
+                              <tr
+                                key={key}
+                                className={
+                                  level === 0 ? 'bg-gray-100' : level === 1 ? 'bg-gray-50' : 'bg-white'
+                                }
                               >
-                                ₱ {Number(entry.amount).toLocaleString('en-PH', {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-right text-gray-900 tabular-nums">
-                                ₱ {Number(entry.running_balance ?? 0).toLocaleString('en-PH', {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {entry.processed_by ?? '—'}
-                              </td>
-                              {showLedgerActions && (
-                                <td className="px-4 py-3 text-sm text-right">
-                                  {canRequestVoid &&
-                                  entry.type === 'payment' &&
-                                  !entry.voided &&
-                                  entry.receipt_number ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setVoidEntry(entry)
-                                        setVoidNote('')
-                                      }}
-                                      className="text-red-600 hover:text-red-700 font-medium"
+                                <td
+                                  colSpan={5}
+                                  className={`px-4 py-2 text-xs ${
+                                    level === 0
+                                      ? 'font-semibold uppercase text-gray-800'
+                                      : level === 1
+                                      ? 'pl-8 font-semibold text-gray-700'
+                                      : 'pl-12 font-medium text-gray-500'
+                                  }`}
+                                >
+                                  <span className={level === 1 ? 'font-mono' : undefined}>{label}</span>
+                                  <span className="ml-2 font-normal normal-case text-gray-400">
+                                    ({items.length} {items.length === 1 ? 'entry' : 'entries'})
+                                  </span>
+                                </td>
+                                <td
+                                  className={`px-4 py-2 text-right tabular-nums ${
+                                    level === 0
+                                      ? 'text-sm font-semibold text-gray-900'
+                                      : level === 1
+                                      ? 'text-sm font-medium text-gray-800'
+                                      : 'text-xs text-gray-600'
+                                  }`}
+                                >
+                                  {formatPeso(sumLedgerAmounts(items))}
+                                </td>
+                                <td colSpan={trailingColSpan} />
+                              </tr>
+                            )
+
+                            const renderLedgerEntryRow = (entry: StudentLedgerEntry, index: number) => (
+                              <tr
+                                key={
+                                  `${entry.type}-${entry.payment_id ?? entry.discount_id ?? entry.fee_id ?? index}`
+                                }
+                                className={
+                                  entry.voided
+                                    ? 'bg-gray-50'
+                                    : entry.source === 'late_fee'
+                                    ? 'bg-red-50/40'
+                                    : undefined
+                                }
+                              >
+                                <td className="px-4 py-3 text-sm text-gray-600 capitalize">
+                                  {entry.type.replace('_', ' ')}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-700">
+                                  <span className={entry.voided ? 'line-through text-gray-400' : undefined}>
+                                    {entry.description}
+                                  </span>
+                                  {entry.source === 'late_fee' && !entry.voided && (
+                                    <span
+                                      className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
+                                      title="Charged automatically for an overdue installment"
                                     >
-                                      Void
-                                    </button>
-                                  ) : canVoidDiscount &&
-                                    entry.type === 'discount' &&
-                                    !entry.voided &&
-                                    entry.discount_id &&
-                                    (entry.discount_scope === 'student' ||
-                                      entry.discount_scope === 'grade_level') ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setVoidDiscountEntry(entry)
-                                        setVoidDiscountNote('')
-                                      }}
-                                      className="text-red-600 hover:text-red-700 font-medium"
+                                      Late fee
+                                    </span>
+                                  )}
+                                  {entry.voided && (
+                                    <span
+                                      className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700"
+                                      title={entry.void_note ? `Reason: ${entry.void_note}${entry.voided_by ? ` — by ${entry.voided_by}` : ''}` : 'Voided'}
                                     >
-                                      Void
-                                    </button>
-                                  ) : (
-                                    <span className="text-gray-300">—</span>
+                                      Voided
+                                    </span>
                                   )}
                                 </td>
-                              )}
-                            </tr>
-                          ))}
+                                <td className="px-4 py-3 text-sm text-gray-600">
+                                  {entry.date ?? '—'}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600 font-mono">
+                                  {entry.or_number ?? '—'}
+                                </td>
+                                <td
+                                  className={`px-4 py-3 text-sm text-right tabular-nums ${
+                                    entry.voided
+                                      ? 'text-gray-400 line-through'
+                                      : entry.amount < 0
+                                      ? 'text-red-600'
+                                      : 'text-gray-900'
+                                  }`}
+                                >
+                                  ₱ {Number(entry.amount).toLocaleString('en-PH', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </td>
+                                <td className="px-4 py-3" />
+                                <td className="px-4 py-3 text-sm text-gray-600">
+                                  {entry.processed_by ?? '—'}
+                                </td>
+                                {showLedgerActions && (
+                                  <td className="px-4 py-3 text-sm text-right">
+                                    {canRequestVoid &&
+                                    entry.type === 'payment' &&
+                                    !entry.voided &&
+                                    entry.receipt_number ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setVoidEntry(entry)
+                                          setVoidNote('')
+                                        }}
+                                        className="text-red-600 hover:text-red-700 font-medium"
+                                      >
+                                        Void
+                                      </button>
+                                    ) : canVoidDiscount &&
+                                      entry.type === 'discount' &&
+                                      !entry.voided &&
+                                      entry.discount_id &&
+                                      (entry.discount_scope === 'student' ||
+                                        entry.discount_scope === 'grade_level') ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setVoidDiscountEntry(entry)
+                                          setVoidDiscountNote('')
+                                        }}
+                                        className="text-red-600 hover:text-red-700 font-medium"
+                                      >
+                                        Void
+                                      </button>
+                                    ) : (
+                                      <span className="text-gray-300">—</span>
+                                    )}
+                                  </td>
+                                )}
+                              </tr>
+                            )
+
+                            return groupLedgerEntries(ledgerQuery.data?.data?.entries ?? []).map((typeGroup) => (
+                              <React.Fragment key={typeGroup.key}>
+                                {groupHeader(`type-${typeGroup.key}`, typeGroup.label, typeGroup.entries, 0)}
+                                {typeGroup.children.map((orGroup) => (
+                                  <React.Fragment key={orGroup.key}>
+                                    {groupHeader(
+                                      `or-${typeGroup.key}-${orGroup.key}`,
+                                      orGroup.label,
+                                      orGroup.entries,
+                                      1
+                                    )}
+                                    {orGroup.children.map((dateGroup) => (
+                                      <React.Fragment key={dateGroup.key}>
+                                        {groupHeader(
+                                          `date-${typeGroup.key}-${orGroup.key}-${dateGroup.key}`,
+                                          dateGroup.label,
+                                          dateGroup.entries,
+                                          2
+                                        )}
+                                        {dateGroup.entries.map(({ entry, index }) => renderLedgerEntryRow(entry, index))}
+                                      </React.Fragment>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
+                              </React.Fragment>
+                            ))
+                          })()}
                           {!ledgerQuery.data?.data?.entries?.length && (
                             <tr>
                               <td
