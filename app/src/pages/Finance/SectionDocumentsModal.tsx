@@ -125,9 +125,12 @@ export const SectionDocumentsModal: React.FC<SectionDocumentsModalProps> = ({
         )?.sequence ?? null
       : null
 
-  const withoutPeriod = byMonth
-    ? (accounts ?? []).filter((account) => sequenceFor(account) == null).length
-    : 0
+  const withoutPeriodNames = byMonth
+    ? (accounts ?? [])
+        .filter((account) => sequenceFor(account) == null)
+        .map(({ student }) => `${student.last_name}, ${student.first_name}`.toUpperCase())
+    : []
+  const withoutPeriod = withoutPeriodNames.length
 
   const title = kind === 'noa' ? 'Section Notice of Account' : 'Section Billing Statement'
   const loading = accounts === null
@@ -215,13 +218,20 @@ export const SectionDocumentsModal: React.FC<SectionDocumentsModalProps> = ({
               {(withoutPeriod > 0 || failed.length > 0) && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1 text-sm text-amber-800">
                   {withoutPeriod > 0 && (
-                    <p>
-                      {withoutPeriod} student{withoutPeriod === 1 ? ' has' : 's have'} no
-                      installment due in {monthLabel(month)} —{' '}
-                      {kind === 'noa'
-                        ? 'their full-year notice is printed instead.'
-                        : 'their statement asks for the whole balance.'}
-                    </p>
+                    <div>
+                      <p>
+                        {withoutPeriod} student{withoutPeriod === 1 ? ' has' : 's have'} no
+                        installment due in {monthLabel(month)} —{' '}
+                        {kind === 'noa'
+                          ? 'their full-year notice is printed instead.'
+                          : 'their statement asks for the whole balance.'}
+                      </p>
+                      <ul className="mt-1 list-disc pl-5 text-xs max-h-32 overflow-y-auto">
+                        {withoutPeriodNames.map((name, index) => (
+                          <li key={`${name}-${index}`}>{name}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                   {failed.length > 0 && (
                     <p>
