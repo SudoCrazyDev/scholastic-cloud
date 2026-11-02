@@ -293,66 +293,42 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
               <table className="min-w-full">
                 {/* Two header rows: Total Payable spans the three parts it is made of plus
                     its own total, so the row can be read across and seen to add up. */}
-                <thead className="bg-gray-50">
+                <thead className="border-b border-gray-200 bg-gray-50">
                   <tr>
-                    <th
-                      rowSpan={2}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
-                    >
+                    <th rowSpan={2} className="px-3 py-2 text-left align-bottom text-xs font-medium tracking-wide whitespace-nowrap text-gray-500 uppercase">
                       Student
                     </th>
-                    <th
-                      rowSpan={2}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
-                    >
-                      LRN
-                    </th>
-                    <th
-                      rowSpan={2}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
-                    >
+                    <th rowSpan={2} className="px-3 py-2 text-left align-bottom text-xs font-medium tracking-wide whitespace-nowrap text-gray-500 uppercase">
                       Section
                     </th>
-                    <th
-                      colSpan={4}
-                      scope="colgroup"
-                      className="border-x border-gray-200 px-4 pt-3 pb-1 text-center text-xs font-semibold text-gray-500 uppercase"
-                    >
-                      Total Payable
+                    <th colSpan={4} scope="colgroup" className="px-3 pt-2 pb-0">
+                      <div className="border-b border-gray-200 pb-1 text-center text-[11px] font-semibold tracking-wide whitespace-nowrap text-gray-500 uppercase">
+                        Total Payable
+                      </div>
                     </th>
-                    <th
-                      rowSpan={2}
-                      className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase align-bottom"
-                    >
-                      Remaining Balance
+                    <th rowSpan={2} className="px-3 py-2 text-right align-bottom text-xs font-medium tracking-wide whitespace-nowrap text-gray-500 uppercase">
+                      Balance
                     </th>
-                    <th
-                      rowSpan={2}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase align-bottom"
-                    >
-                      Action
+                    <th rowSpan={2} className="px-3 py-2 align-bottom">
+                      <span className="sr-only">Documents</span>
                     </th>
                   </tr>
                   <tr>
-                    <th className="border-l border-gray-200 px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      School Fees
+                    <th className="px-3 pt-1 pb-2 text-right text-xs font-medium tracking-wide whitespace-nowrap text-gray-500 uppercase">School</th>
+                    <th className="px-3 pt-1 pb-2 text-right text-xs font-medium tracking-wide whitespace-nowrap text-gray-500 uppercase">Student</th>
+                    <th className="px-3 pt-1 pb-2 text-right text-xs font-medium tracking-wide whitespace-nowrap text-gray-500 uppercase">
+                      <abbr title="Balance Forward" className="no-underline">
+                        Bal. Fwd
+                      </abbr>
                     </th>
-                    <th className="px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Student Fees
-                    </th>
-                    <th className="px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Balance Forward
-                    </th>
-                    <th className="border-r border-gray-200 px-4 pb-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Total
-                    </th>
+                    <th className="px-3 pt-1 pb-2 text-right text-xs font-medium tracking-wide whitespace-nowrap text-gray-500 uppercase">Total</th>
                   </tr>
                 </thead>
                 {groups.map((group) => (
                   <tbody key={group.grade_level} className="divide-y divide-gray-200">
                     <tr className="bg-gray-100/70">
                       <th
-                        colSpan={9}
+                        colSpan={8}
                         scope="colgroup"
                         className="px-4 py-2 text-left text-sm font-semibold text-gray-900"
                       >
@@ -380,7 +356,7 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                               isOpen ? 'bg-primary-50/60' : 'hover:bg-gray-50'
                             }`}
                           >
-                            <td className="px-4 py-3">
+                            <td className="px-3 py-2.5">
                               <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
                                 <ChevronRightIcon
                                   className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${
@@ -388,7 +364,12 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                                   }`}
                                   aria-hidden="true"
                                 />
-                                <span className="uppercase">{student.display_name}</span>
+                                <div className="min-w-0">
+                                  <div className="uppercase">{student.display_name}</div>
+                                  <div className="text-xs font-normal text-gray-500">
+                                    {student.lrn ? `LRN ${student.lrn}` : 'No LRN'}
+                                  </div>
+                                </div>
                                 {student.other_fee_count > 0 && (
                                   <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-normal text-gray-600">
                                     {student.other_fee_count} other fee
@@ -397,20 +378,17 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">
-                              {student.lrn || '—'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">
+                            <td className="px-3 py-2.5 text-sm text-gray-600">
                               {student.section || '—'}
                             </td>
-                            <td className="border-l border-gray-200 px-4 py-3 text-right text-sm text-gray-600">
+                            <td className="px-3 py-2.5 text-right text-sm text-gray-600">
                               {formatCurrency(student.school_fees_payable)}
                             </td>
-                            <td className="px-4 py-3 text-right text-sm text-gray-600">
+                            <td className="px-3 py-2.5 text-right text-sm text-gray-600">
                               {formatCurrency(student.student_fees_payable)}
                             </td>
                             <td
-                              className={`px-4 py-3 text-right text-sm ${
+                              className={`px-3 py-2.5 text-right text-sm ${
                                 student.balance_forward !== 0
                                   ? 'font-medium text-amber-700'
                                   : 'text-gray-400'
@@ -418,11 +396,11 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                             >
                               {formatCurrency(student.balance_forward)}
                             </td>
-                            <td className="border-r border-gray-200 px-4 py-3 text-right text-sm font-medium text-gray-900">
+                            <td className="px-3 py-2.5 text-right text-sm font-medium text-gray-900">
                               {formatCurrency(student.total_payable)}
                             </td>
                             <td
-                              className={`px-4 py-3 text-right text-sm font-semibold ${
+                              className={`px-3 py-2.5 text-right text-sm font-semibold ${
                                 student.remaining_balance > 0 ? 'text-red-600' : 'text-green-700'
                               }`}
                             >
@@ -431,7 +409,7 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                             {/* The buttons sit inside the clickable row, so their clicks and
                                 key presses stop here instead of also expanding it. */}
                             <td
-                              className="px-4 py-3"
+                              className="px-3 py-2.5"
                               onClick={(event) => event.stopPropagation()}
                               onKeyDown={(event) => event.stopPropagation()}
                             >
@@ -480,7 +458,7 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
                           </tr>
                           {isOpen && (
                             <tr>
-                              <td colSpan={9} className="bg-gray-50 px-4 py-4">
+                              <td colSpan={8} className="bg-gray-50 px-4 py-4">
                                 <StudentOtherFees
                                   student={student}
                                   academicYear={academicYear}
