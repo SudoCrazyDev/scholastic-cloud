@@ -236,7 +236,8 @@ const formatAmount = (amount?: number | null) =>
     maximumFractionDigits: 2,
   })
 
-export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
+// One student's notice as a single page, so a section's notices can share one document.
+export const StudentNOAPage: React.FC<StudentNOAPDFProps> = ({
   data,
   institutionName,
   institutionAddress,
@@ -261,132 +262,136 @@ export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = ({
   const printedOn = new Date().toLocaleDateString('en-US')
 
   return (
-    <Document>
-      <Page size={isMonthly ? 'A6' : 'A4'} style={styles.page}>
-        <View style={styles.frame}>
-          {/* Letterhead */}
-          <View style={styles.header}>
-            {logoUrl ? <Image src={logoUrl} style={styles.headerLogo} /> : null}
-            <View style={styles.headerText}>
-              {institutionName ? (
-                <Text style={styles.institutionTitle}>{institutionName}</Text>
-              ) : null}
-              {institutionAddress ? (
-                <Text style={styles.institutionMeta}>{institutionAddress}</Text>
-              ) : null}
-              <Text style={styles.institutionMeta}>
-                A.Y. {academic_year}
-                {monthly ? ` - For ${describeCoveredPeriods(monthly)}` : ''}
-              </Text>
-            </View>
-            {logoUrl ? <View style={styles.headerSpacer} /> : null}
-          </View>
-
-          <Text style={styles.docTitle}>NOTICE OF ACCOUNT</Text>
-
-          {/* Filled-in form fields */}
-          <View style={styles.infoRow}>
-            <View style={[styles.infoField, styles.infoFieldWide]}>
-              <Text style={styles.infoLabel}>Name:</Text>
-              <Text style={styles.infoValue}>{fullName}</Text>
-            </View>
-            <View style={[styles.infoField, styles.infoFieldNarrow]}>
-              <Text style={styles.infoLabel}>Student No.:</Text>
-              <Text style={styles.infoValue}>{student.lrn || ''}</Text>
-            </View>
-          </View>
-          <View style={styles.infoRow}>
-            <View style={[styles.infoField, styles.infoFieldWide]}>
-              <Text style={styles.infoLabel}>Grade/Level:</Text>
-              <Text style={styles.infoValue}>{grade_level || ''}</Text>
-            </View>
-            <View style={[styles.infoField, styles.infoFieldNarrow]}>
-              <Text style={styles.infoLabel}>Date:</Text>
-              <Text style={styles.infoValue}>{printedOn}</Text>
-            </View>
-          </View>
-
-          {/* What is being billed */}
-          <View style={styles.table}>
-            <View style={styles.tableRow}>
-              <View style={[styles.cell, styles.cellDesc]}>
-                <Text style={styles.columnHead}>DESCRIPTION</Text>
-              </View>
-              <View style={[styles.cell, styles.cellAmount]}>
-                <Text style={styles.columnHead}>AMOUNT</Text>
-              </View>
-            </View>
-
-            {lines.map((line) => (
-              <View key={line.key} style={styles.tableRow}>
-                <View style={[styles.cell, styles.cellDesc]}>
-                  <Text style={styles.lineText}>{line.description}</Text>
-                </View>
-                <View style={[styles.cell, styles.cellAmount]}>
-                  <Text style={styles.lineAmount}>{formatAmount(line.amount)}</Text>
-                </View>
-              </View>
-            ))}
-
-            <View style={[styles.tableRow, styles.tableRowLast, styles.totalRow]}>
-              <View style={[styles.cell, styles.cellDesc]}>
-                <Text style={styles.totalText}>TOTAL</Text>
-              </View>
-              <View style={[styles.cell, styles.cellAmount]}>
-                <Text style={styles.totalAmount}>{formatAmount(total)}</Text>
-              </View>
-            </View>
-          </View>
-
-          {monthly && lines.some((line) => line.apportioned) ? (
-            <Text style={styles.tableNote}>
-              Amounts shown are each fee's share of the period{monthly.arrears.length ? 's' : ''}
-              {' '}covered.
+    <Page size={isMonthly ? 'A6' : 'A4'} style={styles.page}>
+      <View style={styles.frame}>
+        {/* Letterhead */}
+        <View style={styles.header}>
+          {logoUrl ? <Image src={logoUrl} style={styles.headerLogo} /> : null}
+          <View style={styles.headerText}>
+            {institutionName ? (
+              <Text style={styles.institutionTitle}>{institutionName}</Text>
+            ) : null}
+            {institutionAddress ? (
+              <Text style={styles.institutionMeta}>{institutionAddress}</Text>
+            ) : null}
+            <Text style={styles.institutionMeta}>
+              A.Y. {academic_year}
+              {monthly ? ` - For ${describeCoveredPeriods(monthly)}` : ''}
             </Text>
-          ) : null}
+          </View>
+          {logoUrl ? <View style={styles.headerSpacer} /> : null}
+        </View>
 
-          {/* Cash-basis fees: shown for information, deliberately outside the total */}
-          {monthly && monthly.otherFees.length > 0 ? (
-            <View style={styles.otherFees}>
-              <Text style={styles.otherFeesTitle}>OTHER FEES</Text>
-              <View style={styles.table}>
-                {monthly.otherFees.map((fee, index) => (
-                  <View
-                    key={`other-${fee.fee_id}`}
-                    style={[
-                      styles.tableRow,
-                      index === monthly.otherFees.length - 1 ? styles.tableRowLast : styles.tableRow,
-                    ]}
-                  >
-                    <View style={[styles.cell, styles.cellDesc]}>
-                      <Text style={styles.lineText}>{fee.fee_name}</Text>
-                    </View>
-                    <View style={[styles.cell, styles.cellAmount]}>
-                      <Text style={styles.lineAmount}>{formatAmount(fee.amount)}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-              <Text style={styles.otherFeesNote}>
-                Collected separately - not included in the TOTAL above. Outstanding:{' '}
-                {formatAmount(monthly.otherFeesOutstanding)}
-              </Text>
-            </View>
-          ) : null}
+        <Text style={styles.docTitle}>NOTICE OF ACCOUNT</Text>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerLine}>
-              Please settle your account on/before the Examination day which will be on
-              ______________________.
-            </Text>
-            <Text style={styles.noteLine}>
-              NOTE: Disregard this notice if payments have been made.
-            </Text>
-            <Text style={styles.noteIndent}>Kindly present this to the cashier when paying.</Text>
+        {/* Filled-in form fields */}
+        <View style={styles.infoRow}>
+          <View style={[styles.infoField, styles.infoFieldWide]}>
+            <Text style={styles.infoLabel}>Name:</Text>
+            <Text style={styles.infoValue}>{fullName}</Text>
+          </View>
+          <View style={[styles.infoField, styles.infoFieldNarrow]}>
+            <Text style={styles.infoLabel}>Student No.:</Text>
+            <Text style={styles.infoValue}>{student.lrn || ''}</Text>
           </View>
         </View>
-      </Page>
-    </Document>
+        <View style={styles.infoRow}>
+          <View style={[styles.infoField, styles.infoFieldWide]}>
+            <Text style={styles.infoLabel}>Grade/Level:</Text>
+            <Text style={styles.infoValue}>{grade_level || ''}</Text>
+          </View>
+          <View style={[styles.infoField, styles.infoFieldNarrow]}>
+            <Text style={styles.infoLabel}>Date:</Text>
+            <Text style={styles.infoValue}>{printedOn}</Text>
+          </View>
+        </View>
+
+        {/* What is being billed */}
+        <View style={styles.table}>
+          <View style={styles.tableRow}>
+            <View style={[styles.cell, styles.cellDesc]}>
+              <Text style={styles.columnHead}>DESCRIPTION</Text>
+            </View>
+            <View style={[styles.cell, styles.cellAmount]}>
+              <Text style={styles.columnHead}>AMOUNT</Text>
+            </View>
+          </View>
+
+          {lines.map((line) => (
+            <View key={line.key} style={styles.tableRow}>
+              <View style={[styles.cell, styles.cellDesc]}>
+                <Text style={styles.lineText}>{line.description}</Text>
+              </View>
+              <View style={[styles.cell, styles.cellAmount]}>
+                <Text style={styles.lineAmount}>{formatAmount(line.amount)}</Text>
+              </View>
+            </View>
+          ))}
+
+          <View style={[styles.tableRow, styles.tableRowLast, styles.totalRow]}>
+            <View style={[styles.cell, styles.cellDesc]}>
+              <Text style={styles.totalText}>TOTAL</Text>
+            </View>
+            <View style={[styles.cell, styles.cellAmount]}>
+              <Text style={styles.totalAmount}>{formatAmount(total)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {monthly && lines.some((line) => line.apportioned) ? (
+          <Text style={styles.tableNote}>
+            Amounts shown are each fee's share of the period{monthly.arrears.length ? 's' : ''}
+            {' '}covered.
+          </Text>
+        ) : null}
+
+        {/* Cash-basis fees: shown for information, deliberately outside the total */}
+        {monthly && monthly.otherFees.length > 0 ? (
+          <View style={styles.otherFees}>
+            <Text style={styles.otherFeesTitle}>OTHER FEES</Text>
+            <View style={styles.table}>
+              {monthly.otherFees.map((fee, index) => (
+                <View
+                  key={`other-${fee.fee_id}`}
+                  style={[
+                    styles.tableRow,
+                    index === monthly.otherFees.length - 1 ? styles.tableRowLast : styles.tableRow,
+                  ]}
+                >
+                  <View style={[styles.cell, styles.cellDesc]}>
+                    <Text style={styles.lineText}>{fee.fee_name}</Text>
+                  </View>
+                  <View style={[styles.cell, styles.cellAmount]}>
+                    <Text style={styles.lineAmount}>{formatAmount(fee.amount)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.otherFeesNote}>
+              Collected separately - not included in the TOTAL above. Outstanding:{' '}
+              {formatAmount(monthly.otherFeesOutstanding)}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerLine}>
+            Please settle your account on/before the Examination day which will be on
+            ______________________.
+          </Text>
+          <Text style={styles.noteLine}>
+            NOTE: Disregard this notice if payments have been made.
+          </Text>
+          <Text style={styles.noteIndent}>Kindly present this to the cashier when paying.</Text>
+        </View>
+      </View>
+    </Page>
   )
 }
+
+export const StudentNOAPDF: React.FC<StudentNOAPDFProps> = (props) => (
+  <Document>
+    <StudentNOAPage {...props} />
+  </Document>
+)

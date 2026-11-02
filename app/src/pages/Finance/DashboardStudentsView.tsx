@@ -15,6 +15,8 @@ import { studentFinanceService } from '../../services/studentFinanceService'
 import type { FinanceDashboardStudent, LedgerFeeBreakdown } from '../../types'
 import NoticeOfAccountModal from './NoticeOfAccountModal'
 import BillingStatementModal from './BillingStatementModal'
+import SectionDocumentsModal from './SectionDocumentsModal'
+import type { SectionDocument } from './SectionDocumentsModal'
 
 interface DashboardStudentsViewProps {
   academicYearOptions: { value: string; label: string }[]
@@ -57,6 +59,7 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
     studentId: string
     kind: StudentDocument
   } | null>(null)
+  const [sectionDocument, setSectionDocument] = useState<SectionDocument | null>(null)
 
   const studentsQuery = useQuery({
     queryKey: ['finance-dashboard', 'students', academicYear, gradeFilter, sectionFilter],
@@ -112,6 +115,8 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
     ],
     [sections, gradeFilter]
   )
+
+  const selectedSection = sections.find((section) => section.id === sectionFilter)
 
   // A section filter left over from another grade level would show an empty list, so the
   // grade level clears it whenever the two no longer agree.
@@ -185,16 +190,39 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
             see the fees charged to them.
           </p>
         </div>
-        <div className="w-full lg:w-64">
-          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-            Academic year
-          </label>
-          <Select
-            value={academicYear}
-            onChange={(event) => setAcademicYear(event.target.value)}
-            options={academicYearOptions}
-            className="w-full"
-          />
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+          <div className="w-full lg:w-64">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+              Academic year
+            </label>
+            <Select
+              value={academicYear}
+              onChange={(event) => setAcademicYear(event.target.value)}
+              options={academicYearOptions}
+              className="w-full"
+            />
+          </div>
+          {/* Prints the whole section at once. Only offered once a section is chosen — the
+              list is then exactly that section's students. */}
+          {(
+            [
+              ['noa', 'Generate Section NOA', DocumentTextIcon],
+              ['billing-statement', 'Generate Section Billing Statement', DocumentCurrencyDollarIcon],
+            ] as const
+          ).map(([kind, label, Icon]) => (
+            <Button
+              key={kind}
+              type="button"
+              variant="outline"
+              className="whitespace-nowrap"
+              disabled={!selectedSection || !students.length || studentsQuery.isFetching}
+              title={selectedSection ? undefined : 'Choose a section first'}
+              onClick={() => setSectionDocument(kind)}
+            >
+              <Icon className="h-4 w-4 mr-1.5" />
+              {label}
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -496,6 +524,20 @@ const DashboardStudentsView: React.FC<DashboardStudentsViewProps> = ({
           logoUrl={logoUrl}
           defaultPreparedBy={defaultPreparedBy}
           onClose={() => setDocumentRequest(null)}
+        />
+      )}
+
+      {sectionDocument && selectedSection && (
+        <SectionDocumentsModal
+          kind={sectionDocument}
+          sectionName={`${selectedSection.grade_level} — ${selectedSection.title}`}
+          students={students}
+          academicYear={academicYear}
+          institutionName={institutionName}
+          institutionAddress={institutionAddress}
+          logoUrl={logoUrl}
+          defaultPreparedBy={defaultPreparedBy}
+          onClose={() => setSectionDocument(null)}
         />
       )}
 

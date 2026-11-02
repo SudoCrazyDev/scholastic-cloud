@@ -217,7 +217,8 @@ interface StatementRow {
   highlight?: boolean
 }
 
-export const StudentBillingStatementPDF: React.FC<StudentBillingStatementPDFProps> = ({
+// One student's statement as a single page, so a section's statements can share one document.
+export const StudentBillingStatementPage: React.FC<StudentBillingStatementPDFProps> = ({
   data,
   institutionName,
   institutionAddress,
@@ -274,123 +275,127 @@ export const StudentBillingStatementPDF: React.FC<StudentBillingStatementPDFProp
   const lateFeePercentage = Number(monthly?.selected.late_fee_percentage || 0)
 
   return (
-    <Document>
-      <Page size="A5" style={styles.page}>
-        <View style={styles.frame}>
-          <View style={styles.header}>
-            {logoUrl ? <Image src={logoUrl} style={styles.headerLogo} /> : null}
-            <View style={styles.headerText}>
-              {institutionName ? (
-                <Text style={styles.institutionTitle}>{institutionName}</Text>
-              ) : null}
-              {institutionAddress ? (
-                <Text style={styles.institutionMeta}>{institutionAddress}</Text>
-              ) : null}
-              <Text style={styles.institutionMeta}>S.Y. {academic_year}</Text>
+    <Page size="A5" style={styles.page}>
+      <View style={styles.frame}>
+        <View style={styles.header}>
+          {logoUrl ? <Image src={logoUrl} style={styles.headerLogo} /> : null}
+          <View style={styles.headerText}>
+            {institutionName ? (
+              <Text style={styles.institutionTitle}>{institutionName}</Text>
+            ) : null}
+            {institutionAddress ? (
+              <Text style={styles.institutionMeta}>{institutionAddress}</Text>
+            ) : null}
+            <Text style={styles.institutionMeta}>S.Y. {academic_year}</Text>
+          </View>
+          {logoUrl ? <View style={styles.headerSpacer} /> : null}
+        </View>
+
+        <Text style={styles.docTitle}>BILLING STATEMENT</Text>
+        <Text style={styles.docDate}>
+          DATE:{' '}
+          {new Date()
+            .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            .toUpperCase()}
+        </Text>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.infoName}>Name: {fullName}</Text>
+          <Text style={styles.infoGrade}>Grade/Level: {(grade_level || '').toUpperCase()}</Text>
+        </View>
+
+        <View style={styles.table}>
+          <View style={styles.row}>
+            <View style={[styles.cell, styles.colDate]}>
+              <Text style={styles.head}>Date</Text>
             </View>
-            {logoUrl ? <View style={styles.headerSpacer} /> : null}
+            <View style={[styles.cell, styles.colParticulars]}>
+              <Text style={styles.head}>Particulars</Text>
+            </View>
+            <View style={[styles.cell, styles.colOr]}>
+              <Text style={styles.head}>OR No</Text>
+            </View>
+            <View style={[styles.cell, styles.cellLast, styles.colTotal]}>
+              <Text style={styles.head}>Total</Text>
+            </View>
           </View>
 
-          <Text style={styles.docTitle}>BILLING STATEMENT</Text>
-          <Text style={styles.docDate}>
-            DATE:{' '}
-            {new Date()
-              .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-              .toUpperCase()}
-          </Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoName}>Name: {fullName}</Text>
-            <Text style={styles.infoGrade}>Grade/Level: {(grade_level || '').toUpperCase()}</Text>
-          </View>
-
-          <View style={styles.table}>
-            <View style={styles.row}>
+          {rows.map((row, index) => (
+            <View
+              key={row.key}
+              style={[
+                styles.row,
+                ...(row.highlight ? [styles.rowHighlight] : []),
+                ...(index === rows.length - 1 ? [styles.rowLast] : []),
+              ]}
+            >
               <View style={[styles.cell, styles.colDate]}>
-                <Text style={styles.head}>Date</Text>
+                <Text style={styles.center}>{row.date ?? ''}</Text>
               </View>
               <View style={[styles.cell, styles.colParticulars]}>
-                <Text style={styles.head}>Particulars</Text>
+                <Text style={[styles.center, styles.bold]}>{row.particulars}</Text>
               </View>
               <View style={[styles.cell, styles.colOr]}>
-                <Text style={styles.head}>OR No</Text>
+                <Text style={styles.center}>{row.orNumber ?? ''}</Text>
               </View>
               <View style={[styles.cell, styles.cellLast, styles.colTotal]}>
-                <Text style={styles.head}>Total</Text>
+                <Text style={styles.amount}>{row.total}</Text>
               </View>
             </View>
+          ))}
+        </View>
 
-            {rows.map((row, index) => (
-              <View
-                key={row.key}
-                style={[
-                  styles.row,
-                  ...(row.highlight ? [styles.rowHighlight] : []),
-                  ...(index === rows.length - 1 ? [styles.rowLast] : []),
-                ]}
-              >
-                <View style={[styles.cell, styles.colDate]}>
-                  <Text style={styles.center}>{row.date ?? ''}</Text>
-                </View>
-                <View style={[styles.cell, styles.colParticulars]}>
-                  <Text style={[styles.center, styles.bold]}>{row.particulars}</Text>
-                </View>
-                <View style={[styles.cell, styles.colOr]}>
-                  <Text style={styles.center}>{row.orNumber ?? ''}</Text>
-                </View>
-                <View style={[styles.cell, styles.cellLast, styles.colTotal]}>
-                  <Text style={styles.amount}>{row.total}</Text>
-                </View>
-              </View>
-            ))}
+        <View style={styles.summary}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>TOTAL AMOUNT PAID</Text>
+            <Text style={styles.summaryValue}>{formatAmount(statement.totalPaid)}</Text>
           </View>
-
-          <View style={styles.summary}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>TOTAL AMOUNT PAID</Text>
-              <Text style={styles.summaryValue}>{formatAmount(statement.totalPaid)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>BALANCE FOR S.Y. {academic_year}</Text>
-              <Text style={styles.summaryValue}>{formatSigned(statement.balance)}</Text>
-            </View>
-            <View style={[styles.summaryRow, styles.rowHighlight, styles.rowLast]}>
-              <Text style={[styles.summaryLabel, styles.dueLabel]}>{dueLabel}</Text>
-              <Text style={[styles.summaryValue, styles.dueValue]}>
-                PHP {formatAmount(statement.amountDue)}
-              </Text>
-            </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>BALANCE FOR S.Y. {academic_year}</Text>
+            <Text style={styles.summaryValue}>{formatSigned(statement.balance)}</Text>
           </View>
-
-          <View style={styles.notes}>
-            {dueDate ? (
-              <View style={styles.noteRow}>
-                <Text style={styles.noteCenter}>
-                  PLEASE SETTLE YOUR PAYMENT ON OR BEFORE {dueDate.toUpperCase()}
-                </Text>
-              </View>
-            ) : null}
-            {preparedBy ? (
-              <View style={styles.noteRow}>
-                <Text style={styles.noteCenter}>Prepared by: {preparedBy}</Text>
-              </View>
-            ) : null}
-            {lateFeePercentage > 0 ? (
-              <View style={styles.noteRow}>
-                <Text style={styles.noteSmall}>
-                  "A LATE PAYMENT FEE of {lateFeePercentage}% shall be charged if installment
-                  payments are not paid/settled on or before the specific due dates."
-                </Text>
-              </View>
-            ) : null}
-            <View style={[styles.noteRow, styles.noteRowLast]}>
-              <Text style={styles.noteLeft}>
-                KINDLY DISREGARD THIS NOTICE IF PAYMENT HAS ALREADY BEEN MADE
-              </Text>
-            </View>
+          <View style={[styles.summaryRow, styles.rowHighlight, styles.rowLast]}>
+            <Text style={[styles.summaryLabel, styles.dueLabel]}>{dueLabel}</Text>
+            <Text style={[styles.summaryValue, styles.dueValue]}>
+              PHP {formatAmount(statement.amountDue)}
+            </Text>
           </View>
         </View>
-      </Page>
-    </Document>
+
+        <View style={styles.notes}>
+          {dueDate ? (
+            <View style={styles.noteRow}>
+              <Text style={styles.noteCenter}>
+                PLEASE SETTLE YOUR PAYMENT ON OR BEFORE {dueDate.toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
+          {preparedBy ? (
+            <View style={styles.noteRow}>
+              <Text style={styles.noteCenter}>Prepared by: {preparedBy}</Text>
+            </View>
+          ) : null}
+          {lateFeePercentage > 0 ? (
+            <View style={styles.noteRow}>
+              <Text style={styles.noteSmall}>
+                "A LATE PAYMENT FEE of {lateFeePercentage}% shall be charged if installment
+                payments are not paid/settled on or before the specific due dates."
+              </Text>
+            </View>
+          ) : null}
+          <View style={[styles.noteRow, styles.noteRowLast]}>
+            <Text style={styles.noteLeft}>
+              KINDLY DISREGARD THIS NOTICE IF PAYMENT HAS ALREADY BEEN MADE
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Page>
   )
 }
+
+export const StudentBillingStatementPDF: React.FC<StudentBillingStatementPDFProps> = (props) => (
+  <Document>
+    <StudentBillingStatementPage {...props} />
+  </Document>
+)
