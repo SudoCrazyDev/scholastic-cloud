@@ -69,6 +69,118 @@ loop_pids() { pgrep -u "$(id -u)" -f 'bash [^ ]*kiosk\.sh( run.*)?$'; }
 # Matching on the kiosk profile leaves any ordinary Chromium window alone.
 browser_pids() { pgrep -u "$(id -u)" -f -- "--user-data-dir=$KIOSK_PROFILE( |\$)"; }
 
+# ── Mend Local Storage after a power cut ────────────────────────────────────
+# Chromium keeps Local Storage — where a gate keeps its pairing token — in a
+# LevelDB log it never fsyncs. Pull the plug at the wrong moment and part of
+# that log comes back as zeros; on the next start LevelDB stops reading at the
+# hole, silently, and every write after it is appended past the hole and lost
+# on the start after that. The gate pairs, works, and asks for a code again on
+# every reboot, for good.
+#
+# Every record carries its own CRC, so the intact ones on either side of the
+# hole can be found and written back as a clean log. Only runs while Chromium
+# is closed; the damaged original is kept under $LOG_DIR/storage-repairs.
+repair_local_storage() {
+  local dir="$KIOSK_PROFILE/Default/Local Storage/leveldb" log out
+  command -v python3 >/dev/null 2>&1 || return 0
+  [ -d "$dir" ] || return 0
+  [ -z "$(browser_pids)" ] || return 0
+
+  for log in "$dir"/*.log; do
+    [ -f "$log" ] || continue
+    if ! out=$(python3 - "$log" "$LOG_DIR/storage-repairs" <<'PY' 2>&1
+import os, shutil, struct, sys, time
+
+BLOCK = 32768
+TABLE = []
+for n in range(256):
+    c = n
+    for _ in range(8):
+        c = (c >> 1) ^ 0x82F63B78 if c & 1 else c >> 1
+    TABLE.append(c)
+
+def crc32c(data):
+    c = 0xFFFFFFFF
+    for b in data:
+        c = TABLE[(c ^ b) & 0xFF] ^ (c >> 8)
+    return c ^ 0xFFFFFFFF
+
+def mask(c):
+    return ((((c >> 15) | (c << 17)) & 0xFFFFFFFF) + 0xA282EAD8) & 0xFFFFFFFF
+
+path, backup_dir = sys.argv[1], sys.argv[2]
+data = open(path, "rb").read()
+
+# Scan byte by byte for headers whose CRC checks out, reassembling records
+# that LevelDB split across blocks. Anything else is damage, except the
+# zero trailer LevelDB itself leaves in the last <7 bytes of a block.
+records, pending, damaged, i = [], None, False, 0
+while i < len(data):
+    if BLOCK - i % BLOCK < 7:
+        damaged |= any(data[i:i + BLOCK - i % BLOCK])
+        i += BLOCK - i % BLOCK
+        continue
+    head = data[i:i + 7]
+    ok = len(head) == 7
+    if ok:
+        crc, length, kind = struct.unpack("<IHB", head)
+        body = data[i + 7:i + 7 + length]
+        ok = kind in (1, 2, 3, 4) and len(body) == length and mask(crc32c(bytes([kind]) + body)) == crc
+    if not ok:
+        damaged = True
+        i += 1
+        continue
+    if kind == 1:
+        records.append(body)
+        pending = None
+    elif kind == 2:
+        pending = body
+    elif pending is not None:
+        pending += body
+        if kind == 4:
+            records.append(pending)
+            pending = None
+    i += 7 + length
+
+if not damaged:
+    sys.exit(0)
+
+out, pos = bytearray(), 0
+for record in records:
+    first = True
+    while True:
+        left = BLOCK - pos % BLOCK
+        if left < 7:
+            out += b"\0" * left
+            pos += left
+            left = BLOCK
+        chunk = record[:left - 7]
+        record = record[len(chunk):]
+        kind = (1 if first else 4) if not record else (2 if first else 3)
+        out += struct.pack("<IHB", mask(crc32c(bytes([kind]) + chunk)), len(chunk), kind) + chunk
+        pos += 7 + len(chunk)
+        first = False
+        if not record:
+            break
+
+os.makedirs(backup_dir, exist_ok=True)
+shutil.copy2(path, os.path.join(backup_dir, time.strftime("%Y%m%d-%H%M%S-") + os.path.basename(path)))
+with open(path + ".repair", "wb") as f:
+    f.write(out)
+    f.flush()
+    os.fsync(f.fileno())
+os.replace(path + ".repair", path)
+print(f"kept {len(records)} records, {len(out)} of {len(data)} bytes")
+PY
+    ); then
+      say "could not check Local Storage ($log): $out"
+    elif [ -n "$out" ]; then
+      say "repaired Local Storage after a power cut ($log): $out"
+    fi
+  done
+  sync
+}
+
 # ── Run, and put it back if it dies ─────────────────────────────────────────
 run_kiosk() {
   if [ "${1:-}" = "--no-wait" ]; then
@@ -171,6 +283,7 @@ run_kiosk() {
       sed -i 's/"exit_type":"[^"]*"/"exit_type":"Normal"/; s/"exited_cleanly":false/"exited_cleanly":true/' \
         "$prefs" 2>/dev/null || true
     fi
+    repair_local_storage
 
     # 9>&- so Chromium doesn't inherit the lock and hold it after we're gone.
     "$CHROMIUM" "${flags[@]}" "$KIOSK_URL" >>"$LOG_FILE" 2>&1 9>&-

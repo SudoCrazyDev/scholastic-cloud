@@ -144,6 +144,13 @@ tail -f ~/.local/state/kiosk.log    # Chromium's own output
 - A hard power-off makes Chromium think it crashed and show a *"restore pages?"*
   bar over the kiosk. `kiosk.sh` clears that flag from the profile before each
   start.
+- A hard power-off can also leave a hole of zeros in Chromium's Local Storage
+  log, after which a gate loses its pairing on every restart — it pairs, works,
+  and asks for a code again after the next reboot. `kiosk.sh` checks that log
+  before each start and rewrites it from the records whose checksums still
+  hold, keeping the damaged original under `~/.local/state/storage-repairs`.
+  A repair is logged: `journalctl -t kiosk | grep repaired`. Under-voltage
+  (`vcgencmd get_throttled` not `0x0`) makes these power-offs far more likely.
 - `KIOSK_ALLOW_CAMERA=1` grants the camera to whatever page is loaded with no
   prompt. That's fine on a locked-down kiosk pointed at one URL; don't set it on
   a device anyone can browse from.
