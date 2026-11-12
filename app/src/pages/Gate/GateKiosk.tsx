@@ -142,6 +142,12 @@ const GateKiosk: React.FC<GateKioskProps> = ({ type, deviceName, sync }) => {
         scannedAt: correctedNow(),
         status: 'pending',
       });
+    } else if (!local && scanSeq.current === seq) {
+      // The previous student's card stays up until the next tap, so a tap the
+      // roster cannot name has to take it down at once — otherwise their name
+      // and photo would greet this student while the upload is in flight.
+      releasePhoto();
+      setResult(null);
     }
 
     // Returns once the scan is durable, saying whether it also got through.
