@@ -3288,7 +3288,8 @@ const Finance: React.FC = () => {
                               key: string,
                               label: string,
                               items: { entry: StudentLedgerEntry }[],
-                              level: 0 | 1 | 2
+                              level: 0 | 1 | 2,
+                              remarks: string[] = []
                             ) => (
                               <tr
                                 key={key}
@@ -3310,6 +3311,12 @@ const Finance: React.FC = () => {
                                   <span className="ml-2 font-normal normal-case text-gray-400">
                                     ({items.length} {items.length === 1 ? 'entry' : 'entries'})
                                   </span>
+                                  {remarks.length > 0 && (
+                                    <p className="mt-0.5 font-normal normal-case text-gray-500 whitespace-pre-line">
+                                      <span className="font-medium text-gray-600">Remarks:</span>{' '}
+                                      {remarks.join(' · ')}
+                                    </p>
+                                  )}
                                 </td>
                                 <td
                                   className={`px-4 py-2 text-right tabular-nums ${
@@ -3436,7 +3443,19 @@ const Finance: React.FC = () => {
                                       `or-${typeGroup.key}-${orGroup.key}`,
                                       orGroup.label,
                                       orGroup.entries,
-                                      1
+                                      1,
+                                      // The cashier's remark from the payment summary, copied onto
+                                      // every line of the receipt. Entries without an OR number are
+                                      // unrelated to one another, so their remarks are not pooled.
+                                      orGroup.key
+                                        ? [
+                                            ...new Set(
+                                              orGroup.entries
+                                                .map(({ entry }) => entry.remarks?.trim() ?? '')
+                                                .filter(Boolean)
+                                            ),
+                                          ]
+                                        : []
                                     )}
                                     {orGroup.children.map((dateGroup) => (
                                       <React.Fragment key={dateGroup.key}>

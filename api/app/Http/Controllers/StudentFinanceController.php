@@ -400,6 +400,7 @@ class StudentFinanceController extends Controller
                 'or_number' => $payment->or_number,
                 'receipt_number' => $payment->receipt_number,
                 'reference_number' => $payment->reference_number,
+                'remarks' => $payment->remarks,
                 'payment_id' => $payment->id,
                 'fee_id' => $payment->school_fee_id ?? $payment->student_additional_fee_id,
                 'fee_name' => $feeName,

@@ -487,6 +487,7 @@ export interface StudentLedgerEntry {
   or_number?: string | null;
   receipt_number?: string;
   reference_number?: string;
+  remarks?: string | null;
   payment_id?: string;
   discount_id?: string;
   discount_type?: 'fixed' | 'percentage';
